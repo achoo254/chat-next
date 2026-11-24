@@ -35,7 +35,7 @@ type Config struct {
 	LeaseTTL time.Duration
 	// PageSize is how many messages one history call asks for.
 	PageSize int
-	// PageDelay is the pause between two history calls (default 300 ms), so
+	// PageDelay is the pause between two history calls (default 1 s), so
 	// a large window does not look like a scraper to the other app.
 	PageDelay time.Duration
 	// BatchSize is how many messages one Chat transaction imports.
@@ -89,7 +89,7 @@ func (c Config) withDefaults() Config {
 		c.PageSize = 100
 	}
 	if c.PageDelay == 0 {
-		c.PageDelay = 300 * time.Millisecond
+		c.PageDelay = time.Second
 	}
 	if c.BatchSize <= 0 {
 		c.BatchSize = 200
@@ -183,6 +183,8 @@ type runner struct {
 	refusedUntil map[string]time.Time
 	// turn is where each look that reads conversation by conversation goes on next time.
 	turn map[string]int
+	// floodUntil is when the wait the other app last asked for ends (see holdFlood).
+	floodUntil time.Time
 }
 
 // run connects the account and syncs until ctx ends or something fails.
@@ -231,13 +233,13 @@ func (r *runner) run(ctx context.Context) error {
 		// does not hold up what arrives meanwhile.
 		r.pending = append(r.pending, l)
 	}
-	if err := r.skipRefused(r.syncConversations(runCtx), "sync", ""); err != nil {
+	if err := r.skipBusy(r.syncConversations(runCtx), "sync", ""); err != nil {
 		return r.settle(runCtx, err)
 	}
 	// A chat synced before pins were read gets them now; a chat that was just
 	// imported got them at the end of its backfill.
 	for _, l := range caughtUp {
-		if err := r.skipRefused(r.syncPins(runCtx, l), "pins", l.ExternalChat); err != nil {
+		if err := r.skipBusy(r.syncPins(runCtx, l), "pins", l.ExternalChat); err != nil {
 			return r.settle(runCtx, err)
 		}
 	}
@@ -247,7 +249,7 @@ func (r *runner) run(ctx context.Context) error {
 	defer imports.Stop()
 	states := time.NewTicker(e.cfg.StatePoll)
 	defer states.Stop()
-	if err := r.skipRefused(r.pollAll(runCtx), "sync", ""); err != nil {
+	if err := r.skipBusy(r.pollAll(runCtx), "sync", ""); err != nil {
 		return r.settle(runCtx, err)
 	}
 	for {
@@ -259,25 +261,31 @@ func (r *runner) run(ctx context.Context) error {
 				return r.settle(runCtx, err)
 			}
 		case <-states.C:
-			if err := r.skipRefused(r.pollAll(runCtx), "sync", ""); err != nil {
+			if r.floodHeld() {
+				continue
+			}
+			if err := r.skipBusy(r.pollAll(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 			r.conversationsTick++
 			if r.conversationsTick%conversationsEvery == 0 || r.relist {
 				r.relist = false
-				if err := r.skipRefused(r.syncConversations(runCtx), "sync", ""); err != nil {
+				if err := r.skipBusy(r.syncConversations(runCtx), "sync", ""); err != nil {
 					return r.settle(runCtx, err)
 				}
 			}
 		case <-imports.C:
-			if err := r.skipRefused(r.importNext(runCtx), "sync", ""); err != nil {
+			if r.floodHeld() {
+				continue
+			}
+			if err := r.skipBusy(r.importNext(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case <-r.syncNow:
 			if err := r.reloadSyncState(runCtx); err != nil {
 				return r.settle(runCtx, err)
 			}
-			if err := r.skipRefused(r.syncConversations(runCtx), "sync", ""); err != nil {
+			if err := r.skipBusy(r.syncConversations(runCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case err := <-subDone:
@@ -470,6 +478,11 @@ func retryRateLimit[T any](ctx context.Context, call func() (T, error)) (T, erro
 		v, err := call()
 		var limit *bridge.RateLimitError
 		if !errors.As(err, &limit) {
+			return v, err
+		}
+		if limit.RetryAfter > maxInlineWait {
+			// Sleeping here would hold the run's only loop (live events, sends from Chat, the
+			// other reads) for as long as the other app asks; the caller defers instead.
 			return v, err
 		}
 		// A long wait is said, or the sync looks stuck while it waits.

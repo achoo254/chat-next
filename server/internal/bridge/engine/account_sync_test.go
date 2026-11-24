@@ -2,6 +2,8 @@ package engine_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -277,5 +279,47 @@ func TestAnAppThatCannotBeWrittenToNeverRaisesAChat(t *testing.T) {
 	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
 	if got := e.directionOf("g1"); got != "in" {
 		t.Fatalf("direction = %q, want in", got)
+	}
+}
+
+func TestALongWaitFromTheOtherAppDoesNotHoldUpLiveEventsAndTheImportResumesAfterIt(t *testing.T) {
+	t.Cleanup(engine.SetMaxInlineWait(20 * time.Millisecond)) // first cleanup: runs after the engine stopped
+	e := newEnv(t)
+	ctx := context.Background()
+	e.group("g0")
+	e.fake.AddHistory("g0", e.msg("a1", lan, "một", 1))
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.syncState() == engine.SyncLive }, func() string { return "state " + e.syncState() })
+	g0 := e.chatOf("g0")
+
+	// a conversation that appears now is asked for its history, and the other app says to wait
+	const wait = 1500 * time.Millisecond
+	e.group("g1")
+	e.fake.AddHistory("g1", bridge.Message{Conversation: "g1", ID: "b1", From: lan, Text: "mới", Date: e.at(5), Version: 1})
+	e.fake.FailBackfill(&bridge.RateLimitError{RetryAfter: wait})
+	asked := time.Now()
+	first := bridge.Message{Conversation: "g1", ID: "b2", From: minh, Text: "kích", Date: e.at(6), Version: 1}
+	e.fake.Push(bridge.Event{Message: &first})
+	time.Sleep(300 * time.Millisecond)
+
+	// while the wait runs, a live message of an imported chat still arrives
+	live := e.msg("a2", lan, "hai", 2)
+	live.Conversation = "g0"
+	e.fake.Push(bridge.Event{Message: &live})
+	e.waitTexts(g0, []string{"một", "hai"})
+	if g1 := e.chatOf("g1"); g1 != 0 && e.backfillDone(g1) {
+		t.Fatal("the import of g1 finished inside the wait: the loop was held, or the wait was not kept")
+	}
+
+	// and the import goes on once the wait is over, not before
+	e.eventually(func() bool { g1 := e.chatOf("g1"); return g1 != 0 && e.backfillDone(g1) }, func() string { return "g1 never imported" })
+	if took := time.Since(asked); took < wait-200*time.Millisecond {
+		t.Fatalf("g1 was imported after %v, before the %v wait was over", took, wait)
+	}
+	if got := fmt.Sprint(e.texts(e.chatOf("g1"))); !strings.Contains(got, "mới") {
+		t.Fatalf("g1 texts = %s, want the imported history in it", got)
 	}
 }
