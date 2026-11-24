@@ -236,8 +236,8 @@ export interface WorkspaceLabel {
 	readonly byBranch: boolean;
 	/** The line under it: the folder when the title is the branch; "" otherwise. */
 	readonly sub: string;
-	/** The main checkout (not a git worktree), marked when the project has several workspaces. */
-	readonly primary: boolean;
+	/** The branch as a chip beside the title, whenever the title is not already the branch; "" without one. */
+	readonly branch: string;
 }
 
 /** The last two parts of a path ("/Users/me/code/app" → "code/app"). */
@@ -268,14 +268,11 @@ function shownFolder(w: AgentWorkspace, nodes: readonly Pick<WorkspaceNode, "wor
  * folder under it (unless it is the project's name); the folder when there is no branch or two workspaces
  * share it. A title equal to the project's name says more (the folder, or
  * the folder with its parent), since the project row above already says it.
- * The primary badge marks the main checkout: the oldest workspace that is
- * not a git worktree, only when the project has more than one.
+ * Every workspace on a branch says it once: as its title, else as the
+ * branch chip beside it, so two rows on "main" both read "main".
  */
 export function workspaceLabels(projectName: string, nodes: readonly Pick<WorkspaceNode, "workspace" | "branch">[]): Map<number, WorkspaceLabel> {
 	const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-	const main = nodes
-		.filter((n) => n.workspace.kind !== AgentWorkspaceKind.WORKTREE)
-		.sort((a, b) => a.workspace.createdAt - b.workspace.createdAt || a.workspace.id - b.workspace.id)[0];
 	const out = new Map<number, WorkspaceLabel>();
 	for (const n of nodes) {
 		const folder = shownFolder(n.workspace, nodes);
@@ -284,7 +281,7 @@ export function workspaceLabels(projectName: string, nodes: readonly Pick<Worksp
 		const title = byBranch ? n.branch : same(folder, projectName) ? pathTail(n.workspace.dir) : folder;
 		// The folder under the branch, unless it only says the project's name again.
 		const sub = byBranch && !same(folder, projectName) ? folder : "";
-		out.set(n.workspace.id, { title, byBranch, sub, primary: nodes.length > 1 && main === n });
+		out.set(n.workspace.id, { title, byBranch, sub, branch: byBranch ? "" : n.branch });
 	}
 	return out;
 }

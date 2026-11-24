@@ -1172,7 +1172,6 @@ export const enMachines: MachinesCopy = {
 			linkSave: "Save link",
 			unlinked: "The git repository is unlinked.",
 			split: "Move to a project of its own",
-			primary: "main",
 			remoteExists: "A project already links this repository.",
 			tooMany: "The limit of projects or workspaces is reached.",
 			saveFailed: "Could not save; try again later.",

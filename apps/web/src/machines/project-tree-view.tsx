@@ -252,7 +252,7 @@ function WorkspaceItem({ node, label, project, ctx }: { node: WorkspaceNode; lab
 					{/* A worktree, a git checkout or a plain folder, or its state in that place. */}
 						<StatusGlyph status={node.status} icon={workspaceIcon(node)} ai={node.ai} offline={node.offline} />
 						<b>{label.title}</b>
-						{label.primary && <span className="mx-ws-primary">{p.primary}</span>}
+						{label.branch !== "" && <span className="mx-ws-branch" title={label.branch}>{label.branch}</span>}
 						<HostChip name={machineName} offline={!online} />
 							{!open && <span className="mx-ws-count" aria-label={p.sessions(node.threads.length)}>{node.threads.length}</span>}
 						</span>
@@ -387,7 +387,7 @@ export function ProjectItem({ node, open, onToggle, ctx, place }: { node: Projec
 						</button>
 					</div>
 				) : (
-					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} label={labels.get(w.workspace.id) ?? { title: folderName(w.workspace.dir), byBranch: false, sub: "", primary: false }} project={project} ctx={ctx} />)
+					node.workspaces.map((w) => <WorkspaceItem key={w.workspace.id} node={w} label={labels.get(w.workspace.id) ?? { title: folderName(w.workspace.dir), byBranch: false, sub: "", branch: "" }} project={project} ctx={ctx} />)
 				))}
 			{bar}
 			<Suspense fallback={null}>
