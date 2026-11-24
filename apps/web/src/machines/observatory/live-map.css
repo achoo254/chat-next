@@ -7,7 +7,8 @@
 .lm-strip-core[data-core="waiting_permission"], .lm-strip-core[data-core="compacting"] { color: var(--c-warning-text); }
 .lm-strip-core[data-core="failed"] { color: var(--c-error-text); }
 .lm-toggle { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: auto; color: var(--c-text); cursor: pointer; }
-.lm-frame { position: relative; flex: 1 1 auto; min-height: min(70dvh, 75vw); overflow: hidden; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); touch-action: none; user-select: none; }
+/* The frame has the plate's own proportions (--lm-ratio, set from the scene) and is as wide as the room allows up to 78dvh tall, so the plate fills it with no empty bars. */
+.lm-frame { position: relative; align-self: center; width: min(100%, calc(78dvh * var(--lm-ratio, 1.33))); aspect-ratio: var(--lm-ratio, 1.33); overflow: hidden; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); touch-action: none; user-select: none; }
 .lm-world { position: absolute; inset: 0; transform-origin: 0 0; }
 .lm-plate { position: absolute; display: block; pointer-events: none; }
 .lm-canvas-host, .lm-canvas-host > canvas { position: absolute; inset: 0; display: block; pointer-events: none; }

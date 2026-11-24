@@ -279,7 +279,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 			</div>
 			{/* Pointer gestures only zoom; every action is also a button reachable with Tab. */}
 			{/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
-			<div className="lm-frame" ref={setFrame} onClick={onClick} {...pinch}>
+			<div className="lm-frame" ref={setFrame} onClick={onClick} {...pinch} style={assets === null ? undefined : ({ "--lm-ratio": assets.scene.space.width / assets.scene.space.height } as CSSProperties)}>
 				<div className="lm-world" ref={world} style={worldStyle}>
 					{showPlate && plate !== null && assets !== null && <img className="lm-plate" src={assets.base + plate.file} alt="" style={plateStyle(fit, assets)} />}
 					<div className="lm-canvas-host" ref={host} />

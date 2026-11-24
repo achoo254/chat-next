@@ -383,6 +383,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 /* Chat */
 .mx-chat { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; max-width: 100%; overflow-x: clip; }
 .mx-chat-body { position: relative; display: flex; flex: 1; min-height: 0; }
+/* A body shown inside the chat row (the Observe map) takes the room beside the file panel instead of shrinking to its content. */
+.mx-chat-body > .mx-body { flex: 1 1 0; min-width: 0; overflow-y: auto; }
 .mx-chat-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; container-type: inline-size; }
 .mx-messages-wrap { position: relative; display: flex; flex: 1; min-height: 0; }
 .mx-messages { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
