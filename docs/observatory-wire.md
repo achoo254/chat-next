@@ -204,6 +204,7 @@ Trạng thái lõi (`ObservatoryCoreState`) theo sự kiện cuối có nói v�
 | `stop`, `notification` nhãn `idle_prompt` | `WAITING_USER` (kết thúc lượt) |
 | tool kết thúc với `error` = `interrupted` (người dùng bấm Esc/Ctrl+C; khi đó Claude Code không gửi `Stop`) | `WAITING_USER` (kết thúc lượt) |
 | `stop_failure` | `FAILED` (kết thúc lượt) |
+| đang `WAITING_USER` mà còn subagent đã bắt đầu, chưa dừng (`ended_at` = 0): Claude Code kết thúc lượt chính và chờ tác tử chạy nền | `THINKING` (việc vẫn tiếp diễn) |
 | không có sự kiện; phiên đã kết thúc (`ended_at` ≥ sự kiện cuối) | `IDLE` |
 
 - `running`: lời gọi tool chưa kết thúc (`success` chưa đặt) kể từ lúc lượt bắt đầu, theo trạm; lời gọi có `permission_denied` hay `hook_block` cùng

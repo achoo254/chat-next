@@ -326,10 +326,12 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 	}
 }
 
-/** The core's state, idle once the session ended after its last event (the machine's rule). */
+/** The core's state, idle once the session ended after its last event, thinking while a subagent still runs after the main turn stopped (the machine's rules). */
 export function coreOf(state: Pick<LiveMapState, "scene" | "info" | "newestAt">): CoreState {
 	const ended = state.info?.endedAt ?? 0;
-	return ended > 0 && ended >= state.newestAt ? "idle" : state.scene.core;
+	if (ended > 0 && ended >= state.newestAt) return "idle";
+	const { core, subagents } = state.scene;
+	return core === "waiting_user" && Object.values(subagents).some((s) => s.running) ? "thinking" : core;
 }
 
 /** The scene of `events` (ordered) on top of `base`. */

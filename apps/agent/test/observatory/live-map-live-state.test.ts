@@ -48,6 +48,15 @@ describe("the core's state", () => {
     expect(live([prompt(T), event("notification", T + 1, { label: "idle_prompt" })]).core).toBe("waiting_user");
   });
 
+  it("keeps thinking after the main turn stops while a subagent has started and not stopped, and waits for the user once it stopped", () => {
+    const sub = (id: string, at: number, endedAt?: number): TimelineEntry =>
+      entry({ kind: "subagent", row: { agentId: id, sessionId: S, startedAt: at, ...(endedAt === undefined ? {} : { endedAt }) } });
+    expect(live([prompt(T), sub("a1", T + 1), event("stop", T + 2)]).core).toBe("thinking");
+    expect(live([prompt(T), sub("a1", T + 1, T + 5), event("stop", T + 2)]).core).toBe("waiting_user");
+    // The session's end still wins.
+    expect(live([prompt(T), sub("a1", T + 1), event("stop", T + 2)], { endedAt: T + 9 }).core).toBe("idle");
+  });
+
   it("compacts and comes back to where it was; the session's end makes it idle", () => {
     expect(live([prompt(T), event("compact_start", T + 1)]).core).toBe("compacting");
     expect(live([prompt(T), event("compact_start", T + 1), event("compact_end", T + 2)]).core).toBe("thinking");

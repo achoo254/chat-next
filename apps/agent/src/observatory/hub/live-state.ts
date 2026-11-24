@@ -20,6 +20,9 @@
 //   user; stopped with a failure: failed;
 // - a tool call that ended interrupted: waiting for the user (the person
 //   stopped the turn with Esc or Ctrl+C, and Claude Code tells no Stop then);
+// - waiting for the user while a subagent started and not stopped yet runs
+//   (Claude Code stops the main turn and waits for the background agent):
+//   thinking, as the work goes on;
 // - no event, or the session ended after its last event: idle.
 import { TOOL_ERROR } from "../ingest/normalize-hook-record.ts";
 import type { Station } from "../live-map/station-map.ts";
@@ -69,6 +72,8 @@ export function liveStateOf(input: LiveInput): LiveState {
   let lastTimed: Extract<TimelineEntry, { kind: "apiRequest" }>["row"] | undefined;
   let largest = input.largestContext;
   let lastAt = 0;
+  /** Subagents that started and have not stopped. */
+  const runningSubagents = new Set<string>();
 
   const active = (): void => {
     core = "thinking";
@@ -84,8 +89,12 @@ export function liveStateOf(input: LiveInput): LiveState {
     lastAt = Math.max(lastAt, e.at);
     switch (e.kind) {
       case "prompt":
+        active();
+        break;
       case "subagent":
         active();
+        if (e.row.endedAt === null || e.row.endedAt === 0) runningSubagents.add(e.row.agentId);
+        else runningSubagents.delete(e.row.agentId);
         break;
       case "toolCall":
         active();
@@ -142,6 +151,7 @@ export function liveStateOf(input: LiveInput): LiveState {
         break;
     }
   }
+  if (core === "waiting_user" && runningSubagents.size > 0) core = "thinking";
   if (input.endedAt !== null && input.endedAt >= lastAt) endTurn("idle");
 
   const mainModel = lastApi?.model ?? input.mainModel ?? "";

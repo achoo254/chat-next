@@ -128,6 +128,14 @@ describe("the Live Map state", () => {
 		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), api("sub", 20, { agentId: "ag1" })])).toBe("waiting_user");
 	});
 
+	it("keeps thinking after the main turn stops while a subagent runs, and waits for the user once it ended", () => {
+		const running = live(start(), numbered([prompt(1, 0), subagent("ag1", 5), lifecycle("stop", "s1", 10)]));
+		expect(coreOf(running)).toBe("thinking");
+		const done = live(start(), numbered([prompt(1, 0), subagent("ag1", 5, 8), lifecycle("stop", "s1", 10)]));
+		expect(coreOf(done)).toBe("waiting_user");
+		expect(coreOf({ ...running, info: info({ endedAt: running.newestAt }) })).toBe("idle");
+	});
+
 	it("is idle once the session ended after its last event", () => {
 		const s = live(start(), numbered([prompt(1, 0), lifecycle("stop", "s1", 10)]));
 		expect(coreOf(s)).toBe("waiting_user");
