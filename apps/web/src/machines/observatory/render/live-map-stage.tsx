@@ -316,7 +316,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 							const batch = batches[tag.place];
 							const cls = ["lm-tag", tag.bottleneck !== "none" ? `is-${tag.bottleneck}` : "", selectedPlace === tag.place ? "is-selected" : "", tag.mine === true ? "is-mine" : ""].filter(Boolean).join(" ");
 							return (
-								<div key={`tag-${tag.place}`} className={cls} style={{ left: at.x, top: at.y }} data-id={`observe-tag-${tag.place}`} aria-hidden="true">
+								<div key={`tag-${tag.place}`} className={cls} style={{ left: `clamp(var(--lm-tag-half), ${at.x}px, calc(100% - var(--lm-tag-half)))`, top: `clamp(1.1rem, ${at.y}px, calc(100% - 5rem))` }} data-id={`observe-tag-${tag.place}`} aria-hidden="true">
 									<b>
 										{tag.bottleneck !== "none" && <span title={t.bottleneck}>⚠ </span>}
 										{tag.name}

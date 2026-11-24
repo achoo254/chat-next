@@ -16,7 +16,8 @@
 .lm-hit:hover { background: color-mix(in srgb, var(--c-primary) 12%, transparent); }
 .lm-hit:focus-visible { outline: none; background: color-mix(in srgb, var(--c-primary) 30%, transparent); }
 .lm-hit[aria-pressed="true"] { background: color-mix(in srgb, var(--c-primary) 20%, transparent); }
-.lm-tag { position: absolute; display: grid; justify-items: center; gap: 0; max-width: 220px; padding: var(--space-1) var(--space-2); transform: translate(-50%, -50%); border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 88%, transparent); box-shadow: var(--shadow-sm); font-size: 0.75rem; line-height: 1.3; text-align: center; pointer-events: none; }
+/* The tag's name row sits on its anchor and the facts grow downward, so a tag does not jump when its lines change; the position is held inside the frame so no tag is cut at an edge. */
+.lm-tag { position: absolute; display: grid; justify-items: center; gap: 0; --lm-tag-half: 110px; max-width: 220px; padding: var(--space-1) var(--space-2); transform: translate(-50%, -0.85rem); border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 88%, transparent); box-shadow: var(--shadow-sm); font-size: 0.75rem; line-height: 1.3; text-align: center; pointer-events: none; }
 .lm-tag b { font-weight: 600; color: var(--c-text); white-space: nowrap; }
 .lm-tag i { font-style: normal; color: var(--c-text-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lm-tag.is-warn { border-color: var(--c-warning); }
@@ -29,6 +30,6 @@
 .lm-note { margin: 0; }
 /* A phone: tags keep their names only. */
 @container (max-width: 600px) {
-	.lm-tag { max-width: 140px; padding: 0 var(--space-1); }
+	.lm-tag { --lm-tag-half: 70px; max-width: 140px; padding: 0 var(--space-1); }
 	.lm-tag i { display: none; }
 }
