@@ -136,6 +136,14 @@ describe("the Live Map state", () => {
 		expect(coreOf({ ...running, info: info({ endedAt: running.newestAt }) })).toBe("idle");
 	});
 
+	it("keeps thinking after the turn stops while a shell started in the background may still run, until a new turn or KillShell", () => {
+		const shell = (use: string, ms: number, over = {}) => tool(use, ms, { toolName: "Bash", station: "SANDBOX", stationFlags: 64, success: true, ...over });
+		expect(coreOf(live(start(), numbered([prompt(1, 0), shell("b1", 5), lifecycle("stop", "s1", 10)])))).toBe("thinking");
+		expect(coreOf(live(start(), numbered([prompt(1, 0), shell("b1", 5, { stationFlags: 0 }), lifecycle("stop", "s1", 10)])))).toBe("waiting_user");
+		expect(coreOf(live(start(), numbered([prompt(1, 0), shell("b1", 5), lifecycle("stop", "s1", 10), prompt(2, 20), lifecycle("stop", "s2", 30)])))).toBe("waiting_user");
+		expect(coreOf(live(start(), numbered([prompt(1, 0), shell("b1", 5), shell("k1", 6, { toolName: "KillShell", stationFlags: 0 }), lifecycle("stop", "s1", 10)])))).toBe("waiting_user");
+	});
+
 	it("is idle once the session ended after its last event", () => {
 		const s = live(start(), numbered([prompt(1, 0), lifecycle("stop", "s1", 10)]));
 		expect(coreOf(s)).toBe("waiting_user");

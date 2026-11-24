@@ -79,6 +79,8 @@ export interface LiveMapScene {
 	beforeCompact: CoreState;
 	/** Calls denied or blocked by a hook: they never ran. */
 	notRun: Set<string>;
+	/** Shell calls started in the background and not known to have ended (the machine's rule, docs/observatory-wire.md). */
+	backgroundShells: Set<string>;
 	/** The main agent's latest model; "" before any. */
 	model: string;
 	/** Output tokens per second of the main agent's latest API request; null when it gave no numbers. */
@@ -148,7 +150,7 @@ function perStation<T>(make: (code: StationCode) => T): Record<StationCode, T> {
 }
 
 export function emptyScene(): LiveMapScene {
-	return { core: "idle", inTurn: false, beforeCompact: "idle", notRun: new Set(), model: "", tokensPerSecond: null, stations: perStation(emptyStation), subagents: {}, mcp: {}, todo: null, bottlenecks: new Map() };
+	return { core: "idle", inTurn: false, beforeCompact: "idle", notRun: new Set(), backgroundShells: new Set(), model: "", tokensPerSecond: null, stations: perStation(emptyStation), subagents: {}, mcp: {}, todo: null, bottlenecks: new Map() };
 }
 
 function cloneScene(s: LiveMapScene): LiveMapScene {
@@ -160,7 +162,7 @@ function cloneScene(s: LiveMapScene): LiveMapScene {
 	for (const [id, sub] of Object.entries(s.subagents)) subagents[id] = { ...sub };
 	const mcp: Record<string, McpWireState> = {};
 	for (const [server, wire] of Object.entries(s.mcp)) mcp[server] = { ...wire };
-	return { ...s, stations, subagents, mcp, todo: s.todo === null ? null : { ...s.todo }, bottlenecks: new Map(s.bottlenecks), notRun: new Set(s.notRun) };
+	return { ...s, stations, subagents, mcp, todo: s.todo === null ? null : { ...s.todo }, bottlenecks: new Map(s.bottlenecks), notRun: new Set(s.notRun), backgroundShells: new Set(s.backgroundShells) };
 }
 
 /** (at, id) order: by time, then by id in code-unit order (the same on every device). */
@@ -192,6 +194,8 @@ function recomputeBottlenecks(d: LiveMapScene): void {
 const NOT_RUN = new Set(["permission_denied", "hook_block"]);
 /** The machine's label of a tool call the person interrupted (the turn ends with it). */
 const INTERRUPTED = "interrupted";
+/** `station_flags` bit of a shell call started with `run_in_background`. */
+const BACKGROUND_FLAG = 64;
 
 function active(d: LiveMapScene): void {
 	d.core = "thinking";
@@ -224,6 +228,8 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 		case "prompt":
 			active(d);
 			clearQueues(d);
+			// A new turn (the person's, or Claude Code's notice that a shell ended).
+			d.backgroundShells.clear();
 			return;
 		case "tool": {
 			active(d);
@@ -250,6 +256,8 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 					if (!e.success) wire.failures += 1;
 				}
 			}
+			if (e.toolName === "KillShell") d.backgroundShells.clear();
+			else if ((e.stationFlags & BACKGROUND_FLAG) !== 0 && e.success !== false && !d.notRun.has(e.toolUseId)) d.backgroundShells.add(e.toolUseId);
 			// The person stopped the turn (Esc, Ctrl+C): Claude Code tells no Stop, only this call's end.
 			if (e.error === INTERRUPTED) endTurn(d, "waiting_user");
 			return;
@@ -326,12 +334,12 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 	}
 }
 
-/** The core's state, idle once the session ended after its last event, thinking while a subagent still runs after the main turn stopped (the machine's rules). */
+/** The core's state, idle once the session ended after its last event, thinking while a subagent or a background shell may still run after the main turn stopped (the machine's rules). */
 export function coreOf(state: Pick<LiveMapState, "scene" | "info" | "newestAt">): CoreState {
 	const ended = state.info?.endedAt ?? 0;
 	if (ended > 0 && ended >= state.newestAt) return "idle";
-	const { core, subagents } = state.scene;
-	return core === "waiting_user" && Object.values(subagents).some((s) => s.running) ? "thinking" : core;
+	const { core, subagents, backgroundShells } = state.scene;
+	return core === "waiting_user" && (backgroundShells.size > 0 || Object.values(subagents).some((s) => s.running)) ? "thinking" : core;
 }
 
 /** The scene of `events` (ordered) on top of `base`. */

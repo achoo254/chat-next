@@ -70,6 +70,16 @@ describe("stationOf", () => {
   });
 });
 
+describe("a shell call started in the background", () => {
+  it("carries the background flag, whatever station its command is at", () => {
+    expect(stationOf("Bash", { command: "npm run dev", run_in_background: true })).toEqual({ station: "SANDBOX", flags: 64 });
+    expect(stationOf("PowerShell", { command: "pnpm test", run_in_background: true })).toEqual({ station: "TESTING", flags: 64 });
+    expect(stationOf("Bash", { command: "npm run dev", run_in_background: false })).toEqual({ station: "SANDBOX", flags: 0 });
+    // Reading or ending a shell is not starting one.
+    expect(stationOf("BashOutput", { run_in_background: true }).flags).toBe(0);
+  });
+});
+
 describe("a chained shell line", () => {
   it("keeps the flags of every command it chains", () => {
     expect(stationOf("Bash", { command: "git add -A && git commit -m x" })).toEqual({ station: "GIT", flags: commit });

@@ -57,6 +57,18 @@ describe("the core's state", () => {
     expect(live([prompt(T), sub("a1", T + 1), event("stop", T + 2)], { endedAt: T + 9 }).core).toBe("idle");
   });
 
+  it("keeps thinking after the turn stops while a shell started in the background may still run, until a new turn or KillShell", () => {
+    const shell = (id: string, at: number, flags = 64, name = "Bash"): TimelineEntry =>
+      entry({ kind: "toolCall", row: { toolUseId: id, sessionId: S, at, toolName: name, station: "SANDBOX", stationFlags: flags, success: true } });
+    expect(live([prompt(T), shell("b1", T + 1), event("stop", T + 2)]).core).toBe("thinking");
+    // A shell not started in the background does not hold the core.
+    expect(live([prompt(T), shell("b1", T + 1, 0), event("stop", T + 2)]).core).toBe("waiting_user");
+    // The completion notice opens a new turn, which ends too.
+    expect(live([prompt(T), shell("b1", T + 1), event("stop", T + 2), prompt(T + 3), event("stop", T + 4)]).core).toBe("waiting_user");
+    expect(live([prompt(T), shell("b1", T + 1), shell("k1", T + 2, 0, "KillShell"), event("stop", T + 3)]).core).toBe("waiting_user");
+    expect(live([prompt(T), shell("b1", T + 1), event("stop", T + 2)], { endedAt: T + 9 }).core).toBe("idle");
+  });
+
   it("compacts and comes back to where it was; the session's end makes it idle", () => {
     expect(live([prompt(T), event("compact_start", T + 1)]).core).toBe("compacting");
     expect(live([prompt(T), event("compact_start", T + 1), event("compact_end", T + 2)]).core).toBe("thinking");

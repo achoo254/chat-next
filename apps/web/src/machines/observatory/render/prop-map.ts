@@ -94,7 +94,7 @@ export const DURATION_MS: Readonly<Record<MotionKind, number>> = {
 };
 
 /** `station_flags` bits (docs/observatory-wire.md section 3). */
-export const FLAG = { commit: 1, push: 2, deploy: 4, write: 8, memory: 16, estimated: 32 } as const;
+export const FLAG = { commit: 1, push: 2, deploy: 4, write: 8, memory: 16, estimated: 32, background: 64 } as const;
 
 /** HTTP 429: the API's rate limit. */
 const RATE_LIMITED = 429;

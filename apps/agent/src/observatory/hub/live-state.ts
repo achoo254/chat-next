@@ -23,9 +23,13 @@
 // - waiting for the user while a subagent started and not stopped yet runs
 //   (Claude Code stops the main turn and waits for the background agent):
 //   thinking, as the work goes on;
+// - waiting for the user while a shell started with `run_in_background` may
+//   still run: thinking, until a new turn begins (Claude Code opens one with the
+//   shell's completion notice) or a KillShell call; Claude Code sends no event
+//   for a shell's end, so this is a best effort;
 // - no event, or the session ended after its last event: idle.
 import { TOOL_ERROR } from "../ingest/normalize-hook-record.ts";
-import type { Station } from "../live-map/station-map.ts";
+import { type Station, StationFlag } from "../live-map/station-map.ts";
 import { contextTokensOf, contextWindowOf } from "../live-map/model-window.ts";
 import type { TimelineEntry } from "../store/timeline-reads.ts";
 
@@ -74,6 +78,8 @@ export function liveStateOf(input: LiveInput): LiveState {
   let lastAt = 0;
   /** Subagents that started and have not stopped. */
   const runningSubagents = new Set<string>();
+  /** Shell calls started in the background and not known to have ended. */
+  const backgroundShells = new Set<string>();
 
   const active = (): void => {
     core = "thinking";
@@ -90,6 +96,7 @@ export function liveStateOf(input: LiveInput): LiveState {
     switch (e.kind) {
       case "prompt":
         active();
+        backgroundShells.clear();
         break;
       case "subagent":
         active();
@@ -101,6 +108,8 @@ export function liveStateOf(input: LiveInput): LiveState {
         if (e.row.success === null && !notRun.has(e.row.toolUseId)) running.set(e.row.toolUseId, e.row.station ?? "CORE");
         else running.delete(e.row.toolUseId);
         if (e.row.error === TOOL_ERROR.interrupted) endTurn("waiting_user");
+        if (e.row.toolName === "KillShell") backgroundShells.clear();
+        else if (((e.row.stationFlags ?? 0) & StationFlag.background) !== 0 && e.row.success !== false && !notRun.has(e.row.toolUseId)) backgroundShells.add(e.row.toolUseId);
         break;
       case "apiRequest":
         if (!isMainThread(e.row.agentId)) break;
@@ -151,7 +160,7 @@ export function liveStateOf(input: LiveInput): LiveState {
         break;
     }
   }
-  if (core === "waiting_user" && runningSubagents.size > 0) core = "thinking";
+  if (core === "waiting_user" && (runningSubagents.size > 0 || backgroundShells.size > 0)) core = "thinking";
   if (input.endedAt !== null && input.endedAt >= lastAt) endTurn("idle");
 
   const mainModel = lastApi?.model ?? input.mainModel ?? "";

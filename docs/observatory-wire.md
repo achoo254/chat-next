@@ -112,7 +112,7 @@ cache_write_tokens=9, cost_usd_estimate=10, has_cost=11, git_ops=12, session_eve
 
 - Trường số kiểu `optional` không đặt nghĩa là DB không có giá trị (khác 0).
 - `station` là trạm Live Map (`CORE`, `FILES`, `MEMORY`, `TESTING`, `GIT`, `SANDBOX`, `MCP`, `EXTERNAL`, `SKILLS`, `ORCHESTRATOR`); `station_flags` là các bit
-  `commit` 1, `push` 2, `deploy` 4, `write` 8, `memory` 16, `estimated` 32 (đặt theo nhãn đã lọc, có thể sai). Nguồn: `apps/agent/src/observatory/live-map/station-map.ts`.
+  `commit` 1, `push` 2, `deploy` 4, `write` 8, `memory` 16, `estimated` 32 (đặt theo nhãn đã lọc, có thể sai), `background` 64 (lệnh Bash/PowerShell chạy với `run_in_background`). Nguồn: `apps/agent/src/observatory/live-map/station-map.ts`.
 - `session_event.kind`: `permission_request`, `permission_decision`, `permission_denied`, `hook_block`, `compact_start`, `compact_end`, `stop`, `stop_failure`,
   `notification`, `model_change`, `permission_mode`, `todo_counts`, `api_error`, `mcp_connection` (`SESSION_EVENT_KINDS` trong
   `apps/agent/src/observatory/store/observatory-rows.ts`). Loại lạ: thiết bị bỏ qua.
@@ -205,6 +205,7 @@ Trạng thái lõi (`ObservatoryCoreState`) theo sự kiện cuối có nói v�
 | tool kết thúc với `error` = `interrupted` (người dùng bấm Esc/Ctrl+C; khi đó Claude Code không gửi `Stop`) | `WAITING_USER` (kết thúc lượt) |
 | `stop_failure` | `FAILED` (kết thúc lượt) |
 | đang `WAITING_USER` mà còn subagent đã bắt đầu, chưa dừng (`ended_at` = 0): Claude Code kết thúc lượt chính và chờ tác tử chạy nền | `THINKING` (việc vẫn tiếp diễn) |
+| đang `WAITING_USER` mà còn lệnh shell chạy nền (cờ `background`) chưa biết là đã xong: Claude Code không gửi sự kiện khi shell kết thúc, nên lệnh coi là còn chạy tới khi có lượt (`prompt`) mới (thông báo hoàn tất của Claude Code mở một lượt) hoặc một lời gọi `KillShell` | `THINKING` (ước lượng) |
 | không có sự kiện; phiên đã kết thúc (`ended_at` ≥ sự kiện cuối) | `IDLE` |
 
 - `running`: lời gọi tool chưa kết thúc (`success` chưa đặt) kể từ lúc lượt bắt đầu, theo trạm; lời gọi có `permission_denied` hay `hook_block` cùng

@@ -20,6 +20,8 @@ export const StationFlag = {
   memory: 16,
   /** Placed from the filtered target, not the raw call: may be wrong. */
   estimated: 32,
+  /** A shell call started with `run_in_background`: it may still run when the turn stops. */
+  background: 64,
 } as const;
 
 export type StationPlace = { station: Station; flags: number };
@@ -72,7 +74,11 @@ export function stationOf(toolName: string, input: unknown): StationPlace {
     const path = text(args.file_path) || text(args.notebook_path);
     return isMemoryPath(path) ? { station: "MEMORY", flags: StationFlag.write | StationFlag.memory } : { station: "FILES", flags: StationFlag.write };
   }
-  if (SHELL_TOOLS.has(toolName)) return shellPlace(text(args.command));
+  if (SHELL_TOOLS.has(toolName)) {
+    const place = shellPlace(text(args.command));
+    const starts = (toolName === "Bash" || toolName === "PowerShell") && args.run_in_background === true;
+    return starts ? { ...place, flags: place.flags | StationFlag.background } : place;
+  }
   if (toolName.startsWith("mcp__")) return { station: "MCP", flags: 0 };
   if (WEB_TOOLS.has(toolName)) return { station: "EXTERNAL", flags: 0 };
   if (toolName === "Skill") return { station: "SKILLS", flags: 0 };
