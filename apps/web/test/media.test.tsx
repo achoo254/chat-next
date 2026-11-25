@@ -333,9 +333,11 @@ describe("shared media and forwarding", () => {
 		const seqs = [1, 2].map((seed) => f.sendFile(lan, chat, photo(seed), "", 31));
 		const log = await open(f, chat);
 		const album = await within(log).findByRole("group", { name: "Album 2 ảnh và video" }, LONG);
-		const message = album.closest(".msg");
+		const message = album.closest<HTMLElement>(".msg");
 		if (message === null) throw new Error("no message");
-		await userEvent.click(within(message as HTMLElement).getByRole("button", { name: "Chuyển tiếp", hidden: true }));
+		// Forward lives in the message menu (right click, long press), as in Telegram; the hover row only has reply.
+		fireEvent.contextMenu(message);
+		await userEvent.click(within(await screen.findByRole("menu", {}, LONG)).getByRole("menuitem", { name: "Chuyển tiếp" }));
 		const dialog = await screen.findByRole("dialog", { name: "Chuyển tiếp tới" }, LONG);
 		await userEvent.click(await within(dialog).findByRole("checkbox", { name: /Nhóm thiết kế/ }, LONG));
 		await userEvent.click(within(dialog).getByRole("button", { name: "Gửi tới 1 chat" }));
