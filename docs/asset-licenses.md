@@ -19,18 +19,18 @@ dữ liệu. Quyền với tệp: sở hữu của hoandat, giữ mọi quyền 
 
 ## Live Map (`apps/web/public/observatory/`)
 
-Tài sản của tab Quan sát ([ADR 0027](./adr/0027-observatory-live-map.md)). Tên tệp có 8 ký tự mã băm nội dung, nên bảng dưới ghi theo mẫu tên.
+Tài sản của tab Quan sát ([ADR 0027](./adr/0027-observatory-live-map.md), hình ảnh theo [ADR 0029](./adr/0029-observatory-cyber-city.md)).
+Tên tệp có 8 ký tự mã băm nội dung, nên bảng dưới ghi theo mẫu tên. Tất cả vẽ ngày 25/11/2026 bằng model AI chạy offline trên GPU của PC ở nhà
+(ComfyUI); prompt, seed và cách làm ở `hoandat-app/tools/observatory-art/` (riêng tư).
 
 | Loại | Tệp | Cách làm | Giấy phép công cụ / model | Quyền với tệp |
 |---|---|---|---|---|
-| Tấm nền | `observatory-plate-{2560,1280}.*.webp` | Cảnh Live Map không có phần diễn xuất (drone, phong thư, tài liệu bay, hộp, tia, lõi AI, nhân vật): FLUX.2 klein 4B chỉnh từ ảnh khái niệm đã duyệt của cảnh, dự phòng Qwen-Image-2512; phóng to bằng Real-ESRGAN x4plus rồi cắt hai cỡ WebP | FLUX.2 klein 4B (Apache-2.0), Qwen-Image-2512 (Apache-2.0), Real-ESRGAN x4plus (BSD-3-Clause) | Sở hữu của hoandat, giữ mọi quyền (không phải CC0) |
-| Sprite | atlas `*.webp` và spritesheet `*.json` khi có | Z-Image-Turbo, tách nền bằng BiRefNet; sprite vẽ theo mẫu dùng FLUX.2 klein 4B, tách nền bằng khoá màu phẳng. Quầng sáng là hình tròn sinh bằng code | Z-Image-Turbo (Apache-2.0), BiRefNet (MIT), FLUX.2 klein 4B (Apache-2.0) | Sở hữu của hoandat, giữ mọi quyền |
-| Bảng cảnh | `live-map-scene.*.json` | Toạ độ trạm, vùng bấm, neo nhãn đo trên tấm nền, ghi bằng tay và script | — | Như mã nguồn của repo |
+| Tấm nền | `observatory-plate-{2400,1200}.*.webp` | Thành phố số isometric: FLUX.2 klein 4B vẽ lại từ ảnh mẫu của chủ sở hữu (bỏ chữ và giao diện), thêm một lượt làm sạch và một lượt đặt các khu nhỏ lên bệ; phóng to bằng Real-ESRGAN x2plus rồi cắt hai cỡ WebP | FLUX.2 klein 4B (Apache-2.0), Real-ESRGAN x2plus (BSD-3-Clause) | Sở hữu của hoandat, giữ mọi quyền (không phải CC0) |
+| Lớp sáng các khu | atlas `observatory-lit.*` | Cùng thành phố "bật đèn" (FLUX.2 klein 4B theo tấm nền), cắt theo từng khu, viền mờ dần bằng script | FLUX.2 klein 4B (Apache-2.0) | Sở hữu của hoandat, giữ mọi quyền |
+| Sprite | atlas `observatory-core.*` | Vành sáng, cột ngữ cảnh, cổng xoáy, gói dữ liệu, quầng sáng: Qwen-Image-2512 trên nền đen, tách theo độ sáng; drone và bảng holographic: FLUX.2 klein 4B theo tháp AI, tách nền bằng khoá màu phẳng | Qwen-Image-2512 (Apache-2.0), FLUX.2 klein 4B (Apache-2.0) | Sở hữu của hoandat, giữ mọi quyền |
+| Bảng cảnh | `live-map-scene.*.json` | Vị trí các khu, đường năng lượng, neo nhãn đo trên tấm nền | — | Như mã nguồn của repo |
 | Bảng tài sản | `observatory-assets.json` | Sinh bằng script | — | Như mã nguồn của repo |
 
-Tấm nền đang phát hành là bản tạm: ảnh khái niệm của cảnh (vẽ bằng AI cho hệ sinh thái ngày 21/11/2026) được cắt thẳng thành hai cỡ, chưa qua
-bước vẽ lại ở trên; model của ảnh khái niệm không được ghi lại lúc vẽ. Chưa có atlas sprite nào (`atlases` rỗng), cảnh vẽ phần diễn xuất bằng hình
-khối. Khi tấm nền và sprite vẽ xong thì thay tệp theo tên trong `observatory-assets.json` và ghi ngày vẽ vào bảng trên. WebP được ghi không kèm siêu
-dữ liệu (không đường dẫn máy, không tên máy, không workflow ComfyUI nhúng). Không ảnh nào chứa chữ.
+WebP được ghi không kèm siêu dữ liệu (không đường dẫn máy, không tên máy, không workflow ComfyUI nhúng). Không ảnh nào chứa chữ.
 
 Ghi trong phần ghi công: "AI-generated for the hoandat ecosystem; owned by hoandat, all rights reserved (not CC0)".
