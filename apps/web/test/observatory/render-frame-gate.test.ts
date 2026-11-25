@@ -1,18 +1,21 @@
-// When the Live Map draws: never on its own (an idle minute is 0 frames),
-// frames while something moves and one more for a still change, none while
+// When the Live Map draws: never on its own (an idle minute is 0 frames
+// under reduced motion), frames while something moves and one more for a
+// still change, the idle scene's gentle motion at 20 frames a second at most
+// (and none with reduced motion or save-data), none while
 // the page is hidden, the Capacitor app is in the background, the canvas is
 // off screen or the GPU context is lost (work asked for meanwhile is drawn on
 // return); and a lost context shows the still plate, a second loss within a
 // minute stays still.
 import { describe, expect, it, vi } from "vitest";
 import { guardContext, REPEAT_LOSS_MS } from "../../src/machines/observatory/render/context-guard.ts";
-import { createFrameGate, type FrameGateDeps } from "../../src/machines/observatory/render/frame-gate.ts";
+import { AMBIENT_FPS, createFrameGate, type DrawResult, type FrameGateDeps } from "../../src/machines/observatory/render/frame-gate.ts";
 
 /** A fake requestAnimationFrame at 60 frames per second. */
 class FakeFrames {
 	private queue = new Map<number, (now: number) => void>();
 	private next = 1;
 	now = 0;
+	timers: { fire(): void } | null = null;
 	request = (cb: (now: number) => void): number => {
 		const id = this.next++;
 		this.queue.set(id, cb);
@@ -29,6 +32,7 @@ class FakeFrames {
 		const end = this.now + ms;
 		while (this.now < end) {
 			this.now += 16;
+			this.timers?.fire();
 			const due = [...this.queue.values()];
 			this.queue.clear();
 			for (const cb of due) cb(this.now);
@@ -53,16 +57,49 @@ class FakePage extends EventTarget {
 	}
 }
 
-function setup(moving: () => boolean = () => false) {
+/** setTimeout run by the fake frame clock. */
+class FakeTimers {
+	private timers = new Map<number, { at: number; run: () => void }>();
+	private next = 1;
+	constructor(private readonly frames: FakeFrames) {}
+	set = (run: () => void, ms: number): number => {
+		const id = this.next++;
+		this.timers.set(id, { at: this.frames.now + ms, run });
+		return id;
+	};
+	clear = (id: number): void => {
+		this.timers.delete(id);
+	};
+	/** Runs the timers due by now. */
+	fire(): void {
+		for (const [id, t] of [...this.timers]) {
+			if (t.at <= this.frames.now) {
+				this.timers.delete(id);
+				t.run();
+			}
+		}
+	}
+	get pending(): number {
+		return this.timers.size;
+	}
+}
+
+function setup(moving: () => boolean | DrawResult = () => false, ambient: () => boolean = () => false) {
 	const frames = new FakeFrames();
 	const page = new FakePage();
 	let onScreen: ((v: boolean) => void) | null = null;
 	let foreground: ((v: boolean) => void) | null = null;
 	const offScreen = vi.fn();
 	const offApp = vi.fn();
+	const timers = new FakeTimers(frames);
+	frames.timers = timers;
 	const deps: FrameGateDeps = {
 		requestFrame: frames.request,
 		cancelFrame: frames.cancel,
+		setTimer: timers.set,
+		clearTimer: timers.clear,
+		now: () => frames.now,
+		ambientAllowed: ambient,
 		page: page as unknown as Document,
 		watchOnScreen: (_el, cb) => {
 			onScreen = cb;
@@ -74,10 +111,14 @@ function setup(moving: () => boolean = () => false) {
 			return Promise.resolve(offApp);
 		},
 	};
-	const draw = vi.fn((_now: number) => moving());
+	const draw = vi.fn((_now: number): DrawResult => {
+		const r = moving();
+		return r === true ? "moving" : r === false ? "still" : r;
+	});
 	const gate = createFrameGate(document.createElement("div"), draw, deps);
 	return {
 		frames,
+		timers,
 		page,
 		gate,
 		draw,
@@ -95,6 +136,45 @@ describe("the frame gate", () => {
 		expect(gate.frames).toBe(0);
 		expect(draw).not.toHaveBeenCalled();
 		expect(frames.pending).toBe(0);
+	});
+
+	it("draws the idle scene's motion at 20 frames a second at most when ambient motion is allowed", () => {
+		const { frames, gate } = setup(() => "ambient", () => true);
+		gate.wake();
+		frames.run(60_000);
+		expect(gate.frames).toBeGreaterThan(60 * 10);
+		expect(gate.frames).toBeLessThanOrEqual(60 * AMBIENT_FPS + 1);
+	});
+
+	it("draws 0 frames of idle motion with reduced motion or save-data (ambient not allowed), after the first", () => {
+		const { frames, gate, timers } = setup(() => "ambient", () => false);
+		gate.wake();
+		frames.run(60_000);
+		expect(gate.frames).toBe(1);
+		expect(frames.pending).toBe(0);
+		expect(timers.pending).toBe(0);
+	});
+
+	it("stops the idle motion while the page is hidden and resumes when shown", () => {
+		const { frames, gate, page } = setup(() => "ambient", () => true);
+		gate.wake();
+		frames.run(1_000);
+		const before = gate.frames;
+		page.set("hidden");
+		frames.run(30_000);
+		expect(gate.frames).toBe(before);
+		page.set("visible");
+		frames.run(1_000);
+		expect(gate.frames).toBeGreaterThan(before);
+	});
+
+	it("wakes once a moment later when asked (a camera move that becomes due)", () => {
+		const { frames, gate } = setup();
+		gate.wakeIn(500);
+		frames.run(400);
+		expect(gate.frames).toBe(0);
+		frames.run(200);
+		expect(gate.frames).toBe(1);
 	});
 
 	it("draws while something moves, then stops asking for frames", () => {

@@ -84,6 +84,80 @@ export interface ObservatoryCopy {
 		readonly hidden: string;
 		readonly replayHere: string;
 	};
+	/** The activity card over the scene (activity-card.tsx). */
+	readonly card: {
+		readonly label: string;
+		readonly status: Readonly<Record<"run" | "ok" | "err" | "wait" | "think" | "idle", string>>;
+		readonly running: string;
+		readonly done: string;
+		readonly failed: string;
+		readonly waitKind: string;
+		readonly thinkKind: (turn: number) => string;
+		readonly idleKind: string;
+		readonly steps: Readonly<Record<"commit" | "push" | "ci" | "deploy", string>>;
+		readonly subagent: (type: string) => string;
+		readonly runtime: string;
+		readonly waited: string;
+		readonly p95: string;
+		readonly calls: string;
+		readonly noHistory: string;
+		readonly historyCount: (n: number) => string;
+		readonly overP95: string;
+		readonly thinking: string;
+		readonly waitWhat: (what: string) => string;
+		readonly waitDesc: string;
+		readonly idleWhat: string;
+		readonly lastJob: (what: string, ok: boolean, runtime: string) => string;
+		readonly output: string;
+		readonly outputPending: string;
+		readonly outputEmpty: string;
+		readonly outputHidden: string;
+		readonly outputOff: string;
+		readonly outputNone: string;
+		readonly outputNotYet: string;
+		readonly outputLoading: string;
+		readonly outputFailed: string;
+		readonly outputUnavailable: string;
+		readonly journey: string;
+		readonly journeyNone: string;
+		readonly more: string;
+	};
+	/** The camera's controls, the overview map and the status legend of the scene. */
+	readonly camera: {
+		readonly label: string;
+		readonly auto: string;
+		readonly free: string;
+		readonly focus: string;
+		readonly whole: string;
+		readonly note: (where: string, n: number) => string;
+		readonly minimap: string;
+		readonly legend: string;
+		readonly legendRun: string;
+		readonly legendWait: string;
+		readonly legendOk: string;
+		readonly legendErr: string;
+	};
+	/** The holographic board over a district, the roads' labels and the pipeline's steps. */
+	readonly board: {
+		readonly label: (place: string) => string;
+		readonly empty: string;
+		readonly result: string;
+		readonly calls: (n: number) => string;
+		readonly failures: (n: number) => string;
+		readonly p95: (d: string) => string;
+		readonly runtime: (d: string) => string;
+		readonly apiTurn: (n: number) => string;
+		readonly context: (percent: number) => string;
+		readonly speed: (tps: number) => string;
+		readonly noSubagent: string;
+		readonly subagentRunning: string;
+		readonly workflows: (n: number) => string;
+		readonly prod: string;
+		readonly waitingFor: (what: string) => string;
+		readonly prompts: (n: number) => string;
+	};
+	/** A line under each district's name. */
+	readonly places: Readonly<Record<"core" | "user-desk" | "orchestrator" | "memory" | "skills" | "files" | "mcp" | "external" | "security" | "sandbox" | "testing" | "git" | "monitoring", string>>;
 	readonly replay: {
 		readonly label: string;
 		readonly title: string;
@@ -182,6 +256,90 @@ const vi: ObservatoryCopy = {
 		contentNotYet: "Sự kiện còn tạm, máy chưa lưu nên chưa có nội dung. Mở lại sau ít giây.",
 		hidden: "Đang bật Ẩn chi tiết: nhãn và nội dung được giấu.",
 		replayHere: "Tua tới đây",
+	},
+	card: {
+		label: "Hoạt động hiện tại",
+		status: { run: "Đang chạy", ok: "Thành công", err: "Lỗi", wait: "Đang chờ", think: "Suy nghĩ", idle: "Rảnh" },
+		running: "Đang thực thi",
+		done: "Vừa xong",
+		failed: "Lỗi",
+		waitKind: "Chờ bạn cấp quyền",
+		thinkKind: (turn) => `Đang suy nghĩ · lượt API #${turn}`,
+		idleKind: "Rảnh",
+		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
+		subagent: (type) => `subagent ${type}`,
+		runtime: "Runtime",
+		waited: "Đã chờ",
+		p95: "p95 lịch sử",
+		calls: "Lần gọi",
+		noHistory: "lần đầu trong phiên, chưa có lịch sử",
+		historyCount: (n) => `(${n} lần trước)`,
+		overP95: "lâu hơn p95 lịch sử",
+		thinking: "Claude đang suy nghĩ",
+		waitWhat: (what) => (what === "" ? "Claude xin quyền" : `Claude xin quyền: ${what}`),
+		waitDesc: "Claude dừng lại cho tới khi bạn cho phép.",
+		idleWhat: "chờ prompt tiếp theo",
+		lastJob: (what, ok, runtime) => `Việc cuối: ${what} · ${ok ? "thành công" : "lỗi"} · runtime ${runtime}`,
+		output: "Output",
+		outputPending: "chưa có, Claude Code gửi output khi lệnh xong",
+		outputEmpty: "(trống)",
+		outputHidden: "đang bật Ẩn chi tiết",
+		outputOff: "dự án tắt lưu nội dung",
+		outputNone: "không có nội dung được lưu",
+		outputNotYet: "máy chưa lưu, xem lại sau ít giây",
+		outputLoading: "đang xin từ máy…",
+		outputFailed: "chưa lấy được từ máy",
+		outputUnavailable: "chưa xem được ở đây",
+		journey: "Hành trình",
+		journeyNone: "chưa đi qua khối nào",
+		more: "Xem chi tiết",
+	},
+	camera: {
+		label: "Chế độ camera",
+		auto: "Tự động",
+		free: "Tự do",
+		focus: "Tập trung",
+		whole: "toàn cảnh",
+		note: (where, n) => `góc: ${where} · đổi ${n} lần`,
+		minimap: "Bản đồ tổng quan",
+		legend: "Chú giải",
+		legendRun: "Đang chạy",
+		legendWait: "Chờ",
+		legendOk: "Thành công",
+		legendErr: "Thất bại",
+	},
+	board: {
+		label: (place) => `Bảng của ${place}`,
+		empty: "chưa có lần gọi nào",
+		result: "Kết quả",
+		calls: (n) => `${n} lần gọi`,
+		failures: (n) => `${n} lỗi`,
+		p95: (d) => `p95 lịch sử ${d}`,
+		runtime: (d) => `runtime ${d}`,
+		apiTurn: (n) => `lượt API #${n}`,
+		context: (percent) => `ngữ cảnh ${percent}%`,
+		speed: (tps) => `${tps} tok/s`,
+		noSubagent: "không có subagent nào đang chạy",
+		subagentRunning: "đang chạy",
+		workflows: (n) => `${n} workflow`,
+		prod: "prod",
+		waitingFor: (what) => (what === "" ? "chờ bạn cấp quyền" : `chờ quyền: ${what}`),
+		prompts: (n) => `${n} prompt`,
+	},
+	places: {
+		core: "model · ngữ cảnh · suy luận",
+		"user-desk": "prompt",
+		orchestrator: "drone bay tới khối đang làm",
+		memory: "CLAUDE.md",
+		skills: "skill",
+		files: "đọc · sửa · tìm",
+		mcp: "công cụ · tích hợp",
+		external: "duyệt web · tải tài nguyên",
+		security: "quyền",
+		sandbox: "thực thi lệnh · script",
+		testing: "chạy test · kiểm tra",
+		git: "commit · push · CI · deploy",
+		monitoring: "ngữ cảnh đã dùng",
 	},
 	replay: {
 		label: "Thanh thời gian của phiên",
@@ -282,6 +440,90 @@ const en: ObservatoryCopy = {
 		hidden: "Hide details is on: labels and content are hidden.",
 		replayHere: "Replay to here",
 	},
+	card: {
+		label: "Current activity",
+		status: { run: "Running", ok: "Succeeded", err: "Failed", wait: "Waiting", think: "Thinking", idle: "Idle" },
+		running: "Running",
+		done: "Just finished",
+		failed: "Failed",
+		waitKind: "Waiting for your permission",
+		thinkKind: (turn) => `Thinking · API request #${turn}`,
+		idleKind: "Idle",
+		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
+		subagent: (type) => `subagent ${type}`,
+		runtime: "Runtime",
+		waited: "Waited",
+		p95: "p95 history",
+		calls: "Calls",
+		noHistory: "first in this session, no history yet",
+		historyCount: (n) => `(${n} before)`,
+		overP95: "longer than the p95 history",
+		thinking: "Claude is thinking",
+		waitWhat: (what) => (what === "" ? "Claude asks for permission" : `Claude asks for permission: ${what}`),
+		waitDesc: "Claude waits until you allow it.",
+		idleWhat: "waiting for the next prompt",
+		lastJob: (what, ok, runtime) => `Last job: ${what} · ${ok ? "succeeded" : "failed"} · runtime ${runtime}`,
+		output: "Output",
+		outputPending: "none yet, Claude Code sends the output when the call ends",
+		outputEmpty: "(empty)",
+		outputHidden: "Hide details is on",
+		outputOff: "the project does not store content",
+		outputNone: "no stored content",
+		outputNotYet: "not stored yet, look again in a few seconds",
+		outputLoading: "asking the machine…",
+		outputFailed: "could not get it from the machine",
+		outputUnavailable: "not available here",
+		journey: "Journey",
+		journeyNone: "no district yet",
+		more: "View details",
+	},
+	camera: {
+		label: "Camera mode",
+		auto: "Auto",
+		free: "Free",
+		focus: "Focus",
+		whole: "whole scene",
+		note: (where, n) => `view: ${where} · moved ${n} times`,
+		minimap: "Overview",
+		legend: "Legend",
+		legendRun: "Running",
+		legendWait: "Waiting",
+		legendOk: "Succeeded",
+		legendErr: "Failed",
+	},
+	board: {
+		label: (place) => `${place} board`,
+		empty: "no calls yet",
+		result: "Result",
+		calls: (n) => `${n} calls`,
+		failures: (n) => `${n} failed`,
+		p95: (d) => `p95 history ${d}`,
+		runtime: (d) => `runtime ${d}`,
+		apiTurn: (n) => `API request #${n}`,
+		context: (percent) => `context ${percent}%`,
+		speed: (tps) => `${tps} tok/s`,
+		noSubagent: "no subagent running",
+		subagentRunning: "running",
+		workflows: (n) => `${n} workflows`,
+		prod: "prod",
+		waitingFor: (what) => (what === "" ? "waiting for your permission" : `waiting for permission: ${what}`),
+		prompts: (n) => `${n} prompts`,
+	},
+	places: {
+		core: "model · context · reasoning",
+		"user-desk": "prompt",
+		orchestrator: "drones fly to the district at work",
+		memory: "CLAUDE.md",
+		skills: "skills",
+		files: "read · edit · search",
+		mcp: "tools · integrations",
+		external: "web · downloads",
+		security: "permissions",
+		sandbox: "commands · scripts",
+		testing: "tests · checks",
+		git: "commit · push · CI · deploy",
+		monitoring: "context used",
+	},
 	replay: {
 		label: "Session timeline",
 		title: "Replay",
@@ -380,6 +622,90 @@ const zhCN: ObservatoryCopy = {
 		contentNotYet: "此事件仍是临时的，机器尚未保存，因此还没有内容。请几秒后再打开。",
 		hidden: "已开启「隐藏详情」：标签和内容被隐藏。",
 		replayHere: "回放到这里",
+	},
+	card: {
+		label: "当前活动",
+		status: { run: "运行中", ok: "成功", err: "失败", wait: "等待中", think: "思考中", idle: "空闲" },
+		running: "正在执行",
+		done: "刚完成",
+		failed: "失败",
+		waitKind: "等待你授权",
+		thinkKind: (turn) => `思考中 · 第 ${turn} 次 API 请求`,
+		idleKind: "空闲",
+		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
+		subagent: (type) => `子代理 ${type}`,
+		runtime: "运行时间",
+		waited: "已等待",
+		p95: "历史 p95",
+		calls: "调用次数",
+		noHistory: "本会话首次，暂无历史",
+		historyCount: (n) => `（之前 ${n} 次）`,
+		overP95: "比历史 p95 更久",
+		thinking: "Claude 正在思考",
+		waitWhat: (what) => (what === "" ? "Claude 请求权限" : `Claude 请求权限：${what}`),
+		waitDesc: "Claude 会等到你允许为止。",
+		idleWhat: "等待下一个提示",
+		lastJob: (what, ok, runtime) => `最后的任务：${what} · ${ok ? "成功" : "失败"} · 运行时间 ${runtime}`,
+		output: "输出",
+		outputPending: "暂无，Claude Code 在调用结束后发送输出",
+		outputEmpty: "（空）",
+		outputHidden: "已开启「隐藏详情」",
+		outputOff: "该项目不保存内容",
+		outputNone: "没有保存的内容",
+		outputNotYet: "尚未保存，请几秒后再看",
+		outputLoading: "正在向机器请求…",
+		outputFailed: "未能从机器获取",
+		outputUnavailable: "此处无法查看",
+		journey: "路径",
+		journeyNone: "尚未经过任何区域",
+		more: "查看详情",
+	},
+	camera: {
+		label: "镜头模式",
+		auto: "自动",
+		free: "自由",
+		focus: "聚焦",
+		whole: "全景",
+		note: (where, n) => `视角：${where} · 切换 ${n} 次`,
+		minimap: "总览图",
+		legend: "图例",
+		legendRun: "运行中",
+		legendWait: "等待",
+		legendOk: "成功",
+		legendErr: "失败",
+	},
+	board: {
+		label: (place) => `${place} 面板`,
+		empty: "还没有调用",
+		result: "结果",
+		calls: (n) => `${n} 次调用`,
+		failures: (n) => `${n} 次失败`,
+		p95: (d) => `历史 p95 ${d}`,
+		runtime: (d) => `运行时间 ${d}`,
+		apiTurn: (n) => `第 ${n} 次 API 请求`,
+		context: (percent) => `上下文 ${percent}%`,
+		speed: (tps) => `${tps} tok/s`,
+		noSubagent: "没有正在运行的子代理",
+		subagentRunning: "运行中",
+		workflows: (n) => `${n} 个工作流`,
+		prod: "prod",
+		waitingFor: (what) => (what === "" ? "等待你授权" : `等待授权：${what}`),
+		prompts: (n) => `${n} 个提示`,
+	},
+	places: {
+		core: "模型 · 上下文 · 推理",
+		"user-desk": "提示",
+		orchestrator: "无人机飞往正在工作的区域",
+		memory: "CLAUDE.md",
+		skills: "技能",
+		files: "读取 · 编辑 · 搜索",
+		mcp: "工具 · 集成",
+		external: "网页 · 下载",
+		security: "权限",
+		sandbox: "命令 · 脚本",
+		testing: "测试 · 检查",
+		git: "commit · push · CI · deploy",
+		monitoring: "已用上下文",
 	},
 	replay: {
 		label: "会话时间轴",

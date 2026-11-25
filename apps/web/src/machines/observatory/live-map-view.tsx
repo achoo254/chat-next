@@ -34,10 +34,10 @@ import { ObserveEmptyState, type ObserveThread, type RelaunchAction } from "./ob
 import { OfficeReplacedNotice } from "./office-replaced-notice.tsx";
 import type { RelaunchKind } from "./relaunch-session.ts";
 import { LiveMapStage, readHideDetails } from "./render/live-map-stage.tsx";
-import { STATION_PLACE, type PlaceId } from "./render/scene-table.ts";
+import type { PlaceId } from "./render/scene-table.ts";
+import { stationAtPlace } from "./place-names.ts";
 import { ReplayBar } from "./replay-bar.tsx";
 import { cursorAt, detailsExpired, focusedAt, LIVE_CURSOR, marksOf, stateAt, timelineOf, type ReplayCursor } from "./replay-controller.ts";
-import { STATION_CODES, type StationCode } from "./station-catalog.ts";
 import { StationDrawer } from "./station-drawer.tsx";
 import { useObservatorySession, useThreadSessions } from "./use-observatory-session.ts";
 import { useReplayHistory } from "./use-replay-history.ts";
@@ -70,11 +70,6 @@ function useRecordedSessionWait(waiting: boolean, mark: string, bump: (change: (
 
 /** Marks the bar draws across the timeline. */
 const BAR_MARKS = 120;
-
-/** The station a place of the map is, when it is one (the user desk, gateway and monitoring are not). */
-function stationAtPlace(place: PlaceId | null): StationCode | null {
-	return STATION_CODES.find((code) => STATION_PLACE[code] === place) ?? null;
-}
 
 /** The session to show: the one a thread runs now (its newest), or one by its own id. */
 export type LiveMapTarget =
@@ -171,6 +166,7 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 	}
 
 	const panelOpen = detail !== null || station !== null;
+	const contentSource = useMemo(() => ({ link, sessionId: state.sessionId, online }), [link, state.sessionId, online]);
 	const projectKey = state.info?.projectKey ?? "";
 	return (
 		<div
@@ -207,7 +203,10 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 							setSelected({ place: null, eventId });
 							setDetail(findEvent(eventId) ?? null);
 						}}
+						onDeselect={() => setSelected({ place: null, eventId: null })}
 						onHideDetails={setHideDetails}
+						replayAt={replaying ? cursor.at : undefined}
+						contentSource={contentSource}
 					/>
 					{detail !== null ? (
 						<EventDetail link={link} sessionId={state.sessionId} online={online} event={detail} hideDetails={hideDetails} onReplayTo={replayTo} onClose={() => setDetail(null)} />

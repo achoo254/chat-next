@@ -1,6 +1,7 @@
 // The page observatory-csp.e2e.ts opens: built with the app (same Vite config,
 // same chunks of the Live Map renderer) and served under the production CSP.
-// It mounts the scene on the shipped assets, plays a few real events through
+// It mounts the scene on the shipped assets (following the page's reduced
+// motion as the app does), plays a few real events through
 // the reducer, and reports what happened on window.__liveMapHarness and
 // document.body's data-status ("ready" or "still" with the error).
 import { applyEvents, fromSnapshot, takeAnimations, type LiveMapState } from "../../src/machines/observatory/live-map-state.ts";
@@ -37,7 +38,8 @@ async function start(): Promise<void> {
 	const assets = await loadSceneAssets(assetBase(import.meta.env.BASE_URL));
 	let state: LiveMapState = fromSnapshot({ sessionId: "s1", epoch: 1n, seq: 0, info: null, live: null, events: [], earlier: "" });
 	const { mountLiveMap } = await import("../../src/machines/observatory/render/live-map-app.ts");
-	const handle: LiveMapHandle = await mountLiveMap({ host, assets, state, width: host.clientWidth, height: host.clientHeight, saveData: false, record: true });
+	const reduceMotion = (): boolean => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	const handle: LiveMapHandle = await mountLiveMap({ host, assets, state, width: host.clientWidth, height: host.clientHeight, saveData: false, reduceMotion, record: true });
 	window.__liveMapHarness = {
 		renderer: handle.renderer,
 		frames: () => handle.frames(),

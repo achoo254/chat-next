@@ -2,13 +2,13 @@
 // (hoandat-app/tools/observatory-art/build-observatory-manifest.mjs, copied
 // into public/observatory/): the asset table observatory-assets.json (the
 // plate in two sizes, the scene table, sprite atlases, all with
-// content-hashed names) and the scene table it names (where each of the 13
-// places of the scene sits on the plate, in the plate's 2560x1920 pixels).
-// Both are read over the network, so both are checked here before use. Until
-// the real plate and sprites are drawn the table points at a stand-in plate
-// cut from concept-04 and lists no atlas; the renderer then draws the moving
-// pieces itself. Re-running the pipeline and copying its dist/ swaps them in
-// with no code change.
+// content-hashed names) and the scene table it names (formatVersion 2: where
+// each of the 13 districts of the machine's interior sits, in scene pixels:
+// its rect, tier, sprite frame, name tag anchor and the energy road from the
+// AI core to it; the core's base centre, radius and the area subagent drones
+// fly in; the token wave's rect). Both are read over the network, so both are
+// checked here before use. A sprite frame an atlas does not hold is simply
+// not drawn (the DOM tags and the code-drawn data layers still show).
 import type { StationCode } from "../station-catalog.ts";
 
 /** The 13 places of the scene, as the scene table names them. */
@@ -17,24 +17,27 @@ export type PlaceId = (typeof PLACE_IDS)[number];
 
 export type Point = readonly [number, number];
 
-export interface SceneOverlay {
-	readonly points: readonly Point[];
-	readonly polygon: readonly Point[];
+export interface Rect {
+	readonly x: number;
+	readonly y: number;
+	readonly w: number;
+	readonly h: number;
 }
+
+/** 1: main, 2: secondary, 3: background (smaller, dimmer while unused). */
+export type Tier = 1 | 2 | 3;
 
 export interface ScenePlace {
 	readonly id: PlaceId;
-	/** Click outline. */
-	readonly hit: readonly Point[];
+	/** The district's box: its sprite fits inside (bottom centred), and it is the click area and the camera's focus box. */
+	readonly rect: Rect;
+	readonly tier: Tier;
+	/** The atlas frame drawn in the rect. */
+	readonly sprite: string;
 	/** Name tag anchor. */
 	readonly label: Point;
-	/** Where a drone (or a beam) stops. */
-	readonly droneTarget: Point;
-	/** Up to 4 waiting spots. */
-	readonly queue: readonly Point[];
-	/** From inside the core to droneTarget; empty for the core itself. */
-	readonly flightPath: readonly Point[];
-	readonly overlays: Readonly<Record<string, SceneOverlay>>;
+	/** The energy road from the core's base to the district (diagonals allowed); empty when none. */
+	readonly route: readonly Point[];
 }
 
 export interface SceneSpace {
@@ -42,10 +45,19 @@ export interface SceneSpace {
 	readonly height: number;
 }
 
+export interface SceneCore {
+	/** The tower's base centre. */
+	readonly centre: Point;
+	readonly radius: number;
+	/** Half axes of the area drones idle in around the base. */
+	readonly orbit: Point;
+}
+
 export interface SceneTable {
 	readonly space: SceneSpace;
-	/** "concept-04" until the plate is approved and the table measured on it. */
 	readonly measuredOn: string;
+	readonly core: SceneCore;
+	readonly wave: Rect;
 	readonly places: Readonly<Record<PlaceId, ScenePlace>>;
 }
 
@@ -79,6 +91,7 @@ export interface SceneAssets {
 }
 
 export const ASSET_TABLE_FILE = "observatory-assets.json";
+export const SCENE_FORMAT = 2;
 
 /** The asset folder under the app's base URL. */
 export function assetBase(baseUrl: string): string {
@@ -109,17 +122,22 @@ function fileName(v: unknown, what: string): string {
 	return need(typeof v === "string" && /^[\w.-]+$/.test(v) && !v.startsWith("."), v as string, `${what} is not a file name`);
 }
 
+function numbers(v: unknown, n: number, what: string): number[] {
+	const ok = Array.isArray(v) && v.length === n && v.every((x) => typeof x === "number" && Number.isFinite(x));
+	return need(ok, v as number[], `${what} is not a list of ${n} numbers`);
+}
+
 function point(v: unknown, space: SceneSpace, what: string): Point {
-	const ok = Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === "number" && Number.isFinite(n));
-	need(ok, null, `${what} is not a point`);
-	const [x, y] = v as [number, number];
+	const [x = 0, y = 0] = numbers(v, 2, what);
 	need(x >= 0 && y >= 0 && x <= space.width && y <= space.height, null, `${what} is outside the plate`);
 	return [x, y];
 }
 
-function points(v: unknown, space: SceneSpace, what: string): Point[] {
-	need(v === undefined || Array.isArray(v), null, `${what} is not a list`);
-	return ((v as unknown[] | undefined) ?? []).map((p, i) => point(p, space, `${what}[${i}]`));
+function rect(v: unknown, space: SceneSpace, what: string): Rect {
+	const [x = 0, y = 0, w = 0, h = 0] = numbers(v, 4, what);
+	need(w > 0 && h > 0, null, `${what} has no size`);
+	need(x >= 0 && y >= 0 && x + w <= space.width && y + h <= space.height, null, `${what} is outside the plate`);
+	return { x, y, w, h };
 }
 
 function space(v: unknown): SceneSpace {
@@ -155,44 +173,39 @@ function isPlaceId(v: unknown): v is PlaceId {
 	return typeof v === "string" && (PLACE_IDS as readonly string[]).includes(v);
 }
 
-/** The scene table (live-map-scene.json), checked: every place once, every point on the plate. */
+function tier(v: unknown, what: string): Tier {
+	return need(v === 1 || v === 2 || v === 3, v as Tier, `${what} is not 1, 2 or 3`);
+}
+
+/** The scene table (live-map-scene.json, format 2), checked: every place once, every rect and point on the plate. */
 export function parseSceneTable(json: unknown): SceneTable {
 	need(isObject(json), null, "the scene table is not an object");
 	const t = json as Json;
-	need(t.formatVersion === 1, null, `scene table format ${String(t.formatVersion)} is not 1`);
+	need(t.formatVersion === SCENE_FORMAT, null, `scene table format ${String(t.formatVersion)} is not ${SCENE_FORMAT}`);
 	const sp = space(t.space);
-	need(Array.isArray(t.stations), null, "stations is not a list");
+	need(isObject(t.core), null, "core is missing");
+	const c = t.core as Json;
+	const [rx = 0, ry = 0] = numbers(c.orbit, 2, "core.orbit");
+	need(rx > 0 && ry > 0, null, "core.orbit is not positive");
+	const core: SceneCore = { centre: point(c.centre, sp, "core.centre"), radius: positive(c.radius, "core.radius"), orbit: [rx, ry] };
+	const wave = rect(t.wave, sp, "wave");
+	need(Array.isArray(t.places), null, "places is not a list");
 	const places: Partial<Record<PlaceId, ScenePlace>> = {};
-	for (const [i, raw] of (t.stations as unknown[]).entries()) {
-		need(isObject(raw), null, `stations[${i}] is not an object`);
+	for (const [i, raw] of (t.places as unknown[]).entries()) {
+		need(isObject(raw), null, `places[${i}] is not an object`);
 		const s = raw as Json;
-		need(isPlaceId(s.id), null, `stations[${i}].id ${String(s.id)} is not a place of the scene`);
+		need(isPlaceId(s.id), null, `places[${i}].id ${String(s.id)} is not a place of the scene`);
 		const id = s.id as PlaceId;
 		need(places[id] === undefined, null, `${id} is listed twice`);
-		const hit = points(s.hit, sp, `${id}.hit`);
-		need(hit.length >= 3, null, `${id}.hit has fewer than 3 points`);
-		const overlays: Record<string, SceneOverlay> = {};
-		if (s.overlays !== undefined) {
-			need(isObject(s.overlays), null, `${id}.overlays is not an object`);
-			for (const [name, o] of Object.entries(s.overlays as Json)) {
-				need(isObject(o), null, `${id}.overlays.${name} is not an object`);
-				const ov = o as Json;
-				overlays[name] = { points: points(ov.points, sp, `${id}.overlays.${name}.points`), polygon: points(ov.polygon, sp, `${id}.overlays.${name}.polygon`) };
-			}
-		}
-		places[id] = {
-			id,
-			hit,
-			label: point(s.label, sp, `${id}.label`),
-			droneTarget: point(s.droneTarget, sp, `${id}.droneTarget`),
-			queue: points(s.queue, sp, `${id}.queue`).slice(0, 4),
-			flightPath: points(s.flightPath, sp, `${id}.flightPath`),
-			overlays,
-		};
+		need(typeof s.sprite === "string" && /^[a-z0-9-]+$/.test(s.sprite), null, `${id}.sprite is not a frame name`);
+		need(Array.isArray(s.route), null, `${id}.route is not a list`);
+		const route = (s.route as unknown[]).map((p, k) => point(p, sp, `${id}.route[${k}]`));
+		need(route.length === 0 || route.length >= 2, null, `${id}.route has a single point`);
+		places[id] = { id, rect: rect(s.rect, sp, `${id}.rect`), tier: tier(s.tier, `${id}.tier`), sprite: s.sprite as string, label: point(s.label, sp, `${id}.label`), route };
 	}
 	const missing = PLACE_IDS.filter((id) => places[id] === undefined);
 	need(missing.length === 0, null, `places missing: ${missing.join(", ")}`);
-	return { space: sp, measuredOn: typeof t.measuredOn === "string" ? t.measuredOn : "", places: places as Record<PlaceId, ScenePlace> };
+	return { space: sp, measuredOn: typeof t.measuredOn === "string" ? t.measuredOn : "", core, wave, places: places as Record<PlaceId, ScenePlace> };
 }
 
 async function getJson(fetcher: typeof fetch, url: string, signal: AbortSignal | undefined): Promise<unknown> {
@@ -222,7 +235,7 @@ export interface PlateConditions {
 /** The frame must be at least this wide for the full plate. */
 export const FULL_PLATE_MIN_WIDTH = 900;
 
-/** The 2560 plate only when the GPU takes it, the frame is wide and the user does not save data; the 1280 one otherwise. */
+/** The full plate only when the GPU takes it, the frame is wide and the user does not save data; the half one otherwise. */
 export function choosePlate(table: AssetTable, c: PlateConditions): PlateFile {
 	const gpuTakesIt = c.maxTextureSize === null || c.maxTextureSize >= table.plate.full.width;
 	return gpuTakesIt && c.frameWidth >= FULL_PLATE_MIN_WIDTH && !c.saveData ? table.plate.full : table.plate.half;
@@ -253,31 +266,24 @@ export function unproject(x: number, y: number, fit: SceneFit): Point {
 	return [(x - fit.offsetX) / fit.scale, (y - fit.offsetY) / fit.scale];
 }
 
-/** Whether `p` lies inside `polygon` (even-odd rule). */
-export function insidePolygon(p: Point, polygon: readonly Point[]): boolean {
-	let inside = false;
-	for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-		const a = polygon[i];
-		const b = polygon[j];
-		if (a === undefined || b === undefined) continue;
-		if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
-	}
-	return inside;
+export function insideRect(p: Point, r: Rect): boolean {
+	return p[0] >= r.x && p[0] <= r.x + r.w && p[1] >= r.y && p[1] <= r.y + r.h;
 }
 
-/** The middle of a set of points (a polygon's vertices); [0, 0] for none. */
-export function centreOf(pts: readonly Point[]): Point {
-	if (pts.length === 0) return [0, 0];
-	let x = 0;
-	let y = 0;
-	for (const [px, py] of pts) {
-		x += px;
-		y += py;
-	}
-	return [x / pts.length, y / pts.length];
+/** Places tried by a click, small and front ones first; the drones' area (orchestrator) last, as an ellipse around the core's base. */
+const HIT_ORDER: readonly PlaceId[] = ["security", "user-desk", "monitoring", "memory", "skills", "files", "sandbox", "testing", "git", "mcp", "external", "core"];
+
+/** The place at a plate point, or null. */
+export function placeAt(scene: SceneTable, p: Point): PlaceId | null {
+	for (const id of HIT_ORDER) if (insideRect(p, scene.places[id].rect)) return id;
+	const [cx, cy] = scene.core.centre;
+	const [rx, ry] = scene.core.orbit;
+	const dx = (p[0] - cx) / rx;
+	const dy = (p[1] - cy) / ry;
+	return dx * dx + dy * dy <= 1 ? "orchestrator" : null;
 }
 
-/** The place a station's things happen at; the three places without a station (user desk, gateway, monitoring) take the events the prop table sends them. */
+/** The place a station's things happen at; the three places without a station (input port, permission lock, context reservoir) take what the scene sends them. */
 export const STATION_PLACE: Readonly<Record<StationCode, PlaceId>> = {
 	CORE: "core",
 	ORCHESTRATOR: "orchestrator",

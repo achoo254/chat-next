@@ -1,14 +1,15 @@
 // Times the Live Map's moves: takes the animations the state queued (each
-// names its source event), turns each into its moves (prop-map.ts) and keeps
-// them while they play. A place that receives more than BATCH_LIMIT moves
-// within BATCH_WINDOW_MS plays one batch with a count instead of each, so a
-// burst of 50 reads is one move "×50", not 50 at once. Every move started (or
+// names its source event), turns each into its moves (prop-map.ts: packets
+// of energy along a district's road, pulses at a place) and keeps them while
+// they play. A place that receives more than BATCH_LIMIT moves within
+// BATCH_WINDOW_MS plays one batch with a count instead of each, so a burst of
+// 50 reads is one move "×50", not 50 packets at once. Every move started (or
 // folded into a batch) is written to the animation log with its source event,
 // place, kind and time, so a test (or an acceptance run) can check that no
 // motion happens without an event. Clock-free: the caller passes the time.
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import type { LiveMapEvent } from "../live-map-types.ts";
-import { movesOf, pathPoint, type MotionKind, type Move } from "./prop-map.ts";
+import { movesOf, pathPoint, placeCentre, type MotionKind, type Move } from "./prop-map.ts";
 import type { PlaceId, Point, SceneTable } from "./scene-table.ts";
 
 /** More moves than this at one place within BATCH_WINDOW_MS are played as one batch. */
@@ -18,11 +19,11 @@ export const BATCH_WINDOW_MS = 1_000;
 export const MAX_ACTIVE = 200;
 /** Log entries kept. */
 export const LOG_CAP = 2_000;
-/** A click this close (plate pixels) to a moving piece opens its event. */
+/** A click this close (scene pixels) to a moving packet opens its event. */
 export const HIT_RADIUS = 70;
 
-/** A logged motion: a move, or the core starting to turn ("core-spin"). */
-export type LoggedKind = MotionKind | "core-spin";
+/** A logged motion: a move, or the model starting to think on the scene ("think"). */
+export type LoggedKind = MotionKind | "think";
 
 export interface DirectorLogEntry {
 	readonly eventId: string;
@@ -75,7 +76,7 @@ export class AnimationDirector {
 		const byId = new Map<string, LiveMapEvent>();
 		for (const e of state.log) byId.set(e.id, e);
 		for (const anim of animations) {
-			for (const move of movesOf(anim, byId.get(anim.eventId), state, this.scene)) this.start(move, now);
+			for (const move of movesOf(anim, byId.get(anim.eventId), this.scene)) this.start(move, now);
 		}
 		if (this.active.length > MAX_ACTIVE) this.active = this.active.slice(this.active.length - MAX_ACTIVE);
 	}
@@ -97,8 +98,7 @@ export class AnimationDirector {
 		const i = this.active.findIndex((a) => a.move.kind === "batch" && a.move.place === move.place);
 		const before = i < 0 ? undefined : this.active[i];
 		const count = (before?.count ?? 0) + 1;
-		const place = this.scene.places[move.place];
-		const batch: Move = { ...move, kind: "batch", tone: move.tone === "error" ? "error" : (before?.move.tone ?? "normal"), path: [place.droneTarget], durationMs: 1200, flashes: 1 };
+		const batch: Move = { ...move, kind: "batch", tone: move.tone === "error" ? "error" : (before?.move.tone ?? "normal"), path: [placeCentre(this.scene, move.place)], durationMs: 1200 };
 		const next: ActiveMove = { move: batch, start: now, count, lastEventId: move.eventId };
 		if (i < 0) this.active.push(next);
 		else this.active[i] = next;
@@ -112,7 +112,7 @@ export class AnimationDirector {
 		if (this.entries.length > LOG_CAP) this.entries.splice(0, this.entries.length - LOG_CAP);
 	}
 
-	/** Records a still change shown by the scene (the core starting to turn): it too names its event. */
+	/** Records a change shown by the scene (the model starting to think): it too names its event. */
 	note(eventId: string, place: PlaceId, kind: LoggedKind, now: number): void {
 		this.write(eventId, place, kind, now);
 	}

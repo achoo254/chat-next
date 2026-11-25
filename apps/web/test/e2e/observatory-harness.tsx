@@ -1,6 +1,6 @@
 // The page observatory.e2e.ts opens: the real Live Map view (LiveMapView,
 // with its PixiJS stage, drawer, detail and replay bar, on the app's styles
-// and the interim plate of public/observatory/) watching one session of a
+// and the AI-drawn plate of public/observatory/) watching one session of a
 // fake machine. The machine is a link answering Observatory's requests in the
 // page: the watch with a snapshot of a session that began 90 s ago, a
 // station's numbers, an event's content, no older events. The test reads the

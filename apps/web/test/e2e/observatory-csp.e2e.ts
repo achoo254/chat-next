@@ -10,7 +10,8 @@
 //
 // Checks: with WebGL, no CSP violation and no console error, the renderer is
 // WebGL, the canvas shows more than one colour, the events play (the
-// animation log names them) and the scene goes still afterwards; with WebGL
+// animation log names them), the idle scene moves at 20 frames a second at
+// most, and with reduced motion it goes still afterwards; with WebGL
 // switched off, the Canvas renderer or the still view, still without a CSP
 // violation.
 //
@@ -111,10 +112,10 @@ interface Run {
 	readonly errors: string[];
 }
 
-async function open(args: string[]): Promise<Run> {
+async function open(args: string[], reducedMotion: "reduce" | "no-preference" = "reduce"): Promise<Run> {
 	await browser?.close();
 	browser = await chromium.launch({ args });
-	const page = await browser.newPage({ viewport: { width: 1280, height: 960 } });
+	const page = await browser.newPage({ viewport: { width: 1280, height: 960 }, reducedMotion });
 	const violations: string[] = [];
 	const errors: string[] = [];
 	await page.exposeFunction("__reportCsp", (line: string) => violations.push(line));
@@ -162,13 +163,27 @@ test("draws with WebGL under the production CSP and goes still after its events"
 	assert.ok(played >= 3, `animations queued: ${played}`);
 	await page.waitForTimeout(400);
 	assert.ok((await colours(page)) > 20, "the canvas shows the plate and its pieces");
-	// Every move ends within 1.5 s; the core stopped (a Stop came), so nothing moves after.
+	// Every move ends within 1.5 s; the core stopped (a Stop came), so with reduced motion nothing moves after.
 	await page.waitForTimeout(2_000);
 	const settled = await page.evaluate(() => window.__liveMapHarness?.frames() ?? -1);
 	await page.waitForTimeout(2_000);
 	assert.equal(await page.evaluate(() => window.__liveMapHarness?.frames() ?? -1), settled, "no frame while idle");
 	const logged = await page.evaluate(() => (window.__liveMapHarness?.log() ?? []).map((e) => e.eventId));
 	for (const id of ["prompt:p1", "tool:t1", "event:stop"]) assert.ok(logged.includes(id), `${id} played`);
+	assert.deepEqual(violations, [], "no CSP violation");
+	assert.deepEqual(errors, [], "no console error");
+});
+
+test("without reduced motion the idle scene moves gently, at 20 frames a second at most", async () => {
+	const { page, violations, errors } = await open(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"], "no-preference");
+	assert.equal(await page.evaluate(() => document.body.dataset.status), "ready");
+	await page.evaluate(() => window.__liveMapHarness?.play());
+	await page.waitForTimeout(3_000);
+	const start = await page.evaluate(() => window.__liveMapHarness?.frames() ?? -1);
+	await page.waitForTimeout(2_000);
+	const idle = (await page.evaluate(() => window.__liveMapHarness?.frames() ?? -1)) - start;
+	assert.ok(idle > 0, "the idle scene still moves");
+	assert.ok(idle <= 2 * 20 + 2, `at most 20 frames a second while idle: ${idle} in 2 s`);
 	assert.deepEqual(violations, [], "no CSP violation");
 	assert.deepEqual(errors, [], "no console error");
 });

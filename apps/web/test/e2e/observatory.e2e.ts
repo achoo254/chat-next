@@ -1,7 +1,7 @@
 // The Live Map of a Claude Code session in a real browser (Chromium, WebGL
 // through SwiftShader): the real view (LiveMapView with its PixiJS stage,
 // station drawer, event detail and replay bar, on the app's styles and the
-// interim plate of public/observatory/) watching a fake machine. The
+// AI-drawn plate of public/observatory/) watching a fake machine. The
 // signed-in app has no machine that serves Observatory (the e2e stack has no
 // machine; the visual harness's demo machine runs an older tunelo), so a
 // harness page (observatory-harness.tsx) mounts the view with a link that
@@ -14,7 +14,9 @@
 // replay bar plays and scrubs, the scene follows the replayed moment, and
 // "Trực tiếp" comes back to now; "Ẩn chi tiết" hides the names and an event
 // opened then is shown without asking the machine for its content; the
-// scene draws no frame while nothing happens; on a phone the drawer is a
+// activity card names the call; a click on a district focuses the camera; the
+// scene draws no frame while nothing happens under reduced motion and at most
+// 20 a second otherwise; on a phone the drawer is a
 // sheet from the bottom, the bar compact, and nothing scrolls sideways.
 // Screenshots of the desktop and phone states go to $E2E_SHOTS when set.
 //
@@ -61,9 +63,10 @@ interface Opened {
 }
 
 /** The harness at `width` x `height`, the scene drawn; the animation log on, the one-time notice already seen. */
-async function open(width: number, height: number, mobile = false): Promise<Opened> {
+/** Reduced motion by default: the idle scene then draws nothing, which the tests check. */
+async function open(width: number, height: number, mobile = false, reducedMotion: "reduce" | "no-preference" = "reduce"): Promise<Opened> {
 	if (browser === null) throw new Error("no browser");
-	const context = await browser.newContext({ locale: "vi-VN", viewport: { width, height }, isMobile: mobile, hasTouch: mobile });
+	const context = await browser.newContext({ locale: "vi-VN", viewport: { width, height }, isMobile: mobile, hasTouch: mobile, reducedMotion });
 	await context.addInitScript(() => {
 		window.localStorage.setItem("observe.animationLog", "1");
 		window.localStorage.setItem("observe.officeReplacedSeen", "1");
@@ -126,6 +129,24 @@ test("draws the session, follows a live event and goes still when nothing happen
 	);
 	assert.ok((await settled(page)) > still, "the event was drawn, then the scene went still again");
 	await shot(page, "observatory-desktop-live");
+	assert.deepEqual(errors, [], "no page error");
+	await page.context().close();
+});
+
+test("the activity card names the last call, a click on a district focuses the camera, and idle motion stays at 20 frames a second at most", async () => {
+	const { page, errors } = await open(1280, 900, false, "no-preference");
+	assert.match(await page.locator("[data-id=observe-card]").innerText(), /pnpm test|Bash/);
+	assert.equal(await page.locator("[data-id=observe-stage]").getAttribute("data-camera"), "auto");
+	await page.locator("[data-id=observe-place-testing]").click();
+	await page.waitForFunction(() => document.querySelector("[data-id=observe-stage]")?.getAttribute("data-camera") === "focus", null, { timeout: WAIT_MS });
+	await page.locator("[data-id=observe-board-testing]").waitFor({ timeout: WAIT_MS });
+	// The camera eases in (about 2.5 s), then only the idle motion is left.
+	await page.waitForTimeout(4_000);
+	const start = await frames(page);
+	await page.waitForTimeout(2_000);
+	const idle = (await frames(page)) - start;
+	assert.ok(idle <= 2 * 20 + 2, `at most 20 frames a second while idle: ${idle} in 2 s`);
+	await shot(page, "observatory-desktop-focus");
 	assert.deepEqual(errors, [], "no page error");
 	await page.context().close();
 });
@@ -214,9 +235,10 @@ test("hiding details hides the names, and an event opened then does not ask for 
 	await page.locator("[data-id=observe-hide-details]").uncheck();
 	await page.locator("[data-id=lmd-content]").waitFor({ timeout: WAIT_MS });
 	assert.equal(await page.locator("[data-id=lmd-content]").innerText(), "content of tool:t1");
+	// The detail's event, and the files board's last result (the focused district shows its newest ended call's output).
 	assert.deepEqual(
-		(await requests(page)).filter((r) => r.startsWith("observatoryContent")),
-		["observatoryContent tool:t1"],
+		[...new Set((await requests(page)).filter((r) => r.startsWith("observatoryContent")))].sort(),
+		["observatoryContent tool:t1", "observatoryContent tool:t2"],
 	);
 	assert.deepEqual(errors, [], "no page error");
 	await page.context().close();

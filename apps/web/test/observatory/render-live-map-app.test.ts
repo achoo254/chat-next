@@ -1,14 +1,18 @@
 // The Live Map's PixiJS glue with PixiJS replaced by a recorder: it starts
 // WebGL then Canvas (never WebGPU) without autostart at a resolution of at
-// most 2, picks the plate by MAX_TEXTURE_SIZE, draws nothing more after its
-// first frame while idle, plays animations with their source events in the
-// log, stops turning a thinking core no event moved for a while, stops on a lost context and draws again on restore, and on destroy
-// removes every listener and destroys the app with its children and textures.
+// most 2, picks the plate by MAX_TEXTURE_SIZE, draws its idle scene at 20
+// frames a second at most and none at all with reduced motion, plays
+// animations with their source events in the log, stops the model thinking
+// on the scene when no event came for a while, leaves out an atlas that does
+// not load, moves the camera (a drag switches to free and is reported), finds
+// a packet under a click, stops on a lost context and draws again on restore,
+// and on destroy removes every listener and destroys the app with its
+// children and textures.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveMapMountOptions } from "../../src/machines/observatory/render/live-map-app.ts";
 import { CORE_SPIN_IDLE_MS } from "../../src/machines/observatory/render/prop-map.ts";
-import { prompt, tool } from "../machines/observatory/live-map-fixtures.ts";
-import { played, readJson, shippedAssets } from "./render-fixtures.ts";
+import { lifecycle, prompt, tool } from "../machines/observatory/live-map-fixtures.ts";
+import { fixtureAssets, fixtureFile, played, SHEET_FILE } from "./render-fixtures.ts";
 
 const pixi = vi.hoisted(() => {
 	const record = {
@@ -31,13 +35,35 @@ const pixi = vi.hoisted(() => {
 		children: unknown[] = [];
 		scale = point();
 		position = point();
+		rotation = 0;
 		addChild(...c: unknown[]) {
 			this.children.push(...c);
+		}
+		addChildAt(c: unknown, i: number) {
+			this.children.splice(i, 0, c);
+		}
+		removeChild(c: unknown) {
+			this.children = this.children.filter((x) => x !== c);
+		}
+		getChildIndex(c: unknown) {
+			return this.children.indexOf(c);
+		}
+	}
+	const texture = () => ({ width: 10, height: 10, frame: { x: 0, y: 0, width: 10, height: 10 }, source: {}, destroy: () => {} });
+	class Texture {
+		width = 10;
+		height = 10;
+		frame = { x: 0, y: 0, width: 10, height: 10 };
+		source = {};
+		destroy() {}
+		static from() {
+			return texture();
 		}
 	}
 	class Sprite {
 		anchor = point();
 		position = point();
+		scale = point();
 		width = 0;
 		height = 0;
 		tint = 0;
@@ -63,20 +89,36 @@ const pixi = vi.hoisted(() => {
 			record.destroyed.push(args);
 		}
 	}
-	return { record, Container, Sprite, Application, Graphics: function Graphics() { return chain(); }, Texture: { from: () => ({}) }, Spritesheet: class Spritesheet {
-		textures: Record<string, object> = {};
-		constructor(_texture: unknown, public data: { frames: Record<string, unknown> }) {}
-		destroy() {}
-		async parse() {
-			for (const name of Object.keys(this.data.frames)) this.textures[name] = {};
-		}
-	} };
+	return {
+		record,
+		Container,
+		Sprite,
+		Application,
+		Texture,
+		Rectangle: function Rectangle() {
+			return {};
+		},
+		Graphics: function Graphics() {
+			return chain();
+		},
+		Spritesheet: class Spritesheet {
+			textures: Record<string, object> = {};
+			constructor(
+				_texture: unknown,
+				public data: { frames: Record<string, unknown> },
+			) {}
+			destroy() {}
+			async parse() {
+				for (const name of Object.keys(this.data.frames)) this.textures[name] = texture();
+			}
+		},
+	};
 });
 
 vi.mock("pixi.js/unsafe-eval", () => ({}));
-vi.mock("pixi.js", () => ({ Application: pixi.Application, Container: pixi.Container, Sprite: pixi.Sprite, Graphics: pixi.Graphics, Texture: pixi.Texture, Spritesheet: pixi.Spritesheet }));
+vi.mock("pixi.js", () => ({ Application: pixi.Application, Container: pixi.Container, Sprite: pixi.Sprite, Graphics: pixi.Graphics, Texture: pixi.Texture, Spritesheet: pixi.Spritesheet, Rectangle: pixi.Rectangle }));
 
-/** requestAnimationFrame at 60 frames per second, run by hand. */
+/** requestAnimationFrame at 60 frames per second and the timers, run by hand together. */
 const frames = {
 	queue: new Map<number, FrameRequestCallback>(),
 	next: 1,
@@ -85,6 +127,7 @@ const frames = {
 		const end = frames.now + ms;
 		while (frames.now < end) {
 			frames.now += 16;
+			vi.advanceTimersByTime(16);
 			const due = [...frames.queue.values()];
 			frames.queue.clear();
 			for (const cb of due) cb(frames.now);
@@ -94,14 +137,20 @@ const frames = {
 
 const { mountLiveMap } = await import("../../src/machines/observatory/render/live-map-app.ts");
 
+let reduce = true;
+let fetched: string[] = [];
+
 function options(over: Partial<LiveMapMountOptions> = {}): LiveMapMountOptions {
-	return { host: document.createElement("div"), assets: shippedAssets(), state: played([]).state, width: 1200, height: 900, saveData: false, record: true, now: () => frames.now, ...over };
+	return { host: document.createElement("div"), assets: fixtureAssets(), state: played([]).state, width: 1200, height: 720, saveData: false, record: true, now: () => frames.now, reduceMotion: () => reduce, ...over };
 }
 
 beforeEach(() => {
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 	Object.assign(pixi.record, { init: null, renderer: "webgl", maxTextureSize: 4096, failInit: false, renders: 0, destroyed: [], canvas: null });
 	frames.queue.clear();
 	frames.now = 0;
+	reduce = true;
+	fetched = [];
 	vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
 		const id = frames.next++;
 		frames.queue.set(id, cb);
@@ -109,14 +158,18 @@ beforeEach(() => {
 	});
 	vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.queue.delete(id));
 	vi.stubGlobal("devicePixelRatio", 3);
-	// The atlases' spritesheet files are served from the shipped folder, as the page's server does.
-	vi.stubGlobal("fetch", async (url: string) => ({ ok: true, status: 200, json: async () => readJson(url.replace("/observatory/", "")) }));
+	// The atlas sheet is served from the fixtures, as the page's server would.
+	vi.stubGlobal("fetch", async (url: string) => {
+		fetched.push(url);
+		return { ok: true, status: 200, json: async () => fixtureFile(url.replace("/observatory/", "")) };
+	});
 	// jsdom has no image decoding; this file's environment is its own.
 	HTMLImageElement.prototype.decode = () => Promise.resolve();
 	vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
@@ -127,11 +180,12 @@ describe("mounting the Live Map", () => {
 		expect(pixi.record.init).toMatchObject({ preference: ["webgl", "canvas"], autoStart: false, sharedTicker: false, resolution: 2 });
 		expect(handle.renderer).toBe("webgl");
 		expect(handle.canvas.getAttribute("aria-hidden")).toBe("true");
+		expect(fetched).toEqual([`/observatory/${SHEET_FILE}`]);
 		handle.destroy();
 	});
 
-	it("takes the 1280 plate when the GPU cannot hold the 2560 one, or the frame is narrow", async () => {
-		const { table } = shippedAssets();
+	it("takes the half plate when the GPU cannot hold the full one, or the frame is narrow", async () => {
+		const { table } = fixtureAssets();
 		pixi.record.maxTextureSize = 2048;
 		const small = await mountLiveMap(options());
 		expect(small.plate).toEqual(table.plate.half);
@@ -142,20 +196,47 @@ describe("mounting the Live Map", () => {
 		pixi.record.renderer = "canvas";
 		const canvas = await mountLiveMap(options());
 		expect(canvas.renderer).toBe("canvas");
-		expect(canvas.plate).toEqual(table.plate.full);
 	});
 
-	it("draws its first frame, then 0 frames over an idle minute", async () => {
+	it("leaves out an atlas that does not load and still starts", async () => {
+		vi.stubGlobal("fetch", async () => ({ ok: false, status: 404, json: async () => ({}) }));
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const handle = await mountLiveMap(options());
+		expect(warn).toHaveBeenCalled();
 		frames.run(100);
+		expect(handle.frames()).toBeGreaterThan(0);
+		handle.destroy();
+	});
+
+	it("with reduced motion draws its first frames, then 0 frames over an idle minute", async () => {
+		const handle = await mountLiveMap(options());
+		frames.run(500);
 		const settled = handle.frames();
-		expect(settled).toBe(1);
+		expect(settled).toBeGreaterThan(0);
 		frames.run(60_000);
 		expect(handle.frames()).toBe(settled);
 		expect(frames.queue.size).toBe(0);
-		// A new state that changes nothing on the scene draws nothing either.
-		handle.update(played([]).state, []);
+		handle.destroy();
+	});
+
+	it("draws the idle scene's gentle motion at 20 frames a second at most", async () => {
+		reduce = false;
+		const handle = await mountLiveMap(options());
 		frames.run(1_000);
+		const start = handle.frames();
+		frames.run(60_000);
+		const idle = handle.frames() - start;
+		expect(idle).toBeGreaterThan(60 * 5);
+		expect(idle).toBeLessThanOrEqual(60 * 20 + 1);
+		handle.destroy();
+	});
+
+	it("does not draw the idle motion with save-data", async () => {
+		reduce = false;
+		const handle = await mountLiveMap(options({ saveData: true }));
+		frames.run(1_000);
+		const settled = handle.frames();
+		frames.run(30_000);
 		expect(handle.frames()).toBe(settled);
 		handle.destroy();
 	});
@@ -164,37 +245,73 @@ describe("mounting the Live Map", () => {
 		const handle = await mountLiveMap(options());
 		frames.run(100);
 		const { state, animations } = played([prompt(1, 0), tool("r1", 10), tool("r1", 20, { success: true })]);
-		// The prompt leaves the core thinking (it turns); a stop would still it.
 		handle.update({ ...state, live: null }, animations);
 		frames.run(2_000);
-		expect(handle.frames()).toBeGreaterThan(60);
 		expect(handle.animationLog().map((e) => e.eventId)).toEqual(expect.arrayContaining(["prompt:p1", "tool:r1"]));
 		expect(handle.animationLog().every((e) => e.eventId !== "")).toBe(true);
 		handle.destroy();
 	});
 
-	it("stops turning the thinking core when no event came for CORE_SPIN_IDLE_MS, and turns again on a new event", async () => {
+	it("stops the model thinking on the scene when no event came for CORE_SPIN_IDLE_MS", async () => {
+		reduce = false;
 		const handle = await mountLiveMap(options());
 		frames.run(100);
 		// A turn the person interrupted while the model thought: no event ends it.
 		const thinking = played([prompt(1, 0)]);
 		handle.update({ ...thinking.state, live: null }, thinking.animations);
-		frames.run(CORE_SPIN_IDLE_MS - 1_000);
-		expect(frames.queue.size).toBe(1);
+		frames.run(5_000);
+		const busy = handle.frames();
+		frames.run(1_000);
+		// Thinking: every display frame.
+		expect(handle.frames() - busy).toBeGreaterThan(50);
+		frames.run(CORE_SPIN_IDLE_MS);
+		const stale = handle.frames();
+		frames.run(1_000);
+		// The ambient rate only.
+		expect(handle.frames() - stale).toBeLessThanOrEqual(21);
+		expect(handle.animationLog().filter((e) => e.kind === "think").map((e) => e.eventId)).toEqual(["prompt:p1"]);
+		handle.destroy();
+	});
+
+	it("follows the activity with the camera, and a drag switches it to free", async () => {
+		const onCamera = vi.fn();
+		const onView = vi.fn();
+		const handle = await mountLiveMap(options({ onCamera, onView }));
+		frames.run(100);
+		const { state } = played([prompt(1, 0), tool("r1", 10, { station: "SANDBOX" })]);
+		handle.update(state, []);
 		frames.run(2_000);
-		const still = handle.frames();
-		frames.run(60_000);
-		expect(handle.frames()).toBe(still);
-		expect(frames.queue.size).toBe(0);
-		// The same state again does not start it.
-		handle.update({ ...thinking.state, live: null }, []);
-		frames.run(1_000);
-		expect(handle.frames()).toBe(still);
-		// A new event does.
-		const next = played([prompt(1, 0), tool("r1", 10)]);
-		handle.update({ ...next.state, live: null }, []);
-		frames.run(1_000);
-		expect(handle.frames()).toBeGreaterThan(still + 30);
+		expect(handle.camera()).toMatchObject({ mode: "auto", zone: "sandbox", contentZone: "sandbox", switches: 1 });
+		expect(onCamera).toHaveBeenLastCalledWith(expect.objectContaining({ zone: "sandbox" }));
+		handle.pan(40, 0);
+		frames.run(100);
+		expect(handle.camera().mode).toBe("free");
+		expect(onView).toHaveBeenCalled();
+		handle.select("files");
+		handle.setCameraMode("focus");
+		frames.run(100);
+		expect(handle.camera()).toMatchObject({ mode: "focus", contentZone: "files" });
+		frames.run(3_000);
+		const [, view] = onView.mock.calls.at(-1) as [unknown, { s: number }];
+		expect(view.s).toBeGreaterThan(1.3);
+		handle.destroy();
+	});
+
+	it("finds the packet under a click while it moves", async () => {
+		const handle = await mountLiveMap(options());
+		frames.run(100);
+		const { state, animations } = played([prompt(1, 0), tool("r1", 10, { station: "FILES" })]);
+		handle.update(state, animations.filter((a) => a.eventId === "tool:r1"));
+		const scene = fixtureAssets().scene;
+		const start = scene.places.files.route[0] ?? [0, 0];
+		// The frame's point of the packet's start (the road's first point) at the current view.
+		let hit: string | null = null;
+		for (let x = 0; x <= 1200 && hit === null; x += 10) for (let y = 0; y <= 720 && hit === null; y += 10) {
+			const [sx, sy] = handle.toScene(x, y);
+			if (Math.hypot(sx - start[0], sy - start[1]) < 40) hit = handle.hitEvent(x, y);
+		}
+		expect(hit).toBe("tool:r1");
+		expect(handle.hitEvent(1, 1)).toBeNull();
 		handle.destroy();
 	});
 
@@ -205,7 +322,7 @@ describe("mounting the Live Map", () => {
 		frames.run(100);
 		handle.canvas.dispatchEvent(new Event("webglcontextlost"));
 		expect(onStill).toHaveBeenCalledWith("lost");
-		const { state, animations } = played([prompt(1, 0)]);
+		const { state, animations } = played([prompt(1, 0), lifecycle("stop", "s", 10)]);
 		handle.update(state, animations);
 		const before = handle.frames();
 		frames.run(5_000);

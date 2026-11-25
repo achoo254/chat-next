@@ -1,88 +1,82 @@
 {
 	"formatVersion": 1,
-	"note": "Live Map assets (tools/observatory-art in the workspace); file names carry a content hash. plate.full is the 2560x1920 picture, plate.half the 1280x960 one for devices whose MAX_TEXTURE_SIZE is below 2560. Scene table and sprite anchors are in 2560x1920 plate pixels; scale them with the plate in use. Atlases are PixiJS spritesheets (frame anchors set).",
+	"note": "Live Map assets (tools/observatory-art in the workspace); file names carry a content hash. plate.full is the 2400x1440 picture, plate.half the 1200x720 one for devices whose MAX_TEXTURE_SIZE is below 2400. Scene table and sprite anchors are in 2400x1440 plate pixels; scale them with the plate in use. Atlases are PixiJS spritesheets (frame anchors set).",
 	"space": {
-		"width": 2560,
-		"height": 1920
+		"width": 2400,
+		"height": 1440
 	},
 	"plate": {
 		"full": {
-			"file": "observatory-plate-2560.ab9a1124.webp",
-			"width": 2560,
-			"height": 1920
+			"file": "observatory-plate-2400.25dff12f.webp",
+			"width": 2400,
+			"height": 1440
 		},
 		"half": {
-			"file": "observatory-plate-1280.bd70a00a.webp",
-			"width": 1280,
-			"height": 960
+			"file": "observatory-plate-1200.b02d474c.webp",
+			"width": 1200,
+			"height": 720
 		}
 	},
-	"scene": "live-map-scene.76a19f29.json",
-	"sceneMeasuredOn": "concept-04",
+	"scene": "live-map-scene.4bf08b05.json",
+	"sceneMeasuredOn": "city-plate",
 	"atlases": [
 		{
 			"name": "core",
-			"sheet": "observatory-core.ead07f5e.json",
-			"image": "observatory-core.7ef6d22f.webp",
-			"width": 1564,
-			"height": 696,
+			"sheet": "observatory-core.de8c96de.json",
+			"image": "observatory-core.ed8c1905.webp",
+			"width": 1664,
+			"height": 431,
 			"sprites": [
-				"core-error",
-				"core-full",
-				"core-idle",
-				"core-thinking",
-				"core-ring",
-				"glow"
+				"core-halo",
+				"context-fill",
+				"holo-panel",
+				"glow",
+				"portal-swirl",
+				"drone",
+				"packet"
 			]
 		},
 		{
-			"name": "actors",
-			"sheet": "observatory-actors.040159c4.json",
-			"image": "observatory-actors.5ecc7888.webp",
-			"width": 1999,
-			"height": 533,
+			"name": "lit",
+			"sheet": "observatory-lit.48eb8045.json",
+			"image": "observatory-lit.24e225f0.webp",
+			"width": 1935,
+			"height": 578,
 			"sprites": [
-				"gate-closed",
-				"gate-open",
-				"cloud-flicker",
-				"user-at-desk",
-				"branch-new",
-				"rocket",
-				"shield",
-				"cross",
-				"drone-carry",
-				"check",
-				"drone-fly",
-				"scroll",
-				"document",
-				"box",
-				"jar-glow",
-				"envelope"
+				"lit-core",
+				"lit-sandbox",
+				"lit-git",
+				"lit-testing",
+				"lit-mcp",
+				"lit-files",
+				"lit-external",
+				"lit-security",
+				"lit-memory",
+				"lit-monitoring",
+				"lit-skills",
+				"lit-user-desk"
 			]
 		}
 	],
 	"sprites": {
-		"core-error": "core",
-		"core-full": "core",
-		"core-idle": "core",
-		"core-thinking": "core",
-		"core-ring": "core",
+		"core-halo": "core",
+		"context-fill": "core",
+		"holo-panel": "core",
 		"glow": "core",
-		"gate-closed": "actors",
-		"gate-open": "actors",
-		"cloud-flicker": "actors",
-		"user-at-desk": "actors",
-		"branch-new": "actors",
-		"rocket": "actors",
-		"shield": "actors",
-		"cross": "actors",
-		"drone-carry": "actors",
-		"check": "actors",
-		"drone-fly": "actors",
-		"scroll": "actors",
-		"document": "actors",
-		"box": "actors",
-		"jar-glow": "actors",
-		"envelope": "actors"
+		"portal-swirl": "core",
+		"drone": "core",
+		"packet": "core",
+		"lit-core": "lit",
+		"lit-sandbox": "lit",
+		"lit-git": "lit",
+		"lit-testing": "lit",
+		"lit-mcp": "lit",
+		"lit-files": "lit",
+		"lit-external": "lit",
+		"lit-security": "lit",
+		"lit-memory": "lit",
+		"lit-monitoring": "lit",
+		"lit-skills": "lit",
+		"lit-user-desk": "lit"
 	}
 }

@@ -1,6 +1,9 @@
 // The Live Map's PixiJS scene: loaded on demand by the Observe tab (its own
 // chunk, never at startup), mounted while the tab shows, destroyed with every
-// GPU resource when it unmounts.
+// GPU resource when it unmounts. It owns the camera (camera-director.ts): the
+// camera eases inside the scene's frames, and every change of the view is
+// handed to the page (onView) so the DOM layer (tags, boards, buttons) moves
+// with it.
 //
 // Content Security Policy: production serves `script-src 'self' …
 // 'wasm-unsafe-eval'` without 'unsafe-eval' and `worker-src 'self'` without
@@ -12,21 +15,36 @@
 // the renderer work: no 'unsafe-eval', no blob:, no new source. A renderer
 // that cannot start under it falls back to the still view.
 //
-// Renderers: WebGL, else PixiJS's Canvas renderer; never WebGPU. Frames run
-// only while something moves (frame-gate.ts), and the thinking core stops
-// turning when no event came for CORE_SPIN_IDLE_MS; a lost GPU context shows
-// the still plate (context-guard.ts).
+// Renderers: WebGL, else PixiJS's Canvas renderer; never WebGPU. Frames
+// (frame-gate.ts): every display frame while something moves with the
+// session (packets, flowing energy, the model thinking, a drone flying, the
+// camera easing); at most 20 per second for the idle scene's gentle motion;
+// none at all under reduced motion or save-data once still. The model stops
+// thinking on the scene when no event came for CORE_SPIN_IDLE_MS; a lost GPU
+// context shows the still plate (context-guard.ts).
 import "pixi.js/unsafe-eval";
 import { Application, Spritesheet, Texture, type SpritesheetData } from "pixi.js";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import { AnimationDirector, type DirectorLogEntry } from "./animation-director.ts";
+import { activityZone, CameraDirector, type CameraMode, type CameraView } from "./camera-director.ts";
 import { guardContext } from "./context-guard.ts";
-import { createFrameGate, intersectionWatcher, type FrameGateDeps } from "./frame-gate.ts";
-import { CORE_SPIN_IDLE_MS, lookOf, sameLook, type SceneLook } from "./prop-map.ts";
-import { SceneLayers, makeGlowTexture, readPalette } from "./scene-layers.ts";
-import { choosePlate, fitScene, unproject, type PlaceId, type PlateFile, type SceneAssets } from "./scene-table.ts";
+import { createFrameGate, intersectionWatcher, type DrawResult, type FrameGateDeps } from "./frame-gate.ts";
+import { activityOf, CORE_SPIN_IDLE_MS, lookOf, sameLook, type SceneLook } from "./prop-map.ts";
+import { makeGlowTexture, readPalette, SceneLayers, type RootPlacement } from "./scene-layers.ts";
+import { choosePlate, fitScene, type PlaceId, type PlateFile, type SceneAssets, type SceneFit } from "./scene-table.ts";
 
 export type RendererKind = "webgl" | "canvas";
+
+/** Where the camera stands, as the page needs it. */
+export interface CameraState {
+	readonly mode: CameraMode;
+	/** auto's zone (null: the whole scene). */
+	readonly zone: PlaceId | null;
+	/** The place whose live content shows (focus: the selection, auto: its zone, free: the activity's). */
+	readonly contentZone: PlaceId | null;
+	/** auto's moves so far. */
+	readonly switches: number;
+}
 
 export interface LiveMapMountOptions {
 	/** The element the canvas goes into; it sizes the scene. */
@@ -37,29 +55,47 @@ export interface LiveMapMountOptions {
 	readonly height: number;
 	/** navigator.connection.saveData. */
 	readonly saveData: boolean;
+	/** Reduced motion asked for (read each frame, so a change applies at once). */
+	readonly reduceMotion?: () => boolean;
 	/** Keep the animation log. */
 	readonly record?: boolean;
 	readonly onBatch?: (place: PlaceId, count: number | null) => void;
+	/** The scene moved under the camera: where the root sits in the frame, and the camera's view. */
+	readonly onView?: (placement: RootPlacement, view: CameraView) => void;
+	/** The camera's mode, zone, content zone or move count changed. */
+	readonly onCamera?: (camera: CameraState) => void;
 	/** The GPU context was lost (show the still plate) or lost twice in a minute (stay still). */
 	readonly onStill?: (reason: "lost" | "given-up") => void;
 	/** The context came back: the canvas draws again. */
 	readonly onRestored?: () => void;
 	/** The Capacitor app's foreground changes (native build only). */
 	readonly watchAppState?: FrameGateDeps["watchAppState"];
-	/** Clock (ms); performance.now by default. */
+	/** Animation clock (ms); performance.now by default. */
 	readonly now?: () => number;
+	/** The machine's clock (ms), for runtimes against p95; Date.now by default. */
+	readonly wallClock?: () => number;
 }
 
 export interface LiveMapHandle {
 	readonly renderer: RendererKind;
 	readonly plate: PlateFile;
 	readonly canvas: HTMLCanvasElement;
-	/** A new state and the animations it queued (taken from it by the caller). */
-	update(state: LiveMapState, animations: readonly Animation[]): void;
+	/** A new state and the animations it queued (taken from it by the caller); `at`: the replayed moment (null: live). */
+	update(state: LiveMapState, animations: readonly Animation[], at?: number | null): void;
 	/** The frame's size in CSS pixels. */
 	resize(width: number, height: number): void;
-	/** The source event of the moving piece at a frame point (CSS pixels), or null. */
+	/** The source event of the moving packet at a frame point (CSS pixels), or null. */
 	hitEvent(x: number, y: number): string | null;
+	/** A frame point (CSS pixels) in scene pixels. */
+	toScene(x: number, y: number): readonly [number, number];
+	setCameraMode(mode: CameraMode): void;
+	/** The selected place (focus locks on it). */
+	select(place: PlaceId | null): void;
+	/** A drag by (dx, dy) CSS pixels (switches to free). */
+	pan(dx: number, dy: number): void;
+	/** A zoom by `factor` about the frame point (x, y) (switches to free). */
+	zoomAt(factor: number, x: number, y: number): void;
+	camera(): CameraState;
 	/** Frames drawn since mount. */
 	frames(): number;
 	animationLog(): readonly DirectorLogEntry[];
@@ -88,28 +124,39 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 	return img.decode().then(() => img);
 }
 
-/** The atlases' sprites by name (none until the art is drawn). */
+/** The atlases' frames by name. An atlas that does not load is left out (its frames are not drawn), the scene still starts. */
 async function loadSprites(assets: SceneAssets): Promise<{ sprites: Map<string, Texture>; sheets: Spritesheet[] }> {
 	const sprites = new Map<string, Texture>();
 	const sheets: Spritesheet[] = [];
 	for (const atlas of assets.table.atlases) {
-		const response = await fetch(assets.base + atlas.sheet);
-		if (!response.ok) throw new Error(`live map: atlas ${atlas.name} answered ${response.status}`);
-		const data: unknown = await response.json();
-		if (!isSheet(data)) throw new Error(`live map: atlas ${atlas.name} is not a spritesheet`);
-		const sheet = new Spritesheet(Texture.from(await loadImage(assets.base + atlas.image)), data);
-		await sheet.parse();
-		sheets.push(sheet);
-		for (const name of atlas.sprites) {
-			const texture = sheet.textures[name] ?? sheet.textures[`${name}.png`];
-			if (texture !== undefined) sprites.set(name, texture);
+		try {
+			const response = await fetch(assets.base + atlas.sheet);
+			if (!response.ok) throw new Error(`answered ${response.status}`);
+			const data: unknown = await response.json();
+			if (!isSheet(data)) throw new Error("not a spritesheet");
+			const sheet = new Spritesheet(Texture.from(await loadImage(assets.base + atlas.image)), data);
+			await sheet.parse();
+			sheets.push(sheet);
+			for (const name of atlas.sprites) {
+				const texture = sheet.textures[name] ?? sheet.textures[`${name}.png`];
+				if (texture !== undefined) sprites.set(name, texture);
+			}
+		} catch (error) {
+			console.warn(`live map: atlas ${atlas.name} left out`, error);
 		}
 	}
 	return { sprites, sheets };
 }
 
+/** Where the root sits for a fit and a camera view: the view's centre in the frame's middle. */
+export function placementOf(fit: SceneFit, frame: { width: number; height: number }, view: CameraView): RootPlacement {
+	const scale = fit.scale * view.s;
+	return { scale, x: frame.width / 2 - view.x * scale, y: frame.height / 2 - view.y * scale };
+}
+
 export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandle> {
 	const now = o.now ?? (() => performance.now());
+	const reduce = o.reduceMotion ?? (() => false);
 	const app = new Application();
 	try {
 		await app.init({
@@ -135,57 +182,76 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		const plate = choosePlate(o.assets.table, { maxTextureSize, frameWidth: o.width, saveData: o.saveData });
 		const [plateImage, atlas] = await Promise.all([loadImage(o.assets.base + plate.file), loadSprites(o.assets)]);
 		sheets.push(...atlas.sheets);
-		const layers = new SceneLayers(o.assets.scene, { plate: Texture.from(plateImage), glow: atlas.sprites.get("glow") ?? makeGlowTexture(), sprites: atlas.sprites }, readPalette(o.host));
+		const scene = o.assets.scene;
+		const layers = new SceneLayers(scene, { plate: Texture.from(plateImage), // The atlas glow has rays; the soft one drawn in code reads better under data.
+			glow: makeGlowTexture(), sprites: atlas.sprites }, readPalette(o.host));
 		app.stage.addChild(layers.root);
 		const canvas = app.canvas;
 		canvas.setAttribute("aria-hidden", "true");
 		canvas.classList.add("lm-canvas");
 		o.host.appendChild(canvas);
 
-		const director = new AnimationDirector(o.assets.scene, { record: o.record === true, ...(o.onBatch === undefined ? {} : { onBatch: o.onBatch }) });
+		const director = new AnimationDirector(scene, { record: o.record === true, ...(o.onBatch === undefined ? {} : { onBatch: o.onBatch }) });
+		const cameraDirector = new CameraDirector(scene);
 		let state = o.state;
-		let look: SceneLook = lookOf(state, o.assets.scene);
+		let replayAt: number | null = null;
+		const wall = (): number => replayAt ?? (o.wallClock ?? Date.now)();
+		let look: SceneLook = lookOf(state, scene);
 		layers.setLook(look);
-		let spin: { start: number; base: number; speed: number } | null = null;
-		/** The newest event the core turns for and when it came (this clock): past CORE_SPIN_IDLE_MS without a newer one, the core stops. */
-		let spinFor: { eventId: string; since: number } | null = null;
-		const spinStale = (t: number): boolean => spinFor !== null && t - spinFor.since >= CORE_SPIN_IDLE_MS;
-		const spinTurns = (t: number): number | null => (spin === null ? null : spin.base + ((t - spin.start) / 1000) * spin.speed);
-		const setSpin = (next: SceneLook["spin"], t: number): void => {
-			if (next === null) {
-				spin = null;
-				spinFor = null;
-				return;
+		/** The newest event the model thinks for and when it came (this clock): past CORE_SPIN_IDLE_MS without a newer one, it stops. */
+		let thinkFor: { eventId: string; since: number } | null = null;
+		const noteThinking = (t: number): void => {
+			const id = look.thinkingFor;
+			if (id === null) thinkFor = null;
+			else if (thinkFor?.eventId !== id) {
+				thinkFor = { eventId: id, since: t };
+				director.note(id, "core", "think", t);
 			}
-			if (spinFor?.eventId !== next.eventId) spinFor = { eventId: next.eventId, since: t };
-			if (spinStale(t)) spin = null;
-			else if (spin === null) {
-				spin = { start: t, base: 0, speed: next.speed };
-				director.note(next.eventId, "core", "core-spin", t);
-			} else if (spin.speed !== next.speed) spin = { start: t, base: spinTurns(t) ?? 0, speed: next.speed };
 		};
-		setSpin(look.spin, now());
-		let fit = fitScene(o.assets.scene.space, { width: o.width, height: o.height });
-		layers.layout(fit);
+		const thinking = (t: number): boolean => thinkFor !== null && t - thinkFor.since < CORE_SPIN_IDLE_MS;
+		noteThinking(now());
+		let size = { width: o.width, height: o.height };
+		let fit = fitScene(scene.space, size);
+		let placement = placementOf(fit, size, cameraDirector.view);
+		let camera: CameraState = { mode: "auto", zone: null, contentZone: null, switches: 0 };
+		const place = (): void => {
+			placement = placementOf(fit, size, cameraDirector.view);
+			layers.layout(placement);
+			o.onView?.(placement, cameraDirector.view);
+		};
+		place();
 
+		const draw = (t: number): DrawResult => {
+			const motion = !reduce();
+			const activity = activityOf(state);
+			const before = cameraDirector.view;
+			const cam = cameraDirector.step(activity, t, !motion);
+			if (cam.view !== before) place();
+			const mode = cameraDirector.mode;
+			const contentZone = mode === "focus" ? cameraDirector.selected : mode === "auto" ? cam.zone : activityZone(activity);
+			const next: CameraState = { mode, zone: cam.zone, contentZone, switches: cameraDirector.switches };
+			if (next.mode !== camera.mode || next.zone !== camera.zone || next.contentZone !== camera.contentZone || next.switches !== camera.switches) {
+				camera = next;
+				o.onCamera?.(camera);
+			}
+			layers.setFocus(cameraDirector.selected, contentZone);
+			const isThinking = look.mode === "think" && thinking(t);
+			const flying = layers.drawFrame({ t, wall: wall(), moves: director.frame(t), thinking: isThinking, motion });
+			app.render();
+			if (cam.wakeAt !== null) gate.wakeIn(cam.wakeAt - t);
+			if (director.busy || !cam.settled || flying) return "moving";
+			if (motion && (isThinking || look.mode === "exec" || look.mode === "wait" || look.drones.length > 0)) return "moving";
+			return "ambient";
+		};
 		const watchOnScreen = intersectionWatcher();
-		const gate = createFrameGate(
-			canvas,
-			() => {
-				const t = now();
-				if (spinStale(t)) spin = null;
-				layers.drawFrame(director.frame(t), spinTurns(t));
-				app.render();
-				return director.busy || spin !== null;
-			},
-			{
-				requestFrame: (cb) => requestAnimationFrame(cb),
-				cancelFrame: (id) => cancelAnimationFrame(id),
-				page: document,
-				...(watchOnScreen === undefined ? {} : { watchOnScreen }),
-				...(o.watchAppState === undefined ? {} : { watchAppState: o.watchAppState }),
-			},
-		);
+		const gate = createFrameGate(canvas, draw, {
+			requestFrame: (cb) => requestAnimationFrame(cb),
+			cancelFrame: (id) => cancelAnimationFrame(id),
+			page: document,
+			ambientAllowed: () => !reduce() && !o.saveData,
+			...(watchOnScreen === undefined ? {} : { watchOnScreen }),
+			...(o.watchAppState === undefined ? {} : { watchAppState: o.watchAppState }),
+		});
 		const guard = guardContext(canvas, {
 			lost() {
 				gate.setContextLost(true);
@@ -205,35 +271,60 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		});
 		gate.wake();
 
+		const toScene = (x: number, y: number): readonly [number, number] => [(x - placement.x) / (placement.scale || 1), (y - placement.y) / (placement.scale || 1)];
 		let destroyed = false;
 		return {
 			renderer,
 			plate,
 			canvas,
-			update(next, animations) {
+			update(next, animations, at = null) {
 				if (destroyed) return;
 				state = next;
+				replayAt = at;
 				const t = now();
-				const nextLook = lookOf(state, o.assets.scene);
+				const nextLook = lookOf(state, scene);
 				const changed = !sameLook(look, nextLook);
 				if (changed) {
 					look = nextLook;
 					layers.setLook(look);
 				}
-				setSpin(look.spin, t);
+				noteThinking(t);
 				director.play(animations, state, t);
-				if (changed || animations.length > 0) gate.wake();
+				// The camera reads the activity at once (a call's end is its moment), then the frame draws it.
+				gate.wake();
 			},
 			resize(width, height) {
 				if (destroyed || width <= 0 || height <= 0) return;
 				app.renderer.resize(width, height);
-				fit = fitScene(o.assets.scene.space, { width, height });
-				layers.layout(fit);
+				size = { width, height };
+				fit = fitScene(scene.space, size);
+				place();
 				gate.wake();
 			},
 			hitEvent(x, y) {
-				return director.hit(unproject(x, y, fit), now());
+				return director.hit(toScene(x, y), now());
 			},
+			toScene,
+			setCameraMode(mode) {
+				cameraDirector.setMode(mode);
+				gate.wake();
+			},
+			select(p) {
+				cameraDirector.select(p);
+				gate.wake();
+			},
+			pan(dx, dy) {
+				cameraDirector.pan(dx / (placement.scale || 1), dy / (placement.scale || 1));
+				place();
+				gate.wake();
+			},
+			zoomAt(factor, x, y) {
+				const [sx, sy] = toScene(x, y);
+				cameraDirector.zoomAt(factor, sx, sy);
+				place();
+				gate.wake();
+			},
+			camera: () => camera,
 			frames: () => gate.frames,
 			animationLog: () => director.log(),
 			destroy() {
@@ -242,6 +333,7 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 				gate.dispose();
 				guard.dispose();
 				director.clear();
+				layers.destroy();
 				for (const sheet of sheets) sheet.destroy(true);
 				app.destroy(true, { children: true, texture: true, textureSource: true });
 			},
