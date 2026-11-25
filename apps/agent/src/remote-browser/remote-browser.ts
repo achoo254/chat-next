@@ -175,6 +175,8 @@ interface Controller {
 interface Takeover extends TakeoverInfo {
 	/** The session waiting; "" for one a device opened. */
 	key: string;
+	/** A tab the user opened in the dock: nobody waits on it, so it does not end by itself (expiresAt is 0). */
+	persistent?: boolean;
 	/** The tab shown last. */
 	targetId: string;
 	announcedExpiry: number;
@@ -196,7 +198,13 @@ interface Cast {
 interface View {
 	takeoverId: string;
 	targetId: string;
+	/** The picture size the device asked for (0: the default), kept for the tab it moves on to. */
+	maxWidth: number;
+	maxHeight: number;
 }
+
+/** What the address bar and tab buttons of a takeover ask for. */
+export type NavigateAction = "goto" | "back" | "forward" | "reload" | "new-tab" | "close-tab";
 
 interface TargetInfo {
 	targetId: string;
@@ -205,7 +213,12 @@ interface TargetInfo {
 	title: string;
 }
 
-const isPage = (t: TargetInfo) => t.type === "page" && !t.url.startsWith("devtools://");
+/**
+ * Pages the browser opens for itself on a fresh profile (Edge's sign-in and sync prompt): nobody asked for
+ * them and a device would list them among its tabs, so they are closed.
+ */
+const firstRunPrompt = (t: TargetInfo) => t.type === "page" && t.url.startsWith("edge://sync-confirmation-dialog");
+const isPage = (t: TargetInfo) => t.type === "page" && !t.url.startsWith("devtools://") && !firstRunPrompt(t);
 const blank = (url: string) => url === "" || url === "about:blank" || url.startsWith("chrome://newtab") || url.startsWith("edge://newtab");
 
 export interface RemoteBrowserOptions {
@@ -308,7 +321,10 @@ export class RemoteBrowser {
 		try {
 			await conn.send("Target.setDiscoverTargets", { discover: true });
 			const { targetInfos } = await conn.send<{ targetInfos: TargetInfo[] }>("Target.getTargets");
-			for (const info of targetInfos) if (isPage(info)) this.addPage(ctl, info);
+			for (const info of targetInfos) {
+				if (isPage(info)) this.addPage(ctl, info);
+				else this.dismissPrompt(ctl, info);
+			}
 		} catch (err) {
 			conn.close();
 			throw err;
@@ -355,6 +371,7 @@ export class RemoteBrowser {
 			case "Target.targetCreated":
 			case "Target.targetInfoChanged": {
 				const info = e.params.targetInfo as TargetInfo | undefined;
+				if (info && firstRunPrompt(info)) return this.dismissPrompt(ctl, info);
 				if (!info || !isPage(info)) return;
 				const page = ctl.pages.get(info.targetId);
 				if (!page) this.addPage(ctl, info);
@@ -384,6 +401,10 @@ export class RemoteBrowser {
 		}
 	}
 
+	private dismissPrompt(ctl: Controller, info: TargetInfo): void {
+		if (firstRunPrompt(info)) void ctl.conn.send("Target.closeTarget", { targetId: info.targetId }).catch(() => undefined);
+	}
+
 	private tabGone(ctl: Controller, targetId: string): void {
 		const page = ctl.pages.get(targetId);
 		if (!page) return;
@@ -397,7 +418,7 @@ export class RemoteBrowser {
 			for (const viewer of cast.viewers) {
 				const view = this.views.get(viewer);
 				this.views.delete(viewer);
-				if (view) void this.view(viewer, { takeoverId: view.takeoverId, targetId: "", on: true }).catch(() => undefined);
+				if (view) void this.view(viewer, { takeoverId: view.takeoverId, targetId: "", on: true, maxWidth: view.maxWidth, maxHeight: view.maxHeight }).catch(() => undefined);
 			}
 		}
 		this.tabsChanged();
@@ -563,7 +584,7 @@ export class RemoteBrowser {
 	// --- takeovers ----------------------------------------------------------------
 
 	private openTakeover(init: Omit<Takeover, "takeoverId" | "expiresAt" | "announcedExpiry" | "timer" | "passkeys">): Takeover {
-		const expiresAt = this.now() + this.idleMs;
+		const expiresAt = init.persistent === true ? 0 : this.now() + this.idleMs;
 		const t: Takeover = { ...init, takeoverId: randomBytes(12).toString("base64url"), expiresAt, announcedExpiry: expiresAt, timer: undefined, passkeys: [] };
 		this.takeovers.set(t.takeoverId, t);
 		this.currentTarget = t.targetId;
@@ -574,6 +595,7 @@ export class RemoteBrowser {
 
 	private arm(t: Takeover): void {
 		clearTimeout(t.timer);
+		if (t.persistent === true) return;
 		t.timer = setTimeout(() => this.expire(t.takeoverId), Math.max(0, t.expiresAt - this.now()) + 5);
 		t.timer.unref?.();
 	}
@@ -589,6 +611,7 @@ export class RemoteBrowser {
 
 	/** The user acts on a takeover: its expiry moves on. */
 	private touch(t: Takeover): void {
+		if (t.persistent === true) return;
 		t.expiresAt = this.now() + this.idleMs;
 		if (t.expiresAt - t.announcedExpiry >= ANNOUNCE_MOVE_MS) {
 			t.announcedExpiry = t.expiresAt;
@@ -635,6 +658,30 @@ export class RemoteBrowser {
 		return infoOf(this.openTakeover({ threadId: "", key: "", reason: "", url: page.url, targetId: page.targetId, osDialog: false }));
 	}
 
+	/**
+	 * A device opens the browser as a tab of the dock: the browser starts when it does not run, `url` opens
+	 * when given. The device takeover is shared by every device and never expires: nobody waits on it.
+	 */
+	async openTab(url?: string): Promise<TakeoverInfo> {
+		const target = url === undefined || url === "" ? undefined : checkBrowserUrl(url);
+		const ctl = await this.controller(true);
+		const page = target ? await this.show(ctl, target) : await this.currentPage(ctl);
+		const mine = [...this.takeovers.values()].find((t) => t.key === "");
+		if (mine) {
+			mine.targetId = page.targetId;
+			this.currentTarget = page.targetId;
+			if (mine.persistent !== true) {
+				mine.persistent = true;
+				mine.expiresAt = 0;
+				mine.announcedExpiry = 0;
+				clearTimeout(mine.timer);
+				this.emit({ type: "takeover", takeover: infoOf(mine) });
+			}
+			return infoOf(mine);
+		}
+		return infoOf(this.openTakeover({ threadId: "", key: "", reason: "", url: page.url, targetId: page.targetId, osDialog: false, persistent: true }));
+	}
+
 	/** A device gives a takeover back (to Claude) or closes its own. */
 	end(takeoverId: string, device: string): void {
 		this.finish(this.takeover(takeoverId), { device });
@@ -653,7 +700,7 @@ export class RemoteBrowser {
 		this.currentTarget = page.targetId;
 		const before = this.views.get(viewer);
 		if (before?.targetId !== page.targetId) this.detach(viewer);
-		this.views.set(viewer, { takeoverId: t.takeoverId, targetId: page.targetId });
+		this.views.set(viewer, { takeoverId: t.takeoverId, targetId: page.targetId, maxWidth: req.maxWidth ?? 0, maxHeight: req.maxHeight ?? 0 });
 		await ctl.conn.send("Target.activateTarget", { targetId: page.targetId }).catch(() => undefined);
 		const size = (n: number | undefined) => Math.min(Math.max(n || DEFAULT_SIZE, 200), MAX_SIZE);
 		await this.cast(ctl, page, viewer, size(req.maxWidth), size(req.maxHeight));
@@ -715,6 +762,47 @@ export class RemoteBrowser {
 			void ctl.conn.send("Page.screencastFrameAck", { sessionId: frameSession }, pageSession).catch(() => undefined);
 		}, Math.max(0, cast.lastAck + MIN_FRAME_MS - this.now()));
 		cast.ackTimer.unref?.();
+	}
+
+	/** The address bar and tab buttons: go to an address, back, forward, reload, open or close a tab. */
+	async navigate(viewer: BrowserViewer, req: { takeoverId: string; targetId: string; action: NavigateAction; url?: string }): Promise<void> {
+		const t = this.takeover(req.takeoverId);
+		const ctl = this.ctl;
+		if (!ctl?.conn.isOpen) throw new BrowserNotRunning("the tunelo browser is not running");
+		this.touch(t);
+		const address = req.url === undefined || req.url === "" ? undefined : checkBrowserUrl(req.url);
+		if (req.action === "new-tab") {
+			const { targetId } = await ctl.conn.send<{ targetId: string }>("Target.createTarget", { url: address ?? "about:blank" });
+			const page = await this.pageById(ctl, targetId);
+			const before = this.views.get(viewer);
+			return this.view(viewer, { takeoverId: t.takeoverId, targetId: page.targetId, on: true, maxWidth: before?.maxWidth ?? 0, maxHeight: before?.maxHeight ?? 0 });
+		}
+		const page = ctl.pages.get(req.targetId || t.targetId);
+		if (!page) throw new BrowserToolError("that tab is closed");
+		await page.ready;
+		const sessionId = page.sessionId;
+		if (!sessionId) throw new BrowserToolError("the tab cannot be reached");
+		switch (req.action) {
+			case "goto":
+				if (!address) throw new BrowserToolError("an address is needed");
+				await ctl.conn.send("Page.navigate", { url: address }, sessionId);
+				return;
+			case "reload":
+				await ctl.conn.send("Page.reload", {}, sessionId);
+				return;
+			case "back":
+			case "forward": {
+				const history = await ctl.conn.send<{ currentIndex: number; entries: { id: number }[] }>("Page.getNavigationHistory", {}, sessionId);
+				const entry = history.entries[history.currentIndex + (req.action === "back" ? -1 : 1)];
+				if (entry) await ctl.conn.send("Page.navigateToHistoryEntry", { entryId: entry.id }, sessionId);
+				return;
+			}
+			case "close-tab":
+				// The last tab stays, blank: the browser always has something to show.
+				if (ctl.pages.size <= 1) await ctl.conn.send("Page.navigate", { url: "about:blank" }, sessionId);
+				else await ctl.conn.send("Target.closeTarget", { targetId: page.targetId });
+				return;
+		}
 	}
 
 	/** One input of the user on a takeover's tab; refused unless the takeover is open. Never logged. */
@@ -802,5 +890,5 @@ export class RemoteBrowser {
 }
 
 function infoOf(t: Takeover): TakeoverInfo {
-	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: t.expiresAt, osDialog: t.osDialog };
+	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: t.persistent === true ? 0 : t.expiresAt, osDialog: t.osDialog };
 }

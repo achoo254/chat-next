@@ -16,6 +16,11 @@ export interface PaneNode {
 	readonly session: number;
 	/** The session's AI runs in it: closing the pane only detaches (the session goes on). */
 	readonly ai?: true;
+	/**
+	 * The machine's browser, not a terminal: `session` is 0 (the machine numbers its sessions from 1) and no
+	 * session is behind it, so nothing here closes or reopens one.
+	 */
+	readonly browser?: true;
 }
 
 export interface SplitNode {
@@ -83,7 +88,7 @@ export function isSplitPane(layout: DockLayout, paneId: string): boolean {
 
 /** Every session the layout shows. */
 export function sessionsOf(layout: DockLayout): Set<number> {
-	return new Set(layout.tabs.flatMap((tab) => panesOf(tab.root).map((p) => p.session)));
+	return new Set(layout.tabs.flatMap((tab) => panesOf(tab.root).filter((p) => p.browser !== true).map((p) => p.session)));
 }
 
 export function activeTab(layout: DockLayout): TerminalTab | null {
@@ -97,6 +102,15 @@ export function addTab(layout: DockLayout, session: number, ai = false): DockLay
 	// A new AI tab is the AI shown again: the earlier close no longer holds.
 	const { aiClosed: _closed, ...kept } = layout;
 	return { ...(ai ? kept : layout), tabs: [...layout.tabs, tab].slice(-MAX_TABS), active: tab.id };
+}
+
+/** The tab of the machine's browser (there is one: its own tabs live inside it), made the active one; added when there is none. */
+export function addBrowserTab(layout: DockLayout): DockLayout {
+	const existing = layout.tabs.find((t) => panesOf(t.root).some((p) => p.browser === true));
+	if (existing !== undefined) return existing.id === layout.active ? layout : { ...layout, active: existing.id };
+	const pane: PaneNode = { kind: "pane", id: newId("pane"), session: 0, browser: true };
+	const tab: TerminalTab = { id: newId("tab"), root: pane, focus: pane.id };
+	return { ...layout, tabs: [...layout.tabs, tab].slice(-MAX_TABS), active: tab.id };
 }
 
 /** Closed by the user: the layout remembers it when the AI's own tab was among `closedPaneIds`. */
@@ -223,6 +237,7 @@ export function pruneForScope(layout: DockLayout, sessions: readonly { readonly 
 	let next = layout;
 	for (const tab of layout.tabs)
 		for (const pane of panesOf(tab.root)) {
+			if (pane.browser === true) continue;
 			const has = owner.get(pane.session);
 			const expected = pane.ai === true ? threadId : "";
 			if (has === undefined || has !== expected) next = closePane(next, pane.id);
@@ -242,6 +257,7 @@ function parseNode(value: unknown, depth: number, seen: Set<string>): LayoutNode
 	if (!isId(v.id) || seen.has(v.id)) return null;
 	seen.add(v.id);
 	if (v.kind === "pane") {
+		if (v.browser === true) return { kind: "pane", id: v.id, session: 0, browser: true };
 		const session = v.session;
 		if (typeof session !== "number" || !Number.isInteger(session) || session < 1 || session > 0xffffffff) return null;
 		return { kind: "pane", id: v.id, session, ...(v.ai === true ? { ai: true as const } : {}) };

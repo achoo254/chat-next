@@ -14,11 +14,12 @@ import { providerOf } from "../machines/use-machines.ts";
 
 type TerminalCopy = MachinesCopy["terminal"];
 
-export type NewTabGroup = "terminal" | "agent" | "session";
+export type NewTabGroup = "terminal" | "browser" | "agent" | "session";
 
 /** The menu's groups, top to bottom, each under its heading. A group with no entry is left out. */
 export const NEW_TAB_GROUPS: readonly { readonly id: NewTabGroup; heading(t: TerminalCopy): string }[] = [
 	{ id: "terminal", heading: (t) => t.groupTerminal },
+	{ id: "browser", heading: (t) => t.groupBrowser },
 	{ id: "agent", heading: (t) => t.groupAgent },
 	{ id: "session", heading: (t) => t.sessionsOnMachine },
 ];
@@ -65,6 +66,16 @@ export const KNOWN_AIS: readonly KnownAi[] = [
 	{ id: "antigravity", name: "Antigravity", icon: "run-antigravity" },
 ];
 
+/** Whether the machine's browser can open as a tab: it runs on the machine, so the machine needs a browser and a tunelo that knows the tab requests. */
+export type BrowserAvailability = "ready" | "not-installed" | "needs-update";
+
+/** The browser against what the machine reports (none reported yet: "not installed", as agentChoices does). */
+export function browserAvailability(info: MachineInfo | null): BrowserAvailability {
+	const reported = info?.browser;
+	if (reported === undefined || !reported.available) return "not-installed";
+	return reported.tabs ? "ready" : "needs-update";
+}
+
 /** Whether a new session of the AI can open in the terminal: the machine has it, signed in, and its CLI opens there. */
 export type AgentAvailability = "ready" | "not-installed" | "needs-login" | "not-in-terminal";
 
@@ -107,12 +118,16 @@ export interface NewTabInput {
 	 */
 	readonly noFolder: boolean;
 	readonly agents: readonly AgentChoice[];
+	/** The machine's browser as a tab; absent: the menu has no row for it. */
+	readonly browser?: BrowserAvailability | undefined;
 	/** The machine's sessions no pane shows. */
 	readonly hidden: readonly TermSessionInfo[];
 	/** "Today" for the sessions' opened times: the moment the menu opened. */
 	readonly now: number;
 	onNewTab(): void;
 	onStartAgent(provider: string): void;
+	/** Opens the browser tab (or shows it when it is open). */
+	onNewBrowser?(): void;
 	onReopen(session: number): void;
 	/** Stops the session on the machine (TermClose), freeing what it holds; none: rows have no stop button. */
 	onStop?(session: number): void;
@@ -126,6 +141,18 @@ function sessionHint(t: TerminalCopy, s: TermSessionInfo, now: number): string {
 	]
 		.filter((x) => x !== "")
 		.join(" · ");
+}
+
+/** Why the browser's row is greyed out; none when it can open. */
+function browserHint(t: TerminalCopy, availability: BrowserAvailability): string | undefined {
+	switch (availability) {
+		case "not-installed":
+			return t.browserNotInstalled;
+		case "needs-update":
+			return t.browserNeedsUpdate;
+		case "ready":
+			return undefined;
+	}
 }
 
 /** Why the AI's row is greyed out; none when it can start. */
@@ -145,6 +172,19 @@ function agentHint(t: TerminalCopy, ai: AgentChoice, noFolder: boolean): string 
 export function buildNewTabActions(input: NewTabInput): NewTabAction[] {
 	const { t, prefix, busy, agents, hidden, now } = input;
 	const terminal: NewTabAction = { id: "new-terminal", group: "terminal", label: t.newTab, shortcut: `${prefix}T`, icon: "terminal", disabled: busy, run: input.onNewTab };
+	const browserRows: NewTabAction[] = [];
+	if (input.browser !== undefined && input.onNewBrowser !== undefined) {
+		const hint = browserHint(t, input.browser);
+		browserRows.push({
+			id: "new-browser",
+			group: "browser",
+			label: t.newBrowser,
+			icon: "globe",
+			disabled: busy || hint !== undefined,
+			...(hint === undefined ? {} : { hint }),
+			run: input.onNewBrowser,
+		});
+	}
 	const agentRows = agents.map((ai): NewTabAction => {
 		const hint = agentHint(t, ai, input.noFolder);
 		return {
@@ -173,7 +213,7 @@ export function buildNewTabActions(input: NewTabInput): NewTabAction[] {
 			run: () => input.onReopen(s.session),
 		};
 	});
-	return [terminal, ...agentRows, ...sessionRows];
+	return [terminal, ...browserRows, ...agentRows, ...sessionRows];
 }
 
 /** The entries whose label, hint or keywords hold every word of `query` (case and Vietnamese accents aside). */

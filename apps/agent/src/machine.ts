@@ -768,7 +768,7 @@ export class Machine {
       attachments: attachmentLimitsBody(this.core.attachmentLimits),
       secrets: true,
       gitChanges: true,
-      browser: { available: this.browser.available(), running: this.browser.running(), clearable: true },
+      browser: { available: this.browser.available(), running: this.browser.running(), clearable: true, tabs: true },
       screenShare: this.screenShare.supported,
       agentUpdate: this.updater.info(),
       terminal: this.terminal.availability(),

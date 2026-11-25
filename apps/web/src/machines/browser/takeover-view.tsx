@@ -9,12 +9,17 @@
 // input goes out at once over the end-to-end encrypted link and the field
 // is emptied. "Trả lại cho <AI>" ends the takeover; "Thu nhỏ" only closes the
 // view.
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
+//
+// Embedded (a tab of the dock, browser-pane.tsx) it has no title bar and no
+// "give back": the address is editable, with back, forward, reload, new tab
+// and close tab, and the picture streams only while its tab is the one shown.
+import { useEffect, useRef, useState, type FormEvent, type ClipboardEvent, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { BrowserMouseType, type BrowserInputSchema, type BrowserTab, type BrowserTakeover } from "@achoo254/chat-proto/remote/remote";
+import { BrowserMouseType, BrowserNavigateAction, type BrowserInputSchema, type BrowserTab, type BrowserTakeover } from "@achoo254/chat-proto/remote/remote";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useDomId } from "../../messaging/ui/parts.tsx";
 import type { MachineLink } from "../link/machine-link.ts";
+import { addressToUrl } from "./address.ts";
 import { BrowserIcon } from "./browser-icons.tsx";
 import { errorText } from "../use-machines.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
@@ -36,6 +41,10 @@ interface TakeoverViewProps {
 	online: boolean;
 	inSession: boolean;
 	onMinimize: () => void;
+	/** A tab of the dock: editable address and tab buttons, no title bar, nothing to give back. */
+	embedded?: boolean;
+	/** Embedded and its tab is not the one shown: the machine stops streaming it (default: shown). */
+	active?: boolean;
 }
 
 interface Picture {
@@ -49,7 +58,7 @@ function wantedSize(): { maxWidth: number; maxHeight: number } {
 	return { maxWidth: Math.min(1600, Math.round(window.innerWidth * dpr)), maxHeight: Math.min(1600, Math.round(window.innerHeight * dpr)) };
 }
 
-export default function TakeoverView({ link, takeover, ai, online, inSession, onMinimize }: TakeoverViewProps) {
+export default function TakeoverView({ link, takeover, ai, online, inSession, onMinimize, embedded = false, active = true }: TakeoverViewProps) {
 	const t = useMachinesCopy();
 	const b = t.browser;
 	const id = useDomId("browser");
@@ -63,6 +72,8 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 	const [error, setError] = useState("");
 	const [ending, setEnding] = useState(false);
 	const [visible, setVisible] = useState(() => document.visibilityState !== "hidden");
+	/** The address being typed; null: the bar shows the page's address. */
+	const [draft, setDraft] = useState<string | null>(null);
 	const surface = useRef<HTMLDivElement>(null);
 	const image = useRef<HTMLImageElement>(null);
 	const typing = useRef<HTMLInputElement>(null);
@@ -101,22 +112,22 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 	// The machine streams only while this view shows on a visible page (again after a reconnect);
 	// it goes on with the tab shown last.
 	useEffect(() => {
-		if (!online || !visible) return;
+		if (!online || !visible || !active) return;
 		link.request({ case: "browserView", value: { takeoverId, targetId: "", on: true, ...wantedSize() } }).catch((err: unknown) => setError(errorText(t, err, ai)));
 		return () => {
 			link.request({ case: "browserView", value: { takeoverId, targetId: "", on: false, maxWidth: 0, maxHeight: 0 } }).catch(() => undefined);
 		};
-	}, [link, takeoverId, online, visible, t, ai]);
+	}, [link, takeoverId, online, visible, active, t, ai]);
 
 	// How long the machine takes to answer, while the view shows.
 	useEffect(() => {
-		if (!online || !visible) return;
-		let active = true;
+		if (!online || !visible || !active) return;
+		let measuring = true;
 		const measure = () => {
 			const start = performance.now();
 			link.request({ case: "ping", value: {} }).then(
 				() => {
-					if (active) setRtt(Math.round(performance.now() - start));
+					if (measuring) setRtt(Math.round(performance.now() - start));
 				},
 				() => undefined,
 			);
@@ -124,10 +135,10 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 		measure();
 		const timer = window.setInterval(measure, PING_MS);
 		return () => {
-			active = false;
+			measuring = false;
 			window.clearInterval(timer);
 		};
-	}, [link, online, visible]);
+	}, [link, online, visible, active]);
 
 	const send = (action: Action) => {
 		link.request({ case: "browserInput", value: { takeoverId, targetId: shown, action } }).catch((err: unknown) => setError(errorText(t, err, ai)));
@@ -267,7 +278,7 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 	// --- keys ------------------------------------------------------------------
 
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-		if (e.key === "Escape" && e.shiftKey) return onMinimize();
+		if (e.key === "Escape" && e.shiftKey && !embedded) return onMinimize();
 		const k = keyPress(e);
 		if (k === null) return;
 		e.preventDefault();
@@ -316,12 +327,37 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 		link.request({ case: "browserView", value: { takeoverId, targetId, on: true, ...wantedSize() } }).catch((err: unknown) => setError(errorText(t, err, ai)));
 	};
 
+	/** The address bar and tab buttons (embedded only). */
+	const navigate = (action: BrowserNavigateAction, to = "") => {
+		link.request({ case: "browserNavigate", value: { takeoverId, targetId: shown, action, url: to } }).catch((err: unknown) => setError(errorText(t, err, ai)));
+	};
+	const go = (e: FormEvent) => {
+		e.preventDefault();
+		const to = addressToUrl(draft ?? "");
+		setDraft(null);
+		if (to !== null) navigate(BrowserNavigateAction.GOTO, to);
+		surface.current?.focus();
+	};
+	const tabName = (tab: BrowserTab) => tab.title || (tab.url === "" || tab.url === "about:blank" ? b.blankTab : tab.url);
+
 	const current = tabs.find((x) => x.targetId === shown);
 	const url = current?.url ?? takeover.url;
 	const expires = new Date(Number(takeover.expiresAt)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 	const forSession = takeover.threadId !== "";
 	return (
-		<div className={`mx-browser${inSession ? " in-session" : ""}`} role="dialog" aria-modal={!inSession} aria-labelledby={`${id}-title`} data-id="browser-view">
+		<div
+			className={`mx-browser${embedded ? " embedded" : inSession ? " in-session" : ""}`}
+			role={embedded ? "region" : "dialog"}
+			aria-modal={embedded ? undefined : !inSession}
+			aria-labelledby={`${id}-title`}
+			data-id="browser-view"
+		>
+			{embedded && (
+				<h3 id={`${id}-title`} className="sr-only">
+					{b.viewTitle}
+				</h3>
+			)}
+			{!embedded && (
 			<header className="mx-browser-head">
 				<div className="mx-browser-title">
 					<h3 id={`${id}-title`}>
@@ -337,21 +373,68 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 					<BrowserIcon name="x" />
 				</button>
 			</header>
-			<div className="mx-browser-bar">
-				<label className="sr-only" htmlFor={`${id}-url`}>
-					{b.address}
-				</label>
-				<input id={`${id}-url`} className="input mono mx-browser-url" readOnly value={url} title={current?.title ?? ""} data-id="browser-view-url" />
-				{tabs.length > 1 && (
+			)}
+			{embedded ? (
+				<form className="mx-browser-bar" onSubmit={go}>
+					<button type="button" className="icon-btn" aria-label={b.back} title={b.back} onClick={() => navigate(BrowserNavigateAction.BACK)} data-id="browser-view-back">
+						<BrowserIcon name="back" small />
+					</button>
+					<button type="button" className="icon-btn" aria-label={b.forward} title={b.forward} onClick={() => navigate(BrowserNavigateAction.FORWARD)} data-id="browser-view-forward">
+						<BrowserIcon name="forward" small />
+					</button>
+					<button type="button" className="icon-btn" aria-label={b.reload} title={b.reload} onClick={() => navigate(BrowserNavigateAction.RELOAD)} data-id="browser-view-reload">
+						<BrowserIcon name="reload" small />
+					</button>
+					<label className="sr-only" htmlFor={`${id}-url`}>
+						{b.addressEdit}
+					</label>
+					<input
+						id={`${id}-url`}
+						className="input mono mx-browser-url"
+						value={draft ?? url}
+						title={current?.title ?? ""}
+						placeholder={b.addressEdit}
+						autoComplete="off"
+						autoCapitalize="off"
+						autoCorrect="off"
+						spellCheck={false}
+						enterKeyHint="go"
+						onFocus={(e) => e.currentTarget.select()}
+						onChange={(e) => setDraft(e.target.value)}
+						onBlur={() => setDraft(null)}
+						data-id="browser-view-url"
+					/>
 					<select className="input mx-browser-tabs" aria-label={b.tab} value={shown} onChange={(e) => choose(e.target.value)} data-id="browser-view-tabs">
 						{tabs.map((tab) => (
 							<option key={tab.targetId} value={tab.targetId}>
-								{tab.title || tab.url}
+								{tabName(tab)}
 							</option>
 						))}
 					</select>
-				)}
-			</div>
+					<button type="button" className="icon-btn" aria-label={b.newTab} title={b.newTab} onClick={() => navigate(BrowserNavigateAction.NEW_TAB)} data-id="browser-view-new-tab">
+						<BrowserIcon name="plus" small />
+					</button>
+					<button type="button" className="icon-btn" aria-label={b.closeTab} title={b.closeTab} onClick={() => navigate(BrowserNavigateAction.CLOSE_TAB)} data-id="browser-view-close-tab">
+						<BrowserIcon name="x" small />
+					</button>
+				</form>
+			) : (
+				<div className="mx-browser-bar">
+					<label className="sr-only" htmlFor={`${id}-url`}>
+						{b.address}
+					</label>
+					<input id={`${id}-url`} className="input mono mx-browser-url" readOnly value={url} title={current?.title ?? ""} data-id="browser-view-url" />
+					{tabs.length > 1 && (
+						<select className="input mx-browser-tabs" aria-label={b.tab} value={shown} onChange={(e) => choose(e.target.value)} data-id="browser-view-tabs">
+							{tabs.map((tab) => (
+								<option key={tab.targetId} value={tab.targetId}>
+									{tab.title || tab.url}
+								</option>
+							))}
+						</select>
+					)}
+				</div>
+			)}
 			{/* The remote page itself: like a canvas, every pointer and key on it goes to the machine's tab. */}
 			{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- role "application" hands all input to the remote page */}
 			<div
@@ -427,11 +510,13 @@ export default function TakeoverView({ link, takeover, ai, online, inSession, on
 					) : (
 						b.e2e
 					)}{" "}
-					<span className="muted">{b.expires(expires)}</span>
+					{!embedded && <span className="muted">{b.expires(expires)}</span>}
 				</p>
-				<button type="button" className="btn btn-primary btn-sm" disabled={ending} onClick={giveBack} data-id="browser-view-give-back">
-					{forSession ? b.giveBack(ai) : b.close}
-				</button>
+				{!embedded && (
+					<button type="button" className="btn btn-primary btn-sm" disabled={ending} onClick={giveBack} data-id="browser-view-give-back">
+						{forSession ? b.giveBack(ai) : b.close}
+					</button>
+				)}
 			</footer>
 			{error !== "" && (
 				<p className="mx-error mx-browser-error" role="alert">

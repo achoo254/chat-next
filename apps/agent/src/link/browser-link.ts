@@ -4,12 +4,12 @@
 // here end-to-end encrypted and are never logged. Input of one device is
 // applied strictly in order, apart from its other requests.
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { BrowserMouseType, type BrowserInput, type Frame, type FrameSchema, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
+import { BrowserMouseType, BrowserNavigateAction, type BrowserInput, type Frame, type FrameSchema, type MachineInfo } from "@achoo254/chat-proto/remote/remote";
 import { InputError, type InputAction, type MouseKind } from "../remote-browser/browser-input.ts";
-import type { BrowserEvent, BrowserViewer, RemoteBrowser, TakeoverInfo } from "../remote-browser/remote-browser.ts";
+import type { BrowserEvent, BrowserViewer, NavigateAction, RemoteBrowser, TakeoverInfo } from "../remote-browser/remote-browser.ts";
 
 type Body = NonNullable<MessageInitShape<typeof FrameSchema>["body"]>;
-export type BrowserFrame = Extract<Frame["body"], { case: "browserControl" | "browserView" | "browserInput" | "browserTakeoverEnd" | "browserClear" }>;
+export type BrowserFrame = Extract<Frame["body"], { case: "browserControl" | "browserView" | "browserInput" | "browserTakeoverEnd" | "browserClear" | "browserOpen" | "browserNavigate" }>;
 
 /** More than this unsent on the device's socket: pictures are skipped until it drains. */
 const BUSY_BYTES = 512 * 1024;
@@ -39,6 +39,15 @@ export function inputAction(v: BrowserInput): InputAction {
 			throw new InputError("no action");
 	}
 }
+
+const NAVIGATE: Partial<Record<BrowserNavigateAction, NavigateAction>> = {
+	[BrowserNavigateAction.GOTO]: "goto",
+	[BrowserNavigateAction.BACK]: "back",
+	[BrowserNavigateAction.FORWARD]: "forward",
+	[BrowserNavigateAction.RELOAD]: "reload",
+	[BrowserNavigateAction.NEW_TAB]: "new-tab",
+	[BrowserNavigateAction.CLOSE_TAB]: "close-tab",
+};
 
 export function takeoverBody(t: TakeoverInfo) {
 	return { takeoverId: t.takeoverId, threadId: t.threadId, reason: t.reason, url: t.url, expiresAt: BigInt(t.expiresAt), osDialog: t.osDialog };
@@ -95,6 +104,19 @@ export class BrowserLink {
 					(err: unknown) => this.fail(id, err),
 				);
 				return;
+			case "browserOpen":
+				void this.browser.openTab(b.value.url).then(
+					(t) => this.send(id, { case: "browserTakeover", value: takeoverBody(t) }),
+					(err: unknown) => this.fail(id, err),
+				);
+				return;
+			case "browserNavigate": {
+				const v = b.value;
+				const action = NAVIGATE[v.action];
+				if (!action) return this.fail(id, new InputError("not a navigation"));
+				void this.browser.navigate(this.viewer, { takeoverId: v.takeoverId, targetId: v.targetId, action, url: v.url }).then(ack, (err: unknown) => this.fail(id, err));
+				return;
+			}
 			case "browserView": {
 				const v = b.value;
 				void this.browser

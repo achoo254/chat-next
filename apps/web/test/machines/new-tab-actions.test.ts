@@ -6,7 +6,7 @@ import { LoginState, MachineInfoSchema, TermSessionInfoSchema, TerminalAvailabil
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { describe, expect, it, vi } from "vitest";
 import { viMachines } from "../../src/machines/copy-vi.ts";
-import { agentChoices, buildNewTabActions, filterNewTabActions, groupNewTabActions, type AgentChoice, type NewTabInput } from "../../src/terminal/new-tab-actions.ts";
+import { agentChoices, browserAvailability, buildNewTabActions, filterNewTabActions, groupNewTabActions, type AgentChoice, type NewTabInput } from "../../src/terminal/new-tab-actions.ts";
 
 const t = viMachines.terminal;
 
@@ -67,6 +67,29 @@ describe("buildNewTabActions", () => {
 		expect(ready).toMatchObject({ disabled: true, hint: "Mở trong một dự án để chạy agent" });
 		// What is wrong with the AI itself says more than the folder.
 		expect(missing).toMatchObject({ disabled: true, hint: "Chưa cài" });
+	});
+
+	it("offers the machine's browser right after the terminal, greyed out with why when it cannot open", () => {
+		const onNewBrowser = vi.fn();
+		const base = { onNewBrowser, agents: [READY] };
+		const ready = buildNewTabActions(input({ ...base, browser: "ready" }));
+		expect(groupNewTabActions(ready).map((g) => g.id)).toEqual(["terminal", "browser", "agent"]);
+		expect(ready[1]).toMatchObject({ id: "new-browser", label: "Trình duyệt", icon: "globe", disabled: false });
+		ready[1]?.run();
+		expect(onNewBrowser).toHaveBeenCalledOnce();
+		expect(buildNewTabActions(input({ ...base, browser: "not-installed" }))[1]).toMatchObject({ disabled: true, hint: "Máy chưa cài Chrome, Edge hay Brave" });
+		expect(buildNewTabActions(input({ ...base, browser: "needs-update" }))[1]).toMatchObject({ disabled: true, hint: "Cần cập nhật tunelo trên máy" });
+		expect(buildNewTabActions(input({ ...base, browser: "ready", busy: true }))[1]).toMatchObject({ disabled: true });
+		// A menu that does not know the browser has no row for it.
+		expect(buildNewTabActions(input({ agents: [READY] })).some((a) => a.group === "browser")).toBe(false);
+	});
+
+	it("reads the browser against what the machine reports", () => {
+		const info = (browser: MessageInitShape<typeof MachineInfoSchema>["browser"]) => create(MachineInfoSchema, { browser });
+		expect(browserAvailability(null)).toBe("not-installed");
+		expect(browserAvailability(info({ available: false, tabs: true }))).toBe("not-installed");
+		expect(browserAvailability(info({ available: true, tabs: false }))).toBe("needs-update");
+		expect(browserAvailability(info({ available: true, tabs: true }))).toBe("ready");
 	});
 
 	it("runs the callback each entry names", () => {

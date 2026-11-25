@@ -7,7 +7,7 @@ import type { MachinesCopy } from "../machines/copy-vi.ts";
 import { MachineIcon } from "../machines/machine-icons.tsx";
 import { Icon } from "../components/screen-icons.tsx";
 import type { TermSessionInfo } from "@achoo254/chat-proto/remote/remote";
-import { buildNewTabActions, groupNewTabActions, NEW_TAB_GROUPS, type AgentChoice, type NewTabAction } from "./new-tab-actions.ts";
+import { buildNewTabActions, groupNewTabActions, NEW_TAB_GROUPS, type AgentChoice, type BrowserAvailability, type NewTabAction } from "./new-tab-actions.ts";
 import { StopSessionButton } from "./stop-session-button.tsx";
 import type { TabView } from "./terminal-tabs.tsx";
 
@@ -20,11 +20,13 @@ interface TabSheetProps {
 	startingAgent: boolean;
 	noFolder: boolean;
 	agents: readonly AgentChoice[];
+	browser: BrowserAvailability | undefined;
 	/** The machine's sessions no tab shows. */
 	hidden: readonly TermSessionInfo[];
 	/** "Today" for the sessions listed: the moment the sheet opened. */
 	now: number;
 	onNewTab(): void;
+	onNewBrowser(): void;
 	onStartAgent(provider: string): void;
 	onReopen(session: number): void;
 	/** Stops one of the machine's sessions the sheet lists. */
@@ -35,8 +37,8 @@ interface TabSheetProps {
 	onDone(): void;
 }
 
-export function TabSheet({ t, tabs, active, busy, startingAgent, noFolder, agents, hidden, now, onNewTab, onStartAgent, onReopen, onStop, onSelect, onClose, onDone }: TabSheetProps) {
-	const actions = buildNewTabActions({ t, prefix: "", busy, startingAgent, noFolder, agents, hidden, now, onNewTab, onStartAgent, onReopen, onStop });
+export function TabSheet({ t, tabs, active, busy, startingAgent, noFolder, agents, browser, hidden, now, onNewTab, onNewBrowser, onStartAgent, onReopen, onStop, onSelect, onClose, onDone }: TabSheetProps) {
+	const actions = buildNewTabActions({ t, prefix: "", busy, startingAgent, noFolder, agents, browser, hidden, now, onNewTab, onNewBrowser, onStartAgent, onReopen, onStop });
 	const run = (action: NewTabAction) => {
 		if (action.disabled === true) return;
 		// Closed first: an entry that navigates must not leave the sheet behind.
@@ -67,7 +69,7 @@ export function TabSheet({ t, tabs, active, busy, startingAgent, noFolder, agent
 									onSelect(tab.id);
 								}}
 							>
-								<MachineIcon name={tab.ai === true ? "ai-session" : "terminal"} small />
+								<MachineIcon name={tab.browser === true ? "globe" : tab.ai === true ? "ai-session" : "terminal"} small />
 								<span>{tab.title}</span>
 							</button>
 							<button type="button" className="tx-sheet-x" aria-label={t.closeTab(tab.title)} title={t.closeTab(tab.title)} onClick={() => onClose(tab.id)}>

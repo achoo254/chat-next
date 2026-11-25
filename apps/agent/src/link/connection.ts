@@ -911,6 +911,8 @@ export class Connection {
         case "browserInput":
         case "browserTakeoverEnd":
         case "browserClear":
+        case "browserOpen":
+        case "browserNavigate":
           return this.browserFrame(id, b);
         case "screenShareStatusRequest":
         case "screenShareOpen":

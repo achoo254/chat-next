@@ -43,6 +43,7 @@ import type { TerminalLink } from "./terminal-link.ts";
 import { terminalLinkFor } from "./terminal-links.ts";
 import {
 	activeTab,
+	addBrowserTab,
 	addTab,
 	aiPane,
 	closePane,
@@ -76,7 +77,8 @@ import { modePath, openSessionIn } from "../machines/session-mode.tsx";
 import { useAgentProjects } from "../machines/agent-projects-store.ts";
 import { adoptStarted } from "../machines/project-actions.ts";
 import { machineErrorText, needsProjectTrust } from "../machines/machine-errors.ts";
-import { agentChoices, type AgentChoice } from "./new-tab-actions.ts";
+import { agentChoices, browserAvailability, type AgentChoice, type BrowserAvailability } from "./new-tab-actions.ts";
+import { BrowserPane } from "../machines/browser/browser-pane.tsx";
 import { TabSheet } from "./tab-sheet.tsx";
 import "./terminal.css";
 
@@ -178,6 +180,7 @@ export default function TerminalScreen({
 	const [projects] = useAgentProjects();
 	const agents: DockAgents = {
 		choices: agentChoices(state.info),
+		browser: browserAvailability(state.info),
 		// Filed under its folder's project, as the tree's quick start does (a machine the directory does not know yet: left as it is).
 		onStarted: (started) => {
 			const entry = hub.entry(machine);
@@ -232,6 +235,8 @@ export interface TerminalDockProps {
 /** What the dock needs to start a new AI session from its "+" menu. */
 export interface DockAgents {
 	readonly choices: readonly AgentChoice[];
+	/** The machine's browser as a tab: its row of the "+" menu; none: no row. */
+	readonly browser?: BrowserAvailability | undefined;
 	/** A session just started from the menu, before the page moves to it. */
 	onStarted?(thread: ThreadSummary): void;
 }
@@ -435,6 +440,9 @@ export function TerminalDock({
 				if (session !== null) setLayout((l) => addTab(l, session));
 				return;
 			}
+			case "new-browser":
+				setLayout((l) => addBrowserTab(l));
+				return;
 			case "split": {
 				if (tab === null) return run({ kind: "new-tab" });
 				const pane = tab.focus;
@@ -609,7 +617,9 @@ export function TerminalDock({
 
 	const view = layout;
 	const tab = activeTab(view);
-	const focused = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
+	const focusedPane = tab === null ? null : (panesOf(tab.root).find((p) => p.id === tab.focus) ?? null);
+	// What the keys, the key bar and the paste reach is a terminal: the browser pane takes its own input.
+	const focused = focusedPane?.browser === true ? null : focusedPane;
 	const shown = sessionsOf(layout);
 	const titleOf = (session: number, index: number) => titles.get(session) || tt.tabTitle(index + 1);
 	// The AI's own tab: its title without the state mark the AI prints, its state from the session (StatusGlyph), as in the AI Agent column.
@@ -623,6 +633,7 @@ export function TerminalDock({
 	const moreTabs = touch && thread !== undefined && (layout.tabs.length > 1 || hidden.length > 0);
 	const tabViews = layout.tabs.map((x, i) => {
 		const pane = panesOf(x.root).find((p) => p.id === x.focus);
+		if (pane?.browser === true) return { id: x.id, title: tt.browserTab, browser: true };
 		if (pane?.ai === true) return { id: x.id, title: aiTitleOf(pane.session, i), ai: true, status: thread?.status, provider: thread?.provider, who: thread?.aiName };
 		return { id: x.id, title: pane === undefined ? tt.tabTitle(i + 1) : titleOf(pane.session, i), ai: false };
 	});
@@ -831,6 +842,13 @@ export function TerminalDock({
 	}
 
 	const renderPane = (pane: PaneNode): ReactNode => {
+		if (pane.browser === true) {
+			return (
+				<div className="tx-pane-in tx-pane-browser" data-split={isSplitPane(layout, pane.id) ? "" : undefined}>
+					<BrowserPane link={link} online={online} active={tab !== null && panesOf(tab.root).some((p) => p.id === pane.id)} />
+				</div>
+			);
+		}
 		const isFocused = focused?.id === pane.id;
 		const code = ended.get(pane.session);
 		const closeLabel = pane.ai === true ? tt.closePaneAi : tt.closePane;
@@ -942,6 +960,7 @@ export function TerminalDock({
 					active={tab?.id ?? ""}
 					hidden={hidden}
 					agents={agents?.choices ?? []}
+					browser={agents?.browser}
 					startingAgent={startingAgent}
 					noFolder={thread === undefined}
 					busy={busy || !online}
@@ -1046,9 +1065,11 @@ export function TerminalDock({
 							startingAgent={startingAgent}
 							noFolder={thread === undefined}
 							agents={agents?.choices ?? []}
+							browser={agents?.browser}
 							hidden={hidden}
 							now={tabsOpen}
 							onNewTab={() => void run({ kind: "new-tab" })}
+							onNewBrowser={() => void run({ kind: "new-browser" })}
 							onStartAgent={(provider) => void startAgent(provider)}
 							onReopen={reopen}
 							onStop={stopListed}

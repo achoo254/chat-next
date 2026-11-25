@@ -72,6 +72,12 @@ export class FakeChrome {
 		return tab;
 	}
 
+	/** A page the browser opens by itself, as targetCreated tells. */
+	openPage(url: string): void {
+		const tab = this.addTab(url);
+		this.event("Target.targetCreated", { targetInfo: this.info(tab) });
+	}
+
 	called(method: string): Call[] {
 		return this.calls.filter((c) => c.method === method);
 	}
@@ -128,6 +134,14 @@ export class FakeChrome {
 						this.event("Target.targetInfoChanged", { targetInfo: this.info(tab) });
 					}
 					return reply({ frameId: "f" });
+				}
+				case "Page.getNavigationHistory":
+					return reply({ currentIndex: 1, entries: [{ id: 10 }, { id: 11 }, { id: 12 }] });
+				case "Target.closeTarget": {
+					const id = String(msg.params.targetId);
+					this.tabs.delete(id);
+					this.event("Target.targetDestroyed", { targetId: id });
+					return reply({ success: true });
 				}
 				case "Page.startScreencast":
 					reply({});

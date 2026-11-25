@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toBinary } from "@bufbuild/protobuf";
-import { BrowserMouseType, ErrorReason, type Frame, FrameSchema } from "@achoo254/chat-proto/remote/remote";
+import { BrowserMouseType, BrowserNavigateAction, ErrorReason, type Frame, FrameSchema } from "@achoo254/chat-proto/remote/remote";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ConfigStore } from "../src/config.ts";
 import { McpHost } from "../src/mcp/mcp-host.ts";
@@ -237,6 +237,122 @@ describe("taking over the browser from a device", () => {
 		chrome.quit();
 		await expect(waiting).rejects.toThrow(/browser was closed/);
 		expect(browser.running()).toBe(false);
+	});
+});
+
+describe("the browser as a tab of the dock", () => {
+	const takeoverOf = (frame: Frame) => (frame.body.case === "browserTakeover" ? frame.body.value : undefined);
+
+	it("a device starts the browser itself and gets one takeover that does not expire", async () => {
+		const { browser } = makeBrowser({ idleMs: 100 });
+		const link = await device(browser);
+		const opened = takeoverOf(await link.request("o1", { case: "browserOpen", value: { url: "https://example.com/" } }));
+		expect(chrome.launched).toBe(1);
+		expect(opened?.threadId).toBe("");
+		expect(opened?.expiresAt).toBe(0n);
+		expect(opened?.url).toBe("https://example.com/");
+		// Longer than the idle limit a takeover of Claude's would get.
+		await new Promise((r) => setTimeout(r, 300));
+		expect(browser.openTakeovers()).toHaveLength(1);
+		const again = takeoverOf(await link.request("o2", { case: "browserOpen", value: {} }));
+		expect(again?.takeoverId).toBe(opened?.takeoverId);
+		expect(chrome.launched).toBe(1);
+	});
+
+	it("turns a takeover the machine page opened into one that does not expire", async () => {
+		const { browser } = makeBrowser({ idleMs: 100 });
+		const link = await device(browser);
+		await browser.open(session);
+		const first = takeoverOf(await link.request("c1", { case: "browserControl", value: {} }));
+		expect(first?.expiresAt).not.toBe(0n);
+		const opened = takeoverOf(await link.request("o1", { case: "browserOpen", value: {} }));
+		expect(opened?.takeoverId).toBe(first?.takeoverId);
+		expect(opened?.expiresAt).toBe(0n);
+		await new Promise((r) => setTimeout(r, 300));
+		expect(browser.openTakeovers()).toHaveLength(1);
+	});
+
+	it("opens only http and https addresses", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		const refused = await link.request("o1", { case: "browserOpen", value: { url: "file:///etc/passwd" } });
+		expect(refused.body.case).toBe("error");
+		expect(chrome.launched).toBe(0);
+	});
+
+	it("goes to an address, back, forward and reload in the tab shown", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: { url: "https://example.com/" } }));
+		const takeoverId = t?.takeoverId ?? "";
+		const nav = (id: string, action: BrowserNavigateAction, url = "") => link.request(id, { case: "browserNavigate", value: { takeoverId, targetId: "", action, url } });
+		await nav("n1", BrowserNavigateAction.GOTO, "https://example.org/a");
+		expect(chrome.called("Page.navigate").at(-1)?.params.url).toBe("https://example.org/a");
+		await nav("n2", BrowserNavigateAction.BACK);
+		expect(chrome.called("Page.navigateToHistoryEntry").at(-1)?.params.entryId).toBe(10);
+		await nav("n3", BrowserNavigateAction.FORWARD);
+		expect(chrome.called("Page.navigateToHistoryEntry").at(-1)?.params.entryId).toBe(12);
+		await nav("n4", BrowserNavigateAction.RELOAD);
+		expect(chrome.called("Page.reload")).toHaveLength(1);
+		const bad = await nav("n5", BrowserNavigateAction.GOTO, "javascript:alert(1)");
+		expect(bad.body.case).toBe("error");
+		const none = await nav("n6", BrowserNavigateAction.GOTO, "");
+		expect(none.body.case).toBe("error");
+		const unknown = await nav("n7", BrowserNavigateAction.UNSPECIFIED);
+		expect(unknown.body.case).toBe("error");
+	});
+
+	it("opens a tab and shows it, and closes one so the viewer goes on with another", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: { url: "https://example.com/" } }));
+		const takeoverId = t?.takeoverId ?? "";
+		await link.request("v1", { case: "browserView", value: { takeoverId, targetId: "", on: true, maxWidth: 800, maxHeight: 600 } });
+		await link.request("n1", { case: "browserNavigate", value: { takeoverId, targetId: "", action: BrowserNavigateAction.NEW_TAB, url: "https://example.net/" } });
+		await until(() => of(link, "browserState").some((f) => f.body.case === "browserState" && f.body.value.tabs.length === 3));
+		const shown = of(link, "browserState").at(-1);
+		const tabs = shown?.body.case === "browserState" ? shown.body.value.tabs : [];
+		expect(tabs.some((x) => x.url === "https://example.net/")).toBe(true);
+		// The new tab is streamed at the size the device asked for.
+		expect(chrome.called("Page.startScreencast").at(-1)?.params).toMatchObject({ maxWidth: 800, maxHeight: 600 });
+		const current = shown?.body.case === "browserState" ? shown.body.value.targetId : "";
+		await link.request("n2", { case: "browserNavigate", value: { takeoverId, targetId: current, action: BrowserNavigateAction.CLOSE_TAB, url: "" } });
+		await until(() => chrome.called("Target.closeTarget").length === 1);
+		await until(() => {
+			const last = of(link, "browserState").at(-1);
+			return last?.body.case === "browserState" && last.body.value.tabs.length === 2 && last.body.value.targetId !== current;
+		});
+	});
+
+	it("closes the sign-in prompt Edge opens on a fresh profile instead of listing it as a tab", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		chrome.addTab("edge://sync-confirmation-dialog/");
+		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: { url: "https://example.com/" } }));
+		await until(() => chrome.called("Target.closeTarget").length === 1);
+		// One that appears later is closed too.
+		chrome.openPage("edge://sync-confirmation-dialog/");
+		await until(() => chrome.called("Target.closeTarget").length === 2);
+		await link.request("v1", { case: "browserView", value: { takeoverId: t?.takeoverId ?? "", targetId: "", on: true, maxWidth: 0, maxHeight: 0 } });
+		const state = of(link, "browserState").at(-1);
+		const urls = state?.body.case === "browserState" ? state.body.value.tabs.map((x) => x.url) : [];
+		expect(urls.some((u) => u.startsWith("edge://"))).toBe(false);
+	});
+
+	it("the last tab is not closed but emptied", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: {} }));
+		await link.request("n1", { case: "browserNavigate", value: { takeoverId: t?.takeoverId ?? "", targetId: "", action: BrowserNavigateAction.CLOSE_TAB, url: "" } });
+		expect(chrome.called("Target.closeTarget")).toHaveLength(0);
+	});
+
+	it("refuses navigation on a takeover that is no longer open", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		await link.request("o1", { case: "browserOpen", value: {} });
+		const gone = await link.request("n1", { case: "browserNavigate", value: { takeoverId: "nope", targetId: "", action: BrowserNavigateAction.RELOAD, url: "" } });
+		expect(gone.body.case === "error" && gone.body.value.reason).toBe(ErrorReason.TAKEOVER_GONE);
 	});
 });
 

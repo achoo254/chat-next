@@ -150,12 +150,15 @@ interface BrowserViewHostProps {
 	/** Inside a session (a large area over it on a wide screen), else over the whole page. */
 	inSession: boolean;
 	onMinimize: () => void;
+	/** A tab of the dock (browser-pane.tsx): see TakeoverView. */
+	embedded?: boolean;
+	active?: boolean;
 }
 
 /** The live view, loaded on first use. */
 export function BrowserViewHost(props: BrowserViewHostProps) {
 	return (
-		<Suspense fallback={<div className={`mx-browser${props.inSession ? " in-session" : ""}`} aria-busy="true" />}>
+		<Suspense fallback={<div className={`mx-browser${props.embedded === true ? " embedded" : props.inSession ? " in-session" : ""}`} aria-busy="true" />}>
 			<TakeoverView {...props} />
 		</Suspense>
 	);
@@ -176,6 +179,15 @@ export function ScreenViewHost(props: { link: MachineLink; ai: string; online: b
  */
 export async function openMachineBrowser(link: MachineLink): Promise<BrowserTakeover | null> {
 	const frame = await link.request({ case: "browserControl", value: {} });
+	return frame.body.case === "browserTakeover" ? frame.body.value : null;
+}
+
+/**
+ * Asks the machine to open its browser as a tab for this device, starting it when it does not run
+ * (and opening `url` when given); resolves with the takeover, which does not end by itself.
+ */
+export async function openBrowserTab(link: MachineLink, url = ""): Promise<BrowserTakeover | null> {
+	const frame = await link.request({ case: "browserOpen", value: { url } });
 	return frame.body.case === "browserTakeover" ? frame.body.value : null;
 }
 

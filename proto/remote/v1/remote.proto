@@ -181,6 +181,9 @@ message Frame {
     ScreenShareClose screen_share_close = 97;
     // Deletes the tunelo browser's profile (as `tunelo browser clear`). Answered with MachineInfo.
     BrowserClear browser_clear = 98;
+    // The browser as a tab of the dock (tunelo 3.27.0+); see "the tunelo browser" below.
+    BrowserOpen browser_open = 197;
+    BrowserNavigate browser_navigate = 198;
     // Updating tunelo itself (tunelo 2.3.0+); see "updating tunelo" below.
     AgentUpdateCheck agent_update_check = 105;
     AgentUpdateStart agent_update_start = 106;
@@ -2303,6 +2306,9 @@ message RemoteBrowserInfo {
   bool running = 2;
   // A device may delete its profile (BrowserClear); false before tunelo 2.0.13.
   bool clearable = 3;
+  // A device may open the browser as a tab (BrowserOpen, BrowserNavigate);
+  // false before tunelo 3.27.0.
+  bool tabs = 4;
 }
 
 message MachineSettings {
@@ -2765,6 +2771,39 @@ message BrowserKey {
 // the user's own. Answered with Ack.
 message BrowserTakeoverEnd {
   string takeover_id = 1;
+}
+
+// A → B: the user opens the browser as a tab of the dock. B starts it when it
+// does not run (BrowserControl needs it running), and opens `url` when given
+// (http and https only). Answered with BrowserTakeover (thread_id empty,
+// expires_at 0: nobody waits on it, so it does not end by itself; it ends
+// with BrowserTakeoverEnd or when the browser closes). The same takeover is
+// answered again while it is open, to this or another device.
+message BrowserOpen {
+  string url = 1;
+}
+
+enum BrowserNavigateAction {
+  BROWSER_NAVIGATE_ACTION_UNSPECIFIED = 0;
+  // Go to `url` in the tab (http and https only).
+  BROWSER_NAVIGATE_ACTION_GOTO = 1;
+  BROWSER_NAVIGATE_ACTION_BACK = 2;
+  BROWSER_NAVIGATE_ACTION_FORWARD = 3;
+  BROWSER_NAVIGATE_ACTION_RELOAD = 4;
+  // Open a tab (on `url` when given) and show it.
+  BROWSER_NAVIGATE_ACTION_NEW_TAB = 5;
+  // Close the tab; the viewers go on with another one.
+  BROWSER_NAVIGATE_ACTION_CLOSE_TAB = 6;
+}
+
+// A → B: the address bar and tab buttons of a takeover. Only while the
+// takeover is open; answered with Ack. `url` is checked as for BrowserOpen.
+message BrowserNavigate {
+  string takeover_id = 1;
+  // The tab; empty: the one shown last.
+  string target_id = 2;
+  BrowserNavigateAction action = 3;
+  string url = 4;
 }
 
 // B → A, unasked: a takeover is open. Sent to every device, again to a device

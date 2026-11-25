@@ -280,6 +280,11 @@ Phiên tunelo mở có thêm 3 tool MCP. Không tool nào trả hình của tran
   phút thì tự kết thúc và Claude nhận lỗi. Hình và thao tác chỉ đi qua kênh E2E, không lưu, không ghi log, không vào journal.
   Nhật ký đồng ý ghi `browser_control` (thiết bị, site) khi trả lại.
 - Trang máy có "Trình duyệt của máy" và nút "Xem trình duyệt của máy" khi hồ sơ đang chạy (takeover của chính người dùng).
+- Menu "+" của dock có mục **Trình duyệt** (tunelo 3.27.0+, máy cần có Chrome/Edge/Brave): thiết bị gửi `BrowserOpen` (mở trình duyệt nếu chưa chạy,
+  mở `url` nếu có) và nhận một takeover của chính người dùng, **không hết hạn** (`expires_at` 0, không ai chờ nó); nó kết thúc khi trình duyệt đóng.
+  Thanh địa chỉ và các nút tab đi qua `BrowserNavigate` (đi tới địa chỉ, quay lại, đi tiếp, tải lại, tab mới, đóng tab; tab cuối chỉ bị làm trống). Chỉ nhận
+  địa chỉ http/https. Đóng tab trong dock chỉ dừng việc xem, trình duyệt và các trang vẫn ở máy; nhiều thiết bị dùng chung một trình duyệt.
+  Chrome, Chromium, Edge và Brave đều chạy được (Chrome và Edge đã thử thật trên macOS); Edge tự mở hộp thoại đồng bộ lần đầu, agent đóng nó.
 - `virtual_authenticator(enable)`: passkey ảo (CDP WebAuthn, CTAP2, có xác minh người dùng) cho mọi tab kể cả tab mở sau, dùng cho
   test E2E app của người dùng; passkey tạo ra chỉ ở trong bộ nhớ, mọi tab dùng chung, mất khi tắt hoặc đóng trình duyệt.
 - Phát hiện passkey thật: mỗi trang được tiêm script bọc `navigator.credentials.create/get` (bỏ qua passkey autofill

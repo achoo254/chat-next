@@ -14,13 +14,14 @@ import type { WorkStatus } from "../machines/project-tree.ts";
 import { StatusGlyph } from "../machines/status-glyph.tsx";
 import { usePopover } from "../machines/use-popover.ts";
 import { BackLink } from "../router.tsx";
-import { buildNewTabActions, type AgentChoice } from "./new-tab-actions.ts";
+import { buildNewTabActions, type AgentChoice, type BrowserAvailability } from "./new-tab-actions.ts";
 import { NewTabMenu } from "./new-tab-menu.tsx";
 import type { SplitDir } from "./terminal-layout.ts";
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "./terminal-font.ts";
 
 export type DockAction =
 	| { readonly kind: "new-tab" }
+	| { readonly kind: "new-browser" }
 	| { readonly kind: "close-pane" }
 	| { readonly kind: "split"; readonly dir: SplitDir }
 	| { readonly kind: "tab"; readonly delta: number }
@@ -74,6 +75,8 @@ export interface TabView {
 	readonly title: string;
 	/** The session's AI runs in it (its spark), not a shell. */
 	readonly ai?: boolean;
+	/** The machine's browser, not a terminal. */
+	readonly browser?: boolean;
 	/** The AI's tab: the session's state (its mark in place of the spark, as in the AI Agent column), its AI's id and name. */
 	readonly status?: WorkStatus | undefined;
 	readonly provider?: string | undefined;
@@ -91,6 +94,8 @@ interface TabsProps {
 	hidden: readonly TermSessionInfo[];
 	/** The known AIs against the machine, for "Agent AI" in the "+" menu (none: the group is left out). */
 	agents: readonly AgentChoice[];
+	/** The machine's browser against the machine, for the "Trình duyệt" row of the "+" menu (none: no row). */
+	browser: BrowserAvailability | undefined;
 	/** A new AI session from the menu is on its way: its rows wait. */
 	startingAgent: boolean;
 	/** The machine's own dock: no folder for an AI to start in (see NewTabInput.noFolder). */
@@ -113,14 +118,14 @@ interface TabsProps {
 	onMenu(): void;
 }
 
-export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents, startingAgent, noFolder, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onStop, onStartAgent, onMenu }: TabsProps) {
+export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents, browser, startingAgent, noFolder, busy, mac, textSize, onTextSize, pill, onSelect, onClose, onAction, onReopen, onStop, onStartAgent, onMenu }: TabsProps) {
 	const { open: menuOpen, setOpen: setMenuOpen, ref: menuRef } = usePopover();
 	// "Today" for the sessions in the menu: the moment it opened.
 	const [menuAt, setMenuAt] = useState(0);
 	const { open: helpOpen, setOpen: setHelpOpen, ref: helpRef } = usePopover();
 	const prefix = mac ? "⌥⇧" : "Alt+Shift+";
 	const actions = menuOpen
-		? buildNewTabActions({ t, prefix, busy, startingAgent, noFolder, agents, hidden, now: menuAt, onNewTab: () => onAction({ kind: "new-tab" }), onStartAgent, onReopen, onStop })
+		? buildNewTabActions({ t, prefix, busy, startingAgent, noFolder, agents, browser, hidden, now: menuAt, onNewTab: () => onAction({ kind: "new-tab" }), onNewBrowser: () => onAction({ kind: "new-browser" }), onStartAgent, onReopen, onStop })
 		: [];
 	// Closed by Esc or a click on nothing: the search field that had the focus is gone, and the focus would
 	// fall to the page; it goes back to "+". An entry that ran, or a click on something focusable, keeps theirs.
@@ -153,7 +158,7 @@ export function TerminalTabs({ t, back, backLabel, tabs, active, hidden, agents,
 							{tab.ai === true && tab.status !== undefined ? (
 								<StatusGlyph status={tab.status} icon="ai-session" ai={tab.provider} {...(tab.who !== undefined ? { who: tab.who } : {})} />
 							) : (
-								<MachineIcon name={tab.ai === true ? "ai-session" : "terminal"} small />
+								<MachineIcon name={tab.browser === true ? "globe" : tab.ai === true ? "ai-session" : "terminal"} small />
 							)}
 							<span>{tab.title}</span>
 						</button>

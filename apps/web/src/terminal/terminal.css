@@ -322,3 +322,5 @@
 .tx-key.own { color: var(--c-primary); }
 .tx-live-btn[aria-pressed="true"] { background: var(--c-error); color: #fff; }
 .tx-live-field[data-listening] { border-color: var(--c-error); }
+/* The machine's browser in a tab: it fills the pane and draws its own frame. */
+.tx-pane-in.tx-pane-browser { padding: 0; }
