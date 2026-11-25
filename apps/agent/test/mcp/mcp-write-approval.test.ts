@@ -1,27 +1,28 @@
 // Write tools of tunelo's MCP in a session tunelo opened: an approval card on
 // the device exactly once per acting call in default, acceptEdits and auto
-// (even under an allow rule), none in bypassPermissions. The stand-in for
+// (even under an allow rule), none in bypassPermissions except in a Chat
+// conversation's AI thread, which asks in every mode. The stand-in for
 // claude below follows its permission order: PreToolUse hooks first ("ask"
 // goes to canUseTool, past any allow rule), then the mode and allow rules.
 import { Decision, PromptState, TurnState } from "@achoo254/chat-proto/remote/remote";
 import type { HookCallbackMatcher, Options, PermissionUpdate, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it } from "vitest";
-import type { AgentCore, CoreOptions } from "../../src/core/agent-core.ts";
-import { createClaudeProvider, writeApprovalHook } from "../../src/providers/claude/index.ts";
+import type { AgentCore, ChatLinkInput, CoreOptions } from "../../src/core/agent-core.ts";
+import { createClaudeProvider, writeApprovalHookFor } from "../../src/providers/claude/index.ts";
 import type { MacFolderGate } from "../../src/safety/mac-folders.ts";
 import { Channel } from "../../src/util/channel.ts";
 import { byCase, makeCore, until } from "../harness.ts";
 
 const consent = { sensitive: false, projectSettings: false };
 
-type HookInput = Parameters<typeof writeApprovalHook>[0];
+type HookInput = Parameters<ReturnType<typeof writeApprovalHookFor>>[0];
 
 function hookInput(tool: string, input: Record<string, unknown>, mode: string): HookInput {
   return { hook_event_name: "PreToolUse", tool_name: tool, tool_input: input, tool_use_id: "tu", permission_mode: mode, session_id: "s", transcript_path: "", cwd: "/" } as HookInput;
 }
 
-async function decision(tool: string, input: Record<string, unknown>, mode: string): Promise<string | undefined> {
-  const out = (await writeApprovalHook(hookInput(tool, input, mode), "tu", { signal: new AbortController().signal })) as {
+async function decision(tool: string, input: Record<string, unknown>, mode: string, askEveryWrite = false): Promise<string | undefined> {
+  const out = (await writeApprovalHookFor(askEveryWrite)(hookInput(tool, input, mode), "tu", { signal: new AbortController().signal })) as {
     hookSpecificOutput?: { permissionDecision?: string };
   };
   return out.hookSpecificOutput?.permissionDecision;
@@ -35,6 +36,13 @@ describe("the PreToolUse hook", () => {
       expect(await decision("mcp__tunelo__open_http_tunnel", { port: 3000 }, mode)).toBe("ask");
     }
     expect(await decision("mcp__tunelo__chat_send_message", { chat_id: 1, text: "x" }, "bypassPermissions")).toBeUndefined();
+  });
+
+  it("asks for every write tool in bypassPermissions too in a Chat conversation's AI thread", async () => {
+    expect(await decision("mcp__tunelo__chat_send_message", { chat_id: 1, text: "x" }, "bypassPermissions", true)).toBe("ask");
+    expect(await decision("mcp__tunelo__localman_send_request", { method: "GET", url: "http://localhost:5173" }, "bypassPermissions", true)).toBe("ask");
+    expect(await decision("mcp__tunelo__open_http_tunnel", { port: 3000 }, "bypassPermissions", true)).toBe("ask");
+    expect(await decision("mcp__tunelo__chat_get_messages", { chat_id: 1 }, "bypassPermissions", true)).toBeUndefined();
   });
 
   it("leaves read tools, other servers and the dry run of a two-step tool alone", async () => {
@@ -108,7 +116,15 @@ function fakeClaude(mode: string, allowRules: string[]) {
 }
 
 /** Runs `calls` in one thread, answering every card with `answer`; returns how many cards came. */
-async function run(mode: string, allowRules: string[], calls: [string, Record<string, unknown>][], answer = Decision.ALLOW, sessionMcp?: CoreOptions["sessionMcp"], more: Partial<CoreOptions> = {}) {
+async function run(
+  mode: string,
+  allowRules: string[],
+  calls: [string, Record<string, unknown>][],
+  answer = Decision.ALLOW,
+  sessionMcp?: CoreOptions["sessionMcp"],
+  more: Partial<CoreOptions> = {},
+  chat?: ChatLinkInput,
+) {
   const claude = fakeClaude(mode, allowRules);
   const provider = createClaudeProvider({ query: claude.fn, findBinary: async () => "claude" });
   provider.detect = async () => ({ installed: true, version: "2.1.319", loginState: "ok" });
@@ -123,7 +139,7 @@ async function run(mode: string, allowRules: string[], calls: [string, Record<st
   };
   const [first, ...rest] = calls;
   if (!first) throw new Error("no call");
-  const t = await core.create({ provider: "claude", model: "", dir: work, text: `call ${first[0]} ${JSON.stringify(first[1])}`, consent, device: "test" });
+  const t = await core.create({ provider: "claude", model: "", dir: work, text: `call ${first[0]} ${JSON.stringify(first[1])}`, consent, device: "test", ...(chat ? { chat } : {}) });
   // A card is answerable once put() returns: answer on the next tick.
   const off = core.onItems((id) => {
     if (id === t.id) setTimeout(() => answerCards(core, t.id), 0);
@@ -138,8 +154,12 @@ async function run(mode: string, allowRules: string[], calls: [string, Record<st
   }
   off();
   const approvals = byCase(core.snapshot(t.id), "approval");
+  const bypassed = core.bypassed(t.id);
+  const writesSkipApproval = core.writesSkipApproval(t.id);
   await core.stop();
   return {
+    bypassed,
+    writesSkipApproval,
     cards: approvals.length,
     summaries: approvals.map((a) => a.body.value.summary),
     reasons: approvals.map((a) => a.body.value.reason),
@@ -177,6 +197,24 @@ describe("write tools in a session", () => {
     const r = await run("bypassPermissions", [], [SEND, ["mcp__tunelo__localman_send_request", { method: "GET", url: "http://localhost:5173" }]]);
     expect(r.cards).toBe(0);
     expect(r.ran).toHaveLength(2);
+    expect(r.bypassed).toBe(true);
+    expect(r.writesSkipApproval).toBe(true);
+  });
+
+  it("asks for every write in bypassPermissions in a Chat conversation's AI thread, and the service holds it to that", async () => {
+    const chat = { chatId: 7n, title: "Team", app: "telegram" };
+    const r = await run("bypassPermissions", [], [SEND, ["mcp__tunelo__localman_send_request", { method: "GET", url: "http://localhost:5173" }]], Decision.ALLOW, undefined, {}, chat);
+    expect(r.cards).toBe(2);
+    expect(r.ran).toHaveLength(2);
+    expect(r.bypassed).toBe(true);
+    expect(r.writesSkipApproval).toBe(false);
+  });
+
+  it("a refused card sends nothing from a Chat conversation's AI thread in bypassPermissions", async () => {
+    const chat = { chatId: 7n, title: "Team", app: "telegram" };
+    const r = await run("bypassPermissions", [], [SEND], Decision.DENY, undefined, {}, chat);
+    expect(r.cards).toBe(1);
+    expect(r.ran).toEqual([]);
   });
 
   it("allow for the session adds no rule for a write tool: the next send asks again", async () => {

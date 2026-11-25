@@ -231,6 +231,11 @@ export type SessionPolicy = {
    * allowBypass say; no session rules.
    */
   advisorSession?: boolean;
+  /**
+   * A Chat conversation's AI thread: every write tool of tunelo's MCP goes
+   * to the device for approval, even in the AI's bypass mode.
+   */
+  askEveryWrite?: boolean;
 };
 
 export type DetectOptions = {

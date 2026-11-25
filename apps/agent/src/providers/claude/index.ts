@@ -485,18 +485,21 @@ const WRITE_APPROVAL_REASON = "It acts as you in Chat, Localman or on the intern
 /**
  * PreToolUse: a write tool of tunelo's MCP always goes to the device for
  * approval, even under an allow rule or in auto mode, unless the session
- * runs in bypassPermissions (which only the machine's own settings start).
+ * runs in bypassPermissions (which only the machine's own settings start)
+ * and is not a Chat conversation's AI thread (`askEveryWrite`).
  * A two-step tool is asked about on the call that acts (with its
  * confirm_token), not on the dry run before it.
  */
-export const writeApprovalHook: HookCallback = async (input) => {
-  if (input.hook_event_name !== "PreToolUse") return {};
-  if (input.permission_mode === BYPASS_MODE) return {};
-  if (!needsApproval(tuneloTool(input.tool_name), input.tool_input)) return {};
-  return {
-    hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: WRITE_APPROVAL_REASON },
+export function writeApprovalHookFor(askEveryWrite: boolean): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse") return {};
+    if (input.permission_mode === BYPASS_MODE && !askEveryWrite) return {};
+    if (!needsApproval(tuneloTool(input.tool_name), input.tool_input)) return {};
+    return {
+      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: WRITE_APPROVAL_REASON },
+    };
   };
-};
+}
 
 const MAC_FOLDER_REASON = "It names a folder macOS protects that tunelo may not enter yet: tunelo asks you first.";
 
@@ -895,7 +898,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
         hooks: withObservedHooks(
           {
             PreToolUse: [
-              { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHook, secretRequestHook, ...advisorHooks] },
+              { matcher: `^mcp__${SESSION_MCP_SERVER}__`, hooks: [writeApprovalHookFor(policy.askEveryWrite === true), secretRequestHook, ...advisorHooks] },
               ...(secrets ? [{ matcher: "^Bash$", hooks: [secretCommandHook(secrets)] }] : []),
               { hooks: [macFolderHook(policy)] },
             ],

@@ -2355,6 +2355,15 @@ export class AgentCore {
     return bypass !== undefined && t.info.permissionMode === bypass;
   }
 
+  /**
+   * A write of tunelo's MCP from the thread's session runs without the
+   * device's approval: only in its AI's bypass mode, and never for a Chat
+   * conversation's AI thread, whose writes reach other people.
+   */
+  writesSkipApproval(threadId: string): boolean {
+    return this.threads.get(threadId)?.meta.chatId === undefined && this.bypassed(threadId);
+  }
+
   async setPermissionMode(threadId: string, mode: string, device: string): Promise<void> {
     const t = this.thread(threadId);
     // An Advisor thread's session reads only, whatever mode its AI would offer.
@@ -2503,6 +2512,7 @@ export class AgentCore {
           ...(this.machineBypasses(t) ? { allowBypass: true } : {}),
           ...(account.scope ? { account: account.scope } : {}),
           ...(t.meta.sessionRules?.length ? { sessionRules: [...t.meta.sessionRules] } : {}),
+          ...(t.meta.chatId !== undefined ? { askEveryWrite: true } : {}),
         };
     // Its ticket lives as long as this session.
     const lease = provider.capabilities.sessionMcp ? this.opts.sessionMcp?.(t.meta.id) : undefined;
