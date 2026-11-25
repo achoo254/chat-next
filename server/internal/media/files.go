@@ -58,6 +58,12 @@ var kindNames = map[appv1.MediaKind]string{
 	appv1.MediaKind_MEDIA_KIND_DOCUMENT: "document",
 }
 
+// KindOf returns the kind named name ("photo", "video", "audio", "voice",
+// "document"); UNSPECIFIED for any other name.
+func KindOf(name string) appv1.MediaKind {
+	return kindOf(name)
+}
+
 func kindOf(name string) appv1.MediaKind {
 	for k, n := range kindNames {
 		if n == name {

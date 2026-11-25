@@ -21,6 +21,8 @@ type InProcess struct {
 	Chats    appv1connect.ChatsServiceHandler
 	Messages appv1connect.MessagesServiceHandler
 	Search   appv1connect.SearchServiceHandler
+	// Media uploads files (answers media_disabled without storage).
+	Media    appv1connect.MediaServiceHandler
 	BotAdmin appv1connect.BotAdminServiceHandler
 	// Integrations manages incoming webhooks; the hooks service checks that
 	// the caller administers the hook's chat.
@@ -34,6 +36,7 @@ func NewInProcess(d Deps) *InProcess {
 		Chats:        &chatsService{chat: d.Chat, logger: d.Logger},
 		Messages:     &messagesService{chat: d.Chat, bots: d.BotUpdates, logger: d.Logger},
 		Search:       &searchService{chat: d.Chat, logger: d.Logger},
+		Media:        &mediaService{media: d.Media, chat: d.Chat, logger: d.Logger},
 		BotAdmin:     &botAdminService{bots: d.Bots, updates: d.BotUpdates, logger: d.Logger},
 		Integrations: &integrationsService{hooks: d.Hooks, logger: d.Logger},
 	}

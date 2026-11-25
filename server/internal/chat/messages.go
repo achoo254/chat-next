@@ -359,6 +359,9 @@ func peerBlockedMe(ctx context.Context, q querier, c *chatRow, me int64) (bool, 
 // also needs ctx FromComposer.
 func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64, plain bool) (int64, error) {
 	if !c.can(m, permSend) {
+		if c.ExternalSource != "" && m.active() {
+			return 0, errImportedReadOnly()
+		}
 		return 0, errDenied("you cannot send messages in this chat")
 	}
 	if err := s.checkUnrestricted(ctx, q, me); err != nil {

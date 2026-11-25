@@ -221,7 +221,7 @@ func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool
 	}
 	switch {
 	case direction != DirectionBoth:
-		return errDenied("imported_chat_read_only: this chat is a copy of a chat in another app; sending into it is not available")
+		return errImportedReadOnly()
 	case status == "stopped":
 		return errDenied("imported_chat_read_only: the account of this chat is disconnected; sending into it is not available")
 	case !plain || me != owner:
@@ -230,6 +230,12 @@ func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool
 		return errComposerOnly()
 	}
 	return nil
+}
+
+// errImportedReadOnly refuses a send into a chat copied from another app that
+// only receives (direction 'in').
+func errImportedReadOnly() error {
+	return errDenied("imported_chat_read_only: this chat is a copy of a chat in another app; sending into it is not available")
 }
 
 // errComposerOnly refuses, in a chat of a composer-only app, anything the owner did

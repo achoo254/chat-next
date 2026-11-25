@@ -81,6 +81,12 @@ func contactTools() []toolDef {
 					return call(ctx, t, t.h.cfg.Services.Users.GetBlockedUsers, &appv1.GetBlockedUsersRequest{Cursor: in.Cursor, Limit: in.Limit})
 				})
 		}},
+		{"list_people", ScopeChatRead, func(s *mcp.Server, t *toolset) {
+			addTool(s, t, &mcp.Tool{Name: "list_people", Description: "The user's people: users the user linked as the same person on several apps (Chat, Telegram, Zalo...), each with the app and the user's private chat with them.", Annotations: readOnly},
+				func(ctx context.Context, _ noInput) (any, error) {
+					return call(ctx, t, t.h.cfg.Services.Users.ListPeople, &appv1.ListPeopleRequest{})
+				})
+		}},
 		{"get_common_chats", ScopeChatRead, func(s *mcp.Server, t *toolset) {
 			addTool(s, t, &mcp.Tool{Name: "get_common_chats", Description: "Groups (and channels the user administers) that the user shares with another user.", Annotations: readOnly},
 				func(ctx context.Context, in commonChatsInput) (any, error) {

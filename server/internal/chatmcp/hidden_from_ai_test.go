@@ -91,3 +91,14 @@ func TestDropHiddenLeavesOutUsersOnlyHiddenChatsReferenced(t *testing.T) {
 		t.Fatalf("answer = %v", r)
 	}
 }
+
+func TestDropHiddenLeavesOutPeopleMembersOfHiddenChats(t *testing.T) {
+	r := &appv1.ListPeopleResponse{People: []*appv1.Person{
+		{Id: 1, Members: []*appv1.PersonMember{{UserId: 2, ChatId: 10}, {UserId: 3, ChatId: 20}}},
+		{Id: 2, Members: []*appv1.PersonMember{{UserId: 4, ChatId: 10}}},
+	}}
+	dropHidden(map[int64]bool{10: true}, 1, r)
+	if len(r.People) != 1 || len(r.People[0].Members) != 1 || r.People[0].Members[0].GetUserId() != 3 {
+		t.Fatalf("people = %v", r.People)
+	}
+}
