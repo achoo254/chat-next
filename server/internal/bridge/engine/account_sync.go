@@ -116,10 +116,18 @@ func (r *runner) syncConversations(ctx context.Context) error {
 // that was gone or left and is back, is raised here; one whose conversation is not
 // listed stays as it is, and a two-way chat is never lowered here. Each change goes
 // through the chat service, which tells the owner's open sessions.
+//
+// An app that cannot say whether a conversation is gone (no bridge.GoneChecker: Zalo,
+// whose list holds only the conversations heard since the server started) never lowers
+// a chat for that reason, so for it a read-only chat is raised listed or not: only a
+// disconnect, which signing in again undoes, or a copy made read-only before chats
+// were two-way by default leaves one. Waiting for the list would keep such a chat
+// read-only until its next message, and every restart forgets the list.
 func (r *runner) raiseListed(ctx context.Context, list []bridge.Conversation) error {
 	if !r.e.canSend(r.account.Source) {
 		return nil
 	}
+	_, knowsGone := r.adapter.(bridge.GoneChecker)
 	listed := make(map[string]bool, len(list))
 	for _, c := range list {
 		listed[c.ID] = true
@@ -131,7 +139,7 @@ func (r *runner) raiseListed(ctx context.Context, list []bridge.Conversation) er
 		return err
 	}
 	for _, l := range links {
-		if l.Direction != chat.DirectionIn || !listed[l.ExternalChat] {
+		if l.Direction != chat.DirectionIn || (knowsGone && !listed[l.ExternalChat]) {
 			continue
 		}
 		if err := r.e.chat.SetImportedDirection(ctx, r.account.OwnerID, l.ChatID, chat.DirectionBoth); err != nil {

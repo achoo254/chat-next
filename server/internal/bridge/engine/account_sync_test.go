@@ -271,6 +271,32 @@ func TestAConnectedAccountRaisesTheReadOnlyChatsOfTheConversationsItListsAgain(t
 	}
 }
 
+// heardOnlyApp is an app that lists only the conversations it heard and cannot say whether
+// one is gone (as Zalo): the fake without its bridge.GoneChecker.
+type heardOnlyApp struct {
+	bridge.Adapter
+	bridge.Sender
+}
+
+func TestAnAppThatCannotTellAGoneConversationRaisesItsReadOnlyChatsListedOrNot(t *testing.T) {
+	e := newEnv(t)
+	e.adapter = heardOnlyApp{e.fake, e.fake}
+	ctx := context.Background()
+	// A read-only copy of a conversation the app has not heard since it started.
+	quiet := e.enable(bridge.Conversation{ID: "quiet", Kind: bridge.ConvPrivate, Title: "Lan", Peer: &lan}, 100)
+	if got := e.directionOf("quiet"); got != "in" {
+		t.Fatalf("direction before the sync = %q, want read-only", got)
+	}
+	eng := e.start()
+	if err := eng.StartSync(ctx, e.owner, e.account); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return e.directionOf("quiet") == "both" }, func() string { return "the unlisted chat stayed read-only" })
+	if _, err := e.chat.SendMessage(ctx, e.owner, &appv1.SendMessageRequest{ChatId: quiet, Text: "chào"}); err != nil {
+		t.Fatalf("the raised chat refuses a message: %v", err)
+	}
+}
+
 func TestAnAppThatCannotBeWrittenToNeverRaisesAChat(t *testing.T) {
 	e := newEnv(t)
 	e.adapter = readOnlyApp{e.fake}
