@@ -169,7 +169,9 @@ type ownPhoneFake struct {
 	number string
 }
 
-func (f *ownPhoneFake) OwnPhone(context.Context, bridge.Account) (string, error) { return f.number, nil }
+func (f *ownPhoneFake) OwnPhone(context.Context, bridge.Account) (string, error) {
+	return f.number, nil
+}
 
 func TestTheAccountsOwnNumberIsRecordedForItsOwner(t *testing.T) {
 	e := newEnv(t)
