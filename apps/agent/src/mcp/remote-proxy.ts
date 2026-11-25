@@ -202,7 +202,7 @@ export class RemoteProxy {
 	/** Calls `tool` on the group's server: its text answers through `clean`, a failure as a tool error. */
 	private async run(group: ToolGroup, tool: string, args: Record<string, unknown>, clean: (text: string) => string): Promise<CallToolResult> {
 		try {
-			const result = await this.withClient(group.app, this.callTimeoutMs, (client) =>
+			const result = await this.withClient(group, this.callTimeoutMs, (client) =>
 				client.callTool({ name: tool, arguments: args }, { timeout: this.callTimeoutMs }),
 			);
 			const content = Array.isArray(result.content) ? result.content : [];
@@ -224,7 +224,7 @@ export class RemoteProxy {
 
 	private async fetchTools(group: ToolGroup): Promise<RemoteTool[]> {
 		try {
-			return await this.withClient(group.app, this.listTimeoutMs, async (client) => {
+			return await this.withClient(group, this.listTimeoutMs, async (client) => {
 				const listed: RemoteTool[] = [];
 				let cursor: string | undefined;
 				for (let page = 0; page < MAX_LIST_PAGES; page++) {
@@ -250,10 +250,11 @@ export class RemoteProxy {
 	}
 
 	/** Runs `use` on the app's client, connecting first; a failed client is dropped. */
-	private async withClient<T>(app: AppName, connectTimeoutMs: number, use: (client: Client) => Promise<T>): Promise<T> {
+	private async withClient<T>(group: ToolGroup, connectTimeoutMs: number, use: (client: Client) => Promise<T>): Promise<T> {
+		const { app } = group;
 		let pending = this.connections.get(app);
 		if (!pending) {
-			pending = this.connect(app, connectTimeoutMs);
+			pending = this.connect(group, connectTimeoutMs);
 			this.connections.set(app, pending);
 		}
 		let connection: Connection | undefined;
@@ -268,11 +269,15 @@ export class RemoteProxy {
 		}
 	}
 
-	private async connect(app: AppName, timeoutMs: number): Promise<Connection> {
+	private async connect(group: ToolGroup, timeoutMs: number): Promise<Connection> {
+		const { app } = group;
+		// The resource is the endpoint without the query: the token's `aud` stays the same.
+		const url = new URL(this.access.endpoint(app));
+		for (const [name, value] of Object.entries(group.serverQuery ?? {})) url.searchParams.set(name, value);
 		// The token each answer was asked with: a 401 forgets exactly that one,
 		// never the fresh token another call already got.
 		const askedWith = new WeakMap<Response, string>();
-		const transport = new StreamableHTTPClientTransport(new URL(this.access.endpoint(app)), {
+		const transport = new StreamableHTTPClientTransport(url, {
 			authProvider: {
 				token: async () => {
 					const token = await this.access.token(app);

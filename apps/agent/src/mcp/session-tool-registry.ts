@@ -7,7 +7,7 @@ import type { CallToolResult, McpServer, StandardSchemaWithJSON } from "@modelco
 import { ADVISOR_GROUP, registerAdvisorTools } from "../advisor/advisor-tools.ts";
 import { BROWSER_GROUP, registerBrowserTools } from "../remote-browser/browser-tools.ts";
 import { SECRETS_GROUP, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
-import { TOOL_GROUPS, ToolTable } from "./groups.ts";
+import { TOOL_GROUPS, ToolTable, exposedToolName } from "./groups.ts";
 import { LocalTunnels } from "./local-tunnels.ts";
 import type { McpContext } from "./mcp-context.ts";
 import type { OfferedTool } from "./mcp-host.ts";
@@ -50,19 +50,27 @@ function advertisedSchema(schema: Record<string, unknown>): StandardSchemaWithJS
 	};
 }
 
-/** Adds every tool of `table` to `server`, each forwarded to `group` in the service. */
-function registerTable(server: McpServer, group: string, table: ToolTable, forward: ForwardCall, skip: (name: string) => boolean, needsSchema: boolean): void {
+/** Adds every tool of `table` to `server` under the name `exposed` gives it, each forwarded to `group` in the service. */
+function registerTable(
+	server: McpServer,
+	group: string,
+	table: ToolTable,
+	forward: ForwardCall,
+	skip: (name: string) => boolean,
+	needsSchema: boolean,
+	exposed: (name: string) => string = (name) => name,
+): void {
 	for (const [name, config] of table.entries()) {
 		if (skip(name)) continue;
 		const { title, description, annotations, inputSchema } = config;
 		if (inputSchema) {
 			server.registerTool(
-				name,
+				exposed(name),
 				{ title, description, inputSchema, ...(annotations ? { annotations } : {}) },
 				(args: ToolArgs) => forward(group, name, args),
 			);
 		} else if (!needsSchema) {
-			server.registerTool(name, { title, description, ...(annotations ? { annotations } : {}) }, () => forward(group, name, {}));
+			server.registerTool(exposed(name), { title, description, ...(annotations ? { annotations } : {}) }, () => forward(group, name, {}));
 		}
 	}
 }
@@ -78,7 +86,8 @@ export function registerSessionTools(server: McpServer, opts: SessionToolOptions
 			const table = new ToolTable();
 			// A session tunelo opened also lists the tools on its thread's folder (chat_send_file).
 			group.register(table, { context, tunnels: new LocalTunnels(context), ...(mode === "session" ? { ticketed: true } : {}) });
-			registerTable(server, group.name, table, forward, (name) => !offered.writes && group.writeTools.includes(name), false);
+			// Named as every tool of the group is (`chat_send_file`; the tunnel tools keep their own names).
+			registerTable(server, group.name, table, forward, (name) => !offered.writes && group.writeTools.includes(name), false, (name) => exposedToolName(group.name, name));
 		}
 	}
 

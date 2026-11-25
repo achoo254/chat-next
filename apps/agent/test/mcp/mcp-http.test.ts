@@ -94,6 +94,9 @@ describe("tunelo's MCP over HTTP", () => {
 		expect(names).toContain("chat_list_chats");
 		expect(names).toContain("chat_send_message");
 		expect(names).toContain("request_secret");
+		// The file tool is named like every chat tool, as its card and the approvals name it.
+		expect(names).toContain("chat_send_file");
+		expect(names).not.toContain("send_file");
 
 		const refused = await client.callTool({ name: "chat_send_message", arguments: SEND });
 		expect(refused.isError).toBe(true);

@@ -422,6 +422,7 @@ describe("the service's MCP host", () => {
 			"localman_get_collection",
 			"localman_get_history_entry",
 			"localman_list_collections",
+			"localman_list_workspaces",
 			"localman_send_request",
 		]);
 		h.endAll();

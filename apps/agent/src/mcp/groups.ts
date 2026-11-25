@@ -120,6 +120,8 @@ export interface ToolGroup {
 	localTools?: readonly string[];
 	/** Tools of the app's server the service calls itself (RemoteProxy.callInternal): never listed, never called by an agent. */
 	internalTools?: readonly string[];
+	/** Query parameters of the app's MCP endpoint the group's tools need (not part of the resource, the token `aud`). */
+	serverQuery?: Readonly<Record<string, string>>;
 }
 
 export const TOOL_GROUPS: readonly ToolGroup[] = [
@@ -193,6 +195,8 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
 			"get_history_entry",
 			"list_machines",
 			"list_machine_ports",
+			// sharing.listWorkspaces: the workspaces whose collections list_collections reads (workspaceId).
+			"list_workspaces",
 			"send_request",
 			// client.createCollectionNode: adds a request (or folder, example) to a collection.
 			"create_collection_node",
@@ -200,6 +204,8 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
 		writeTools: ["send_request", "create_collection_node"],
 		twoStepTools: [],
 		maskHeaderTools: ["list_history", "get_history_entry", "send_request"],
+		// Localman serves the mock and client toolsets by default; list_workspaces is in sharing (scope client:read).
+		serverQuery: { toolsets: "client,sharing" },
 	},
 	{
 		// kb-next apps/server/src/mcp: read the Knowledge Base as the user, save a private note

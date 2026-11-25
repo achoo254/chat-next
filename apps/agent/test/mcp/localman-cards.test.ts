@@ -172,6 +172,21 @@ describe("Localman writes through tunelo's MCP", () => {
 		await s.stop();
 	});
 
+	test("list_workspaces gives the workspace list_collections needs: a read, asked of Localman's client and sharing toolsets", async () => {
+		const s = await setup();
+		expect(needsApproval("localman_list_workspaces", {})).toBe(false);
+		const listed = (await s.host.remoteTools()).tools.filter((t) => t.group === "localman").map((t) => t.exposed);
+		expect(listed).toContain("localman_list_workspaces");
+		const id = s.host.open("wss://tunnel.example");
+		const answer = await s.host.call(id, "localman", "list_workspaces", {});
+		expect(answer.isError).toBeUndefined();
+		expect(textOf(answer)).toContain("ws-1");
+		// The query picks the toolsets; the path stays the resource. (This fake also stands in for Chat and kb, asked without one.)
+		expect(localman.urls).toContain("/mcp?toolsets=client%2Csharing");
+		expect(localman.urls.every((u) => u === "/mcp" || u === "/mcp?toolsets=client%2Csharing")).toBe(true);
+		await s.stop();
+	});
+
 	test("declined, nothing is saved", async () => {
 		const s = await setup();
 		const { result } = await s.run("create_collection_node", SAVE, Decision.DENY);

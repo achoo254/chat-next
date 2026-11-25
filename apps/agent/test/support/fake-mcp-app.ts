@@ -11,6 +11,8 @@ export type FakeMcpApp = {
   accepted: Set<string>;
   /** Tokens accepted but lacking the tool's scope: 403 insufficient_scope. */
   lacking: Set<string>;
+  /** The path and query of every MCP request, in order. */
+  urls: string[];
   /** Bearer tokens of every request, in order. */
   seen: string[];
   /** Tool calls the server ran: name and arguments. */
@@ -169,6 +171,8 @@ function buildServer(app: FakeMcpApp, bearer: string): McpServer {
     { description: "Send an HTTP request.", inputSchema: z.object({ method: z.string(), url: z.string() }) },
     run("send_request", (args) => ({ status: 200, url: args.url })),
   );
+  // Localman's workspaces (sharing.listWorkspaces): the personal one first.
+  server.registerTool("list_workspaces", { description: "The caller's workspaces.", annotations: { readOnlyHint: true } }, run("list_workspaces", () => ({ items: [{ id: "ws-1", name: "Personal", role: "admin", personal: true }] })));
   // Localman's collections: col-1 is named; col-slow answers after the card stops waiting; others are unknown.
   server.registerTool("get_collection", { description: "One collection.", inputSchema: z.object({ collectionId: z.string() }) }, async (args) => {
     app.calls.push({ name: "get_collection", args });
@@ -213,6 +217,7 @@ export async function startFakeMcpApp(): Promise<FakeMcpApp> {
     accepted: new Set(),
     lacking: new Set(),
     seen: [],
+    urls: [],
     calls: [],
     media: { partSize: 5, stored: new Map(), puts: 0, uploads: new Map() },
     close: () =>
@@ -241,6 +246,7 @@ export async function startFakeMcpApp(): Promise<FakeMcpApp> {
       }
       const bearer = String(req.headers.authorization ?? "").replace(/^Bearer /, "");
       app.seen.push(bearer);
+      app.urls.push(req.url ?? "");
       if (app.failWith) {
         res.writeHead(app.failWith, { "content-type": "text/plain" }).end(`upstream failed for Authorization: ${String(req.headers.authorization)} (token ${bearer})`);
         return;
