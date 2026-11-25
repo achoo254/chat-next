@@ -928,6 +928,7 @@ export const viScreens = {
 		unlink: "Bỏ nối",
 		unlinkLabel: (identity: string) => `Bỏ nối ${identity}`,
 		unlinked: (name: string) => `Đã bỏ nối ${name}`,
+		samePhone: "Cùng số điện thoại trên các ứng dụng kia, cần bạn xác nhận",
 		sameName: "Tên giống nhau, chưa xác minh",
 		link: "Nối",
 		linkLabel: (a: string, b: string) => `Nối ${a} với ${b}`,

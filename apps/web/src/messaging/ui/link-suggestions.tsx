@@ -1,6 +1,7 @@
 // Link suggestions (ADR 0025): pairs of users that may be the same person,
-// computed by the server when asked and never linked automatically. A name
-// match is weak, so every such row says "same name, not verified" in words.
+// computed by the server when asked and never linked automatically. Every row
+// says in words why it is there: the same phone number on the other apps
+// (strong, still waiting for "Nối") or the same name (weak, "not verified").
 // Shown for one user in the info column of a private chat, and all of them
 // on the contacts screen ("Gợi ý nối"), each with "Nối" and "Không phải".
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -84,6 +85,12 @@ function SuggestionRow({ store, suggestion, shown }: SuggestionRowProps) {
 						<IdentityName key={member.userId} member={member} />
 					))}
 				</span>
+				{suggestion.reason === "phone" && (
+					<small>
+						<Icon name="info" small />
+						{t.samePhone}
+					</small>
+				)}
 				{suggestion.reason === "name" && (
 					<small>
 						<Icon name="info" small />

@@ -376,23 +376,17 @@ function QuickActions({
 	chatId,
 	itemKey,
 	seq,
-	seqs,
 	label,
 	onReply,
-	forward,
 	reactions,
 	mine,
 }: {
 	chatId: number;
 	itemKey: string;
 	seq: number;
-	/** Every message of an album, forwarded together. */
-	seqs: readonly number[];
 	label: string;
 	/** null: no reply button. */
 	onReply: (() => void) | null;
-	/** Offer the forward button (not on a person's merged timeline). */
-	forward: boolean;
 	reactions: StoredMessage["reactions"];
 	/** The user's own message: only the reaction button (reply, forward and the rest are in its menu: right click, long press). */
 	mine: boolean;
@@ -411,19 +405,16 @@ function QuickActions({
 		<>
 			{!mine && (
 				<div className="msg-actions" role="toolbar" aria-label={label}>
-					{onReply !== null && (
+					{/* Telegram shows a lone reply button; forward and the rest are in the message menu (right click, long press). A message that cannot be replied to gets the menu button instead. */}
+					{onReply !== null ? (
 						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.reply} onClick={onReply}>
 							<Icon name="reply" small />
 						</button>
-					)}
-					{forward && (
-						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.forward} onClick={() => ui.dialog.set({ kind: "forward", chatId, seq, seqs })}>
-							<Icon name="forward" small />
+					) : (
+						<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={(event) => open(event, false)}>
+							<Icon name="dots" small />
 						</button>
 					)}
-					<button type="button" className="qa" tabIndex={-1} aria-label={copy.message.more} onClick={(event) => open(event, false)}>
-						<Icon name="dots" small />
-					</button>
 				</div>
 			)}
 			{/* Telegram-style: the reaction button sits on its own under the bubble. */}
@@ -703,10 +694,8 @@ export function MessageBubble({
 							chatId={chatId}
 							itemKey={itemKey}
 							seq={message.seq}
-							seqs={seqs}
 							label={mine ? copy.message.quickActionsMine : copy.message.quickActions(senderName)}
 							onReply={reply}
-							forward={limited === undefined}
 							mine={mine}
 							reactions={message.reactions}
 						/>

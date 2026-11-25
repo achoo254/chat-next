@@ -150,6 +150,14 @@ type Participant struct {
 	// person by id alone). The engine uses it to create a missing puppet but
 	// never to rename one that already has a real name.
 	NameUnknown bool
+	// PhoneKnown says the app stated the person's phone number, so the engine
+	// records it: Phone is the number as the app gave it ("" when they have
+	// none or hide it, which clears the one recorded). When false the recorded
+	// number is left as it is. The engine keeps only a keyed hash of the number
+	// in E.164 form; a number it cannot read is treated as unknown. Adapters
+	// never log it.
+	PhoneKnown bool
+	Phone      string
 }
 
 // Entity is a normalised text span. Kinds the engine does not know are

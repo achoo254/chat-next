@@ -924,6 +924,7 @@ export const zhCNScreens: ScreensCopy = {
 		unlink: "取消关联",
 		unlinkLabel: (identity: string) => `取消关联 ${identity}`,
 		unlinked: (name: string) => `已取消关联 ${name}`,
+		samePhone: "在其他应用中的电话号码相同，需要你确认",
 		sameName: "名字相同，未经核实",
 		link: "关联",
 		linkLabel: (a: string, b: string) => `将 ${a} 与 ${b} 关联`,

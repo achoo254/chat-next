@@ -155,7 +155,7 @@ func (p *fakeProcess) command(t *testing.T) string {
 	}
 }
 
-const readyLine = `{"ev":"ready","protocol":6}`
+const readyLine = `{"ev":"ready","protocol":7}`
 
 // fastTiming keeps tests short.
 var fastTiming = timing{stopGrace: 200 * time.Millisecond, readyTimeout: 2 * time.Second, firstQR: 2 * time.Second,

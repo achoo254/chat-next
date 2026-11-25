@@ -927,6 +927,7 @@ export const enScreens: ScreensCopy = {
 		unlink: "Unlink",
 		unlinkLabel: (identity: string) => `Unlink ${identity}`,
 		unlinked: (name: string) => `Unlinked ${name}`,
+		samePhone: "Same phone number on the other apps, needs your confirmation",
 		sameName: "Same name, not verified",
 		link: "Link",
 		linkLabel: (a: string, b: string) => `Link ${a} with ${b}`,

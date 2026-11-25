@@ -57,15 +57,27 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 		peer.Name, peer.NameUnknown = ev.DName, false
 	}
 	withAvatar(&peer, ev.PeerAvatar)
+	withPhone(&peer, ev.PeerPhone)
 	if !ev.Self {
 		sender = peer
 	}
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
 	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now), Text: messageText(ev)}
-	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown) {
+	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.PhoneKnown) {
 		m.Peer = &peer
 	}
 	return m, conv, nil
+}
+
+// withPhone gives a participant the phone number their profile shows. Zalo's
+// profile of another person usually leaves the number out, and nobody knows
+// whether an empty one means «none» or «not shown to you», so only a number
+// that is there counts: an empty one leaves the recorded number as it is.
+func withPhone(p *bridge.Participant, raw string) {
+	if raw == "" {
+		return
+	}
+	p.PhoneKnown, p.Phone = true, raw
 }
 
 // messageText is the text of a message, or the label of content not copied.

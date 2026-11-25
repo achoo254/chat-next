@@ -9,7 +9,7 @@ import {
 	type Person as WirePerson,
 	type PersonMember as WireMember,
 } from "@achoo254/chat-proto/users";
-import type { LinkSuggestion, LinkedPerson, PeopleApi, PersonMember } from "./people-api.ts";
+import type { LinkReason, LinkSuggestion, LinkedPerson, PeopleApi, PersonMember } from "./people-api.ts";
 
 function toMember(member: WireMember): PersonMember {
 	return { userId: assertSafeId(member.userId), name: member.name, app: member.app, chatId: assertSafeId(member.chatId) };
@@ -19,13 +19,24 @@ function toPerson(person: WirePerson): LinkedPerson {
 	return { id: assertSafeId(person.id), name: person.name, members: person.members.map(toMember) };
 }
 
+function toReason(reason: LinkSuggestionReason): LinkReason {
+	switch (reason) {
+		case LinkSuggestionReason.PHONE:
+			return "phone";
+		case LinkSuggestionReason.NAME:
+			return "name";
+		default:
+			return "other";
+	}
+}
+
 /** null for a suggestion the server sent without both users (dropped, nothing to show). */
 function toSuggestion(suggestion: WireSuggestion): LinkSuggestion | null {
 	if (suggestion.first === undefined || suggestion.second === undefined) return null;
 	return {
 		first: toMember(suggestion.first),
 		second: toMember(suggestion.second),
-		reason: suggestion.reason === LinkSuggestionReason.NAME ? "name" : "other",
+		reason: toReason(suggestion.reason),
 	};
 }
 

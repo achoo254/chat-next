@@ -23,8 +23,11 @@ export interface LinkedPerson {
 	readonly members: readonly PersonMember[];
 }
 
-/** "name": equal names after folding case, accents and spaces; weak, never verified. */
-export type LinkReason = "name" | "other";
+/**
+ * "phone": the other apps show the same phone number for both; strong, still only a suggestion.
+ * "name": equal names after folding case, accents and spaces; weak, never verified.
+ */
+export type LinkReason = "phone" | "name" | "other";
 
 /** Two users that may be the same person, computed when asked and never linked automatically. */
 export interface LinkSuggestion {

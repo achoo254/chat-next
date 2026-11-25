@@ -96,6 +96,13 @@ type Config struct {
 	// Telegram. The hash is a secret: it is never logged or sent to a client.
 	TelegramAPIID   int
 	TelegramAPIHash string
+	// BridgePhoneKey (BRIDGE_PHONE_KEY, optional, base64 of at least
+	// SessionKeyMinLen bytes, not SESSION_KEY) keys the HMAC that stands for
+	// the phone number of a person of another app (external_users.phone_hmac),
+	// so the same number on two puppets suggests one person. Unset, no number
+	// is kept and no suggestion is made by number. It is never logged, and
+	// changing it makes every stored hash useless until people are seen again.
+	BridgePhoneKey []byte
 	// ZaloSidecarBundle is the absolute path of the Zalo sidecar bundle
 	// (ZALO_SIDECAR_BUNDLE, server/internal/bridge/adapters/zalo/sidecar/dist/
 	// zalo-sidecar.cjs). Empty, the default, offers no Zalo. When set,
@@ -428,6 +435,20 @@ func Load(lookup Lookup) (Config, error) {
 	c.TelegramAPIHash = get("TELEGRAM_API_HASH")
 	if (c.TelegramAPIID == 0) != (c.TelegramAPIHash == "") {
 		errs = append(errs, invalid("TELEGRAM_API_ID", "and TELEGRAM_API_HASH must be set together"))
+	}
+
+	if raw := get("BRIDGE_PHONE_KEY"); raw != "" {
+		key, err := decodeKey(raw)
+		switch {
+		case err != nil:
+			errs = append(errs, invalid("BRIDGE_PHONE_KEY", "must be base64"))
+		case len(key) < SessionKeyMinLen:
+			errs = append(errs, invalid("BRIDGE_PHONE_KEY", fmt.Sprintf("must decode to at least %d bytes", SessionKeyMinLen)))
+		case bytes.Equal(key, c.SessionKey) || bytes.Equal(key, c.SessionKeyPrevious):
+			errs = append(errs, invalid("BRIDGE_PHONE_KEY", "must differ from SESSION_KEY and SESSION_KEY_PREVIOUS"))
+		default:
+			c.BridgePhoneKey = key
+		}
 	}
 
 	if raw := get("ZALO_SIDECAR_BUNDLE"); raw != "" {

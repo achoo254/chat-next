@@ -103,6 +103,9 @@ func TestLoadErrorsNameVariablesWithoutValues(t *testing.T) {
 		"SESSION_KEY_PREVIOUS": func(e map[string]string) {
 			e["SESSION_KEY_PREVIOUS"] = base64.StdEncoding.EncodeToString([]byte(secret))
 		},
+		"BRIDGE_PHONE_KEY": func(e map[string]string) {
+			e["BRIDGE_PHONE_KEY"] = base64.StdEncoding.EncodeToString([]byte(secret))
+		},
 		"TENANT_DOMAIN":    func(e map[string]string) { e["TENANT_DOMAIN"] = "not a domain" },
 		"CHAT_LISTEN_ADDR": func(e map[string]string) { e["CHAT_LISTEN_ADDR"] = "4600" },
 		"APP_URL_SCHEME":   func(e map[string]string) { e["APP_URL_SCHEME"] = "https" },
@@ -455,5 +458,29 @@ func TestLoadNativeSignIn(t *testing.T) {
 	env["NATIVE_SIGN_IN"] = "maybe"
 	if _, err := Load(lookupFrom(env)); err == nil || !strings.Contains(err.Error(), "NATIVE_SIGN_IN") {
 		t.Fatalf("invalid value: %v", err)
+	}
+}
+
+func TestLoadBridgePhoneKey(t *testing.T) {
+	env := validEnv()
+	c, err := Load(lookupFrom(env))
+	if err != nil || c.BridgePhoneKey != nil {
+		t.Fatalf("unset: key = %v, err = %v; want the phone feature off", c.BridgePhoneKey != nil, err)
+	}
+	key := []byte(strings.Repeat("h", 32))
+	env["BRIDGE_PHONE_KEY"] = base64.StdEncoding.EncodeToString(key)
+	if c, err = Load(lookupFrom(env)); err != nil || string(c.BridgePhoneKey) != string(key) {
+		t.Fatalf("set: err = %v", err)
+	}
+	for name, bad := range map[string]string{
+		"not base64":  "!!!",
+		"too short":   base64.StdEncoding.EncodeToString([]byte("short")),
+		"session key": env["SESSION_KEY"],
+	} {
+		env["BRIDGE_PHONE_KEY"] = bad
+		var ve *VarError
+		if _, err := Load(lookupFrom(env)); !errors.As(err, &ve) || ve.Name != "BRIDGE_PHONE_KEY" {
+			t.Errorf("%s: err = %v", name, err)
+		}
 	}
 }

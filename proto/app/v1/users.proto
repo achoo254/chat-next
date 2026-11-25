@@ -381,6 +381,11 @@ enum LinkSuggestionReason {
   // The two names are equal after folding case, accents and spaces. Weak:
   // the app shows it as «same name, not verified».
   LINK_SUGGESTION_REASON_NAME = 1;
+  // The other apps show the same phone number for both (only a keyed hash of
+  // it is kept on the server, never sent). Strong, yet still only a
+  // suggestion: nothing is linked until the owner confirms. Listed before the
+  // name suggestions; a pair that matches both is suggested once, by phone.
+  LINK_SUGGESTION_REASON_PHONE = 2;
 }
 
 message LinkSuggestion {

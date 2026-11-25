@@ -26,6 +26,8 @@ export class FakePeople {
 	readonly people: { id: number; name: string; members: number[] }[] = [];
 	/** Pairs the server would suggest (seeded by the test); filtered like the server does when listed. */
 	readonly suggested: [number, number][] = [];
+	/** Pairs of `suggested` the server would give as a phone match instead of a name match. */
+	readonly samePhone = new Set<string>();
 	readonly rejected = new Set<string>();
 	/** Every call the app made, e.g. "link:3,4", "unlink:3", "reject:3:4", "suggestions:0". */
 	readonly calls: string[] = [];
@@ -98,7 +100,7 @@ export class FakePeople {
 					if (person !== undefined && person.members.includes(b)) return false;
 					return userId === 0 || a === userId || b === userId;
 				});
-				return { suggestions: pending.map(([a, b]) => ({ first: this.member(a), second: this.member(b), reason: LinkSuggestionReason.NAME })) };
+				return { suggestions: pending.map(([a, b]) => ({ first: this.member(a), second: this.member(b), reason: this.samePhone.has(pairKey(a, b)) ? LinkSuggestionReason.PHONE : LinkSuggestionReason.NAME })) };
 			},
 			rejectLinkSuggestion: (req) => {
 				const a = Number(req.userA);

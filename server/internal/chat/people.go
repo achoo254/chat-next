@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"unicode/utf8"
 
 	appv1 "app.local/server/gen/app/v1"
-	"app.local/server/internal/vifold"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -31,6 +29,9 @@ type peer struct {
 	App    string // "telegram", ...; empty for a Chat account
 	Acct   int64  // the bridge account of a puppet; 0 for a Chat account
 	ChatID int64
+	// Phone is the keyed hash of the phone number the other app shows for a
+	// puppet (external_users.phone_hmac); nil when unknown. Never sent out.
+	Phone []byte
 }
 
 func (p peer) member() *appv1.PersonMember {
@@ -42,7 +43,7 @@ func (p peer) member() *appv1.PersonMember {
 // ids narrows the lookup; nil means all of them.
 func (s *Service) peersOf(ctx context.Context, q querier, owner int64, ids []int64) (map[int64]peer, error) {
 	rows, err := q.Query(ctx, `
-		SELECT u.id, u.name, coalesce(u.external_source, ''), coalesce(eu.account_id, 0), p.chat_id
+		SELECT u.id, u.name, coalesce(u.external_source, ''), coalesce(eu.account_id, 0), p.chat_id, eu.phone_hmac
 		FROM private_chats p
 		JOIN chats c ON c.id = p.chat_id AND c.deleted_at IS NULL
 		JOIN users u ON u.id = CASE WHEN p.user_low = $2 THEN p.user_high ELSE p.user_low END
@@ -58,7 +59,7 @@ func (s *Service) peersOf(ctx context.Context, q querier, owner int64, ids []int
 	out := map[int64]peer{}
 	for rows.Next() {
 		var p peer
-		if err := rows.Scan(&p.ID, &p.Name, &p.App, &p.Acct, &p.ChatID); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.App, &p.Acct, &p.ChatID, &p.Phone); err != nil {
 			return nil, fmt.Errorf("chat: people candidates: %w", err)
 		}
 		out[p.ID] = p
@@ -292,98 +293,6 @@ func (s *Service) UnlinkUser(ctx context.Context, me, userID int64) error {
 		s.logger.Info("user unlinked", "owner_id", me, "user_id", userID)
 	}
 	return nil
-}
-
-// ListLinkSuggestions computes the pairs of candidates that may be the same
-// person: equal names after folding case, accents and spaces. Pairs already in
-// one person or rejected are left out. Two Chat accounts, or two puppets of the
-// same bridge account, are never suggested: one person has one identity per
-// account (manual linking stays open for them). userID, when not 0, keeps only
-// the pairs that involve that user.
-func (s *Service) ListLinkSuggestions(ctx context.Context, me, userID int64) ([]*appv1.LinkSuggestion, error) {
-	peers, err := s.peersOf(ctx, s.pool, me, nil)
-	if err != nil {
-		return nil, err
-	}
-	if userID != 0 {
-		if _, ok := peers[userID]; !ok {
-			return nil, errNotFound("user")
-		}
-	}
-	inPerson := map[int64]int64{}
-	rows, err := s.pool.Query(ctx, `SELECT user_id, person_id FROM people_members WHERE owner_id = $1`, me)
-	if err != nil {
-		return nil, fmt.Errorf("chat: link suggestions: %w", err)
-	}
-	for rows.Next() {
-		var u, p int64
-		if err := rows.Scan(&u, &p); err != nil {
-			rows.Close()
-			return nil, fmt.Errorf("chat: link suggestions: %w", err)
-		}
-		inPerson[u] = p
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("chat: link suggestions: %w", err)
-	}
-	type pair struct{ a, b int64 }
-	rejected := map[pair]bool{}
-	rows, err = s.pool.Query(ctx, `SELECT user_a, user_b FROM people_rejections WHERE owner_id = $1`, me)
-	if err != nil {
-		return nil, fmt.Errorf("chat: link suggestions: %w", err)
-	}
-	for rows.Next() {
-		var p pair
-		if err := rows.Scan(&p.a, &p.b); err != nil {
-			rows.Close()
-			return nil, fmt.Errorf("chat: link suggestions: %w", err)
-		}
-		rejected[p] = true
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("chat: link suggestions: %w", err)
-	}
-
-	ordered := make([]peer, 0, len(peers))
-	for _, p := range peers {
-		ordered = append(ordered, p)
-	}
-	slices.SortFunc(ordered, func(x, y peer) int { return int(x.ID - y.ID) })
-	byName := map[string][]peer{}
-	for _, p := range ordered {
-		if key := vifold.Fold(strings.TrimSpace(p.Name)); key != "" {
-			byName[key] = append(byName[key], p)
-		}
-	}
-	var out []*appv1.LinkSuggestion
-	for _, group := range byName {
-		for i, x := range group {
-			for _, y := range group[i+1:] {
-				if userID != 0 && x.ID != userID && y.ID != userID {
-					continue
-				}
-				if (x.App == "" && y.App == "") || (x.Acct != 0 && x.Acct == y.Acct) {
-					continue
-				}
-				if px, ok := inPerson[x.ID]; ok && px == inPerson[y.ID] {
-					continue
-				}
-				if rejected[pair{x.ID, y.ID}] {
-					continue
-				}
-				out = append(out, &appv1.LinkSuggestion{First: x.member(), Second: y.member(), Reason: appv1.LinkSuggestionReason_LINK_SUGGESTION_REASON_NAME})
-			}
-		}
-	}
-	slices.SortFunc(out, func(x, y *appv1.LinkSuggestion) int {
-		if d := x.First.UserId - y.First.UserId; d != 0 {
-			return int(d)
-		}
-		return int(x.Second.UserId - y.Second.UserId)
-	})
-	return out, nil
 }
 
 // RejectLinkSuggestion records that two candidates are not the same person,

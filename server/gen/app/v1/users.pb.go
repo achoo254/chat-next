@@ -210,6 +210,11 @@ const (
 	// The two names are equal after folding case, accents and spaces. Weak:
 	// the app shows it as «same name, not verified».
 	LinkSuggestionReason_LINK_SUGGESTION_REASON_NAME LinkSuggestionReason = 1
+	// The other apps show the same phone number for both (only a keyed hash of
+	// it is kept on the server, never sent). Strong, yet still only a
+	// suggestion: nothing is linked until the owner confirms. Listed before the
+	// name suggestions; a pair that matches both is suggested once, by phone.
+	LinkSuggestionReason_LINK_SUGGESTION_REASON_PHONE LinkSuggestionReason = 2
 )
 
 // Enum value maps for LinkSuggestionReason.
@@ -217,10 +222,12 @@ var (
 	LinkSuggestionReason_name = map[int32]string{
 		0: "LINK_SUGGESTION_REASON_UNSPECIFIED",
 		1: "LINK_SUGGESTION_REASON_NAME",
+		2: "LINK_SUGGESTION_REASON_PHONE",
 	}
 	LinkSuggestionReason_value = map[string]int32{
 		"LINK_SUGGESTION_REASON_UNSPECIFIED": 0,
 		"LINK_SUGGESTION_REASON_NAME":        1,
+		"LINK_SUGGESTION_REASON_PHONE":       2,
 	}
 )
 
@@ -3184,10 +3191,11 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x1bREPORT_REASON_PERSONAL_DATA\x10\x05\x12\x17\n" +
 	"\x13REPORT_REASON_OTHER\x10\x06\x12\x16\n" +
 	"\x12REPORT_REASON_SCAM\x10\a\x12\x18\n" +
-	"\x14REPORT_REASON_SEXUAL\x10\b*_\n" +
+	"\x14REPORT_REASON_SEXUAL\x10\b*\x81\x01\n" +
 	"\x14LinkSuggestionReason\x12&\n" +
 	"\"LINK_SUGGESTION_REASON_UNSPECIFIED\x10\x00\x12\x1f\n" +
-	"\x1bLINK_SUGGESTION_REASON_NAME\x10\x012\xf0\v\n" +
+	"\x1bLINK_SUGGESTION_REASON_NAME\x10\x01\x12 \n" +
+	"\x1cLINK_SUGGESTION_REASON_PHONE\x10\x022\xf0\v\n" +
 	"\fUsersService\x12:\n" +
 	"\aGetSelf\x12\x16.app.v1.GetSelfRequest\x1a\x17.app.v1.GetSelfResponse\x12=\n" +
 	"\bGetUsers\x12\x17.app.v1.GetUsersRequest\x1a\x18.app.v1.GetUsersResponse\x12L\n" +

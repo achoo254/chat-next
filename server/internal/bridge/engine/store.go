@@ -77,6 +77,8 @@ type importedMessage struct {
 type db struct {
 	pool     *pgxpool.Pool
 	tenantID string
+	// phones hashes phone numbers; nil when no key is configured.
+	phones *phoneHasher
 }
 
 func (d *db) loadAccount(ctx context.Context, id int64) (*accountRow, error) {
@@ -342,6 +344,9 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 					return 0, err
 				}
 			}
+			if err := d.setPhone(ctx, a.ID, p); err != nil {
+				return 0, err
+			}
 			return id, nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -376,8 +381,8 @@ func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participa
 			return fmt.Errorf("bridge: create puppet: %w", err)
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref) VALUES ($1, $2, $3, $4, $5)`,
-			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef)
+			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref, phone_hmac) VALUES ($1, $2, $3, $4, $5, $6)`,
+			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef, d.phones.update(p).value)
 		if err != nil {
 			return fmt.Errorf("bridge: link puppet: %w", err)
 		}

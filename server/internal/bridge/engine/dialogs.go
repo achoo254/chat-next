@@ -187,7 +187,7 @@ func (r *runner) doDialogState(ctx context.Context, h *outboxRow) error {
 }
 
 // pollAll runs the poll of every feature that has one, then copies the profile photos
-// of people that changed.
+// of people that changed, and reads the phone book once per account.
 func (r *runner) pollAll(ctx context.Context) error {
 	for i := range handlers {
 		h := &handlers[i]
@@ -202,5 +202,8 @@ func (r *runner) pollAll(ctx context.Context) error {
 		}
 	}
 	// Not a feature of a chat: a person's photo is the same in every chat they are in.
-	return r.pollPeoplePhotos(ctx)
+	if err := r.pollPeoplePhotos(ctx); err != nil {
+		return err
+	}
+	return r.readPhoneBook(ctx)
 }

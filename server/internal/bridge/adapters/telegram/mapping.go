@@ -94,6 +94,7 @@ func participantUser(u *tg.User, self int64) bridge.Participant {
 	named := strings.TrimSpace(u.FirstName+" "+u.LastName) != "" || u.Username != ""
 	p := bridge.Participant{ID: strconv.FormatInt(u.ID, 10), Name: userName(u), Username: u.Username, IsBot: u.Bot, IsSelf: u.ID == self, NameUnknown: !named}
 	withUserPhoto(&p, u)
+	withUserPhone(&p, u)
 	return p
 }
 

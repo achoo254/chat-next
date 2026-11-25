@@ -36,6 +36,9 @@ type Deps struct {
 	// Limiter bounds the logins a user starts; nil means no bound.
 	Limiter ratelimit.Limiter
 	Logger  *slog.Logger
+	// PhoneKey keys the hash kept for the phone number of a person of another
+	// app (external_users.phone_hmac); nil keeps no number at all.
+	PhoneKey []byte
 }
 
 // Engine is the bridge service: it keeps every active external account
@@ -64,7 +67,7 @@ type runnerHandle struct {
 // New builds the engine; Run starts it.
 func New(cfg Config, d Deps) *Engine {
 	cfg = cfg.withDefaults()
-	return &Engine{cfg: cfg, db: &db{pool: d.Pool, tenantID: cfg.TenantID}, chat: d.Chat, box: d.Box,
+	return &Engine{cfg: cfg, db: &db{pool: d.Pool, tenantID: cfg.TenantID, phones: newPhoneHasher(d.PhoneKey)}, chat: d.Chat, box: d.Box,
 		adapters: d.Adapters, logger: d.Logger, limiter: d.Limiter, mediaSvc: d.Media, runners: map[int64]*runnerHandle{}}
 }
 

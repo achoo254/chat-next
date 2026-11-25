@@ -168,4 +168,18 @@ describe("link suggestions on the contacts screen", () => {
 		expect(fixture.people.calls).toContain("suggestions:0");
 		expect(fixture.people.people).toHaveLength(1);
 	});
+
+	it("says a phone match is the same number and still waits for Nối", async () => {
+		const { fixture, lan, lanTelegram, minh } = seed();
+		fixture.people.suggested.push([lan, lanTelegram], [minh, lanTelegram]);
+		fixture.people.samePhone.add(`${Math.min(minh, lanTelegram)}:${Math.max(minh, lanTelegram)}`);
+		renderMessaging(fixture, "/contacts");
+		const region = await screen.findByRole("region", { name: "Gợi ý nối" }, LONG);
+		await waitFor(() => expect(within(region).getAllByRole("listitem")).toHaveLength(2), LONG);
+		const [byName, byPhone] = within(region).getAllByRole("listitem");
+		expect(within(byName ?? region).getByText("Tên giống nhau, chưa xác minh")).toBeTruthy();
+		expect(within(byPhone ?? region).getByText("Cùng số điện thoại trên các ứng dụng kia, cần bạn xác nhận")).toBeTruthy();
+		expect(within(byPhone ?? region).queryByText("Tên giống nhau, chưa xác minh")).toBeNull();
+		expect(fixture.people.people).toHaveLength(0);
+	});
 });

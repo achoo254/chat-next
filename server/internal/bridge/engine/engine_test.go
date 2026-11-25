@@ -57,6 +57,8 @@ type env struct {
 	media   *media.Service
 	// adapter, when set, stands in for the fake in the engine's adapter set.
 	adapter bridge.Adapter
+	// phoneKey, when set, turns on recording phone numbers.
+	phoneKey []byte
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -129,7 +131,8 @@ func (e *env) engine() *engine.Engine {
 	return engine.New(engine.Config{TenantID: "primary", PageSize: 7, PageDelay: time.Millisecond, BatchSize: 5, BackoffMin: 10 * time.Millisecond,
 		BackoffMax: 40 * time.Millisecond, ReconcileEvery: 30 * time.Millisecond, LeaseTTL: 2 * time.Second, Holder: "test",
 		OutboxPoll: 10 * time.Millisecond, StatePoll: 30 * time.Millisecond, DeleteConfirmAfter: 400 * time.Millisecond, SendGap: time.Millisecond, TopicRefreshGap: time.Millisecond},
-		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": adapter}, Logger: quiet})
+		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": adapter}, Logger: quiet,
+			PhoneKey: e.phoneKey})
 }
 
 // start runs a new engine process (stopping the previous one first).

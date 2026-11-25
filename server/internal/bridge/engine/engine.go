@@ -189,6 +189,8 @@ type runner struct {
 	windows map[int64]windowProgress
 	// photoHeld are the profile photos whose copy failed, by external_users.id (see pollPeoplePhotos).
 	photoHeld map[int64]heldPhoto
+	// phoneBookDone: the account's contacts were read for phone numbers, or need not be (see readPhoneBook).
+	phoneBookDone bool
 }
 
 // run connects the account and syncs until ctx ends or something fails.
