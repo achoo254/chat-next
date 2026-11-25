@@ -17,8 +17,9 @@ import (
 // the newest page of 1-1 messages (send, history); version 5 gives a history
 // message the hash of its text instead of the text; version 6 gives a 1-1
 // message the photo URL of the other person; version 7 the phone number their
-// profile shows.
-const protocolVersion = 7
+// profile shows; version 8 sends a photo or a file to one person (file_chunk,
+// send_media).
+const protocolVersion = 8
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -30,6 +31,10 @@ const (
 	cmdLoginSession = "login_session"
 	cmdSend         = "send"
 	cmdHistory      = "history"
+	// cmdFileChunk carries a piece of the file of the send_media command with the
+	// same id; it has no answer.
+	cmdFileChunk = "file_chunk"
+	cmdSendMedia = "send_media"
 )
 
 // Events the sidecar writes on stdout.
@@ -67,8 +72,17 @@ type command struct {
 	// ID names a send or history command; its answer carries it back.
 	ID   string `json:"id,omitempty"`
 	To   string `json:"to,omitempty"`   // send: the person's Zalo id
-	Text string `json:"text,omitempty"` // send: never logged
+	Text string `json:"text,omitempty"` // send: never logged; send_media: the caption of a photo
 	Peer string `json:"peer,omitempty"` // history: the person's Zalo id
+	// file_chunk: base64 of the next bytes of the file. Never logged.
+	Data string `json:"data,omitempty"`
+	// send_media: "photo" or "file", the file name (never logged), its size in
+	// bytes and, for a photo, its pixel size.
+	Kind   string `json:"kind,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Size   int64  `json:"size,omitempty"`
+	Width  int    `json:"width,omitempty"`
+	Height int    `json:"height,omitempty"`
 }
 
 // errCodeSessionRejected is the error code of a login Zalo refused (sidecar
@@ -110,7 +124,7 @@ type wireEvent struct {
 	State   string          `json:"state"`
 	Code    looseString     `json:"code"`
 	Message string          `json:"message"`
-	// answers: sent, send_error, history, history_error
+	// answers: sent, send_error (send and send_media), history, history_error
 	ID       string           `json:"id"`
 	ZaloCode looseString      `json:"zaloCode"`
 	Count    int              `json:"count"`

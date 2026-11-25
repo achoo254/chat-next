@@ -24,7 +24,7 @@ export const zhCNBridge: BridgeCopy = {
 			title: (app) => `连接 ${app} 之前`,
 			points: (app) => [
 				`${app} 没有面向个人账号的官方 API。Chat 通过非官方方式连接，这违反 ${app} 的使用条款。`,
-				`连接后，你在 Chat 中亲自输入的文字会通过你的主要个人账号发送到 ${app}。Chat 不会自动发送任何内容。`,
+				`连接后，你在 Chat 中亲自输入的文字和亲自添加的图片、文件会通过你的主要个人账号发送到 ${app}。Chat 不会自动发送任何内容。`,
 				`${app} 可能因此限制或封禁你的主要个人账号。请在连接前慎重考虑。`,
 				`连接期间请勿打开 ${app} 网页版或电脑版。`,
 				"只使用你本人的账号。",
@@ -92,9 +92,9 @@ export const zhCNBridge: BridgeCopy = {
 		liveBody: (count: number): string => `${count} 个会话，所有更改双向同步。`,
 		privateText: {
 			ask: (app: string): string => `将 ${app} 私聊消息与 Chat 同步？`,
-			askBody: "从现在起收到的私聊消息（文字、贴纸）会显示在 Chat 中，你在这些聊天中输入的文字会发送到该应用。不会拉取旧消息和群组。",
+			askBody: "从现在起收到的私聊消息（文字、图片、文件、贴纸）会显示在 Chat 中，你在这些聊天中输入的文字和添加的图片、文件会发送到该应用。不会拉取旧消息和群组。",
 			startLater: (app: string): string => `同步 ${app} 消息`,
-			liveBody: (count: number): string => `${count} 个会话，新消息进入 Chat，你在 Chat 中输入的文字也会发出。`,
+			liveBody: (count: number): string => `${count} 个会话，新消息进入 Chat，你在 Chat 中发送的文字、图片和文件也会发出。`,
 		},
 	},
 	account: {
@@ -111,6 +111,9 @@ export const zhCNBridge: BridgeCopy = {
 		failed: (app) => `未发送到 ${app}`,
 		unknown: (app) => `不确定是否已到达 ${app}`,
 		editFailed: (app) => `修改未同步到 ${app}`,
+		fileTooLarge: (app) => `未发送到 ${app}：文件太大（Zalo 最多接收 25 MB）`,
+		fileNotSendable: (app) => `未发送到 ${app}：只能发送图片和文件，不能发送视频、语音消息或贴纸`,
+		fileCaption: (app) => `未发送到 ${app}：文字只能随图片发送。请删除该消息，再分别发送文件和文字`,
 		pinRefused: (app, topic) => `${app} 不允许置顶该${topic ? "话题" : "消息"}，已恢复原状。`,
 		changeRefused: (app, feature) => `${app} 未接受“${feature}”的更改，已恢复原状。`,
 		resend: "重新发送",

@@ -5,9 +5,10 @@
 //
 // It receives live 1-1 messages after a QR login (text, and photos, files and
 // videos copied from Zalo's CDN, see message_media.go) and lists the
-// conversations heard since the process started; it sends text to one person
-// the account talks with (send.go). Groups are ignored, stickers and voice are
-// a label, and there is no history beyond what this process heard (see Backfill).
+// conversations heard since the process started; it sends text, photos and files
+// to one person the account talks with (send.go, send_media.go). Groups are
+// ignored, stickers and voice are a label, and there is no history beyond what
+// this process heard (see Backfill).
 package zalo
 
 import (
@@ -47,6 +48,7 @@ type timing struct {
 	connect        time.Duration // login_session -> listener connected
 	sendGap        time.Duration // least time between two sends of one account
 	sendAnswer     time.Duration // send -> answer; also how long a try may still land
+	mediaAnswer    time.Duration // send_media -> answer (upload included); as sendAnswer for a file
 	historyAnswer  time.Duration // history -> page
 }
 
@@ -56,7 +58,7 @@ type timing struct {
 var defaultTiming = timing{stopGrace: 3 * time.Second, readyTimeout: 10 * time.Second, firstQR: 30 * time.Second,
 	loginStartWait: 3 * time.Second, loginPoll: 20 * time.Second, loginIdle: 45 * time.Second,
 	loginTTL: 10 * time.Minute, connect: 2 * time.Minute,
-	sendGap: 2 * time.Second, sendAnswer: 30 * time.Second, historyAnswer: 15 * time.Second}
+	sendGap: 2 * time.Second, sendAnswer: 30 * time.Second, mediaAnswer: 3 * time.Minute, historyAnswer: 15 * time.Second}
 
 // Adapter implements bridge.Adapter for Zalo.
 type Adapter struct {
@@ -103,13 +105,13 @@ func newAdapter(runner Runner, logger *slog.Logger, now func() time.Time) *Adapt
 func (a *Adapter) Name() string { return Name }
 
 // Capabilities implements bridge.Adapter: live messages with the files they
-// carry (received only), and text sent out.
+// carry, and text, photos and files sent out.
 func (a *Adapter) Capabilities() bridge.Capabilities {
 	return bridge.Capabilities{bridge.CapLive: true, bridge.CapMedia: true, bridge.CapSend: true}
 }
 
 // Features implements bridge.Featured: messages come in (with photos, files and
-// videos) and go out (text only). No edits, deletes, topics or pins.
+// videos) and go out (text, photos and files). No edits, deletes, topics or pins.
 func (a *Adapter) Features() map[feature.Feature]feature.Support {
 	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}}
 }

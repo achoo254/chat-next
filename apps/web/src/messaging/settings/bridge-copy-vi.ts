@@ -26,7 +26,7 @@ export const viBridge = {
 			title: (app: string): string => `Trước khi kết nối ${app}`,
 			points: (app: string): readonly string[] => [
 				`${app} không có API chính thức cho tài khoản cá nhân. Chat kết nối qua một cách không chính thức, trái với điều khoản sử dụng của ${app}.`,
-				`Khi đã kết nối, chữ bạn tự gõ trong Chat được gửi sang ${app} bằng tài khoản cá nhân chính của bạn. Chat không tự gửi gì.`,
+				`Khi đã kết nối, chữ bạn tự gõ và ảnh, tệp bạn tự đính kèm trong Chat được gửi sang ${app} bằng tài khoản cá nhân chính của bạn. Chat không tự gửi gì.`,
 				`${app} có thể hạn chế hoặc khoá tài khoản cá nhân chính của bạn vì việc này. Hãy cân nhắc trước khi kết nối.`,
 				`Đừng mở ${app} Web hoặc ${app} trên máy tính trong lúc đang kết nối.`,
 				"Chỉ dùng tài khoản của chính bạn.",
@@ -99,12 +99,12 @@ export const viBridge = {
 		live: "Đang đồng bộ trực tiếp",
 		liveBody: (count: number): string => `${count} cuộc trò chuyện, mọi thay đổi đi hai chiều.`,
 		// An app Chat syncs private text with, from the time it is connected (Zalo for now):
-		// no older messages, no groups, and only the text typed in Chat goes out.
+		// no older messages, no groups, and only what is typed or attached in Chat goes out.
 		privateText: {
 			ask: (app: string): string => `Đồng bộ tin nhắn riêng ${app} với Chat?`,
-			askBody: "Tin nhắn riêng (chữ, nhãn dán) đến từ bây giờ sẽ hiện trong Chat, và chữ bạn gõ trong các chat đó được gửi sang ứng dụng này. Tin cũ và nhóm không được kéo về.",
+			askBody: "Tin nhắn riêng (chữ, ảnh, tệp, nhãn dán) đến từ bây giờ sẽ hiện trong Chat, và chữ bạn gõ, ảnh và tệp bạn đính kèm trong các chat đó được gửi sang ứng dụng này. Tin cũ và nhóm không được kéo về.",
 			startLater: (app: string): string => `Đồng bộ tin nhắn ${app}`,
-			liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới về Chat và chữ bạn gõ trong Chat được gửi đi.`,
+			liveBody: (count: number): string => `${count} cuộc trò chuyện, tin mới về Chat; chữ, ảnh và tệp bạn gửi trong Chat được gửi đi.`,
 		},
 	},
 	account: {
@@ -122,6 +122,10 @@ export const viBridge = {
 		failed: (app: string): string => `Chưa gửi sang ${app}`,
 		unknown: (app: string): string => `Chưa rõ đã gửi sang ${app} chưa`,
 		editFailed: (app: string): string => `Bản sửa chưa sang ${app}`,
+		/** Why a message with a file did not go, after failed(app). */
+		fileTooLarge: (app: string): string => `Chưa gửi sang ${app}: tệp quá lớn (Zalo nhận tối đa 25 MB)`,
+		fileNotSendable: (app: string): string => `Chưa gửi sang ${app}: chỉ gửi được ảnh và tệp, không gửi video, tin thoại hay nhãn dán`,
+		fileCaption: (app: string): string => `Chưa gửi sang ${app}: chữ chỉ đi kèm ảnh. Xoá tin rồi gửi tệp và chữ riêng`,
 		pinRefused: (app: string, topic: boolean): string => `${app} không cho ghim ${topic ? "chủ đề" : "tin nhắn"} này; đã trả về như cũ.`,
 		changeRefused: (app: string, feature: string): string => `${app} không nhận thay đổi “${feature}”; đã trả về như cũ.`,
 		resend: "Gửi lại",

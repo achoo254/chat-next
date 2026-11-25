@@ -8,6 +8,7 @@ import (
 
 	appv1 "app.local/server/gen/app/v1"
 	"app.local/server/internal/bridge/feature"
+	"app.local/server/internal/media"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 )
@@ -162,9 +163,10 @@ func (t *txn) queueDeletes(ctx context.Context, chatID, me int64, seqs []int64) 
 // composerKey marks the context of a send the user typed in Chat's composer.
 type composerKey struct{}
 
-// FromComposer marks ctx as the send of a text the user typed in Chat's message
-// composer: only the RPC the apps' composers call sets it, never a tool, an agent
-// or any other caller, so a new caller is not taken for the composer.
+// FromComposer marks ctx as the send of a text the user typed, or a file the user
+// attached, in Chat's message composer: only the RPCs the apps' composers call
+// set it (SendMessage, SendMedia, SendAlbum over /rpc), never a tool, an agent or
+// any other caller, so a new caller is not taken for the composer.
 func FromComposer(ctx context.Context) context.Context {
 	return context.WithValue(ctx, composerKey{}, true)
 }
@@ -179,8 +181,8 @@ func fromComposer(ctx context.Context) bool {
 	return typed
 }
 
-// SetComposerOnlyApps names the apps whose linked chats take only text the owner
-// types in Chat's composer (FromComposer): their adapter cannot recognise a
+// SetComposerOnlyApps names the apps whose linked chats take only what the owner
+// types or attaches in Chat's composer (FromComposer): their adapter cannot recognise a
 // repeated send on its own (bridge.RetryUnsafe), so nothing is sent from the
 // owner's account there that the owner did not write by hand. Call it before
 // serving.
@@ -224,7 +226,35 @@ func linkedSendRule(ctx context.Context, q querier, chatID, me int64, plain bool
 	case !plain || me != owner:
 		return errDenied("imported_chat_send_unsupported: only your own text and files can be sent on to the other app")
 	case composerOnly(app) && !fromComposer(ctx):
-		return errDenied("imported_chat_composer_only: this chat only takes text typed in Chat; forwards, copies, files and messages sent by tools or agents are not sent to the other app")
+		return errComposerOnly()
+	}
+	return nil
+}
+
+// errComposerOnly refuses, in a chat of a composer-only app, anything the owner did
+// not type or attach in Chat's composer.
+func errComposerOnly() error {
+	return errDenied("imported_chat_composer_only: this chat only takes what you type or attach in Chat; forwards, copies, files of other messages and messages sent by tools or agents are not sent to the other app")
+}
+
+// composerFileRule is the gate of a file attached to a message for chatID: a chat of
+// a composer-only app takes only a file the owner uploaded, not one reused from a
+// message they can see (forwarding by file_id), whatever the caller marked.
+func composerFileRule(ctx context.Context, q querier, chatID, me int64, f *media.File, composerOnly func(app string) bool) error {
+	if f.OwnerID == me {
+		return nil
+	}
+	var app string
+	err := q.QueryRow(ctx, `
+		SELECT a.source FROM external_chats x JOIN external_accounts a ON a.id = x.account_id WHERE x.chat_id = $1`, chatID).Scan(&app)
+	if isNoRows(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("chat: check imported chat: %w", err)
+	}
+	if composerOnly(app) {
+		return errComposerOnly()
 	}
 	return nil
 }

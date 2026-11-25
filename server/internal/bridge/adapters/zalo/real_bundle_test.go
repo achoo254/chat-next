@@ -11,7 +11,8 @@ import (
 
 // The committed bundle, run with the real Node and ExecRunner: it says ready
 // with the protocol this adapter speaks, answers an unknown command and an
-// empty session with error codes, and exits by itself once its stdin closes.
+// empty session with error codes, a file sent before any login with a send_error,
+// and exits by itself once its stdin closes.
 // No command touches the network. Skipped where node is not installed.
 func TestRealBundleSpeaksTheProtocolAndExitsOnStdinClose(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -39,6 +40,14 @@ func TestRealBundleSpeaksTheProtocolAndExitsOnStdinClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectError(ctx, t, side, "bad_session")
+	// A file streamed in chunks and sent before any login is answered, by id, without a network call.
+	if err := side.send(command{Cmd: cmdFileChunk, ID: "f1", Data: "eGluIGNow6Bv"}); err != nil {
+		t.Fatal(err)
+	}
+	ev, err := side.request(ctx, command{Cmd: cmdSendMedia, ID: "f1", To: "123", Kind: "file", Name: "a.txt", Size: 9}, 10*time.Second)
+	if err != nil || ev.Ev != evSendError || string(ev.Code) != "not_logged_in" {
+		t.Fatalf("send_media before login = %+v, %v; want send_error not_logged_in", ev, err)
+	}
 	_ = side.proc.Stdin().Close()
 	select {
 	case <-side.exited:

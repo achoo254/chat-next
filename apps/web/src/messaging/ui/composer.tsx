@@ -89,13 +89,26 @@ interface ComposerProps {
 	disabled?: boolean;
 	/** The chat lets this user send media (the server's limit is checked here). */
 	media?: boolean;
+	/** The chat sends on to an app that takes a caption only with a photo (Zalo): a caption of other files goes as its own message. */
+	captionOnPhotoOnly?: boolean;
 	/** Private chat with a bot: the bot's user id (its command menu and reply keyboard); 0 otherwise. */
 	botId?: number;
 	/** A group: the command menu of its bots. */
 	group?: boolean;
 }
 
-export function Composer({ chatId, topicId, channel, label, placeholder, disabled = false, media = false, botId = 0, group = false }: ComposerProps) {
+export function Composer({
+	chatId,
+	topicId,
+	channel,
+	label,
+	placeholder,
+	disabled = false,
+	media = false,
+	captionOnPhotoOnly = false,
+	botId = 0,
+	group = false,
+}: ComposerProps) {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
 	const limits = useMediaLimits();
@@ -234,7 +247,7 @@ export function Composer({ chatId, topicId, channel, label, placeholder, disable
 		drafts.set(chatId, "", topicId);
 		try {
 			const [{ sendFiles }, { releasePreviews }] = await Promise.all([import("../media/send-media.ts"), import("../media/attach-tray.tsx")]);
-			const outcome = await sendFiles(source, { chatId, topicId, replyToSeq }, picked, caption, limits, asFiles.get());
+			const outcome = await sendFiles(source, { chatId, topicId, replyToSeq }, picked, caption, limits, asFiles.get(), captionOnPhotoOnly);
 			releasePreviews(picked);
 			asFiles.set(false);
 			// Refused files stay in the tray with their reason.

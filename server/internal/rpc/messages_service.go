@@ -31,13 +31,21 @@ func (s *messagesService) SendMessage(ctx context.Context, req *connect.Request[
 	})
 }
 
+// SendMedia and SendAlbum over /rpc are what the composers call with the files
+// the user attached; an MCP tool running the same handler is not (chat.FromComposer).
 func (s *messagesService) SendMedia(ctx context.Context, req *connect.Request[appv1.SendMediaRequest]) (*connect.Response[appv1.SendMediaResponse], error) {
+	if !calledInProcess(ctx) {
+		ctx = chat.FromComposer(ctx)
+	}
 	return call(ctx, s.logger, req, func(me int64, m *appv1.SendMediaRequest) (*appv1.SendMediaResponse, error) {
 		return s.chat.SendMedia(ctx, me, m)
 	})
 }
 
 func (s *messagesService) SendAlbum(ctx context.Context, req *connect.Request[appv1.SendAlbumRequest]) (*connect.Response[appv1.SendAlbumResponse], error) {
+	if !calledInProcess(ctx) {
+		ctx = chat.FromComposer(ctx)
+	}
 	return call(ctx, s.logger, req, func(me int64, m *appv1.SendAlbumRequest) (*appv1.SendAlbumResponse, error) {
 		return s.chat.SendAlbum(ctx, me, m)
 	})

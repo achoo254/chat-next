@@ -19,7 +19,7 @@ const result = await build({
 	format: "cjs",
 	target: "node20",
 	legalComments: "none",
-	alias: { "form-data": path.join(here, "src", "stub-form-data.mjs") },
+	alias: { "form-data": path.join(here, "src", "form-data.mjs") },
 	metafile: true,
 	logLevel: "warning",
 });

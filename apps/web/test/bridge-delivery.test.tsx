@@ -18,14 +18,14 @@ function item(seq: number, op: string, status: BridgeOutboxStatus, lastError = "
 	return { $typeName: "app.v1.BridgeOutboxItem", seq: BigInt(seq), op, status, lastError, attempts: 1 };
 }
 
-/** A two-way chat with one message of mine, and what its outbox holds. */
-function twoWay(items: (seq: number) => BridgeOutboxItem[]): { fixture: ChatFixture; chatId: number; seq: number } {
+/** A two-way chat (with `source`) with one message of mine, and what its outbox holds. */
+function twoWay(items: (seq: number) => BridgeOutboxItem[], source = "telegram"): { fixture: ChatFixture; chatId: number; seq: number } {
 	const fixture = new ChatFixture();
 	const partner = fixture.addUser("Anh Đô");
 	const chatId = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, partner]);
 	fixture.send(partner, chatId, "chào bạn");
 	const seq = fixture.send(fixture.selfId, chatId, "tin của tôi");
-	fixture.bridge.seedTwoWay(chatId);
+	fixture.bridge.seedTwoWay(chatId, source);
 	fixture.bridge.outbox.set(chatId, items(seq));
 	return { fixture, chatId, seq };
 }
@@ -54,6 +54,24 @@ describe("a chat that sends on to another app", () => {
 		const bubble = await myBubble();
 		expect(await within(bubble).findByLabelText("Đang gửi sang Telegram", {}, LONG)).toBeTruthy();
 		expect(within(bubble).queryByRole("button", { name: "Gửi lại" })).toBeNull();
+	});
+
+	it("names Zalo as people know it and says why it did not take a file", async () => {
+		const reasons: [string, string][] = [
+			["bridge: file too large for the other app: files over 25 MiB are not sent to Zalo", "Chưa gửi sang Zalo: tệp quá lớn (Zalo nhận tối đa 25 MB)"],
+			["bridge: not allowed in the other app: file_not_sendable: only photos and files go to Zalo", "Chưa gửi sang Zalo: chỉ gửi được ảnh và tệp, không gửi video, tin thoại hay nhãn dán"],
+			["bridge: not allowed in the other app: file_caption: Zalo takes a caption only on a photo", "Chưa gửi sang Zalo: chữ chỉ đi kèm ảnh. Xoá tin rồi gửi tệp và chữ riêng"],
+			["bridge: not allowed in the other app: Zalo refused the message (code 114)", "Chưa gửi sang Zalo"],
+		];
+		for (const [lastError, said] of reasons) {
+			const { fixture, chatId } = twoWay((s) => [item(s, "send", BridgeOutboxStatus.FAILED, lastError)], "zalo");
+			renderMessaging(fixture, `/c/${chatId}`);
+			await waitFor(() => expect(composerPlaceholder()).toMatch(/ qua Zalo$/), LONG);
+			const bubble = await myBubble();
+			expect((await within(bubble).findAllByText(said, {}, LONG)).length).toBeGreaterThan(0);
+			expect(within(bubble).getByRole("button", { name: "Gửi lại" })).toBeTruthy();
+			cleanup();
+		}
 	});
 
 	it("tells that the app refused a pin, once, without calling the message failed", async () => {

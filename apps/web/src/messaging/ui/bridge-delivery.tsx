@@ -5,6 +5,7 @@
 // (bridge-delivery-watch.ts) and what is drawn (bridge-message-state.tsx) load on
 // demand, and a chat that is not connected costs one status call a minute.
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { appName } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
 import type { BridgeOutboxItem } from "../settings/bridge-api.ts";
 import type { DeliveryState, DeliveryWatch } from "./bridge-delivery-watch.ts";
@@ -20,7 +21,7 @@ export const bridgeChunk = () => import("./bridge-message-state.tsx");
 export const BridgeDeliveryContext = createContext<BridgeDelivery | null>(null);
 
 /** How the app is named to the user. */
-export const bridgeAppName = (app: string): string => (app === "telegram" ? "Telegram" : app);
+export const bridgeAppName = appName;
 
 /** The unfinished item of a message that matters most: a send first, then an edit, then a delete. */
 export function itemOf(delivery: BridgeDelivery | null, seq: number): BridgeOutboxItem | null {

@@ -9,6 +9,12 @@
 //                                            to one person (1-1 only); answered by `sent` or `send_error`
 //   {"cmd":"history","id":"<req id>","peer":"<uid digits>"}  (protocol 4) the newest page of 1-1
 //                                            messages, cut down to that person; `history` or `history_error`
+//   {"cmd":"file_chunk","id":"<req id>","data":"<base64>"}  (protocol 8) the next bytes of the file of the
+//                                            send_media command with the same id; no answer
+//   {"cmd":"send_media","id":"<req id>","to":"<uid digits>","kind":"photo"|"file","name":"..","size":<bytes>,
+//    "width":..,"height":..,"text":".."}    (protocol 8) send the file streamed under id (at most 25 MiB) to one
+//                                            person, a caption only with a photo (src/send-media.mjs);
+//                                            answered by `sent` or `send_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
 //   {"ev":"ready","protocol":7}
@@ -25,8 +31,9 @@
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
 //   {"ev":"sent","id":..,"msgId":"<digits>","ts":<ms>}    ts is this process's clock when Zalo answered
 //   {"ev":"send_error","id":..,"code":"..","zaloCode":<int>?}  src/send.mjs: codes that say nothing was
-//     created (rate_limited, session_rejected, refused, bad_request, not_logged_in) and codes that leave
-//     it open (network_error, zalo_unavailable, unclear); zaloCode only with refused
+//     created (rate_limited, session_rejected, refused, bad_request, not_logged_in; for send_media also
+//     too_large, file_refused, upload_failed) and codes that leave it open (network_error,
+//     zalo_unavailable, unclear); zaloCode only with refused
 //   {"ev":"history","id":..,"count":<page size>,"oldestTs":<ms>,"messages":[{self,msgType,textHash,msgId,ts}]}
 //     textHash: SHA-256 hex of a text message's text (src/history.mjs), null for any other message
 //   {"ev":"history_error","id":..,"code":"listener_down"|"busy"|"timeout"|"failed"}
@@ -52,6 +59,7 @@ import { createHistory, HistoryError } from "./history.mjs";
 import { createPeerLookup } from "./peer-profile.mjs";
 import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
 import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendText } from "./send.mjs";
+import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from "./send-media.mjs";
 
 // 2: adds the `account` event (the engine needs the account id to finish a QR login).
 // 3: login_qr can skip the listener; login failures carry a reason code; the uid is checked.
@@ -59,7 +67,8 @@ import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendTex
 // 5: a history message carries the hash of its text (textHash), not the text.
 // 6: a 1-1 message carries the other person's photo URL (peerAvatar); the profile is looked up for every 1-1 message.
 // 7: a 1-1 message carries the phone number the other person's profile shows (peerPhone), never written anywhere else.
-const PROTOCOL = 7;
+// 8: file_chunk and send_media send one photo or file to one person.
+const PROTOCOL = 8;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -84,6 +93,8 @@ function fail(code, error) {
 // purpose: without it the owner's own messages, sent from the phone, never reach Chat.
 const zalo = new Zalo({ logging: false, checkUpdate: false, selfListen: true });
 let api = null;
+/** The bytes of the file being streamed for a send_media command. */
+const uploads = createUploads();
 /** Whether the websocket listener is connected (a history request needs it). */
 let connected = false;
 /** Pages of old messages; set once the listener starts. */
@@ -115,9 +126,15 @@ function announce(loggedIn) {
 /** Lookups of the other person of a 1-1 message (src/peer-profile.mjs); stderr says only how each ended. */
 let lookupPeer = null;
 
+/** Keeps the logged-in API; its uploads get a time limit (src/send-media.mjs). */
+function useApi(loggedIn) {
+	guardUploads(loggedIn);
+	api = loggedIn;
+}
+
 /** Starts the websocket listener of a logged-in API and forwards what it hears. */
 function listen(loggedIn) {
-	api = loggedIn;
+	useApi(loggedIn);
 	lookupPeer = createPeerLookup({
 		getUserInfo: (uid) => loggedIn.getUserInfo(uid),
 		log: (outcome) => process.stderr.write(`lookup ${outcome}\n`),
@@ -187,7 +204,7 @@ async function loginQR(listenAfter) {
 	});
 	if (!announce(loggedIn)) return;
 	if (listenAfter) listen(loggedIn);
-	else api = loggedIn;
+	else useApi(loggedIn);
 }
 
 async function loginSession(session) {
@@ -210,6 +227,23 @@ async function send(command) {
 		emit({ ev: "sent", id, msgId, ts });
 	} catch (error) {
 		emit({ ev: "send_error", id, ...sendFailure(error) });
+	}
+}
+
+/** Sends the photo or file streamed under the command's id; the answer never carries the file or its name. */
+async function sendFile(command) {
+	const id = command.id;
+	const data = uploads.take(id);
+	if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+	const file = fileOf(command);
+	if (!isUserId(command.to) || file === null || data === null || data.length !== file.size) {
+		return emit({ ev: "send_error", id, code: BAD_REQUEST });
+	}
+	try {
+		const { msgId, ts } = await sendMedia(api, command.to, file, data);
+		emit({ ev: "sent", id, msgId, ts });
+	} catch (error) {
+		emit({ ev: "send_error", id, ...sendMediaFailure(error) });
 	}
 }
 
@@ -239,10 +273,16 @@ async function handle(line) {
 				return await loginQR(command.listen !== false);
 			case "login_session":
 				return await loginSession(command.session);
+			case "file_chunk":
+				// Kept before anything awaits, so the chunks of a file are in order when send_media reads them.
+				if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
+				return uploads.chunk(command.id, command.data);
 			case "send":
 			case "history":
+			case "send_media":
 				if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
-				return command.cmd === "send" ? await send(command) : await readHistory(command);
+				if (command.cmd === "send") return await send(command);
+				return command.cmd === "send_media" ? await sendFile(command) : await readHistory(command);
 			case "stop":
 				api?.listener.stop();
 				return setTimeout(() => process.exit(0), 200);

@@ -82,13 +82,13 @@ export class FakeBridge {
 		return account;
 	});
 
-	/** A connected account whose chat `chatId` sends on to the app (two-way), for the conversation tests. */
-	seedTwoWay(chatId: number): void {
+	/** A connected account of `source` whose chat `chatId` sends on to the app (two-way), for the conversation tests. */
+	seedTwoWay(chatId: number, source = "telegram"): void {
 		this.accounts = [
 			{
 				$typeName: "app.v1.BridgeAccount",
 				id: 1n,
-				source: "telegram",
+				source,
 				status: BridgeAccountStatus.ACTIVE,
 				syncState: BridgeSyncState.LIVE,
 				lastError: "",

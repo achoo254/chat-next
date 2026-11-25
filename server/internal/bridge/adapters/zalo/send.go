@@ -11,8 +11,9 @@ import (
 	"app.local/server/internal/bridge"
 )
 
-// Sending is text only, to one person the owner already talks with, through
-// the account's listening sidecar (a second login would kick the listener).
+// Sending is to one person the owner already talks with, through the account's
+// listening sidecar (a second login would kick the listener): text here, photos
+// and files in send_media.go.
 //
 // Zalo does not recognise a repeated send: zca-js gives each request a
 // client id from the clock. So the adapter keeps, per account, the RandomIDs
@@ -72,10 +73,15 @@ func (a *Adapter) DeleteMessages(context.Context, bridge.Account, bridge.Delete)
 	return fmt.Errorf("%w: Zalo messages cannot be deleted from Chat", bridge.ErrNotAllowed)
 }
 
-// SendMessage implements bridge.Sender: one text message to one person.
-// Entities are dropped (plain text) and a reply goes as a plain message.
+// SendMessage implements bridge.Sender: one text message, or the photos and files
+// of one message or album, to one person. Entities are dropped (plain text) and a
+// reply goes as a plain message.
 func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge.OutMessage) (bridge.SentRef, error) {
 	if err := checkOutgoing(m); err != nil {
+		return bridge.SentRef{}, err
+	}
+	files, err := planFiles(m)
+	if err != nil {
 		return bridge.SentRef{}, err
 	}
 	st := a.sendStateFor(acct.ID)
@@ -101,6 +107,9 @@ func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge
 		st.peers.add(m.Conversation)
 		page = &p
 	}
+	if len(files) > 0 {
+		return a.sendFiles(ctx, st, side, m, files, page)
+	}
 	text := hashText(m.Text)
 	if ref, done, err := a.earlierTry(ctx, st, side, m, text, page); done {
 		return ref, err
@@ -108,16 +117,15 @@ func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge
 	return a.sendNow(ctx, st, side, m, text)
 }
 
-// checkOutgoing refuses what Zalo sending does not take, for good.
+// checkOutgoing refuses what Zalo sending does not take, for good. The text of a
+// message with files is its caption, which may be empty (planFiles checks the rest).
 func checkOutgoing(m bridge.OutMessage) error {
 	switch {
-	case len(m.Media) > 0:
-		return fmt.Errorf("%w: only text can be sent to Zalo", bridge.ErrNotAllowed)
 	case m.Topic != "":
 		return fmt.Errorf("%w: Zalo chats have no topics", bridge.ErrNotAllowed)
 	case !accountUID.MatchString(m.Conversation):
 		return fmt.Errorf("%w: not a Zalo 1-1 chat", bridge.ErrNotAllowed)
-	case m.Text == "":
+	case m.Text == "" && len(m.Media) == 0:
 		return fmt.Errorf("%w: an empty message cannot be sent to Zalo", bridge.ErrNotAllowed)
 	case !utf8.ValidString(m.Text):
 		return fmt.Errorf("%w: the text is not valid UTF-8", bridge.ErrNotAllowed)
@@ -167,24 +175,41 @@ func (a *Adapter) earlierTry(ctx context.Context, st *sendState, side *sidecar, 
 
 // sendNow sends the text, at least sendGap after the account's last send.
 func (a *Adapter) sendNow(ctx context.Context, st *sendState, side *sidecar, m bridge.OutMessage, text textHash) (bridge.SentRef, error) {
-	if wait := st.lastSend.Add(a.timing.sendGap).Sub(a.now()); wait > 0 {
-		timer := time.NewTimer(wait)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return bridge.SentRef{}, ctx.Err()
-		case <-timer.C:
-		}
+	if err := a.waitGap(ctx, st); err != nil {
+		return bridge.SentRef{}, err
 	}
 	st.log.tried(m.RandomID, m.Conversation, text)
 	st.lastSend = a.now()
 	ev, err := side.request(ctx, command{Cmd: cmdSend, ID: a.nextRequestID(), To: m.Conversation, Text: m.Text}, a.timing.sendAnswer)
+	return a.answered(st, m.RandomID, ev, err)
+}
+
+// waitGap waits until sendGap has passed since the account's last send.
+func (a *Adapter) waitGap(ctx context.Context, st *sendState) error {
+	wait := st.lastSend.Add(a.timing.sendGap).Sub(a.now())
+	if wait <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// answered reads the sidecar's answer to the send (or send_media) of rid: the
+// message Zalo created, or why it failed. A failure that says Zalo created
+// nothing forgets rid, so a retry goes out at once.
+func (a *Adapter) answered(st *sendState, rid int64, ev wireEvent, err error) (bridge.SentRef, error) {
 	if err != nil {
 		return bridge.SentRef{}, fmt.Errorf("zalo: whether the message went out is not known: %w", err)
 	}
 	if ev.Ev == evSent && zaloID.MatchString(string(ev.MsgID)) {
 		ref := bridge.SentRef{IDs: []string{string(ev.MsgID)}, Date: parseTimestamp(ev.TS, a.now())}
-		st.log.settle(m.RandomID, ref)
+		st.log.settle(rid, ref)
 		return ref, nil
 	}
 	code := safeCode(string(ev.Code))
@@ -194,7 +219,7 @@ func (a *Adapter) sendNow(ctx context.Context, st *sendState, side *sidecar, m b
 	nothingCreated, err := sendError(code, safeCode(string(ev.ZaloCode)))
 	a.logger.Warn("zalo send failed", "code", code, "zalo_code", safeCode(string(ev.ZaloCode)), "created", !nothingCreated)
 	if nothingCreated {
-		st.log.forget(m.RandomID)
+		st.log.forget(rid)
 	}
 	return bridge.SentRef{}, err
 }
@@ -213,6 +238,13 @@ func sendError(code, zaloCode string) (nothingCreated bool, err error) {
 		return true, fmt.Errorf("%w: the message was refused before it was sent", bridge.ErrNotAllowed)
 	case "not_logged_in":
 		return true, errors.New("zalo: the sidecar is not logged in yet; nothing was sent")
+	case "too_large":
+		return true, fmt.Errorf("%w: Zalo refused the file as too large", bridge.ErrTooLarge)
+	case "file_refused":
+		return true, fmt.Errorf("%w: %s: Zalo does not take this file", bridge.ErrNotAllowed, errFileNotSendable)
+	case "upload_failed":
+		// The upload failed or timed out before any message was posted.
+		return true, errors.New("zalo: the file could not be uploaded to Zalo; nothing was sent")
 	}
 	return false, fmt.Errorf("zalo: whether the message went out is not known (%s)", code)
 }

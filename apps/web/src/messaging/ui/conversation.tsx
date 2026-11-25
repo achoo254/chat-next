@@ -534,6 +534,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					label={chat.type === "channel" ? copy.composer.channelLabel : copy.composer.label(topic?.title ?? title)}
 					placeholder={placeholderFor(chat, topic, title, copy, isSavedChat(chat, view?.peer ?? peer ?? null), delivery?.app ?? null)}
 					media={canSendMedia(chat)}
+					captionOnPhotoOnly={chat.externalApp === "zalo"}
 					botId={botId}
 					group={chat.type === "group"}
 				/>

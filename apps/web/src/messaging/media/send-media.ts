@@ -97,21 +97,31 @@ function newRandomId(target: SendTarget): number {
 
 /**
  * Sends picked files with a caption (on the first send). `asFiles` sends
- * photos and videos as plain files. Rejects when the outbox refused a
- * send; the sends before it stay queued.
+ * photos and videos as plain files. `captionOnPhotoOnly` is for a chat that
+ * sends on to an app taking a caption only with a photo (Zalo): when the
+ * first send does not start with a photo, the caption goes first as its own
+ * message (with the reply). Rejects when the outbox refused a send; the
+ * sends before it stay queued.
  */
 export async function sendFiles(
-	source: ChatSource,
+	source: Pick<ChatSource, "sendText" | "sendMedia" | "sendAlbum">,
 	target: SendTarget,
 	files: readonly File[],
 	caption: string,
 	limits: Pick<MediaLimits, "uploadSizeMax" | "albumSizeMax">,
 	asFiles = false,
+	captionOnPhotoOnly = false,
 ): Promise<SendOutcome> {
 	const plan = planSends(files, limits, asFiles);
 	let text = caption;
 	let replyToSeq = target.replyToSeq;
 	let sent = 0;
+	const opening = plan.groups[0]?.[0];
+	if (captionOnPhotoOnly && text !== "" && opening !== undefined && opening.kind !== "photo") {
+		await source.sendText(target.chatId, text, { randomId: newRandomId(target), ...(replyToSeq === 0 ? {} : { replyToSeq }) });
+		text = "";
+		replyToSeq = 0;
+	}
 	for (const group of plan.groups) {
 		const common = {
 			...(replyToSeq === 0 ? {} : { replyToSeq }),

@@ -24,7 +24,7 @@ export const enBridge: BridgeCopy = {
 			title: (app) => `Before you connect ${app}`,
 			points: (app) => [
 				`${app} has no official API for personal accounts. Chat connects in an unofficial way that is against ${app}'s terms of use.`,
-				`Once connected, the text you type in Chat yourself is sent to ${app} from your main personal account. Chat sends nothing on its own.`,
+				`Once connected, the text you type and the photos and files you attach in Chat yourself are sent to ${app} from your main personal account. Chat sends nothing on its own.`,
 				`${app} may restrict or ban your main personal account because of this. Think it over before you connect.`,
 				`Do not open ${app} Web or ${app} on a computer while connected.`,
 				"Use only your own account.",
@@ -97,9 +97,9 @@ export const enBridge: BridgeCopy = {
 		liveBody: (count: number): string => `${count} conversations, every change goes both ways.`,
 		privateText: {
 			ask: (app: string): string => `Sync your private ${app} messages with Chat?`,
-			askBody: "Private messages (text, stickers) that arrive from now on show up in Chat, and the text you type in those chats is sent to this app. Older messages and groups are not pulled in.",
+			askBody: "Private messages (text, photos, files, stickers) that arrive from now on show up in Chat, and the text you type and the photos and files you attach in those chats are sent to this app. Older messages and groups are not pulled in.",
 			startLater: (app: string): string => `Sync ${app} messages`,
-			liveBody: (count: number): string => `${count} conversations, new messages come into Chat and the text you type in Chat is sent.`,
+			liveBody: (count: number): string => `${count} conversations, new messages come into Chat; the text, photos and files you send in Chat go out.`,
 		},
 	},
 	account: {
@@ -116,6 +116,9 @@ export const enBridge: BridgeCopy = {
 		failed: (app) => `Not sent to ${app}`,
 		unknown: (app) => `Unclear whether it reached ${app}`,
 		editFailed: (app) => `Edit did not reach ${app}`,
+		fileTooLarge: (app) => `Not sent to ${app}: the file is too large (Zalo takes up to 25 MB)`,
+		fileNotSendable: (app) => `Not sent to ${app}: only photos and files can be sent, not videos, voice messages or stickers`,
+		fileCaption: (app) => `Not sent to ${app}: text can only go with a photo. Delete the message and send the file and the text separately`,
 		pinRefused: (app, topic) => `${app} did not let you ${topic ? "pin that topic" : "pin that message"}; it is back as it was.`,
 		changeRefused: (app, feature) => `${app} did not take the change to “${feature}”; it is back as it was.`,
 		resend: "Resend",

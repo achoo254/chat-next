@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/media"
 	"connectrpc.com/connect"
 )
 
@@ -202,6 +203,32 @@ func TestAComposerOnlyAppTakesOnlyTextTypedInTheComposer(t *testing.T) {
 	}
 	if err := h.st.Pool().QueryRow(ctx, `SELECT count(*) FROM external_outbox WHERE chat_id = $1 AND op = 'send'`, telegram).Scan(&n); err != nil || n != 2 {
 		t.Fatalf("the Telegram chat queued %d sends (err %v), want 2", n, err)
+	}
+}
+
+// A chat of a composer-only app takes only files the owner uploaded: a file reused
+// from a message they can see (forwarding by file_id) is refused there, and only there.
+func TestAComposerOnlyAppTakesOnlyFilesTheOwnerUploaded(t *testing.T) {
+	h := newHarness(t, nil)
+	h.svc.SetComposerOnlyApps([]string{"zalo"})
+	ctx := context.Background()
+	owner, other := h.user("owner"), h.user("other")
+	zalo, telegram, plain := h.group(owner), h.group(owner), h.group(owner)
+	h.linkChatTo("zalo", owner, zalo, DirectionBoth)
+	h.linkChat(owner, telegram, DirectionBoth)
+	own, reused := &media.File{OwnerID: owner}, &media.File{OwnerID: other}
+
+	if err := composerFileRule(ctx, h.st.Pool(), zalo, owner, own, h.svc.composerOnlyApp); err != nil {
+		t.Fatalf("the owner's upload into the Zalo chat: %v", err)
+	}
+	err := composerFileRule(ctx, h.st.Pool(), zalo, owner, reused, h.svc.composerOnlyApp)
+	if codeOf(err) != connect.CodePermissionDenied || !strings.Contains(err.Error(), "imported_chat_composer_only") {
+		t.Fatalf("a reused file into the Zalo chat = %v, want PermissionDenied imported_chat_composer_only", err)
+	}
+	for name, chatID := range map[string]int64{"Telegram": telegram, "plain": plain} {
+		if err := composerFileRule(ctx, h.st.Pool(), chatID, owner, reused, h.svc.composerOnlyApp); err != nil {
+			t.Errorf("a reused file into the %s chat: %v", name, err)
+		}
 	}
 }
 

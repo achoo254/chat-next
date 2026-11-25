@@ -338,7 +338,8 @@ func peerBlockedMe(ctx context.Context, q querier, c *chatRow, me int64) (bool, 
 // message is me's own text, file, forward or copy (not a bot message, an inline
 // result or a service message): only that kind may go into a chat linked to
 // another app, and only when the link sends on (see linkedSendRule); an app that
-// takes only composer text (SetComposerOnlyApps) also needs ctx FromComposer.
+// takes only what the owner types or attaches in the composer (SetComposerOnlyApps)
+// also needs ctx FromComposer.
 func (s *Service) postable(ctx context.Context, q querier, c *chatRow, m *memberRow, me, topicID int64, plain bool) (int64, error) {
 	if !c.can(m, permSend) {
 		return 0, errDenied("you cannot send messages in this chat")

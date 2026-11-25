@@ -68,6 +68,7 @@ func newFakeProcess() *fakeProcess {
 	p.stderrR, p.stderrW = io.Pipe()
 	go func() {
 		sc := bufio.NewScanner(p.stdinR)
+		sc.Buffer(make([]byte, 0, 64<<10), 1<<20) // a file_chunk line is longer than the default
 		for sc.Scan() {
 			p.commands <- sc.Text()
 		}
@@ -155,13 +156,13 @@ func (p *fakeProcess) command(t *testing.T) string {
 	}
 }
 
-const readyLine = `{"ev":"ready","protocol":7}`
+const readyLine = `{"ev":"ready","protocol":8}`
 
 // fastTiming keeps tests short.
 var fastTiming = timing{stopGrace: 200 * time.Millisecond, readyTimeout: 2 * time.Second, firstQR: 2 * time.Second,
 	loginStartWait: 2 * time.Second, loginPoll: 300 * time.Millisecond, loginIdle: time.Minute,
 	loginTTL: time.Minute, connect: 3 * time.Second,
-	sendGap: 20 * time.Millisecond, sendAnswer: 300 * time.Millisecond, historyAnswer: 300 * time.Millisecond}
+	sendGap: 20 * time.Millisecond, sendAnswer: 300 * time.Millisecond, mediaAnswer: 300 * time.Millisecond, historyAnswer: 300 * time.Millisecond}
 
 // newTestAdapter returns an adapter on runner with fast timings and a logger
 // that keeps every record for inspection.

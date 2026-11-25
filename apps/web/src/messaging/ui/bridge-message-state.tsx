@@ -28,7 +28,15 @@ const unfinished = (item: BridgeOutboxItem): boolean => item.status === "failed"
 /** What a message that did not go out says, for the time line and the row under it. */
 function noteOf(t: Copy, item: BridgeOutboxItem, app: string): string {
 	if (item.status === "unknown") return t.unknown(app);
-	return item.op === "send" ? t.failed(app) : t.editFailed(app);
+	return item.op === "send" ? (fileReason(t, item.lastError, app) ?? t.failed(app)) : t.editFailed(app);
+}
+
+/** Why a file was refused, from the reason the server keeps (the adapter's error), or null for any other failure. */
+function fileReason(t: Copy, lastError: string, app: string): string | null {
+	if (lastError.includes("file too large")) return t.fileTooLarge(app);
+	if (lastError.includes("file_caption")) return t.fileCaption(app);
+	if (lastError.includes("file_not_sendable")) return t.fileNotSendable(app);
+	return null;
 }
 
 /** The mark that replaces the "sent" tick while a message is on its way or did not go out. */

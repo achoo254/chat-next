@@ -16103,7 +16103,7 @@ var require_websocket = __commonJS({
     var net2 = require("net");
     var querystring = require("querystring");
     var tls = require("tls");
-    var { randomBytes, createHash: createHash2 } = require("crypto");
+    var { randomBytes: randomBytes2, createHash: createHash2 } = require("crypto");
     var { Duplex, Readable } = require("stream");
     var { URL: URL2 } = require("url");
     var PerMessageDeflate2 = require_permessage_deflate();
@@ -16657,7 +16657,7 @@ var require_websocket = __commonJS({
         }
       }
       const defaultPort = isSecure ? 443 : 80;
-      const key = randomBytes(16).toString("base64");
+      const key = randomBytes2(16).toString("base64");
       const request2 = isSecure ? https.request : http.request;
       const protocolSet = /* @__PURE__ */ new Set();
       let perMessageDeflate;
@@ -17582,7 +17582,7 @@ process.env.WS_NO_UTF_8_VALIDATE = "1";
 
 // src/entry.mjs
 var import_node_readline = __toESM(require("node:readline"), 1);
-var import_node_timers2 = require("node:timers");
+var import_node_timers3 = require("node:timers");
 
 // node_modules/.pnpm/zca-js@2.3.0/node_modules/zca-js/dist/Errors/ZaloApiError.js
 var ZaloApiError = class extends Error {
@@ -24387,10 +24387,42 @@ var blockViewFeedFactory = apiFactory()((api2, ctx, utils) => {
   };
 });
 
-// src/stub-form-data.mjs
-function FormData() {
-  throw new Error("file upload is disabled in this build");
+// src/form-data.mjs
+var import_node_crypto2 = require("node:crypto");
+var UNSAFE_IN_HEADER = /[\r\n"]/g;
+function headerValue(value) {
+  return String(value).replace(UNSAFE_IN_HEADER, "_");
 }
+var FormData = class {
+  #boundary = `--------------------------${(0, import_node_crypto2.randomBytes)(12).toString("hex")}`;
+  #parts = [];
+  /** Adds one field whose value is the bytes of a Buffer (or a Uint8Array), with an optional file name and type. */
+  append(name, value, options) {
+    if (!(value instanceof Uint8Array)) throw new TypeError("form-data: only bytes can be appended in this build");
+    const filename = typeof options?.filename === "string" ? options.filename : void 0;
+    const contentType = typeof options?.contentType === "string" ? options.contentType : "application/octet-stream";
+    let disposition = `form-data; name="${headerValue(name)}"`;
+    if (filename !== void 0) disposition += `; filename="${headerValue(filename)}"`;
+    const head = `--${this.#boundary}\r
+Content-Disposition: ${disposition}\r
+Content-Type: ${headerValue(contentType)}\r
+\r
+`;
+    this.#parts.push(Buffer.from(head, "utf8"), Buffer.from(value.buffer, value.byteOffset, value.byteLength), Buffer.from("\r\n"));
+  }
+  getBoundary() {
+    return this.#boundary;
+  }
+  /** The request headers of the body; `extra` headers are kept. */
+  getHeaders(extra = {}) {
+    return { ...extra, "content-type": `multipart/form-data; boundary=${this.#boundary}` };
+  }
+  /** The whole body. */
+  getBuffer() {
+    return Buffer.concat([...this.#parts, Buffer.from(`--${this.#boundary}--\r
+`)]);
+  }
+};
 
 // node_modules/.pnpm/zca-js@2.3.0/node_modules/zca-js/dist/apis/changeAccountAvatar.js
 var import_node_fs2 = __toESM(require("node:fs"), 1);
@@ -29112,7 +29144,7 @@ function installEgressGuard({ onHost = () => {
 }
 
 // src/history.mjs
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 var MAX_HISTORY_MESSAGES = 50;
 var LISTENER_DOWN = "listener_down";
 var BUSY = "busy";
@@ -29151,7 +29183,7 @@ function createHistory(listener, { isConnected, timeoutMs }) {
   };
 }
 function textHash(text) {
-  return (0, import_node_crypto2.createHash)("sha256").update(text, "utf8").digest("hex");
+  return (0, import_node_crypto3.createHash)("sha256").update(text, "utf8").digest("hex");
 }
 function pageFor(messages2, peer) {
   let oldestTs = 0;
@@ -29321,8 +29353,139 @@ function sendFailure(error) {
   return { code: isNetworkError(error) ? NETWORK_ERROR2 : UNCLEAR };
 }
 
+// src/send-media.mjs
+var import_node_timers2 = require("node:timers");
+var MAX_FILE_BYTES = 25 * 1024 * 1024;
+var MAX_CHUNK_TEXT = 1024 * 1024;
+var UPLOAD_TIMEOUT_MS = 12e4;
+var TOO_LARGE = "too_large";
+var FILE_REFUSED = "file_refused";
+var UPLOAD_FAILED = "upload_failed";
+var PHOTO_EXTENSIONS = /* @__PURE__ */ new Set(["jpg", "jpeg", "png", "webp"]);
+var REFUSED_EXTENSIONS = /* @__PURE__ */ new Set(["mp4", "gif"]);
+var UNSAFE_IN_NAME = /* @__PURE__ */ new Set(["/", "\\", '"']);
+var BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+var HTTP_FAILED2 = "Request failed with status code ";
+var FILE_MESSAGES = ["File extension ", "Exceed maximum file", "Missing filename", "Invalid source type", "Missing sources", "File not found"];
+function isSafeName(name) {
+  if (typeof name !== "string" || name.length === 0 || name.length > 255) return false;
+  for (const char of name) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code < 32 || code === 127 || UNSAFE_IN_NAME.has(char)) return false;
+  }
+  return true;
+}
+function extensionOf(name) {
+  const dot = name.lastIndexOf(".");
+  return dot < 0 ? "" : name.slice(dot + 1).toLowerCase();
+}
+function isDimension(value) {
+  return Number.isInteger(value) && value > 0 && value <= 65535;
+}
+function createUploads() {
+  let current = null;
+  return {
+    chunk(id, text) {
+      if (current === null || current.id !== id) current = { id, parts: [], size: 0, spoiled: false };
+      if (current.spoiled) return;
+      if (typeof text !== "string" || text.length === 0 || text.length > MAX_CHUNK_TEXT || text.length % 4 !== 0 || !BASE64.test(text)) {
+        current = { id, parts: [], size: 0, spoiled: true };
+        return;
+      }
+      const bytes = Buffer.from(text, "base64");
+      if (current.size + bytes.length > MAX_FILE_BYTES) {
+        current = { id, parts: [], size: 0, spoiled: true };
+        return;
+      }
+      current.parts.push(bytes);
+      current.size += bytes.length;
+    },
+    /** The bytes streamed under id, and forgets them; null when there are none or they are spoiled. */
+    take(id) {
+      const taken = current;
+      current = null;
+      if (taken === null || taken.id !== id || taken.spoiled) return null;
+      return Buffer.concat(taken.parts, taken.size);
+    }
+  };
+}
+function fileOf(command) {
+  const { kind, name, size, width, height } = command;
+  const text = command.text ?? "";
+  if (!isSafeName(name) || typeof text !== "string" || text.length > 8e3) return null;
+  if (!Number.isInteger(size) || size <= 0 || size > MAX_FILE_BYTES) return null;
+  const extension2 = extensionOf(name);
+  if (REFUSED_EXTENSIONS.has(extension2)) return null;
+  if (kind === "photo") {
+    if (!PHOTO_EXTENSIONS.has(extension2) || !isDimension(width) || !isDimension(height)) return null;
+    return { kind, name, size, width, height, text };
+  }
+  if (kind !== "file" || PHOTO_EXTENSIONS.has(extension2) || text !== "") return null;
+  return { kind, name, size, width: 0, height: 0, text: "" };
+}
+var UploadError = class extends Error {
+  constructor(code, zaloCode) {
+    super("upload failed");
+    this.name = "UploadError";
+    this.code = code;
+    this.zaloCode = zaloCode;
+  }
+};
+function uploadFailure(error) {
+  if (error === null || typeof error !== "object" || error.name !== "ZcaApiError") return new UploadError(UPLOAD_FAILED);
+  const message = typeof error.message === "string" ? error.message : "";
+  if (message.startsWith(HTTP_FAILED2)) {
+    const status = Number(message.slice(HTTP_FAILED2.length));
+    if (status === 429) return new UploadError(RATE_LIMITED);
+    if (status === 401 || status === 403) return new UploadError(SESSION_REJECTED2);
+    return new UploadError(UPLOAD_FAILED);
+  }
+  if (message.includes(" size exceed maximum size of ")) return new UploadError(TOO_LARGE);
+  if (FILE_MESSAGES.some((start) => message.startsWith(start))) return new UploadError(FILE_REFUSED);
+  const zaloCode = Number(error.code);
+  if (error.code !== null && Number.isInteger(zaloCode)) return new UploadError(REFUSED, zaloCode);
+  return new UploadError(UPLOAD_FAILED);
+}
+function guardUploads(api2, timeoutMs = UPLOAD_TIMEOUT_MS) {
+  const upload = api2.uploadAttachment;
+  api2.uploadAttachment = (sources, ...rest) => new Promise((resolve, reject) => {
+    const timer = (0, import_node_timers2.setTimeout)(() => reject(new UploadError(UPLOAD_FAILED)), timeoutMs);
+    const count = Array.isArray(sources) ? sources.length : 1;
+    Promise.resolve().then(() => upload(sources, ...rest)).then(
+      (results) => {
+        (0, import_node_timers2.clearTimeout)(timer);
+        const complete = Array.isArray(results) && results.length === count && results.every((r) => r !== null && typeof r === "object");
+        if (complete) resolve(results);
+        else reject(new UploadError(UPLOAD_FAILED));
+      },
+      (error) => {
+        (0, import_node_timers2.clearTimeout)(timer);
+        reject(uploadFailure(error));
+      }
+    );
+  });
+}
+var NoMessageIdError2 = class extends Error {
+  constructor() {
+    super("no message id");
+    this.name = "NoMessageIdError";
+  }
+};
+async function sendMedia(api2, to, file, data) {
+  const attachment = { data, filename: file.name, metadata: { totalSize: data.length, width: file.width, height: file.height } };
+  const result = await api2.sendMessage({ msg: file.text, attachments: [attachment] }, to, ThreadType.User);
+  const id = result?.attachment?.[0]?.msgId;
+  const msgId = typeof id === "number" || typeof id === "string" ? String(id) : "";
+  if (!/^[0-9]{1,30}$/.test(msgId)) throw new NoMessageIdError2();
+  return { msgId, ts: Date.now() };
+}
+function sendMediaFailure(error) {
+  if (error instanceof UploadError) return error.zaloCode === void 0 ? { code: error.code } : { code: error.code, zaloCode: error.zaloCode };
+  return sendFailure(error);
+}
+
 // src/entry.mjs
-var PROTOCOL = 7;
+var PROTOCOL = 8;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
@@ -29339,6 +29502,7 @@ function fail(code, error) {
 }
 var zalo = new Zalo({ logging: false, checkUpdate: false, selfListen: true });
 var api = null;
+var uploads = createUploads();
 var connected = false;
 var history = null;
 var FORWARDED = {
@@ -29361,8 +29525,12 @@ function announce(loggedIn) {
   return true;
 }
 var lookupPeer = null;
-function listen(loggedIn) {
+function useApi(loggedIn) {
+  guardUploads(loggedIn);
   api = loggedIn;
+}
+function listen(loggedIn) {
+  useApi(loggedIn);
   lookupPeer = createPeerLookup({
     getUserInfo: (uid) => loggedIn.getUserInfo(uid),
     log: (outcome) => process.stderr.write(`lookup ${outcome}
@@ -29431,7 +29599,7 @@ async function loginQR2(listenAfter) {
   });
   if (!announce(loggedIn)) return;
   if (listenAfter) listen(loggedIn);
-  else api = loggedIn;
+  else useApi(loggedIn);
 }
 async function loginSession(session) {
   if (session === null || typeof session !== "object" || !session.cookie || !session.imei || !session.userAgent) {
@@ -29451,6 +29619,21 @@ async function send(command) {
     emit({ ev: "sent", id, msgId, ts });
   } catch (error) {
     emit({ ev: "send_error", id, ...sendFailure(error) });
+  }
+}
+async function sendFile(command) {
+  const id = command.id;
+  const data = uploads.take(id);
+  if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+  const file = fileOf(command);
+  if (!isUserId(command.to) || file === null || data === null || data.length !== file.size) {
+    return emit({ ev: "send_error", id, code: BAD_REQUEST });
+  }
+  try {
+    const { msgId, ts } = await sendMedia(api, command.to, file, data);
+    emit({ ev: "sent", id, msgId, ts });
+  } catch (error) {
+    emit({ ev: "send_error", id, ...sendMediaFailure(error) });
   }
 }
 async function readHistory(command) {
@@ -29477,13 +29660,18 @@ async function handle(line) {
         return await loginQR2(command.listen !== false);
       case "login_session":
         return await loginSession(command.session);
+      case "file_chunk":
+        if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
+        return uploads.chunk(command.id, command.data);
       case "send":
       case "history":
+      case "send_media":
         if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
-        return command.cmd === "send" ? await send(command) : await readHistory(command);
+        if (command.cmd === "send") return await send(command);
+        return command.cmd === "send_media" ? await sendFile(command) : await readHistory(command);
       case "stop":
         api?.listener.stop();
-        return (0, import_node_timers2.setTimeout)(() => process.exit(0), 200);
+        return (0, import_node_timers3.setTimeout)(() => process.exit(0), 200);
       default:
         return fail("unknown_command", new Error("unknown"));
     }
@@ -29496,7 +29684,7 @@ var lines = import_node_readline.default.createInterface({ input: process.stdin 
 lines.on("line", (line) => void handle(line));
 lines.on("close", () => {
   api?.listener.stop();
-  (0, import_node_timers2.setTimeout)(() => process.exit(0), 200);
+  (0, import_node_timers3.setTimeout)(() => process.exit(0), 200);
 });
 process.on("uncaughtException", (error) => {
   fail("uncaught", error);

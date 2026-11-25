@@ -60,6 +60,19 @@ func (t *txn) attachableFile(ctx context.Context, me int64, fileID string) (*med
 	return f, nil
 }
 
+// sendableFile is attachableFile for a message me posts in chatID, which may be
+// linked to an app that takes only files the owner uploaded (composerFileRule).
+func (t *txn) sendableFile(ctx context.Context, me, chatID int64, fileID string) (*media.File, error) {
+	f, err := t.attachableFile(ctx, me, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if err := composerFileRule(ctx, t.tx, chatID, me, f, t.s.composerOnlyApp); err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 // SendMedia posts a file with a caption. A retry with the same random_id
 // returns the first message and its ack.
 func (s *Service) SendMedia(ctx context.Context, me int64, req *appv1.SendMediaRequest) (*appv1.SendMediaResponse, error) {
@@ -82,7 +95,7 @@ func (s *Service) SendMedia(ctx context.Context, me int64, req *appv1.SendMediaR
 	return s.postMedia(ctx, me, mediaPost{
 		chatID: req.GetChatId(), topicID: req.GetTopicId(), replyTo: req.GetReplyToSeq(), randomID: req.GetRandomId(),
 		text: text, ents: ents,
-		file: func(t *txn) (*media.File, error) { return t.attachableFile(ctx, me, req.GetFileId()) },
+		file: func(t *txn) (*media.File, error) { return t.sendableFile(ctx, me, req.GetChatId(), req.GetFileId()) },
 	})
 }
 
@@ -245,7 +258,7 @@ func (s *Service) SendAlbum(ctx context.Context, me int64, req *appv1.SendAlbumR
 		files := make([]*media.File, len(items))
 		group := ""
 		for i, it := range items {
-			if files[i], err = t.attachableFile(ctx, me, it.GetFileId()); err != nil {
+			if files[i], err = t.sendableFile(ctx, me, chatID, it.GetFileId()); err != nil {
 				return err
 			}
 			g := albumGroup(files[i].Kind)

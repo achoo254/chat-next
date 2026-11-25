@@ -90,7 +90,7 @@ describe("offering Zalo", () => {
 		expect(notice.querySelector(".br-signin-actions")).not.toBeNull();
 		expect(screen.getByText(/trái với điều khoản sử dụng của Zalo/)).toBeTruthy();
 		// Sending is part of connecting: the notice says so, with what it risks.
-		expect(within(notice).getByText(/chữ bạn tự gõ trong Chat được gửi sang Zalo bằng tài khoản cá nhân chính của bạn/)).toBeTruthy();
+		expect(within(notice).getByText(/chữ bạn tự gõ và ảnh, tệp bạn tự đính kèm trong Chat được gửi sang Zalo bằng tài khoản cá nhân chính của bạn/)).toBeTruthy();
 		expect(within(notice).getByText(/hạn chế hoặc khoá tài khoản cá nhân chính của bạn/)).toBeTruthy();
 		expect(within(notice).getByText(/Đừng mở Zalo Web hoặc Zalo trên máy tính trong lúc đang kết nối/)).toBeTruthy();
 		expect(within(notice).queryByText(/sau này/)).toBeNull();
@@ -190,7 +190,7 @@ describe("the QR step", () => {
 		await answer(fixture, { kind: "confirm" });
 		await answer(fixture, { kind: "done" });
 		const ask = await screen.findByRole("group", { name: "Đồng bộ tin nhắn riêng Zalo với Chat?" }, LONG);
-		expect(within(ask).getByText(/chữ bạn gõ trong các chat đó được gửi sang ứng dụng này/)).toBeTruthy();
+		expect(within(ask).getByText(/chữ bạn gõ, ảnh và tệp bạn đính kèm trong các chat đó được gửi sang ứng dụng này/)).toBeTruthy();
 		expect(within(ask).getByText(/Tin cũ và nhóm không được kéo về/)).toBeTruthy();
 		expect(screen.queryByText(/Đồng bộ toàn bộ tin nhắn Zalo/)).toBeNull();
 		expect(within(ask).queryByText(/một chiều|thời gian thực|2\.000/)).toBeNull();

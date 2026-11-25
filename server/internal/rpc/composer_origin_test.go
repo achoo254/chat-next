@@ -11,6 +11,7 @@ import (
 	"app.local/server/internal/chat"
 	"app.local/server/internal/ids"
 	"app.local/server/internal/linkpreview"
+	"app.local/server/internal/media"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/store"
 	"app.local/server/internal/store/testdb"
@@ -46,8 +47,17 @@ func newComposerEnv(t *testing.T) *composerEnv {
 		t.Fatal(err)
 	}
 	previews := linkpreview.NewService(st.Pool(), linkpreview.NewFetcher(linkpreview.Options{}), discard)
+	objects, err := media.NewFilesystem(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := media.New(media.Config{TenantID: composerTestTenant, PublicOrigin: "https://media.example.test", UploadMaxBytes: 1 << 20,
+		UserQuotaBytes: 1 << 20, SessionKey: []byte("0123456789abcdef0123456789abcdef")}, st.Pool(), objects, ratelimit.NewMemory(), discard)
+	if err != nil {
+		t.Fatal(err)
+	}
 	svc, err := chat.New(chat.Config{TenantID: composerTestTenant, PublicOrigin: "https://chat.example.test", AppScheme: "com.example.chat"},
-		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Limiter: ratelimit.NewMemory(), Logger: discard})
+		chat.Deps{Pool: st.Pool(), IDs: gen, Previews: previews, Limiter: ratelimit.NewMemory(), Logger: discard, Media: files})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,5 +159,34 @@ func TestOnlyTheComposerSendsIntoAChatOfAComposerOnlyApp(t *testing.T) {
 	}
 	if n := e.sends(t, e.telegram); n != 2 {
 		t.Fatalf("the Telegram chat queued %d sends, want 2", n)
+	}
+}
+
+// file stores a document of the owner, as an upload leaves it, and returns its file_id.
+func (e *composerEnv) file(t *testing.T, name string) string {
+	t.Helper()
+	id := fmt.Sprintf("%-22s", name)[:22]
+	id = strings.ReplaceAll(id, " ", "x")
+	if _, err := e.st.Pool().Exec(context.Background(), `
+		INSERT INTO files (public_id, tenant_id, owner_id, kind, mime_type, size, file_name, file_hash, source_hash, object_key, sizes)
+		VALUES ($1, $2, $3, 'document', 'application/pdf', 4, $4, $5, $5, $6, '[]')`,
+		id, composerTestTenant, e.sess.UserID, name+".pdf", strings.Repeat("a", 64), "k/"+id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// A file the owner attached in the composer goes into a Zalo-linked chat like typed
+// text; the same send run by an MCP tool does not.
+func TestTheComposerSendsAttachedFilesIntoAChatOfAComposerOnlyApp(t *testing.T) {
+	e := newComposerEnv(t)
+	attached := &appv1.SendMediaRequest{ChatId: e.zalo, FileId: e.file(t, "hopdong")}
+	if _, err := e.msgs.SendMedia(e.overRPC(), connect.NewRequest(attached)); err != nil {
+		t.Fatalf("composer file into the Zalo chat: %v", err)
+	}
+	_, err := Invoke(context.Background(), e.sess, e.msgs.SendMedia, &appv1.SendMediaRequest{ChatId: e.zalo, FileId: e.file(t, "congcu")})
+	wantComposerOnly(t, "MCP file into the Zalo chat", err)
+	if n := e.sends(t, e.zalo); n != 1 {
+		t.Fatalf("the Zalo chat queued %d sends, want only the composer's file", n)
 	}
 }
