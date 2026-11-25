@@ -91,7 +91,9 @@ describe("person rows in the chat list", () => {
 		expect(row.getAttribute("aria-label")).toBe("Lan Anh, cùng một người trên Chat, Telegram, Zalo, 3 tin chưa đọc");
 		expect(within(row).getByText("Tin mới nhất từ Telegram")).toBeTruthy();
 		expect(within(row).getByText("3")).toBeTruthy();
-		for (const app of ["Chat", "Telegram", "Zalo"]) expect(within(row).getByText(app)).toBeTruthy();
+		expect(within(row).getByText("Chat")).toBeTruthy();
+		// Telegram and Zalo have a drawn logo: shown as an icon that still carries the app's name.
+		for (const app of ["Telegram", "Zalo"]) expect(within(row).getByRole("img", { name: app })).toBeTruthy();
 		const links = rowLinks();
 		// The read-only Zalo copy is folded in like the others.
 		for (const chatId of [lanChat, telegramChat, zaloChat]) expect(links).not.toContain(`/c/${chatId}`);

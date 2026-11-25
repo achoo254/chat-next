@@ -5,6 +5,7 @@
 // themselves. Loaded with the first person row, never on the first screen.
 import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { AppLogo, hasAppLogo } from "../../components/app-logo.tsx";
 import { Icon } from "../../components/icon.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { Link, navigate, paths } from "../../router.tsx";
@@ -124,11 +125,17 @@ export default function PersonRow({ item, current, style, position, total }: Per
 				<span className="tx">
 					<span className="name">
 						<span className="title-text">{name}</span>
-						{apps.map((app) => (
-							<span key={app} className="tag grey">
-								{app}
-							</span>
-						))}
+						{item.apps.map((app) =>
+							hasAppLogo(app) ? (
+								<span key={app} className="tag-logo" role="img" aria-label={appLabel(app, copy)} title={appLabel(app, copy)}>
+									<AppLogo app={app} />
+								</span>
+							) : (
+								<span key={app} className="tag grey">
+									{appLabel(app, copy)}
+								</span>
+							),
+						)}
 					</span>
 					{view === undefined ? <span className="preview" /> : <Preview view={view} kind="private" saved={false} draft={draft} topics={null} />}
 				</span>
