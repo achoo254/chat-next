@@ -145,6 +145,7 @@ export const en: MessagingCopy = {
 		resend: "Resend",
 		spoiler: "Hidden content, press to reveal",
 		copyCode: "Copy code",
+		copyCodeLabel: "Copy",
 		codeCopied: "Code copied",
 		emailMenu: (email: string) => `Email ${email}`,
 		copyEmail: "Copy",

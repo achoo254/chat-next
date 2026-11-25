@@ -142,6 +142,7 @@ export const zhCN: MessagingCopy = {
 		resend: "重新发送",
 		spoiler: "隐藏内容，点击显示",
 		copyCode: "复制代码",
+		copyCodeLabel: "复制",
 		codeCopied: "代码已复制",
 		emailMenu: (email: string) => `电子邮箱 ${email}`,
 		copyEmail: "复制",

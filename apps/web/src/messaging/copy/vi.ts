@@ -149,6 +149,7 @@ export const vi = {
 		resend: "Gửi lại",
 		spoiler: "Nội dung ẩn, bấm để hiện",
 		copyCode: "Sao chép đoạn code",
+		copyCodeLabel: "Sao chép",
 		codeCopied: "Đã sao chép đoạn code",
 		/** The menu of an e-mail address in a message: copy it or write to it. */
 		emailMenu: (email: string) => `Email ${email}`,

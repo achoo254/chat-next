@@ -154,10 +154,10 @@ export function CodeBlock({ code, language }: { code: string; language: string }
 	return (
 		<div className="code-block">
 			<div className="cb-head">
-				<span>{language}</span>
+				<span>{language || copy.message.copyCodeLabel}</span>
 				<button
 					type="button"
-					className="icon-btn"
+					className="icon-btn cb-copy"
 					aria-label={copied ? copy.message.codeCopied : copy.message.copyCode}
 					onClick={() => {
 						void copyText(code).then((ok) => {
