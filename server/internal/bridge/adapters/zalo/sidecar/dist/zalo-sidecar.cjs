@@ -23702,9 +23702,9 @@ var Listener = class extends import_events.default {
         if (cmd == 612) {
           const parsedData = (await decodeEventData(parsed, this.cipherKey)).data;
           const { reacts, reactGroups } = parsedData;
-          for (const react of reacts) {
-            react.content = JSON.parse(react.content);
-            const reactionObject = new Reaction(this.ctx.uid, react, false);
+          for (const react2 of reacts) {
+            react2.content = JSON.parse(react2.content);
+            const reactionObject = new Reaction(this.ctx.uid, react2, false);
             if (reactionObject.isSelf && !this.selfListen)
               continue;
             this.emit("reaction", reactionObject);
@@ -23721,7 +23721,7 @@ var Listener = class extends import_events.default {
           const parsedData = (await decodeEventData(parsed, this.cipherKey)).data;
           const isGroup = cmd == 611;
           const reacts = parsedData[isGroup ? "reactGroups" : "reacts"];
-          const reactionObjects = reacts.map((react) => new Reaction(this.ctx.uid, react, isGroup));
+          const reactionObjects = reacts.map((react2) => new Reaction(this.ctx.uid, react2, isGroup));
           this.emit("old_reactions", reactionObjects, isGroup);
         }
         if (cmd == 510 && subCmd == 1) {
@@ -29198,6 +29198,7 @@ function pageFor(messages2, peer) {
       msgType: data.msgType,
       textHash: typeof data.content === "string" && data.content !== "" ? textHash(data.content) : null,
       msgId: data.msgId,
+      cliMsgId: data.cliMsgId,
       ts: data.ts
     });
   }
@@ -29353,6 +29354,18 @@ function sendFailure(error) {
   return { code: isNetworkError(error) ? NETWORK_ERROR2 : UNCLEAR };
 }
 
+// src/reaction.mjs
+var CODES2 = new Set(Object.values(Reactions));
+function isReactionCode(value) {
+  return typeof value === "string" && CODES2.has(value);
+}
+function isMessageId(value) {
+  return typeof value === "string" && /^[0-9]{1,30}$/.test(value);
+}
+async function sendReaction(api2, to, msgId, cliMsgId, icon) {
+  await api2.addReaction(icon, { data: { msgId, cliMsgId }, threadId: to, type: ThreadType.User });
+}
+
 // src/send-media.mjs
 var import_node_timers2 = require("node:timers");
 var MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -29485,7 +29498,7 @@ function sendMediaFailure(error) {
 }
 
 // src/entry.mjs
-var PROTOCOL = 8;
+var PROTOCOL = 9;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
@@ -29636,6 +29649,19 @@ async function sendFile(command) {
     emit({ ev: "send_error", id, ...sendMediaFailure(error) });
   }
 }
+async function react(command) {
+  const id = command.id;
+  if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+  if (!isUserId(command.to) || !isMessageId(command.msgId) || !isMessageId(command.cliMsgId) || !isReactionCode(command.icon)) {
+    return emit({ ev: "send_error", id, code: BAD_REQUEST });
+  }
+  try {
+    await sendReaction(api, command.to, command.msgId, command.cliMsgId, command.icon);
+    emit({ ev: "reacted", id });
+  } catch (error) {
+    emit({ ev: "send_error", id, ...sendFailure(error) });
+  }
+}
 async function readHistory(command) {
   const id = command.id;
   if (history === null) return emit({ ev: "history_error", id, code: "listener_down" });
@@ -29666,8 +29692,10 @@ async function handle(line) {
       case "send":
       case "history":
       case "send_media":
+      case "react":
         if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
         if (command.cmd === "send") return await send(command);
+        if (command.cmd === "react") return await react(command);
         return command.cmd === "send_media" ? await sendFile(command) : await readHistory(command);
       case "stop":
         api?.listener.stop();

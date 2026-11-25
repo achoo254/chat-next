@@ -12,11 +12,20 @@ var telegramReactions = []string{
 	"🎄", "☃", "💅", "🤪", "🗿", "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂", "🤷", "🤷‍♀", "😡",
 }
 
+// zaloReactions are the emoji Chat sends Zalo as a reaction, one for each reaction
+// code of Zalo's set (server/internal/bridge/adapters/zalo/reactions.go checks the two agree).
+var zaloReactions = []string{
+	"❤", "👍", "😆", "😮", "😢", "😡", "😘", "😂", "💩", "🌹", "💔", "👎", "😍", "😕", "😉", "🥀", "☀", "🎂", "💣", "👌", "✌", "🤝", "👊", "🔗", "🙏", "🙅", "🤏", "🤟", "😔", "😭", "😎", "🤓", "😁", "😐", "😞", "👋", "😴", "😅", "🤦", "😫", "👏", "😠", "🤐", "😲", "😳", "😨", "😟", "🤣", "🤑", "🍺",
+}
+
 // ReactionsOf lists the emoji the app named app accepts as a reaction, and false
 // when it accepts any (or is not known to restrict them).
 func ReactionsOf(app string) ([]string, bool) {
-	if app == "telegram" {
+	switch app {
+	case "telegram":
 		return telegramReactions, true
+	case "zalo":
+		return zaloReactions, true
 	}
 	return nil, false
 }

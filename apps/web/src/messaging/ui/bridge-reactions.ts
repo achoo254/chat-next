@@ -10,8 +10,13 @@ const TELEGRAM = [
 	"🎄", "☃", "💅", "🤪", "🗿", "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂", "🤷", "🤷‍♀", "😡",
 ];
 
+// Zalo's set (server/internal/bridge/feature/reactions.go).
+const ZALO = [
+	"❤", "👍", "😆", "😮", "😢", "😡", "😘", "😂", "💩", "🌹", "💔", "👎", "😍", "😕", "😉", "🥀", "☀", "🎂", "💣", "👌", "✌", "🤝", "👊", "🔗", "🙏", "🙅", "🤏", "🤟", "😔", "😭", "😎", "🤓", "😁", "😐", "😞", "👋", "😴", "😅", "🤦", "😫", "👏", "😠", "🤐", "😲", "😳", "😨", "😟", "🤣", "🤑", "🍺",
+];
+
 /** What each app takes; an app not here takes any emoji. */
-const TAKEN: Readonly<Record<string, ReadonlySet<string>>> = { telegram: new Set(TELEGRAM) };
+const TAKEN: Readonly<Record<string, ReadonlySet<string>>> = { telegram: new Set(TELEGRAM), zalo: new Set(ZALO) };
 
 /** The closest emoji an app has for one of the quick row's that it lacks. */
 const CLOSEST: Readonly<Record<string, string>> = { "😂": "🤣", "😮": "😱" };

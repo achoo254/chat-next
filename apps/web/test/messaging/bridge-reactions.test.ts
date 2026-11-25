@@ -12,6 +12,12 @@ describe("reactions of a chat synced with another app", () => {
 		expect(reactionTaken("telegram", "❤️")).toBe(true);
 		expect(reactionTaken("telegram", "❤‍🔥")).toBe(true);
 	});
+	it("takes only the emoji Zalo has", () => {
+		expect(reactionTaken("zalo", "😮")).toBe(true);
+		expect(reactionTaken("zalo", "❤️")).toBe(true);
+		expect(reactionTaken("zalo", "🦄")).toBe(false);
+		expect(quickReactions("zalo", ["👍", "❤️", "😂", "😮", "🙏"])).toEqual(["👍", "❤️", "😂", "😮", "🙏"]);
+	});
 	it("swaps a quick-row emoji Telegram lacks for its closest, once", () => {
 		const row = ["👍", "❤️", "😂", "😮", "🙏"];
 		expect(quickReactions(undefined, row)).toEqual(row);

@@ -18,8 +18,9 @@ import (
 // message the hash of its text instead of the text; version 6 gives a 1-1
 // message the photo URL of the other person; version 7 the phone number their
 // profile shows; version 8 sends a photo or a file to one person (file_chunk,
-// send_media).
-const protocolVersion = 8
+// send_media); version 9 sets or takes back the owner's reaction to a message
+// (react) and gives a history message its client id.
+const protocolVersion = 9
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -35,6 +36,7 @@ const (
 	// same id; it has no answer.
 	cmdFileChunk = "file_chunk"
 	cmdSendMedia = "send_media"
+	cmdReact     = "react"
 )
 
 // Events the sidecar writes on stdout.
@@ -53,6 +55,7 @@ const (
 	// Answers to a command with an id (send, history). They are routed to
 	// the caller by id and never reach the listener's loop.
 	evSent         = "sent"
+	evReacted      = "reacted"
 	evSendError    = "send_error"
 	evHistory      = "history"
 	evHistoryError = "history_error"
@@ -60,7 +63,7 @@ const (
 
 // isAnswer reports whether an event answers a command with an id.
 func isAnswer(ev string) bool {
-	return ev == evSent || ev == evSendError || ev == evHistory || ev == evHistoryError
+	return ev == evSent || ev == evReacted || ev == evSendError || ev == evHistory || ev == evHistoryError
 }
 
 // command is one line written to the sidecar.
@@ -78,11 +81,16 @@ type command struct {
 	Data string `json:"data,omitempty"`
 	// send_media: "photo" or "file", the file name (never logged), its size in
 	// bytes and, for a photo, its pixel size.
-	Kind   string `json:"kind,omitempty"`
-	Name   string `json:"name,omitempty"`
-	Size   int64  `json:"size,omitempty"`
-	Width  int    `json:"width,omitempty"`
-	Height int    `json:"height,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	Name string `json:"name,omitempty"`
+	Size int64  `json:"size,omitempty"`
+	// react: the message (its id and the client id Zalo gave it, "0" when
+	// unknown) and the Zalo reaction code, "" taking the reaction back.
+	MsgID    string  `json:"msgId,omitempty"`
+	CliMsgID string  `json:"cliMsgId,omitempty"`
+	Icon     *string `json:"icon,omitempty"`
+	Width    int     `json:"width,omitempty"`
+	Height   int     `json:"height,omitempty"`
 }
 
 // errCodeSessionRejected is the error code of a login Zalo refused (sidecar
@@ -141,6 +149,7 @@ type historyMessage struct {
 	MsgType  looseString `json:"msgType"`
 	TextHash string      `json:"textHash"`
 	MsgID    looseString `json:"msgId"`
+	CliMsgID looseString `json:"cliMsgId"`
 	TS       looseString `json:"ts"`
 }
 

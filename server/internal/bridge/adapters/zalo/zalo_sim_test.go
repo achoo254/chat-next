@@ -34,6 +34,8 @@ type zaloSim struct {
 	chunks      map[string][]byte // file bytes received, by command id
 	failOn      map[int]string    // send_media number n (from 1) is answered with this send_error code
 	mediaSends  []command         // send_media commands, in order
+	reacts      []command         // react commands, in order
+	reactFail   string            // the next react is answered with this send_error code
 }
 
 type simMessage struct {
@@ -101,7 +103,7 @@ func (z *zaloSim) script(p *fakeProcess) {
 	}
 	p.emit(accountLine)
 	p.emit(connectedLine)
-	p.emit(`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"chào","msgId":"4000","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000"}`)
+	p.emit(`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"chào","msgId":"4000","cliMsgId":"77","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000"}`)
 	for {
 		var line string
 		select {
@@ -124,6 +126,17 @@ func (z *zaloSim) script(p *fakeProcess) {
 			z.chunk(c)
 		case cmdSendMedia:
 			z.sendMedia(p, c)
+		case cmdReact:
+			z.mu.Lock()
+			z.reacts = append(z.reacts, c)
+			fail := z.reactFail
+			z.reactFail = ""
+			z.mu.Unlock()
+			if fail != "" {
+				p.emit(fmt.Sprintf(`{"ev":"send_error","id":%q,"code":%q}`, c.ID, fail))
+			} else {
+				p.emit(fmt.Sprintf(`{"ev":"reacted","id":%q}`, c.ID))
+			}
 		}
 	}
 }

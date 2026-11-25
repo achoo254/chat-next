@@ -191,6 +191,7 @@ func (a *Adapter) deliver(ctx context.Context, heard *heardAccount, own *sentLog
 		return nil
 	}
 	heard.record(conv, m)
+	heard.rememberClientID(m.ID, string(ev.CliMsgID))
 	if text, ok := textContent(ev.Content); ok && ev.Self && string(ev.MsgType) == msgTypeText {
 		own.heard(ownMessage{conv: conv.ID, text: hashText(text), id: m.ID, date: m.Date})
 	}

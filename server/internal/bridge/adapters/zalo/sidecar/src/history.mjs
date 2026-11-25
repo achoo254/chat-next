@@ -82,6 +82,7 @@ export function pageFor(messages, peer) {
 			msgType: data.msgType,
 			textHash: typeof data.content === "string" && data.content !== "" ? textHash(data.content) : null,
 			msgId: data.msgId,
+			cliMsgId: data.cliMsgId,
 			ts: data.ts,
 		});
 	}

@@ -13,6 +13,9 @@ func TestReactionAllowed(t *testing.T) {
 		{"telegram", "❤‍🔥", true},
 		{"telegram", "😱", true},
 		{"telegram", "😮", false},
+		{"zalo", "😮", true},
+		{"zalo", "❤️", true},
+		{"zalo", "🦄", false},
 		{"other", "😮", true},
 		{"", "😮", true},
 	}

@@ -15,6 +15,10 @@
 //    "width":..,"height":..,"text":".."}    (protocol 8) send the file streamed under id (at most 25 MiB) to one
 //                                            person, a caption only with a photo (src/send-media.mjs);
 //                                            answered by `sent` or `send_error`
+//   {"cmd":"react","id":"<req id>","to":"<uid digits>","msgId":"<digits>","cliMsgId":"<digits>","icon":".."}
+//                                            (protocol 9) set the owner's reaction to one message of one person
+//                                            to the Zalo reaction code icon, "" taking it back (src/reaction.mjs);
+//                                            answered by `reacted` or `send_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
 //   {"ev":"ready","protocol":7}
@@ -59,6 +63,7 @@ import { createHistory, HistoryError } from "./history.mjs";
 import { createPeerLookup } from "./peer-profile.mjs";
 import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
 import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendText } from "./send.mjs";
+import { isMessageId, isReactionCode, sendReaction } from "./reaction.mjs";
 import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from "./send-media.mjs";
 
 // 2: adds the `account` event (the engine needs the account id to finish a QR login).
@@ -68,7 +73,8 @@ import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from
 // 6: a 1-1 message carries the other person's photo URL (peerAvatar); the profile is looked up for every 1-1 message.
 // 7: a 1-1 message carries the phone number the other person's profile shows (peerPhone), never written anywhere else.
 // 8: file_chunk and send_media send one photo or file to one person.
-const PROTOCOL = 8;
+// 9: react sets or takes back the owner's reaction to a message; a history message carries its client id (cliMsgId).
+const PROTOCOL = 9;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -247,6 +253,21 @@ async function sendFile(command) {
 	}
 }
 
+/** Sets or takes back the owner's reaction to one message; the answer never carries more than the request id. */
+async function react(command) {
+	const id = command.id;
+	if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+	if (!isUserId(command.to) || !isMessageId(command.msgId) || !isMessageId(command.cliMsgId) || !isReactionCode(command.icon)) {
+		return emit({ ev: "send_error", id, code: BAD_REQUEST });
+	}
+	try {
+		await sendReaction(api, command.to, command.msgId, command.cliMsgId, command.icon);
+		emit({ ev: "reacted", id });
+	} catch (error) {
+		emit({ ev: "send_error", id, ...sendFailure(error) });
+	}
+}
+
 /** Reads the newest page of 1-1 messages for one person. */
 async function readHistory(command) {
 	const id = command.id;
@@ -280,8 +301,10 @@ async function handle(line) {
 			case "send":
 			case "history":
 			case "send_media":
+			case "react":
 				if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
 				if (command.cmd === "send") return await send(command);
+				if (command.cmd === "react") return await react(command);
 				return command.cmd === "send_media" ? await sendFile(command) : await readHistory(command);
 			case "stop":
 				api?.listener.stop();

@@ -31,6 +31,7 @@ type heardAccount struct {
 	convs    map[string]*heardConversation
 	messages int // kept in all conversations
 	seen     *boundedSeenSet
+	cli      *boundedIDMap // client id Zalo gave a message, by message id (reacting needs it)
 }
 
 type heardConversation struct {
@@ -48,7 +49,7 @@ type keptMessage struct {
 }
 
 func newHeardAccount(now func() time.Time) *heardAccount {
-	return &heardAccount{now: now, convs: map[string]*heardConversation{}, seen: newBoundedSeenSet(maxSeenMessageIDs)}
+	return &heardAccount{now: now, convs: map[string]*heardConversation{}, seen: newBoundedSeenSet(maxSeenMessageIDs), cli: newBoundedIDMap(maxSeenMessageIDs)}
 }
 
 // firstSighting records a message id and reports whether it is new.
@@ -232,4 +233,47 @@ func (s *boundedSeenSet) add(id string) bool {
 	}
 	s.ids[id] = struct{}{}
 	return true
+}
+
+// boundedIDMap remembers the last capacity pairs added; the oldest goes first.
+type boundedIDMap struct {
+	vals  map[string]string
+	order []string // ring of the keys in vals
+	next  int
+}
+
+func newBoundedIDMap(capacity int) *boundedIDMap {
+	return &boundedIDMap{vals: make(map[string]string, capacity), order: make([]string, 0, max(capacity, 1))}
+}
+
+func (m *boundedIDMap) put(key, val string) {
+	if _, ok := m.vals[key]; ok {
+		m.vals[key] = val
+		return
+	}
+	if len(m.order) < cap(m.order) {
+		m.order = append(m.order, key)
+	} else {
+		delete(m.vals, m.order[m.next])
+		m.order[m.next] = key
+		m.next = (m.next + 1) % len(m.order)
+	}
+	m.vals[key] = val
+}
+
+// rememberClientID keeps the client id Zalo gave a message.
+func (h *heardAccount) rememberClientID(id, cli string) {
+	if cli == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.cli.put(id, cli)
+}
+
+// clientID is the client id kept for a message, "" when unknown.
+func (h *heardAccount) clientID(id string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.cli.vals[id]
 }
