@@ -60,7 +60,7 @@ describe("contacts", () => {
 
 		await userEvent.click(screen.getByRole("button", { name: "Thêm vào danh bạ" }));
 		const dialog = await screen.findByRole("dialog", { name: "Thêm vào danh bạ" });
-		await userEvent.type(within(dialog).getByRole("searchbox", { name: "Username hoặc email đầy đủ" }), "@thuha");
+		await userEvent.type(within(dialog).getByRole("searchbox", { name: "Số điện thoại, email hoặc username" }), "@thuha");
 		await userEvent.click(await within(dialog).findByRole("button", { name: "Thêm vào danh bạ" }, LONG));
 		expect(await within(dialog).findByText("Đã trong danh bạ", {}, LONG)).toBeTruthy();
 		expect(demo.fixture.contacts.has(ha)).toBe(true);
@@ -86,7 +86,7 @@ describe("contacts", () => {
 
 		await userEvent.click(screen.getByRole("button", { name: "Thêm vào danh bạ" }));
 		const dialog = await screen.findByRole("dialog", { name: "Thêm vào danh bạ" });
-		await userEvent.type(within(dialog).getByRole("searchbox", { name: "Username hoặc email đầy đủ" }), "minh");
+		await userEvent.type(within(dialog).getByRole("searchbox", { name: "Số điện thoại, email hoặc username" }), "minh");
 		expect(await within(dialog).findByText("Không tìm thấy", {}, LONG)).toBeTruthy();
 		expect(demo.fixture.contacts.has(demo.ids.users.minh)).toBe(false);
 	});

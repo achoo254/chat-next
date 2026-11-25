@@ -24,6 +24,7 @@ import (
 	"app.local/server/internal/linkpreview"
 	"app.local/server/internal/media"
 	"app.local/server/internal/miniapp"
+	"app.local/server/internal/phone"
 	"app.local/server/internal/ratelimit"
 	"app.local/server/internal/search"
 	"connectrpc.com/connect"
@@ -36,6 +37,9 @@ import (
 // defaults of DefaultConfig.
 type Config struct {
 	TenantID string
+	// PhoneKey keys the hash of a phone number (BRIDGE_PHONE_KEY); empty turns finding people by
+	// phone number off.
+	PhoneKey []byte
 	// PublicOrigin is the web origin invite links point at.
 	PublicOrigin string
 	// AppScheme is the app's own URL scheme allowed in links (ADR 0004).
@@ -116,6 +120,7 @@ type Sink interface {
 // Service implements the messaging core for one tenant.
 type Service struct {
 	pool     *pgxpool.Pool
+	phones   *phone.Hasher
 	cfg      Config
 	ids      IDSource
 	previews *linkpreview.Service
@@ -216,7 +221,8 @@ func New(cfg Config, d Deps) (*Service, error) {
 		return nil, err
 	}
 	s := &Service{
-		pool: d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, media: d.Media, limiter: d.Limiter, logger: d.Logger,
+		phones: phone.NewHasher(cfg.PhoneKey),
+		pool:   d.Pool, cfg: cfg, ids: d.IDs, previews: d.Previews, media: d.Media, limiter: d.Limiter, logger: d.Logger,
 		operators: map[int64]bool{}, onlineCounts: map[onlineKey]onlineEntry{}, searcher: d.Searcher, miniAppURLs: miniAppURLs,
 	}
 	if s.searcher == nil {

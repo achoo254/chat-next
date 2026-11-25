@@ -44,19 +44,20 @@ const liveUser = `u.deletion_requested_at IS NULL AND u.deleted_at IS NULL`
 const findableUser = liveUser + ` AND NOT u.profile_pending AND u.external_source IS NULL`
 
 type privacyRow struct {
-	LastSeen, ProfilePhoto, FindByEmail, FindByUsername, AddToGroups, SendMessages int16
-	NotificationPreview                                                            bool
+	LastSeen, ProfilePhoto, FindByEmail, FindByUsername, FindByPhone, AddToGroups, SendMessages int16
+	NotificationPreview                                                                         bool
 }
 
 func defaultPrivacy() privacyRow {
 	return privacyRow{LastSeen: audContacts, ProfilePhoto: audEveryone, FindByEmail: audNobody,
-		FindByUsername: audEveryone, AddToGroups: audContacts, SendMessages: audEveryone, NotificationPreview: true}
+		FindByUsername: audEveryone, FindByPhone: audEveryone, AddToGroups: audContacts, SendMessages: audEveryone, NotificationPreview: true}
 }
 
 func (p privacyRow) render() *appv1.PrivacySettings {
 	return &appv1.PrivacySettings{
 		LastSeen: appv1.PrivacyAudience(p.LastSeen), ProfilePhoto: appv1.PrivacyAudience(p.ProfilePhoto),
 		FindByEmail: appv1.PrivacyAudience(p.FindByEmail), FindByUsername: appv1.PrivacyAudience(p.FindByUsername),
+		FindByPhone: appv1.PrivacyAudience(p.FindByPhone),
 		AddToGroups: appv1.PrivacyAudience(p.AddToGroups), SendMessages: appv1.PrivacyAudience(p.SendMessages),
 		NotificationPreview: p.NotificationPreview,
 	}
@@ -71,7 +72,7 @@ func loadPrivacy(ctx context.Context, q querier, users []int64) (map[int64]priva
 		return out, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT user_id, last_seen, profile_photo, find_by_email, find_by_username, add_to_groups, send_messages,
+		SELECT user_id, last_seen, profile_photo, find_by_email, find_by_username, find_by_phone, add_to_groups, send_messages,
 			notification_preview FROM privacy_settings WHERE user_id = ANY($1)`, users)
 	if err != nil {
 		return nil, fmt.Errorf("chat: load privacy: %w", err)
@@ -80,7 +81,7 @@ func loadPrivacy(ctx context.Context, q querier, users []int64) (map[int64]priva
 	for rows.Next() {
 		var id int64
 		var p privacyRow
-		if err := rows.Scan(&id, &p.LastSeen, &p.ProfilePhoto, &p.FindByEmail, &p.FindByUsername, &p.AddToGroups,
+		if err := rows.Scan(&id, &p.LastSeen, &p.ProfilePhoto, &p.FindByEmail, &p.FindByUsername, &p.FindByPhone, &p.AddToGroups,
 			&p.SendMessages, &p.NotificationPreview); err != nil {
 			return nil, fmt.Errorf("chat: load privacy: %w", err)
 		}
@@ -371,6 +372,38 @@ func (s *Service) findable(ctx context.Context, me int64, username, email string
 	return id, nil
 }
 
+// findablePhoneSQL selects the users with a phone hash that others may find (alias u, p).
+const findablePhoneSQL = `
+	SELECT u.id, coalesce(p.find_by_phone, $4) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
+	WHERE u.tenant_id = $1 AND u.phone_hmac = $2 AND u.id <> $3 AND ` + findableUser
+
+// phoneHash is the hash of a phone number written in any plain form; ok is false when the text
+// is not a number or finding by phone number is off.
+func (s *Service) phoneHash(raw string) ([]byte, bool) {
+	return s.phones.Hash(raw)
+}
+
+// findableByPhone finds a user by exact phone number when their find_by_phone allows me.
+func (s *Service) findableByPhone(ctx context.Context, me int64, hash []byte) (int64, error) {
+	var id int64
+	var audience int16
+	err := s.pool.QueryRow(ctx, findablePhoneSQL, s.cfg.TenantID, hash, me, audEveryone).Scan(&id, &audience)
+	if isNoRows(err) {
+		return 0, errNotFound("user")
+	}
+	if err != nil {
+		return 0, fmt.Errorf("chat: find user by phone: %w", err)
+	}
+	contacts, err := listedBy(ctx, s.pool, me, []int64{id})
+	if err != nil {
+		return 0, err
+	}
+	if !allowedBy(audience, contacts[id]) {
+		return 0, errNotFound("user")
+	}
+	return id, nil
+}
+
 // ResolveUsername finds a user by exact username when their
 // find_by_username allows me.
 func (s *Service) ResolveUsername(ctx context.Context, me int64, username string) (*appv1.User, error) {
@@ -412,6 +445,21 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	var rows pgx.Rows
 	var err error
 	email := strings.Contains(query, "@") && !strings.HasPrefix(query, "@")
+	phoneHash, isPhone := s.phoneHash(query)
+	if isPhone {
+		// A number is matched whole. When nobody has it the query may still be a name or a
+		// username made of digits, so the search goes on.
+		rows, err = s.pool.Query(ctx, findablePhoneSQL, s.cfg.TenantID, phoneHash, me, audEveryone)
+		if err == nil {
+			var hits []searchHit
+			if hits, err = pgx.CollectRows(rows, scanSearchHit); err == nil && len(hits) > 0 {
+				return s.visibleHits(ctx, me, hits, limit)
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("chat: search users: %w", err)
+		}
+	}
 	if email {
 		rows, err = s.pool.Query(ctx, `
 			SELECT u.id, coalesce(p.find_by_email, $4) FROM users u LEFT JOIN privacy_settings p ON p.user_id = u.id
@@ -428,18 +476,27 @@ func (s *Service) SearchUsers(ctx context.Context, me int64, query string, limit
 	if err != nil {
 		return nil, fmt.Errorf("chat: search users: %w", err)
 	}
-	type hit struct {
-		id       int64
-		audience int16
-	}
-	hits, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (hit, error) {
-		var h hit
-		err := r.Scan(&h.id, &h.audience)
-		return h, err
-	})
+	hits, err := pgx.CollectRows(rows, scanSearchHit)
 	if err != nil {
 		return nil, fmt.Errorf("chat: search users: %w", err)
 	}
+	return s.visibleHits(ctx, me, hits, limit)
+}
+
+// searchHit is a user a search matched and who may find them.
+type searchHit struct {
+	id       int64
+	audience int16
+}
+
+func scanSearchHit(r pgx.CollectableRow) (searchHit, error) {
+	var h searchHit
+	err := r.Scan(&h.id, &h.audience)
+	return h, err
+}
+
+// visibleHits keeps the hits whose audience includes me, at most limit, as users with status.
+func (s *Service) visibleHits(ctx context.Context, me int64, hits []searchHit, limit int32) ([]*appv1.User, error) {
 	ids := make([]int64, len(hits))
 	for i, h := range hits {
 		ids[i] = h.id
@@ -502,8 +559,20 @@ func (s *Service) AddContact(ctx context.Context, me int64, req *appv1.AddContac
 		if id, err = s.findable(ctx, me, "", email); err != nil {
 			return nil, err
 		}
+	case *appv1.AddContactRequest_Phone:
+		hash, ok := s.phoneHash(target.Phone)
+		if !ok {
+			return nil, errInvalid("invalid phone number")
+		}
+		if err := s.allowSearch(ctx, me); err != nil {
+			return nil, err
+		}
+		var err error
+		if id, err = s.findableByPhone(ctx, me, hash); err != nil {
+			return nil, err
+		}
 	default:
-		return nil, errInvalid("a user_id, username or email is required")
+		return nil, errInvalid("a user_id, phone, email or username is required")
 	}
 	if id == me {
 		return nil, errInvalid("you cannot add yourself")
@@ -669,7 +738,7 @@ func (s *Service) SetPrivacy(ctx context.Context, me int64, req *appv1.SetPrivac
 		v   *appv1.PrivacyAudience
 	}{
 		{&p.LastSeen, req.LastSeen}, {&p.ProfilePhoto, req.ProfilePhoto}, {&p.FindByEmail, req.FindByEmail},
-		{&p.FindByUsername, req.FindByUsername}, {&p.AddToGroups, req.AddToGroups}, {&p.SendMessages, req.SendMessages},
+		{&p.FindByUsername, req.FindByUsername}, {&p.FindByPhone, req.FindByPhone}, {&p.AddToGroups, req.AddToGroups}, {&p.SendMessages, req.SendMessages},
 	} {
 		if err := set(f.dst, f.v); err != nil {
 			return nil, err
@@ -679,14 +748,15 @@ func (s *Service) SetPrivacy(ctx context.Context, me int64, req *appv1.SetPrivac
 		p.NotificationPreview = req.GetNotificationPreview()
 	}
 	if _, err := s.pool.Exec(ctx, `
-		INSERT INTO privacy_settings (user_id, last_seen, profile_photo, find_by_email, find_by_username, add_to_groups,
+		INSERT INTO privacy_settings (user_id, last_seen, profile_photo, find_by_email, find_by_username, find_by_phone, add_to_groups,
 			send_messages, notification_preview, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+		VALUES ($1, $2, $3, $4, $5, $9, $6, $7, $8, now())
 		ON CONFLICT (user_id) DO UPDATE SET last_seen = excluded.last_seen, profile_photo = excluded.profile_photo,
 			find_by_email = excluded.find_by_email, find_by_username = excluded.find_by_username,
+			find_by_phone = excluded.find_by_phone,
 			add_to_groups = excluded.add_to_groups, send_messages = excluded.send_messages,
 			notification_preview = excluded.notification_preview, updated_at = now()`,
-		me, p.LastSeen, p.ProfilePhoto, p.FindByEmail, p.FindByUsername, p.AddToGroups, p.SendMessages, p.NotificationPreview); err != nil {
+		me, p.LastSeen, p.ProfilePhoto, p.FindByEmail, p.FindByUsername, p.AddToGroups, p.SendMessages, p.NotificationPreview, p.FindByPhone); err != nil {
 		return nil, fmt.Errorf("chat: set privacy: %w", err)
 	}
 	return p.render(), nil

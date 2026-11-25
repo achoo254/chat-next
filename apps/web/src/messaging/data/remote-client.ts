@@ -151,6 +151,7 @@ export function toPrivacy(settings: PrivacySettings | undefined): Privacy {
 		profilePhoto: AUDIENCES[settings.profilePhoto] ?? "nobody",
 		findByEmail: AUDIENCES[settings.findByEmail] ?? "nobody",
 		findByUsername: AUDIENCES[settings.findByUsername] ?? "nobody",
+		findByPhone: AUDIENCES[settings.findByPhone] ?? "nobody",
 		addToGroups: AUDIENCES[settings.addToGroups] ?? "nobody",
 		sendMessages: AUDIENCES[settings.sendMessages] ?? "nobody",
 		notificationPreview: settings.notificationPreview,
@@ -609,9 +610,11 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				const wire =
 					"userId" in target
 						? { case: "userId" as const, value: BigInt(target.userId) }
-						: "username" in target
-							? { case: "username" as const, value: target.username }
-							: { case: "email" as const, value: target.email };
+						: "phone" in target
+							? { case: "phone" as const, value: target.phone }
+							: "username" in target
+								? { case: "username" as const, value: target.username }
+								: { case: "email" as const, value: target.email };
 				const user = (await users.addContact({ target: wire })).user;
 				if (user === undefined) throw new ConnectError("AddContact returned no user", Code.Internal);
 				return toPerson(user);
@@ -912,6 +915,7 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					...(change.profilePhoto === undefined ? {} : { profilePhoto: WIRE_AUDIENCES[change.profilePhoto] }),
 					...(change.findByEmail === undefined ? {} : { findByEmail: WIRE_AUDIENCES[change.findByEmail] }),
 					...(change.findByUsername === undefined ? {} : { findByUsername: WIRE_AUDIENCES[change.findByUsername] }),
+					...(change.findByPhone === undefined ? {} : { findByPhone: WIRE_AUDIENCES[change.findByPhone] }),
 					...(change.addToGroups === undefined ? {} : { addToGroups: WIRE_AUDIENCES[change.addToGroups] }),
 					...(change.sendMessages === undefined ? {} : { sendMessages: WIRE_AUDIENCES[change.sendMessages] }),
 					...(change.notificationPreview === undefined ? {} : { notificationPreview: change.notificationPreview }),

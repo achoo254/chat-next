@@ -387,6 +387,10 @@ func (e *Engine) removeAccount(ctx context.Context, a *accountRow) error {
 			FROM external_users eu WHERE eu.account_id = $1 AND u.id = eu.user_id AND u.deleted_at IS NULL`, a.ID); err != nil {
 			return fmt.Errorf("bridge: erase contacts: %w", err)
 		}
+		// The owner's number came from this account; without it nobody can find the owner by it.
+		if _, err := tx.Exec(ctx, `UPDATE users SET phone_hmac = NULL WHERE id = $1`, a.OwnerID); err != nil {
+			return fmt.Errorf("bridge: clear own phone: %w", err)
+		}
 		if _, err := tx.Exec(ctx, `DELETE FROM external_accounts WHERE id = $1`, a.ID); err != nil {
 			return fmt.Errorf("bridge: delete account: %w", err)
 		}

@@ -61,6 +61,7 @@ export interface Privacy {
 	readonly profilePhoto: Audience;
 	readonly findByEmail: Audience;
 	readonly findByUsername: Audience;
+	readonly findByPhone: Audience;
 	readonly addToGroups: Audience;
 	readonly sendMessages: Audience;
 	readonly notificationPreview: boolean;
@@ -422,8 +423,12 @@ export interface ReportDetail {
 	readonly hooks: readonly { readonly id: string; readonly name: string; readonly disabled: boolean }[];
 }
 
-/** Who to add to the contact list: a user you can see, an exact username or an exact email. */
-export type ContactTarget = { readonly userId: number } | { readonly username: string } | { readonly email: string };
+/** Who to add to the contact list: a user you can see, an exact phone number, an exact email or an exact username. */
+export type ContactTarget =
+	| { readonly userId: number }
+	| { readonly phone: string }
+	| { readonly email: string }
+	| { readonly username: string };
 
 /** ChatPermission bits (chats.proto). */
 export const Permission = {

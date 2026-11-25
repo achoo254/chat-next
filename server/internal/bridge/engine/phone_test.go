@@ -162,3 +162,31 @@ func TestThePhoneBookFillsNumbersOfKnownPeopleOnce(t *testing.T) {
 		t.Fatalf("the phone book was read %d times, want once", n)
 	}
 }
+
+// ownPhoneFake is the fake app that knows the number its account was verified with.
+type ownPhoneFake struct {
+	*contracttest.Fake
+	number string
+}
+
+func (f *ownPhoneFake) OwnPhone(context.Context, bridge.Account) (string, error) { return f.number, nil }
+
+func TestTheAccountsOwnNumberIsRecordedForItsOwner(t *testing.T) {
+	e := newEnv(t)
+	e.phoneKey = testPhoneKey
+	e.adapter = &ownPhoneFake{Fake: e.fake, number: testNumber}
+	conv := bridge.Conversation{ID: "dm1", Kind: bridge.ConvPrivate, Peer: &lan}
+	e.fake.AddConversation(conv)
+	e.fake.AddHistory("dm1", e.msg("1", lan, "chào", 0))
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"chào"})
+	var got []byte
+	e.eventually(func() bool {
+		_ = e.st.Pool().QueryRow(context.Background(), `
+			SELECT u.phone_hmac FROM users u JOIN external_accounts a ON a.owner_id = u.id WHERE a.id = $1`, e.account).Scan(&got)
+		return got != nil
+	}, func() string { return "the owner's number was not recorded" })
+	if !bytes.Equal(got, expectedPhoneHash()) {
+		t.Fatal("the recorded hash is not the keyed hash of the E.164 number")
+	}
+}

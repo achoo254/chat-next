@@ -151,7 +151,7 @@ func New(ctx context.Context, cfg config.Config, st *store.Store, httpClient *ht
 		return nil, err
 	}
 	chatSvc, err := chat.New(chat.Config{
-		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme, Operators: cfg.OperatorUserIDs,
+		TenantID: cfg.TenantID, PublicOrigin: publicOrigin, AppScheme: cfg.AppURLScheme, Operators: cfg.OperatorUserIDs, PhoneKey: cfg.BridgePhoneKey,
 		Abuse: chat.AbuseLimits{
 			StrangerChatsNew: cfg.Abuse.StrangerChatsNew, StrangerChats: cfg.Abuse.StrangerChats,
 			NewAccountAge: time.Duration(cfg.Abuse.NewAccountDays) * 24 * time.Hour, Reporters: cfg.Abuse.Reporters,

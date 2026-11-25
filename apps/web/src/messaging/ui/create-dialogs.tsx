@@ -18,7 +18,7 @@ import { useChat, useDialogOrder, useMessage, useServices, useUser } from "../da
 import { useNameOf } from "./chat-row.tsx";
 import { displayLink, inviteLinks, isActiveInvite } from "./members.ts";
 import { presenceText } from "./presence.tsx";
-import { isOwnAccount, usePeopleSearch } from "./people-search.ts";
+import { isOwnAccount, queryKind, usePeopleSearch } from "./people-search.ts";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { ChatAvatar, CopyButton, copyText, DialogHead, Modal, Switch, useDomId } from "./parts.tsx";
 import { useUi } from "./ui-context.tsx";
@@ -70,7 +70,7 @@ export function NewChatDialog({ onClose }: CloseProps) {
 	const [opening, setOpening] = useState(0);
 	const { people, failed } = usePeopleSearch(query);
 	const id = useDomId("nc");
-	const email = query.includes("@") && !query.trim().startsWith("@");
+	const kind = queryKind(query);
 
 	const privateChatFailed = usePrivateChatFailure();
 	const open = (person: Person) => {
@@ -103,7 +103,7 @@ export function NewChatDialog({ onClose }: CloseProps) {
 							{person.username !== "" && <small>@{person.username}</small>}
 							<span className="match">
 								<Icon name="check" />
-								{email ? copy.newChat.matchEmail : copy.newChat.matchUsername}
+								{kind === "phone" ? copy.newChat.matchPhone : kind === "email" ? copy.newChat.matchEmail : copy.newChat.matchUsername}
 							</span>
 						</span>
 						<button type="button" className="btn btn-primary btn-sm" aria-busy={opening === person.id} disabled={opening !== 0} onClick={() => open(person)}>

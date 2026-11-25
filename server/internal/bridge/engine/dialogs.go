@@ -205,5 +205,8 @@ func (r *runner) pollAll(ctx context.Context) error {
 	if err := r.pollPeoplePhotos(ctx); err != nil {
 		return err
 	}
-	return r.readPhoneBook(ctx)
+	if err := r.readPhoneBook(ctx); err != nil {
+		return err
+	}
+	return r.recordOwnPhone(ctx)
 }

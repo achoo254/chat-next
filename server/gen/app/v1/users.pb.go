@@ -1228,8 +1228,11 @@ type PrivacySettings struct {
 	SendMessages   PrivacyAudience        `protobuf:"varint,6,opt,name=send_messages,json=sendMessages,proto3,enum=app.v1.PrivacyAudience" json:"send_messages,omitempty"`
 	// Show message content in push notifications.
 	NotificationPreview bool `protobuf:"varint,7,opt,name=notification_preview,json=notificationPreview,proto3" json:"notification_preview,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Who may find the user by their exact phone number. The number is the one the user's
+	// own Telegram or Zalo account was verified with; it is never shown.
+	FindByPhone   PrivacyAudience `protobuf:"varint,8,opt,name=find_by_phone,json=findByPhone,proto3,enum=app.v1.PrivacyAudience" json:"find_by_phone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PrivacySettings) Reset() {
@@ -1309,6 +1312,13 @@ func (x *PrivacySettings) GetNotificationPreview() bool {
 		return x.NotificationPreview
 	}
 	return false
+}
+
+func (x *PrivacySettings) GetFindByPhone() PrivacyAudience {
+	if x != nil {
+		return x.FindByPhone
+	}
+	return PrivacyAudience_PRIVACY_AUDIENCE_UNSPECIFIED
 }
 
 type GetPrivacyRequest struct {
@@ -1401,6 +1411,7 @@ type SetPrivacyRequest struct {
 	AddToGroups         *PrivacyAudience `protobuf:"varint,5,opt,name=add_to_groups,json=addToGroups,proto3,enum=app.v1.PrivacyAudience,oneof" json:"add_to_groups,omitempty"`
 	SendMessages        *PrivacyAudience `protobuf:"varint,6,opt,name=send_messages,json=sendMessages,proto3,enum=app.v1.PrivacyAudience,oneof" json:"send_messages,omitempty"`
 	NotificationPreview *bool            `protobuf:"varint,7,opt,name=notification_preview,json=notificationPreview,proto3,oneof" json:"notification_preview,omitempty"`
+	FindByPhone         *PrivacyAudience `protobuf:"varint,8,opt,name=find_by_phone,json=findByPhone,proto3,enum=app.v1.PrivacyAudience,oneof" json:"find_by_phone,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -1482,6 +1493,13 @@ func (x *SetPrivacyRequest) GetNotificationPreview() bool {
 		return *x.NotificationPreview
 	}
 	return false
+}
+
+func (x *SetPrivacyRequest) GetFindByPhone() PrivacyAudience {
+	if x != nil && x.FindByPhone != nil {
+		return *x.FindByPhone
+	}
+	return PrivacyAudience_PRIVACY_AUDIENCE_UNSPECIFIED
 }
 
 type SetPrivacyResponse struct {
@@ -1738,6 +1756,7 @@ type AddContactRequest struct {
 	//	*AddContactRequest_UserId
 	//	*AddContactRequest_Username
 	//	*AddContactRequest_Email
+	//	*AddContactRequest_Phone
 	Target        isAddContactRequest_Target `protobuf_oneof:"target"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1807,6 +1826,15 @@ func (x *AddContactRequest) GetEmail() string {
 	return ""
 }
 
+func (x *AddContactRequest) GetPhone() string {
+	if x != nil {
+		if x, ok := x.Target.(*AddContactRequest_Phone); ok {
+			return x.Phone
+		}
+	}
+	return ""
+}
+
 type isAddContactRequest_Target interface {
 	isAddContactRequest_Target()
 }
@@ -1828,11 +1856,19 @@ type AddContactRequest_Email struct {
 	Email string `protobuf:"bytes,3,opt,name=email,proto3,oneof"`
 }
 
+type AddContactRequest_Phone struct {
+	// Exact phone number in any plain form (+84 912 345 678, 0912345678). Found only
+	// when the user's find_by_phone allows the caller.
+	Phone string `protobuf:"bytes,4,opt,name=phone,proto3,oneof"`
+}
+
 func (*AddContactRequest_UserId) isAddContactRequest_Target() {}
 
 func (*AddContactRequest_Username) isAddContactRequest_Target() {}
 
 func (*AddContactRequest_Email) isAddContactRequest_Target() {}
+
+func (*AddContactRequest_Phone) isAddContactRequest_Target() {}
 
 type AddContactResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3062,7 +3098,7 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\rBlockResponse\"-\n" +
 	"\x0eUnblockRequest\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\"\x11\n" +
-	"\x0fUnblockResponse\"\xb3\x03\n" +
+	"\x0fUnblockResponse\"\xf0\x03\n" +
 	"\x0fPrivacySettings\x124\n" +
 	"\tlast_seen\x18\x01 \x01(\x0e2\x17.app.v1.PrivacyAudienceR\blastSeen\x12<\n" +
 	"\rprofile_photo\x18\x02 \x01(\x0e2\x17.app.v1.PrivacyAudienceR\fprofilePhoto\x12;\n" +
@@ -3070,10 +3106,11 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x10find_by_username\x18\x04 \x01(\x0e2\x17.app.v1.PrivacyAudienceR\x0efindByUsername\x12;\n" +
 	"\radd_to_groups\x18\x05 \x01(\x0e2\x17.app.v1.PrivacyAudienceR\vaddToGroups\x12<\n" +
 	"\rsend_messages\x18\x06 \x01(\x0e2\x17.app.v1.PrivacyAudienceR\fsendMessages\x121\n" +
-	"\x14notification_preview\x18\a \x01(\bR\x13notificationPreview\"\x13\n" +
+	"\x14notification_preview\x18\a \x01(\bR\x13notificationPreview\x12;\n" +
+	"\rfind_by_phone\x18\b \x01(\x0e2\x17.app.v1.PrivacyAudienceR\vfindByPhone\"\x13\n" +
 	"\x11GetPrivacyRequest\"I\n" +
 	"\x12GetPrivacyResponse\x123\n" +
-	"\bsettings\x18\x01 \x01(\v2\x17.app.v1.PrivacySettingsR\bsettings\"\xdc\x04\n" +
+	"\bsettings\x18\x01 \x01(\v2\x17.app.v1.PrivacySettingsR\bsettings\"\xb0\x05\n" +
 	"\x11SetPrivacyRequest\x129\n" +
 	"\tlast_seen\x18\x01 \x01(\x0e2\x17.app.v1.PrivacyAudienceH\x00R\blastSeen\x88\x01\x01\x12A\n" +
 	"\rprofile_photo\x18\x02 \x01(\x0e2\x17.app.v1.PrivacyAudienceH\x01R\fprofilePhoto\x88\x01\x01\x12@\n" +
@@ -3081,7 +3118,8 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x10find_by_username\x18\x04 \x01(\x0e2\x17.app.v1.PrivacyAudienceH\x03R\x0efindByUsername\x88\x01\x01\x12@\n" +
 	"\radd_to_groups\x18\x05 \x01(\x0e2\x17.app.v1.PrivacyAudienceH\x04R\vaddToGroups\x88\x01\x01\x12A\n" +
 	"\rsend_messages\x18\x06 \x01(\x0e2\x17.app.v1.PrivacyAudienceH\x05R\fsendMessages\x88\x01\x01\x126\n" +
-	"\x14notification_preview\x18\a \x01(\bH\x06R\x13notificationPreview\x88\x01\x01B\f\n" +
+	"\x14notification_preview\x18\a \x01(\bH\x06R\x13notificationPreview\x88\x01\x01\x12@\n" +
+	"\rfind_by_phone\x18\b \x01(\x0e2\x17.app.v1.PrivacyAudienceH\aR\vfindByPhone\x88\x01\x01B\f\n" +
 	"\n" +
 	"_last_seenB\x10\n" +
 	"\x0e_profile_photoB\x10\n" +
@@ -3089,7 +3127,8 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x11_find_by_usernameB\x10\n" +
 	"\x0e_add_to_groupsB\x10\n" +
 	"\x0e_send_messagesB\x17\n" +
-	"\x15_notification_preview\"I\n" +
+	"\x15_notification_previewB\x10\n" +
+	"\x0e_find_by_phone\"I\n" +
 	"\x12SetPrivacyResponse\x123\n" +
 	"\bsettings\x18\x01 \x01(\v2\x17.app.v1.PrivacySettingsR\bsettings\"G\n" +
 	"\x10ReportedMessages\x12\x1b\n" +
@@ -3102,11 +3141,12 @@ const file_app_v1_users_proto_rawDesc = "" +
 	"\x06reason\x18\x04 \x01(\x0e2\x14.app.v1.ReportReasonR\x06reason\x12\x18\n" +
 	"\acomment\x18\x05 \x01(\tR\acommentB\b\n" +
 	"\x06target\"\x10\n" +
-	"\x0eReportResponse\"r\n" +
+	"\x0eReportResponse\"\x8a\x01\n" +
 	"\x11AddContactRequest\x12\x1d\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02H\x00R\x06userId\x12\x1c\n" +
 	"\busername\x18\x02 \x01(\tH\x00R\busername\x12\x16\n" +
-	"\x05email\x18\x03 \x01(\tH\x00R\x05emailB\b\n" +
+	"\x05email\x18\x03 \x01(\tH\x00R\x05email\x12\x16\n" +
+	"\x05phone\x18\x04 \x01(\tH\x00R\x05phoneB\b\n" +
 	"\x06target\"6\n" +
 	"\x12AddContactResponse\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\"3\n" +
@@ -3312,75 +3352,77 @@ var file_app_v1_users_proto_depIdxs = []int32{
 	1,  // 12: app.v1.PrivacySettings.find_by_username:type_name -> app.v1.PrivacyAudience
 	1,  // 13: app.v1.PrivacySettings.add_to_groups:type_name -> app.v1.PrivacyAudience
 	1,  // 14: app.v1.PrivacySettings.send_messages:type_name -> app.v1.PrivacyAudience
-	22, // 15: app.v1.GetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
-	1,  // 16: app.v1.SetPrivacyRequest.last_seen:type_name -> app.v1.PrivacyAudience
-	1,  // 17: app.v1.SetPrivacyRequest.profile_photo:type_name -> app.v1.PrivacyAudience
-	1,  // 18: app.v1.SetPrivacyRequest.find_by_email:type_name -> app.v1.PrivacyAudience
-	1,  // 19: app.v1.SetPrivacyRequest.find_by_username:type_name -> app.v1.PrivacyAudience
-	1,  // 20: app.v1.SetPrivacyRequest.add_to_groups:type_name -> app.v1.PrivacyAudience
-	1,  // 21: app.v1.SetPrivacyRequest.send_messages:type_name -> app.v1.PrivacyAudience
-	22, // 22: app.v1.SetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
-	27, // 23: app.v1.ReportRequest.messages:type_name -> app.v1.ReportedMessages
-	2,  // 24: app.v1.ReportRequest.reason:type_name -> app.v1.ReportReason
-	5,  // 25: app.v1.AddContactResponse.user:type_name -> app.v1.User
-	5,  // 26: app.v1.GetContactsResponse.users:type_name -> app.v1.User
-	36, // 27: app.v1.GetContactsResponse.contacts:type_name -> app.v1.Contact
-	38, // 28: app.v1.GetBlockedUsersResponse.blocked:type_name -> app.v1.BlockedUser
-	5,  // 29: app.v1.GetBlockedUsersResponse.users:type_name -> app.v1.User
-	42, // 30: app.v1.Person.members:type_name -> app.v1.PersonMember
-	43, // 31: app.v1.ListPeopleResponse.people:type_name -> app.v1.Person
-	43, // 32: app.v1.LinkUsersResponse.person:type_name -> app.v1.Person
-	42, // 33: app.v1.LinkSuggestion.first:type_name -> app.v1.PersonMember
-	42, // 34: app.v1.LinkSuggestion.second:type_name -> app.v1.PersonMember
-	3,  // 35: app.v1.LinkSuggestion.reason:type_name -> app.v1.LinkSuggestionReason
-	50, // 36: app.v1.ListLinkSuggestionsResponse.suggestions:type_name -> app.v1.LinkSuggestion
-	6,  // 37: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
-	8,  // 38: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
-	10, // 39: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
-	12, // 40: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
-	14, // 41: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
-	16, // 42: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
-	18, // 43: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
-	20, // 44: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
-	23, // 45: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
-	25, // 46: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
-	28, // 47: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
-	30, // 48: app.v1.UsersService.AddContact:input_type -> app.v1.AddContactRequest
-	32, // 49: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
-	34, // 50: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
-	37, // 51: app.v1.UsersService.GetBlockedUsers:input_type -> app.v1.GetBlockedUsersRequest
-	40, // 52: app.v1.UsersService.SetLocale:input_type -> app.v1.SetLocaleRequest
-	44, // 53: app.v1.UsersService.ListPeople:input_type -> app.v1.ListPeopleRequest
-	46, // 54: app.v1.UsersService.LinkUsers:input_type -> app.v1.LinkUsersRequest
-	48, // 55: app.v1.UsersService.UnlinkUser:input_type -> app.v1.UnlinkUserRequest
-	51, // 56: app.v1.UsersService.ListLinkSuggestions:input_type -> app.v1.ListLinkSuggestionsRequest
-	53, // 57: app.v1.UsersService.RejectLinkSuggestion:input_type -> app.v1.RejectLinkSuggestionRequest
-	7,  // 58: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
-	9,  // 59: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
-	11, // 60: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
-	13, // 61: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
-	15, // 62: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
-	17, // 63: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
-	19, // 64: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
-	21, // 65: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
-	24, // 66: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
-	26, // 67: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
-	29, // 68: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
-	31, // 69: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
-	33, // 70: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
-	35, // 71: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
-	39, // 72: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
-	41, // 73: app.v1.UsersService.SetLocale:output_type -> app.v1.SetLocaleResponse
-	45, // 74: app.v1.UsersService.ListPeople:output_type -> app.v1.ListPeopleResponse
-	47, // 75: app.v1.UsersService.LinkUsers:output_type -> app.v1.LinkUsersResponse
-	49, // 76: app.v1.UsersService.UnlinkUser:output_type -> app.v1.UnlinkUserResponse
-	52, // 77: app.v1.UsersService.ListLinkSuggestions:output_type -> app.v1.ListLinkSuggestionsResponse
-	54, // 78: app.v1.UsersService.RejectLinkSuggestion:output_type -> app.v1.RejectLinkSuggestionResponse
-	58, // [58:79] is the sub-list for method output_type
-	37, // [37:58] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	1,  // 15: app.v1.PrivacySettings.find_by_phone:type_name -> app.v1.PrivacyAudience
+	22, // 16: app.v1.GetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
+	1,  // 17: app.v1.SetPrivacyRequest.last_seen:type_name -> app.v1.PrivacyAudience
+	1,  // 18: app.v1.SetPrivacyRequest.profile_photo:type_name -> app.v1.PrivacyAudience
+	1,  // 19: app.v1.SetPrivacyRequest.find_by_email:type_name -> app.v1.PrivacyAudience
+	1,  // 20: app.v1.SetPrivacyRequest.find_by_username:type_name -> app.v1.PrivacyAudience
+	1,  // 21: app.v1.SetPrivacyRequest.add_to_groups:type_name -> app.v1.PrivacyAudience
+	1,  // 22: app.v1.SetPrivacyRequest.send_messages:type_name -> app.v1.PrivacyAudience
+	1,  // 23: app.v1.SetPrivacyRequest.find_by_phone:type_name -> app.v1.PrivacyAudience
+	22, // 24: app.v1.SetPrivacyResponse.settings:type_name -> app.v1.PrivacySettings
+	27, // 25: app.v1.ReportRequest.messages:type_name -> app.v1.ReportedMessages
+	2,  // 26: app.v1.ReportRequest.reason:type_name -> app.v1.ReportReason
+	5,  // 27: app.v1.AddContactResponse.user:type_name -> app.v1.User
+	5,  // 28: app.v1.GetContactsResponse.users:type_name -> app.v1.User
+	36, // 29: app.v1.GetContactsResponse.contacts:type_name -> app.v1.Contact
+	38, // 30: app.v1.GetBlockedUsersResponse.blocked:type_name -> app.v1.BlockedUser
+	5,  // 31: app.v1.GetBlockedUsersResponse.users:type_name -> app.v1.User
+	42, // 32: app.v1.Person.members:type_name -> app.v1.PersonMember
+	43, // 33: app.v1.ListPeopleResponse.people:type_name -> app.v1.Person
+	43, // 34: app.v1.LinkUsersResponse.person:type_name -> app.v1.Person
+	42, // 35: app.v1.LinkSuggestion.first:type_name -> app.v1.PersonMember
+	42, // 36: app.v1.LinkSuggestion.second:type_name -> app.v1.PersonMember
+	3,  // 37: app.v1.LinkSuggestion.reason:type_name -> app.v1.LinkSuggestionReason
+	50, // 38: app.v1.ListLinkSuggestionsResponse.suggestions:type_name -> app.v1.LinkSuggestion
+	6,  // 39: app.v1.UsersService.GetSelf:input_type -> app.v1.GetSelfRequest
+	8,  // 40: app.v1.UsersService.GetUsers:input_type -> app.v1.GetUsersRequest
+	10, // 41: app.v1.UsersService.UpdateProfile:input_type -> app.v1.UpdateProfileRequest
+	12, // 42: app.v1.UsersService.SetUsername:input_type -> app.v1.SetUsernameRequest
+	14, // 43: app.v1.UsersService.ResolveUsername:input_type -> app.v1.ResolveUsernameRequest
+	16, // 44: app.v1.UsersService.SearchUsers:input_type -> app.v1.SearchUsersRequest
+	18, // 45: app.v1.UsersService.Block:input_type -> app.v1.BlockRequest
+	20, // 46: app.v1.UsersService.Unblock:input_type -> app.v1.UnblockRequest
+	23, // 47: app.v1.UsersService.GetPrivacy:input_type -> app.v1.GetPrivacyRequest
+	25, // 48: app.v1.UsersService.SetPrivacy:input_type -> app.v1.SetPrivacyRequest
+	28, // 49: app.v1.UsersService.Report:input_type -> app.v1.ReportRequest
+	30, // 50: app.v1.UsersService.AddContact:input_type -> app.v1.AddContactRequest
+	32, // 51: app.v1.UsersService.DeleteContact:input_type -> app.v1.DeleteContactRequest
+	34, // 52: app.v1.UsersService.GetContacts:input_type -> app.v1.GetContactsRequest
+	37, // 53: app.v1.UsersService.GetBlockedUsers:input_type -> app.v1.GetBlockedUsersRequest
+	40, // 54: app.v1.UsersService.SetLocale:input_type -> app.v1.SetLocaleRequest
+	44, // 55: app.v1.UsersService.ListPeople:input_type -> app.v1.ListPeopleRequest
+	46, // 56: app.v1.UsersService.LinkUsers:input_type -> app.v1.LinkUsersRequest
+	48, // 57: app.v1.UsersService.UnlinkUser:input_type -> app.v1.UnlinkUserRequest
+	51, // 58: app.v1.UsersService.ListLinkSuggestions:input_type -> app.v1.ListLinkSuggestionsRequest
+	53, // 59: app.v1.UsersService.RejectLinkSuggestion:input_type -> app.v1.RejectLinkSuggestionRequest
+	7,  // 60: app.v1.UsersService.GetSelf:output_type -> app.v1.GetSelfResponse
+	9,  // 61: app.v1.UsersService.GetUsers:output_type -> app.v1.GetUsersResponse
+	11, // 62: app.v1.UsersService.UpdateProfile:output_type -> app.v1.UpdateProfileResponse
+	13, // 63: app.v1.UsersService.SetUsername:output_type -> app.v1.SetUsernameResponse
+	15, // 64: app.v1.UsersService.ResolveUsername:output_type -> app.v1.ResolveUsernameResponse
+	17, // 65: app.v1.UsersService.SearchUsers:output_type -> app.v1.SearchUsersResponse
+	19, // 66: app.v1.UsersService.Block:output_type -> app.v1.BlockResponse
+	21, // 67: app.v1.UsersService.Unblock:output_type -> app.v1.UnblockResponse
+	24, // 68: app.v1.UsersService.GetPrivacy:output_type -> app.v1.GetPrivacyResponse
+	26, // 69: app.v1.UsersService.SetPrivacy:output_type -> app.v1.SetPrivacyResponse
+	29, // 70: app.v1.UsersService.Report:output_type -> app.v1.ReportResponse
+	31, // 71: app.v1.UsersService.AddContact:output_type -> app.v1.AddContactResponse
+	33, // 72: app.v1.UsersService.DeleteContact:output_type -> app.v1.DeleteContactResponse
+	35, // 73: app.v1.UsersService.GetContacts:output_type -> app.v1.GetContactsResponse
+	39, // 74: app.v1.UsersService.GetBlockedUsers:output_type -> app.v1.GetBlockedUsersResponse
+	41, // 75: app.v1.UsersService.SetLocale:output_type -> app.v1.SetLocaleResponse
+	45, // 76: app.v1.UsersService.ListPeople:output_type -> app.v1.ListPeopleResponse
+	47, // 77: app.v1.UsersService.LinkUsers:output_type -> app.v1.LinkUsersResponse
+	49, // 78: app.v1.UsersService.UnlinkUser:output_type -> app.v1.UnlinkUserResponse
+	52, // 79: app.v1.UsersService.ListLinkSuggestions:output_type -> app.v1.ListLinkSuggestionsResponse
+	54, // 80: app.v1.UsersService.RejectLinkSuggestion:output_type -> app.v1.RejectLinkSuggestionResponse
+	60, // [60:81] is the sub-list for method output_type
+	39, // [39:60] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_users_proto_init() }
@@ -3400,6 +3442,7 @@ func file_app_v1_users_proto_init() {
 		(*AddContactRequest_UserId)(nil),
 		(*AddContactRequest_Username)(nil),
 		(*AddContactRequest_Email)(nil),
+		(*AddContactRequest_Phone)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

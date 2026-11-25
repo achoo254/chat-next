@@ -211,6 +211,9 @@ message PrivacySettings {
   PrivacyAudience send_messages = 6;
   // Show message content in push notifications.
   bool notification_preview = 7;
+  // Who may find the user by their exact phone number. The number is the one the user's
+  // own Telegram or Zalo account was verified with; it is never shown.
+  PrivacyAudience find_by_phone = 8;
 }
 
 message GetPrivacyRequest {}
@@ -228,6 +231,7 @@ message SetPrivacyRequest {
   optional PrivacyAudience add_to_groups = 5;
   optional PrivacyAudience send_messages = 6;
   optional bool notification_preview = 7;
+  optional PrivacyAudience find_by_phone = 8;
 }
 
 message SetPrivacyResponse {
@@ -274,6 +278,9 @@ message AddContactRequest {
     // Exact email. Found only when the user's find_by_email allows the
     // caller.
     string email = 3;
+    // Exact phone number in any plain form (+84 912 345 678, 0912345678). Found only
+    // when the user's find_by_phone allows the caller.
+    string phone = 4;
   }
 }
 

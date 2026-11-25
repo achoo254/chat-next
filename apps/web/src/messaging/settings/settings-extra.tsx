@@ -93,7 +93,7 @@ function ContactsDefinition() {
 	);
 }
 
-type AudienceKey = "lastSeen" | "profilePhoto" | "findByEmail" | "findByUsername" | "addToGroups" | "sendMessages";
+type AudienceKey = "lastSeen" | "profilePhoto" | "findByPhone" | "findByEmail" | "findByUsername" | "addToGroups" | "sendMessages";
 
 /** A failed load with a way to try again, in place of a tab's content. */
 function LoadFailed({ onRetry }: { onRetry: () => void }) {
@@ -166,6 +166,7 @@ function PrivacySettings() {
 			</div>
 			<div className="card">
 				<h2 className="card-title">{t.whoFinds}</h2>
+				{row("findByPhone", t.findByPhone, t.whoPhone, t.findByPhoneHint)}
 				{row("findByEmail", t.findByEmail, t.whoEmail, t.findByEmailHint)}
 				{row("findByUsername", t.findByUsername, t.whoUsername, t.findByUsernameHint)}
 				{row("addToGroups", t.addToGroups, t.whoGroups, t.addToGroupsHint)}

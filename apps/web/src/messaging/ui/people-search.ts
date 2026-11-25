@@ -7,6 +7,17 @@ import { useServices } from "../data/services.tsx";
 
 const SEARCH_DELAY_MS = 250;
 
+/** How a search query reads: a phone number, a full email, or a username or name. */
+export type QueryKind = "phone" | "email" | "username";
+
+/** A phone number is digits with spaces, dots, dashes or brackets, an optional leading "+", and at least 8 digits. */
+export function queryKind(query: string): QueryKind {
+	const text = query.trim();
+	if (text.includes("@") && !text.startsWith("@")) return "email";
+	if (/^\+?[0-9 .\-()]+$/.test(text) && text.replace(/\D/g, "").length >= 8) return "phone";
+	return "username";
+}
+
 /** Matches for `query` ("@" optional); null while typing, loading or when the query is empty. */
 export function usePeopleSearch(query: string): { people: Person[] | null; failed: boolean } {
 	const { remote } = useServices();

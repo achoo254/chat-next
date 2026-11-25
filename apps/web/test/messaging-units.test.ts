@@ -24,7 +24,7 @@ import { actionText, chatKind, countLabel, dayLabel, inFolder, isTrustedHost, li
 import { highlight } from "../src/messaging/data/highlight.ts";
 import type { Remote, ServerTopic } from "../src/messaging/data/remote.ts";
 import { loadNextTopicPage, loadTopicPages, toneForColor, topicIcon } from "../src/messaging/data/topic-mapping.ts";
-import { isOwnAccount } from "../src/messaging/ui/people-search.ts";
+import { isOwnAccount, queryKind } from "../src/messaging/ui/people-search.ts";
 import { entityTree } from "../src/messaging/ui/rich-text.tsx";
 import { matchRoute, paths, returnPathFor } from "../src/router.tsx";
 import { loginUrl } from "../src/screens/welcome-url.ts";
@@ -371,3 +371,11 @@ describe("forum topics", () => {
 	});
 });
 
+
+describe("queryKind", () => {
+	it("reads a number, an email and a username apart", () => {
+		for (const phone of ["0912345678", "+84 912 345 678", "091-234-5678", "(091) 234.5678", " 84912345678 "]) expect(queryKind(phone)).toBe("phone");
+		for (const email of ["lan@example.com", "Lan.Nguyen@vidu.vn"]) expect(queryKind(email)).toBe("email");
+		for (const name of ["@lan_pham", "lan", "1234567", "lan 0912345678", "@"]) expect(queryKind(name)).toBe("username");
+	});
+});

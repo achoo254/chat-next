@@ -1,6 +1,6 @@
-// Adding a contact (mockups/chat.html#contact-add): an exact username (with
-// or without @) or a full email. Results follow the other person's "find me
-// by username/email" settings, so someone who hides shows the same "Không
+// Adding a contact (mockups/chat.html#contact-add): an exact phone number or a
+// full email first, a username (with or without @) as the last resort. Results
+// follow the other person's "find me by phone/email/username" settings, so someone who hides shows the same "Không
 // tìm thấy" as no account at all. Email never shows in results.
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useState, type ReactNode } from "react";
@@ -11,11 +11,12 @@ import { contactsOf, useContacts } from "../data/contacts.ts";
 import type { ContactTarget, Person } from "../data/remote.ts";
 import { useServices } from "../data/services.tsx";
 import { ChatAvatar, DialogHead, Modal, useDomId } from "./parts.tsx";
-import { usePeopleSearch } from "./people-search.ts";
+import { queryKind, usePeopleSearch, type QueryKind } from "./people-search.ts";
 
 /** Asks for the person the way the user looked them up (the server checks that kind of search). */
-function targetFor(person: Person, query: string, byEmail: boolean): ContactTarget {
-	if (byEmail) return { email: query };
+function targetFor(person: Person, query: string, kind: QueryKind): ContactTarget {
+	if (kind === "phone") return { phone: query };
+	if (kind === "email") return { email: query };
 	return person.username !== "" ? { username: person.username } : { userId: person.id };
 }
 
@@ -29,12 +30,12 @@ export function AddContactDialog({ onClose }: { onClose: () => void }) {
 	const id = useDomId("add-contact");
 	const t = copy.contacts;
 	const clean = query.trim();
-	const byEmail = clean.includes("@") && !clean.startsWith("@");
+	const kind = queryKind(clean);
 
 	const add = (person: Person) => {
 		setBusy(person.id);
 		contactsOf(remote)
-			.add(targetFor(person, clean, byEmail))
+			.add(targetFor(person, clean, kind))
 			.then(
 				(added) => toasts.show(t.added(added.name)),
 				(err: unknown) => {
@@ -67,7 +68,7 @@ export function AddContactDialog({ onClose }: { onClose: () => void }) {
 							{person.username !== "" && <small>@{person.username}</small>}
 							<span className="match">
 								<Icon name="check" />
-								{byEmail ? t.matchEmail : t.matchUsername}
+								{kind === "phone" ? t.matchPhone : kind === "email" ? t.matchEmail : t.matchUsername}
 							</span>
 						</span>
 						{contacts.ids.has(person.id) ? (
