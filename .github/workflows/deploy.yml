@@ -1,18 +1,19 @@
-# Continuous deploy of chat.hoandat.com: after `ci` passes on main, build the
-# web app and the Linux server binary, upload them as the restricted
-# `chat-deploy` user to /opt/chat/incoming/<id>, and activate through the one
-# sudo command that user has (infra/chat/activate-incoming.sh). The server
-# backs up the database, migrates, switches and rolls back on failure; the
-# smoke test then checks production from outside. Building (which runs
-# dependency code) happens in a job without the deploy key; the deploy job
-# only downloads the artifact, uploads it and activates it.
+# Deploy of chat.hoandat.com.
+# Started on demand (`gh workflow run deploy.yml`, usually through the
+# chat-ops-prod skill) rather than on every push: AI sessions push to main many
+# times a day, and deploying each push kept prod restarting and the session
+# waiting. The run deploys the tip of main, and only once `ci` of that commit
+# has passed (it waits while that run is still going). The build job makes the
+# web app and the Linux server binary without the deploy key; the deploy job
+# uploads them as the restricted `chat-deploy` user to /opt/chat/incoming/<id>
+# and activates through the one sudo command that user has
+# (infra/chat/activate-incoming.sh). The server backs up the database,
+# migrates, switches and rolls back on failure; the smoke test then checks
+# production from outside.
 name: deploy
 
 on:
-  workflow_run:
-    workflows: [ci]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,15 +25,37 @@ concurrency:
 
 jobs:
   build:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
     outputs:
       release_id: ${{ steps.release.outputs.id }}
     steps:
+      # Only a commit whose push to main passed `ci` goes to production. A run
+      # started right after a push waits for that commit's `ci` (up to 30 min).
+      - name: ci passed for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          for _ in $(seq 90); do
+            state="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --event push --branch main \
+              --commit "$SHA" --limit 1 --json status,conclusion --jq '.[] | "\(.status) \(.conclusion)"')"
+            case "$state" in
+              "completed success") echo "ci passed for $SHA"; exit 0 ;;
+              completed*) echo "::error::ci of $SHA ended: $state"; exit 1 ;;
+            esac
+            echo "waiting for ci of $SHA (${state:-not started})"
+            sleep 20
+          done
+          echo "::error::ci of $SHA did not finish within 30 minutes"
+          exit 1
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -46,7 +69,7 @@ jobs:
       - id: release
         name: build release
         env:
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ github.sha }}
         run: |
           id="$(date -u +%Y%m%d-%H%M%S)-${SHA:0:12}"
           echo "id=$id" >>"$GITHUB_OUTPUT"
@@ -80,7 +103,7 @@ jobs:
       # Only the smoke script is needed from the repository.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           sparse-checkout: infra/chat/smoke.sh
           sparse-checkout-cone-mode: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

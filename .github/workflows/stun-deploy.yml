@@ -1,6 +1,6 @@
 # Deploy of stun-responder (apps/stun) to the shared server, started by hand (Actions > stun-deploy > Run workflow, or
-# `gh workflow run stun-deploy.yml`): it changes rarely and has no app behind it, the one exception to deploying on
-# every push (docs/deploy-standard.md in the hoandat-app workspace). The build job makes a static musl binary for the
+# `gh workflow run stun-deploy.yml`): it changes rarely and has no app behind it, so it stays apart from the app's
+# deploy workflow (docs/deploy-standard.md in the hoandat-app workspace). The build job makes a static musl binary for the
 # server's x86_64 CPU without the deploy key; the deploy job uploads the bundle as `chat-deploy` to
 # /opt/chat/incoming/stun-<id> and runs the one stun command that user has through sudo
 # (infra/stun/activate-incoming.sh: flock, checks, infra/stun/install-on-server.sh).
