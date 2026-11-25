@@ -70,6 +70,32 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 	return m, conv, nil
 }
 
+// undoPayload is what the listener reports when a message is recalled: the
+// message that took its place carries the recalled one's id as globalMsgId.
+type undoPayload struct {
+	ThreadID looseString `json:"threadId"`
+	IsGroup  bool        `json:"isGroup"`
+	Data     struct {
+		Content struct {
+			GlobalMsgID looseString `json:"globalMsgId"`
+		} `json:"content"`
+	} `json:"data"`
+}
+
+// mapUndo turns a recall of a 1-1 message into the conversation (the other
+// person's Zalo id) and the id of the message to remove.
+func mapUndo(raw json.RawMessage) (conv, id string, err error) {
+	var p undoPayload
+	if err := json.Unmarshal(raw, &p); err != nil || p.IsGroup {
+		return "", "", errNotPrivate
+	}
+	conv, id = string(p.ThreadID), string(p.Data.Content.GlobalMsgID)
+	if !zaloID.MatchString(conv) || !zaloID.MatchString(id) {
+		return "", "", errors.New("zalo: recall without valid ids")
+	}
+	return conv, id, nil
+}
+
 // withPhone gives a participant the phone number their profile shows. Zalo's
 // profile of another person usually leaves the number out, and nobody knows
 // whether an empty one means «none» or «not shown to you», so only a number

@@ -275,3 +275,27 @@ func (a *Adapter) subscribed(account string) *subscription {
 	defer a.mu.Unlock()
 	return a.subs[account]
 }
+
+func TestSubscribeRecallRemovesTheMessageAndIgnoresGroups(t *testing.T) {
+	lines := []string{
+		accountLine,
+		connectedLine,
+		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"1","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000"}`,
+		`{"ev":"event","name":"undo","payload":{"data":{"msgId":"1005","content":{"globalMsgId":1001,"cliMsgId":1,"deleteMsg":0}},"threadId":"500","isSelf":false,"isGroup":false}}`,
+		`{"ev":"event","name":"undo","payload":{"data":{"content":{"globalMsgId":"2001"}},"threadId":"900","isGroup":true}}`,
+		`{"ev":"event","name":"undo","payload":{"data":{"content":{}},"threadId":"500"}}`,
+		`{"ev":"listener","state":"closed","code":1006}`,
+	}
+	r := &fakeRunner{script: scriptedSession(t, lines, false)}
+	a, _ := newTestAdapter(t, r)
+	got, _ := runSubscribe(t, a, testAccount)
+	if len(got) != 2 || got[1].Delete == nil {
+		t.Fatalf("events = %+v, want the message then one delete (group and malformed recalls dropped)", got)
+	}
+	if d := got[1].Delete; d.Conversation != "500" || len(d.IDs) != 1 || d.IDs[0] != "1001" {
+		t.Errorf("delete = %+v, want message 1001 of conversation 500", d)
+	}
+	if page, _ := a.Backfill(context.Background(), testAccount, "500", bridge.Cursor{}, 50); len(page.Messages) != 0 {
+		t.Errorf("backfill handed %d messages, want the recalled one forgotten", len(page.Messages))
+	}
+}

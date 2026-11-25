@@ -106,6 +106,13 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 			if err := a.deliver(ctx, heard, own, ev, out); err != nil {
 				return err
 			}
+		case evOther:
+			if ev.Name != "undo" {
+				continue // typing, reaction, seen...: no feature declared for them
+			}
+			if err := a.deliverUndo(ctx, heard, ev, out); err != nil {
+				return err
+			}
 		case evAccount:
 			if err := a.checkAccount(st, string(ev.UID)); err != nil {
 				return err
@@ -118,10 +125,25 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 			if err := a.sidecarError(st, ev); err != nil {
 				return err
 			}
-		default:
-			// other listener events (typing, reaction, undo, seen...): no
-			// feature declared for them in this step.
 		}
+	}
+}
+
+// deliverUndo hands the engine the recall of a 1-1 message, so Chat removes
+// the copy it holds; a recall of a message Chat has not copied yet is kept as a
+// tombstone by the engine.
+func (a *Adapter) deliverUndo(ctx context.Context, heard *heardAccount, ev wireEvent, out chan<- bridge.Event) error {
+	conv, id, err := mapUndo(ev.Payload)
+	if err != nil {
+		a.logger.Debug("zalo recall dropped", "reason", err.Error())
+		return nil
+	}
+	heard.forget(conv, id)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case out <- bridge.Event{Delete: &bridge.Delete{Conversation: conv, IDs: []string{id}}}:
+		return nil
 	}
 }
 

@@ -100,6 +100,19 @@ func (h *heardAccount) record(conv bridge.Conversation, m bridge.Message) {
 	}
 }
 
+// forget drops a recalled message from what Backfill would still hand over.
+func (h *heardAccount) forget(conv, id string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c := h.convs[conv]
+	if c == nil {
+		return
+	}
+	before := len(c.recent)
+	c.recent = slices.DeleteFunc(c.recent, func(k keptMessage) bool { return k.msg.ID == id })
+	h.messages -= before - len(c.recent)
+}
+
 func (h *heardAccount) evictOldestConversation() {
 	var oldest string
 	var at time.Time
