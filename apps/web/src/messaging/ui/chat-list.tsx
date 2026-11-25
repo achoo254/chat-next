@@ -284,7 +284,7 @@ function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: Dialo
 						height: (rows.offsets[position + 1] ?? rows.total) - (rows.offsets[position] ?? 0),
 					};
 					return typeof item === "number" ? (
-						<ChatRow key={item} chatId={item} current={item === currentChatId} position={position + 1} total={rows.items.length} style={style} />
+						<ChatRow key={item} chatId={item} current={item === currentChatId} position={position + 1} total={rows.items.length} style={style} appFolder={app} />
 					) : (
 						<Suspense key={`p${item.person.id}`} fallback={null}>
 							<PersonRow item={item} current={item.person.id === currentPerson} position={position + 1} total={rows.items.length} style={style} />

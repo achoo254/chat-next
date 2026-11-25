@@ -205,9 +205,11 @@ interface ChatRowProps {
 	style?: CSSProperties;
 	position: number;
 	total: number;
+	/** The app folder the list shows, or null: its chats need no app logo there. */
+	appFolder?: string | null;
 }
 
-export const ChatRow = memo(function ChatRow({ chatId, current, style, position, total }: ChatRowProps) {
+export const ChatRow = memo(function ChatRow({ chatId, current, style, position, total, appFolder = null }: ChatRowProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
 	const { store } = useServices();
@@ -232,6 +234,8 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 	const kindIcon = KIND_ICONS[kind];
 	// The server counts the whole chat (every topic), up to 1000.
 	const unread = dialog.unreadCount;
+	// In that app's own folder every row is from it: the logo would only crowd the name.
+	const externalApp = view.chat?.externalApp === appFolder ? undefined : view.chat?.externalApp;
 	return (
 		<li className="chat-slot" style={style} aria-setsize={total} aria-posinset={position} {...trigger}>
 			<Link to={paths.chat(chatId)} className="chat-row" current={current} onNavigate={() => {
@@ -251,14 +255,14 @@ export const ChatRow = memo(function ChatRow({ chatId, current, style, position,
 							<LabelledIcon name={kindIcon} label={kindLabel(kind, copy)} className="type-ico" />
 						)}
 						<span className="title-text">{title}</span>
-						{view.chat?.externalApp !== undefined &&
-							(hasAppLogo(view.chat.externalApp) ? (
-								<span className="tag-logo" role="img" aria-label={appName(view.chat.externalApp)} title={copy.list.copyOf(appName(view.chat.externalApp))}>
-									<AppLogo app={view.chat.externalApp} />
+						{externalApp !== undefined &&
+							(hasAppLogo(externalApp) ? (
+								<span className="tag-logo" role="img" aria-label={appName(externalApp)} title={copy.list.copyOf(appName(externalApp))}>
+									<AppLogo app={externalApp} />
 								</span>
 							) : (
-								<span className="tag" title={copy.list.copyOf(appName(view.chat.externalApp))}>
-									{appName(view.chat.externalApp)}
+								<span className="tag" title={copy.list.copyOf(appName(externalApp))}>
+									{appName(externalApp)}
 								</span>
 							))}
 						{muted && <LabelledIcon name="bell-off" label={copy.list.muted} />}

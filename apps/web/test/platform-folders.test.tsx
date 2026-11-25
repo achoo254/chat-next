@@ -55,6 +55,18 @@ describe("platform folders", () => {
 		expect(within(row).queryByText("Telegram")).toBeNull();
 	});
 
+	it("leaves the logo off the rows in the app's own folder, where every chat is from it", async () => {
+		renderMessaging(mixed(), "/");
+		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
+		await userEvent.click(await within(rail).findByRole("button", { name: /^Telegram/ }, LONG));
+		const row = (await screen.findByText("tin hai chiều", {}, LONG)).closest("a") as HTMLElement;
+		expect(within(row).queryByRole("img", { name: "Telegram" })).toBeNull();
+
+		await userEvent.click(within(rail).getByRole("button", { name: /^Tất cả/ }));
+		const again = (await screen.findByText("tin hai chiều", {}, LONG)).closest("a") as HTMLElement;
+		expect(within(again).getAllByRole("img", { name: "Telegram" })).toHaveLength(1);
+	});
+
 	it("lists Telegram and Zalo with their logos even when no chat is synced with an app", async () => {
 		const fixture = new ChatFixture();
 		const tom = fixture.addUser("Tôm");
