@@ -4,9 +4,13 @@
 // call that follows CI, `gh run watch`, `gh pr checks`) and, for CI, also
 // from the lifecycle events the agent sends while it follows GitHub Actions
 // after a push (`ci_started` / `ci_finished`: label = the workflow's name,
-// flag = success, number = duration ms). Several workflows fold into one CI
-// step: running while one still runs, failed when one failed, with their
-// count. A new commit resets the steps after it.
+// flag = success, number = duration ms). A `ci_finished` without a flag is an
+// outcome the machine does not know (it stopped following the run), and a run
+// with no `ci_finished` CI_STALE_MS after it started is taken as unknown too
+// (the agent restarted meanwhile): neither ✓ nor ✗. An unknown outcome never
+// replaces a known one of the same workflow. Several workflows fold into one
+// CI step: running while one still runs, failed when one failed, unknown when
+// one is, with their count. A new commit resets the steps after it.
 //
 // Which events: the turn of the latest release call (from the prompt before
 // it), and the CI lifecycle events after that prompt even when they land in
@@ -18,7 +22,10 @@ import type { LiveMapEvent } from "./live-map-types.ts";
 export const CI_STARTED = "ci_started";
 export const CI_FINISHED = "ci_finished";
 
-export type StepStatus = "idle" | "run" | "ok" | "err";
+export type StepStatus = "idle" | "run" | "ok" | "err" | "unknown";
+
+/** A CI run with no outcome this long after it started reads as unknown. */
+export const CI_STALE_MS = 45 * 60_000;
 
 export interface PipelineStep {
 	readonly status: StepStatus;
@@ -42,6 +49,8 @@ export interface Pipeline {
 	readonly ci: CiWorkflows;
 	/** A deploy succeeded. */
 	readonly prod: boolean;
+	/** When the oldest CI run still running turns unknown (machine ms); null when none runs. */
+	readonly ciStaleAt: number | null;
 }
 
 const IDLE: PipelineStep = { status: "idle", startedAt: null, durationMs: null, eventId: null };
@@ -82,8 +91,11 @@ function scope(log: readonly LiveMapEvent[]): readonly LiveMapEvent[] {
 	return log.slice(start).filter((e, i) => isCi(e) || start + i <= anchor);
 }
 
-/** The pipeline of a session's ordered log. */
-export function pipelineOf(log: readonly LiveMapEvent[]): Pipeline {
+/**
+ * The pipeline of a session's ordered log; with `now` (machine ms), the CI
+ * runs older than CI_STALE_MS that still run are unknown.
+ */
+export function pipelineOf(log: readonly LiveMapEvent[], now?: number): Pipeline {
 	const tools = new Map<ReleaseStep, Map<string, Entry>>(RELEASE_STEPS.map((s) => [s, new Map()]));
 	const workflows = new Map<string, Entry>();
 	const reset = (from: number): void => {
@@ -106,13 +118,23 @@ export function pipelineOf(log: readonly LiveMapEvent[]): Pipeline {
 			}
 		} else if (isCi(e)) {
 			const name = e.label === "" ? "CI" : e.label;
+			const current = workflows.get(name);
 			if (e.name === CI_STARTED) workflows.set(name, { status: "run", startedAt: e.at, durationMs: null, eventId: null });
-			else {
+			else if (e.flag === undefined) {
+				// The machine stopped following the run: unknown, unless its outcome is known already.
+				if (current?.status !== "ok" && current?.status !== "err") workflows.set(name, { status: "unknown", startedAt: current?.startedAt ?? e.at, durationMs: null, eventId: null });
+			} else {
 				const durationMs = e.number ?? null;
-				const startedAt = workflows.get(name)?.startedAt ?? (durationMs === null ? e.at : e.at - durationMs);
-				workflows.set(name, { status: e.flag === false ? "err" : "ok", startedAt, durationMs, eventId: null });
+				const startedAt = current?.startedAt ?? (durationMs === null ? e.at : e.at - durationMs);
+				workflows.set(name, { status: e.flag ? "ok" : "err", startedAt, durationMs, eventId: null });
 			}
 		}
+	}
+	let ciStaleAt: number | null = null;
+	for (const [name, w] of workflows) {
+		if (w.status !== "run") continue;
+		if (now !== undefined && now >= w.startedAt + CI_STALE_MS) workflows.set(name, { ...w, status: "unknown" });
+		else ciStaleAt = Math.min(ciStaleAt ?? Infinity, w.startedAt + CI_STALE_MS);
 	}
 	const steps = {} as Record<ReleaseStep, PipelineStep>;
 	for (const step of RELEASE_STEPS) {
@@ -125,13 +147,20 @@ export function pipelineOf(log: readonly LiveMapEvent[]): Pipeline {
 		steps,
 		ci: { total: flows.length, running: flows.filter((w) => w.status === "run").length, failed: flows.filter((w) => w.status === "err").length },
 		prod: steps.deploy.status === "ok",
+		ciStaleAt,
 	};
 }
 
-/** Several runs of one step as one: running while one runs, failed when one failed, else done. */
+/** `pipeline` (of `log`) as it reads at `now` (machine ms): itself until a CI run turns stale, then worked out again. */
+export function pipelineAt(pipeline: Pipeline, log: readonly LiveMapEvent[], now: number): Pipeline {
+	return pipeline.ciStaleAt !== null && now >= pipeline.ciStaleAt ? pipelineOf(log, now) : pipeline;
+}
+
+/** Several runs of one step as one: running while one runs, failed when one failed, unknown when one is, else done. */
 function fold(entries: readonly Entry[]): PipelineStep {
 	if (entries.length === 0) return IDLE;
-	const status: StepStatus = entries.some((e) => e.status === "run") ? "run" : entries.some((e) => e.status === "err") ? "err" : "ok";
+	const has = (status: Entry["status"]): boolean => entries.some((e) => e.status === status);
+	const status: StepStatus = has("run") ? "run" : has("err") ? "err" : has("unknown") ? "unknown" : "ok";
 	const startedAt = Math.min(...entries.map((e) => e.startedAt));
 	const ends = entries.map((e) => (e.durationMs === null ? null : e.startedAt + e.durationMs));
 	const durationMs = status === "run" || ends.some((x) => x === null) ? null : Math.max(...ends.map((x) => x ?? 0)) - startedAt;

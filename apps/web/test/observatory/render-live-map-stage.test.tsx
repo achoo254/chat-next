@@ -7,7 +7,10 @@
 // back to auto, a drag pans (free), the camera's buttons and note; a click on
 // a moving packet opens its event; new animations go to the renderer once; a
 // renderer that cannot start leaves the still plate with its note; leaving
-// destroys the renderer.
+// destroys the renderer. MCP tool names stay hidden in tags and boards with
+// "Ẩn chi tiết"; a focused district's button never scrolls the frame and the
+// camera frames it; a plain wheel scrolls the page unless the camera is free;
+// live times read in the machine's clock.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,13 +21,21 @@ import type { LiveMapLiveState } from "../../src/machines/observatory/live-map-t
 import { OBSERVATORY_COPY } from "../../src/machines/observatory/observatory-copy.ts";
 import type { CameraState, LiveMapHandle, LiveMapMountOptions } from "../../src/machines/observatory/render/live-map-app.ts";
 import { HIDE_DETAILS_KEY, LiveMapStage } from "../../src/machines/observatory/render/live-map-stage.tsx";
-import { prompt, tool } from "../machines/observatory/live-map-fixtures.ts";
+import { prompt, T0, tool } from "../machines/observatory/live-map-fixtures.ts";
 import { fixtureAssets, played } from "./render-fixtures.ts";
 
 const t = viMachines.observe;
 const c = OBSERVATORY_COPY.vi;
 
-type Fake = LiveMapHandle & { update: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn>; setCameraMode: ReturnType<typeof vi.fn>; select: ReturnType<typeof vi.fn>; pan: ReturnType<typeof vi.fn> };
+type Fake = LiveMapHandle & {
+	update: ReturnType<typeof vi.fn>;
+	destroy: ReturnType<typeof vi.fn>;
+	setCameraMode: ReturnType<typeof vi.fn>;
+	select: ReturnType<typeof vi.fn>;
+	pan: ReturnType<typeof vi.fn>;
+	peek: ReturnType<typeof vi.fn>;
+	zoomAt: ReturnType<typeof vi.fn>;
+};
 
 function fakeHandle(over: Partial<LiveMapHandle> = {}): Fake {
 	return {
@@ -37,6 +48,7 @@ function fakeHandle(over: Partial<LiveMapHandle> = {}): Fake {
 		toScene: (x: number, y: number) => [x, y] as const,
 		setCameraMode: vi.fn(),
 		select: vi.fn(),
+		peek: vi.fn(),
 		pan: vi.fn(),
 		zoomAt: vi.fn(),
 		camera: () => ({ mode: "auto", zone: null, contentZone: null, switches: 0 }),
@@ -66,7 +78,7 @@ const live = (over: Partial<LiveMapLiveState>): LiveMapLiveState => ({
 	...over,
 });
 
-function setup(state: LiveMapState, handle = fakeHandle(), mount?: (o: LiveMapMountOptions) => Promise<LiveMapHandle>, selectedPlace: LiveMapStageProps["selectedPlace"] = null) {
+function setup(state: LiveMapState, handle = fakeHandle(), mount?: (o: LiveMapMountOptions) => Promise<LiveMapHandle>, selectedPlace: LiveMapStageProps["selectedPlace"] = null, extra: Partial<LiveMapStageProps> = {}) {
 	const onStation = vi.fn();
 	const onEvent = vi.fn();
 	const onDeselect = vi.fn();
@@ -76,7 +88,7 @@ function setup(state: LiveMapState, handle = fakeHandle(), mount?: (o: LiveMapMo
 	const loadRenderer = () => Promise.resolve({ mountLiveMap });
 	const view = (s: LiveMapState) => (
 		<I18nProvider>
-			<LiveMapStage state={s} accountEmail="ban@example.com" selectedPlace={selectedPlace} onStation={onStation} onEvent={onEvent} onDeselect={onDeselect} loadAssets={loadAssets} loadRenderer={loadRenderer} />
+			<LiveMapStage state={s} accountEmail="ban@example.com" selectedPlace={selectedPlace} onStation={onStation} onEvent={onEvent} onDeselect={onDeselect} loadAssets={loadAssets} loadRenderer={loadRenderer} {...extra} />
 		</I18nProvider>
 	);
 	const r = render(view(state));
@@ -148,6 +160,82 @@ describe("the Live Map frame", () => {
 		await flush();
 		expect(again.container.textContent).not.toContain("src/app.ts");
 		expect((screen.getByLabelText(t.map.hideDetails) as HTMLInputElement).checked).toBe(true);
+	});
+
+	it("'Ẩn chi tiết' hides an MCP tool's name in the tag, the board and the card", async () => {
+		const mcp = tool("m1", 20, { toolName: "mcp__acme-crm__lookup_customer", mcpServer: "acme-crm", target: "acme-crm › lookup_customer", station: "MCP" });
+		const ended = tool("m0", 5, { toolName: "mcp__acme-crm__list", mcpServer: "acme-crm", target: "acme-crm › list", station: "MCP", success: true, durationMs: 3 });
+		const { state } = played([prompt(1, 0), ended, mcp]);
+		let report: ((c: CameraState) => void) | undefined;
+		const handle = fakeHandle();
+		const { container } = setup(state, handle, (o) => ((report = o.onCamera), Promise.resolve(handle)));
+		await flush();
+		act(() => report?.({ mode: "auto", zone: "mcp", contentZone: "mcp", switches: 1 }));
+		expect(container.querySelector("[data-id=observe-board-mcp]")?.textContent).toContain("mcp__acme-crm__lookup_customer");
+		await userEvent.click(screen.getByLabelText(t.map.hideDetails));
+		expect(container.querySelector("[data-id=observe-tag-mcp] [data-id=observe-working]")?.textContent).toBe(c.detail.kinds.tool);
+		expect(container.querySelector("[data-id=observe-board-mcp]")?.textContent).toContain(`▶ ${c.detail.kinds.tool}`);
+		expect(container.querySelector("[data-id=observe-card-what]")?.textContent).toBe(c.detail.kinds.tool);
+		expect(container.textContent).not.toContain("mcp__");
+		expect(container.textContent).not.toContain("acme-crm");
+	});
+
+	it("focusing a district's button never scrolls the frame and frames the district; leaving the map lets the camera go", async () => {
+		const { state } = played([]);
+		const { handle, container } = setup(state);
+		await flush();
+		const frame = container.querySelector<HTMLElement>(".lm-frame");
+		if (frame === null) throw new Error("no frame");
+		const git = screen.getByRole("button", { name: t.stations.GIT });
+		frame.scrollLeft = 120;
+		frame.scrollTop = 40;
+		act(() => git.focus());
+		expect(handle.peek).toHaveBeenLastCalledWith("git");
+		expect([frame.scrollLeft, frame.scrollTop]).toEqual([0, 0]);
+		// The browser scrolls the clipped frame to show a focused child: it is put back at once.
+		frame.scrollLeft = 300;
+		fireEvent.scroll(frame);
+		expect(frame.scrollLeft).toBe(0);
+		// From one district to the next: the next is framed, the camera is not let go in between.
+		act(() => screen.getByRole("button", { name: t.stations.CORE }).focus());
+		expect(handle.peek).toHaveBeenLastCalledWith("core");
+		expect(handle.peek).not.toHaveBeenCalledWith(null);
+		act(() => screen.getByLabelText(t.map.hideDetails).focus());
+		expect(handle.peek).toHaveBeenLastCalledWith(null);
+	});
+
+	it("a plain wheel scrolls the page; Ctrl or Cmd + wheel zooms, and in free the wheel alone does", async () => {
+		const { state } = played([]);
+		let report: ((c: CameraState) => void) | undefined;
+		const handle = fakeHandle();
+		const { container } = setup(state, handle, (o) => ((report = o.onCamera), Promise.resolve(handle)));
+		await flush();
+		const frame = container.querySelector(".lm-frame");
+		if (frame === null) throw new Error("no frame");
+		const wheel = (init: WheelEventInit): boolean => frame.dispatchEvent(new WheelEvent("wheel", { deltaY: 100, cancelable: true, bubbles: true, ...init }));
+		expect(wheel({})).toBe(true);
+		expect(handle.zoomAt).not.toHaveBeenCalled();
+		expect(wheel({ ctrlKey: true })).toBe(false);
+		expect(wheel({ metaKey: true })).toBe(false);
+		expect(handle.zoomAt).toHaveBeenCalledTimes(2);
+		act(() => report?.({ mode: "free", zone: null, contentZone: null, switches: 0 }));
+		expect(wheel({})).toBe(false);
+		expect(handle.zoomAt).toHaveBeenCalledTimes(3);
+	});
+
+	it("reads live times in the machine's clock: the card's runtime and the renderer's clock", async () => {
+		vi.useFakeTimers({ toFake: ["Date"] });
+		try {
+			// The viewer's clock is 5 s behind the machine's: 2 s after the call started there.
+			vi.setSystemTime(T0 + 20 + 2_000 - 5_000);
+			const { state } = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "SANDBOX" })]);
+			const { container, mounted } = setup(state, fakeHandle(), undefined, null, { clockSkewMs: 5_000 });
+			await flush();
+			expect(container.querySelector("[data-id=observe-card-runtime]")?.textContent).toBe(`${c.card.runtime} 2 s`);
+			expect(mounted[0]?.wallClock?.()).toBe(T0 + 20 + 2_000);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("shows the context as approximate when its window was assumed", async () => {

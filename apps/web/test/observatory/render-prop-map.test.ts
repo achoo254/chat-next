@@ -35,6 +35,15 @@ function moves(events: LiveMapEvent[]) {
 }
 
 describe("moves", () => {
+	it("pulses the Git district for a CI outcome: green, red, or plain when unknown", () => {
+		const tones = moves([lifecycle("ci_finished", "ok", 10, { flag: true }), lifecycle("ci_finished", "bad", 20, { flag: false }), lifecycle("ci_finished", "unknown", 30)]).map((m) => [m.eventId, m.place, m.tone]);
+		expect(tones).toEqual([
+			["event:ok", "git", "success"],
+			["event:bad", "git", "error"],
+			["event:unknown", "git", "normal"],
+		]);
+	});
+
 	it("a call sends a packet out along its district's road and back at its end, red when it failed", () => {
 		const out = moves([prompt(1, 0), tool("r1", 10, { station: "FILES" })]).filter((m) => m.eventId === "tool:r1");
 		expect(out).toEqual([expect.objectContaining({ kind: "packet-out", place: "files", tone: "normal", path: scene.places.files.route })]);

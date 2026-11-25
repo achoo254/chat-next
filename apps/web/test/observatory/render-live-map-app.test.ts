@@ -6,8 +6,9 @@
 // on the scene when no event came for a while, leaves out an atlas that does
 // not load, moves the camera (a drag switches to free and is reported), finds
 // a packet under a click, stops on a lost context and draws again on restore,
+// never holds the full display rate for a run of tool calls or a wait alone,
 // and on destroy removes every listener and destroys the app with its
-// children and textures.
+// children and textures, and the glow texture it drew itself.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveMapMountOptions } from "../../src/machines/observatory/render/live-map-app.ts";
 import { CORE_SPIN_IDLE_MS } from "../../src/machines/observatory/render/prop-map.ts";
@@ -22,6 +23,7 @@ const pixi = vi.hoisted(() => {
 		failInit: false,
 		renders: 0,
 		destroyed: [] as unknown[][],
+		texturesDestroyed: 0,
 		canvas: null as HTMLCanvasElement | null,
 	};
 	/** Any method returns the object itself: Graphics' chained drawing calls. */
@@ -49,7 +51,17 @@ const pixi = vi.hoisted(() => {
 			return this.children.indexOf(c);
 		}
 	}
-	const texture = () => ({ width: 10, height: 10, frame: { x: 0, y: 0, width: 10, height: 10 }, source: {}, destroy: () => {} });
+	const texture = () => ({
+		width: 10,
+		height: 10,
+		frame: { x: 0, y: 0, width: 10, height: 10 },
+		source: {},
+		destroyed: false,
+		destroy() {
+			this.destroyed = true;
+			record.texturesDestroyed += 1;
+		},
+	});
 	class Texture {
 		width = 10;
 		height = 10;
@@ -146,7 +158,7 @@ function options(over: Partial<LiveMapMountOptions> = {}): LiveMapMountOptions {
 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-	Object.assign(pixi.record, { init: null, renderer: "webgl", maxTextureSize: 4096, failInit: false, renders: 0, destroyed: [], canvas: null });
+	Object.assign(pixi.record, { init: null, renderer: "webgl", maxTextureSize: 4096, failInit: false, renders: 0, destroyed: [], texturesDestroyed: 0, canvas: null });
 	frames.queue.clear();
 	frames.now = 0;
 	reduce = true;
@@ -273,6 +285,34 @@ describe("mounting the Live Map", () => {
 		handle.destroy();
 	});
 
+	it("does not hold the full display rate while tool calls run or a permission waits: the ambient rate once settled", async () => {
+		reduce = false;
+		for (const events of [[prompt(1, 0), tool("r1", 10, { station: "SANDBOX" })], [prompt(1, 0), lifecycle("permission_request", "q1", 10, { station: "SANDBOX" })]]) {
+			const handle = await mountLiveMap(options());
+			frames.run(100);
+			const { state, animations } = played(events);
+			handle.update({ ...state, live: null }, animations);
+			// Packets played, the camera moved and settled, the districts faded in.
+			frames.run(8_000);
+			const settled = handle.frames();
+			frames.run(1_000);
+			expect(handle.frames() - settled).toBeLessThanOrEqual(21);
+			handle.destroy();
+		}
+	});
+
+	it("draws nothing while tool calls run under reduced motion, once settled", async () => {
+		const handle = await mountLiveMap(options());
+		frames.run(100);
+		const { state, animations } = played([prompt(1, 0), tool("r1", 10, { station: "SANDBOX" })]);
+		handle.update({ ...state, live: null }, animations);
+		frames.run(8_000);
+		const settled = handle.frames();
+		frames.run(10_000);
+		expect(handle.frames()).toBe(settled);
+		handle.destroy();
+	});
+
 	it("follows the activity with the camera, and a drag switches it to free", async () => {
 		const onCamera = vi.fn();
 		const onView = vi.fn();
@@ -342,6 +382,8 @@ describe("mounting the Live Map", () => {
 		const listened = add.mock.calls.map(([type]) => type);
 		handle.destroy();
 		expect(pixi.record.destroyed).toEqual([[true, { children: true, texture: true, textureSource: true }]]);
+		// The glow texture drawn in code is destroyed by the scene itself (it may sit on no sprite).
+		expect(pixi.record.texturesDestroyed).toBe(1);
 		expect(remove.mock.calls.map(([type]) => type)).toEqual(listened);
 		handle.canvas.dispatchEvent(new Event("webglcontextlost"));
 		expect(onStill).not.toHaveBeenCalled();

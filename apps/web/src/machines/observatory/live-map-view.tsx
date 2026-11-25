@@ -115,13 +115,15 @@ interface MapBodyProps {
 	readonly state: LiveMapState;
 	readonly disconnected: boolean;
 	readonly focus: ObserveFocus | undefined;
+	/** The machine's clock minus the viewer's (ms). */
+	readonly skewMs: number;
 }
 
 /** What the viewer is going to: a moment, an event, or both (a link, a finding's evidence). */
 type Goal = { readonly at?: number; readonly event?: string };
 
 /** One watched session's map with its drawer, detail and replay bar; the view keys it by session, so another session starts clean. */
-function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyProps) {
+function MapBody({ link, machine, online, state, disconnected, focus, skewMs }: MapBodyProps) {
 	const t = useMachinesCopy().observe;
 	// The signed-in account; absent outside the signed-in app (tests of this view alone).
 	const accountEmail = useContext(ServicesContext)?.self.email ?? "";
@@ -206,6 +208,7 @@ function MapBody({ link, machine, online, state, disconnected, focus }: MapBodyP
 						onDeselect={() => setSelected({ place: null, eventId: null })}
 						onHideDetails={setHideDetails}
 						replayAt={replaying ? cursor.at : undefined}
+						clockSkewMs={skewMs}
 						contentSource={contentSource}
 					/>
 					{detail !== null ? (
@@ -273,5 +276,5 @@ export default function LiveMapView({ link, machine, info, online, target, focus
 		return <Note text={failureText(t, watched.failure)} retry={again ? watched.retry : undefined} />;
 	}
 	if (watched.state === null) return online ? <SessionLoading label={t.loading} /> : <Note text={t.offline} />;
-	return <MapBody key={watched.state.sessionId} link={link} machine={machine} online={online} state={watched.state} disconnected={watched.disconnected} focus={focus} />;
+	return <MapBody key={watched.state.sessionId} link={link} machine={machine} online={online} state={watched.state} disconnected={watched.disconnected} focus={focus} skewMs={watched.skewMs} />;
 }

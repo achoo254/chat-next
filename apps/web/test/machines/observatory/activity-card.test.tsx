@@ -3,7 +3,9 @@
 // indeterminate bar while a call runs (no percentage), the output pending
 // while it runs, the description and last output line asked by id once it
 // ended (and not asked at all with "Ẩn chi tiết", the reason said instead),
-// "content off" for a project that stores none, the journey and "Xem chi tiết".
+// "content off" for a project that stores none, MCP names hidden with "Ẩn chi
+// tiết", a status for screen readers that changes only with the subject, the
+// journey and "Xem chi tiết".
 import { create } from "@bufbuild/protobuf";
 import { ObservatoryContentResultSchema, ObservatoryContentState } from "@achoo254/chat-proto/remote/remote";
 import { act, render, screen } from "@testing-library/react";
@@ -110,6 +112,44 @@ describe("the activity card", () => {
 		const idle = show(played([prompt(1, 0), bash(10, { ok: true, took: 100 }), lifecycle("stop", "s", 200)]).state, T0 + 60_000);
 		expect(idle.text("observe-card-status")).toBe(c.card.status.idle);
 		expect(idle.text("observe-card-desc")).toBe(c.card.lastJob("Bash pnpm", true, "100 ms"));
+	});
+
+	it("with Ẩn chi tiết, never shows an MCP tool's name: running, done and as the idle card's last job", () => {
+		const mcp = (end?: { ok: boolean; took: number }) =>
+			tool("m1", 10, { toolName: "mcp__acme-crm__lookup_customer", mcpServer: "acme-crm", target: "acme-crm › lookup_customer", station: "MCP", ...(end === undefined ? {} : { success: end.ok, durationMs: end.took }) });
+		const running = show(played([prompt(1, 0), mcp()]).state, T0 + 1_010, { hide: true });
+		expect(running.text("observe-card-what")).toBe(c.detail.kinds.tool);
+		expect(running.container.textContent).not.toContain("acme-crm");
+		running.unmount();
+		const idle = show(played([prompt(1, 0), mcp({ ok: true, took: 100 }), lifecycle("stop", "s", 200)]).state, T0 + 60_000, { hide: true });
+		expect(idle.text("observe-card-desc")).toBe(c.card.lastJob(c.detail.kinds.tool, true, "100 ms"));
+		expect(idle.container.textContent).not.toContain("acme-crm");
+		idle.unmount();
+		// Shown, the name is there; a built-in tool keeps its own name when hidden.
+		const shown = show(played([prompt(1, 0), mcp()]).state, T0 + 1_010);
+		expect(shown.text("observe-card-what")).toContain("mcp__acme-crm__lookup_customer");
+		shown.unmount();
+		expect(show(played([prompt(1, 0), bash(10)]).state, T0 + 1_010, { hide: true }).text("observe-card-what")).toBe("Bash");
+	});
+
+	it("names a subagent of an unknown type from the copy, and says its status to screen readers only when the subject changes", () => {
+		const sub = played([prompt(1, 0), tool("x1", 10, { toolName: "Bash", station: "SANDBOX", agentId: "agent-1" })]);
+		const { text, container, rerender } = show(sub.state, T0 + 1_000);
+		expect(text("observe-card-kind")).toContain(c.card.subagentUnknown);
+		const card = container.querySelector("[data-id=observe-card]");
+		expect(card?.hasAttribute("aria-live")).toBe(false);
+		const live = container.querySelector("[data-id=observe-card-live]");
+		expect(live?.getAttribute("role")).toBe("status");
+		const spoken = live?.textContent;
+		// The runtime ticks; the spoken status does not.
+		rerender(
+			<I18nProvider>
+				<ActivityCard card={activityCardOf(sub.state, T0 + 5_000)} names={names} hide={false} source={null} onDetail={() => undefined} />
+			</I18nProvider>,
+		);
+		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 5 s`);
+		expect(container.querySelector("[data-id=observe-card-live]")?.textContent).toBe(spoken);
+		expect(spoken).not.toContain("5 s");
 	});
 
 	it("shows the journey and opens the event's detail", async () => {

@@ -7,19 +7,24 @@
 // road figures, the pipeline's steps, the board of the district in view), the
 // camera's modes, the overview map and the legend.
 //
-// Camera: auto follows the AI; a drag, a wheel or a pinch switches to free;
-// a click on a district selects it (its drawer opens as before) and switches
-// to focus; a click on empty ground clears the selection and goes back to
-// auto. A click on a moving packet opens its source event. When neither WebGL
+// Camera: auto follows the AI; a drag, a pinch or Ctrl/⌘ + wheel switches to
+// free, where the wheel alone zooms too (elsewhere a plain wheel scrolls the
+// page past the map); a click on a district selects it (its drawer opens as
+// before) and switches to focus; a click on empty ground clears the selection
+// and goes back to auto. Tab onto a district's button frames it (the camera
+// leans to it, and the frame never scrolls under the canvas); Enter selects
+// it. A click on a moving packet opens its source event. Live times read in
+// the machine's clock (machine-clock.ts). When neither WebGL
 // nor Canvas can draw, or the GPU context is lost, the plate shows as a still
 // picture with the same tags and buttons (the camera then stays on the whole
 // scene).
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type MouseEvent, type PointerEvent } from "react";
 import { activityCardOf, DONE_HOLD_MS } from "../activity-card-model.ts";
 import { ActivityCard } from "../activity-card.tsx";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import { useObservatoryCopy } from "../observatory-copy.ts";
 import { placeNames } from "../place-names.ts";
+import { machineNow } from "../machine-clock.ts";
 import { useTickingNow, type ContentSource } from "../use-tool-content.ts";
 import { useMachinesCopy } from "../../use-machines-copy.ts";
 import "../live-map.css";
@@ -51,6 +56,8 @@ export interface LiveMapStageProps {
 	readonly onHideDetails?: (hide: boolean) => void;
 	/** The replayed moment (machine ms); absent while live. */
 	readonly replayAt?: number | undefined;
+	/** The machine's clock minus the viewer's (ms): live times are compared with the machine's now (machine-clock.ts). */
+	readonly clockSkewMs?: number | undefined;
 	/** Where the card and boards may ask a call's content; absent: they say it is not available. */
 	readonly contentSource?: ContentSource | undefined;
 	/** Test seams: the asset loader and the renderer's module. */
@@ -133,7 +140,7 @@ function applyView(world: HTMLElement | null, minimapView: HTMLElement | null, p
 
 const AUTO: CameraState = { mode: "auto", zone: null, contentZone: null, switches: 0 };
 
-export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, onEvent, onDeselect, onHideDetails, replayAt, contentSource, loadAssets = defaultAssets, loadRenderer = defaultRenderer }: LiveMapStageProps) {
+export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, onEvent, onDeselect, onHideDetails, replayAt, clockSkewMs = 0, contentSource, loadAssets = defaultAssets, loadRenderer = defaultRenderer }: LiveMapStageProps) {
 	const observe = useMachinesCopy().observe;
 	const t = observe.map;
 	const c = useObservatoryCopy();
@@ -153,10 +160,12 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 	const handle = useRef<LiveMapHandle | null>(null);
 	const played = useRef(new WeakSet<Animation>());
 	const latest = useRef(state);
+	const skew = useRef(clockSkewMs);
 	const onEventRef = useRef(onEvent);
 	const gesture = useRef<{ pointers: Map<number, { x: number; y: number }>; moved: boolean; start: { x: number; y: number } | null; suppressClick: boolean }>({ pointers: new Map(), moved: false, start: null, suppressClick: false });
 	useEffect(() => {
 		latest.current = state;
+		skew.current = clockSkewMs;
 		onEventRef.current = onEvent;
 	});
 
@@ -201,6 +210,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 					height: mountSize.current.height,
 					saveData: saveData(),
 					reduceMotion,
+					wallClock: () => machineNow(Date.now(), skew.current),
 					record,
 					onBatch: (place, count) => setBatches((b) => ({ ...b, [place]: count ?? undefined })),
 					onView: (p, view) => applyView(world.current, minimapView.current, p, view, assets.scene.space),
@@ -267,12 +277,18 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 		if (selectedPlace === null && camera.mode === "focus") handle.current?.setCameraMode("auto");
 	}, [selectedPlace, camera.mode, status]);
 
-	// Wheel zooms the scene (not the page): a native listener, React's is passive.
+	// Ctrl/⌘ + wheel zooms the scene (and switches to free); in free the wheel alone does. Otherwise the page scrolls.
+	// A native listener: React's is passive.
+	const cameraMode = useRef(camera.mode);
+	useEffect(() => {
+		cameraMode.current = camera.mode;
+	});
 	useEffect(() => {
 		if (frame === null) return;
 		const onWheel = (e: globalThis.WheelEvent): void => {
 			const h = handle.current;
 			if (h === null) return;
+			if (!e.ctrlKey && !e.metaKey && cameraMode.current !== "free") return;
 			e.preventDefault();
 			const r = frame.getBoundingClientRect();
 			h.zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
@@ -284,7 +300,9 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 	const look = useMemo(() => (assets === null ? null : lookOf(state, assets.scene)), [state, assets]);
 	const busy = look !== null && look.mode !== "idle";
 	// Live: the clock ticks while the AI works; a finished call's hold is read again once it is over.
-	const tick = useTickingNow(replayAt === undefined && busy, state, DONE_HOLD_MS + 50);
+	// A CI run's timer ticks too (it runs after Claude's turn), and it turns unknown once stale.
+	const ciRunning = look !== null && look.pipeline.steps.ci.status === "run";
+	const tick = useTickingNow(replayAt === undefined && (busy || ciRunning), state, DONE_HOLD_MS + 50, clockSkewMs);
 	const now = replayAt ?? tick;
 	const card = activityCardOf(state, now);
 	const active = useMemo(() => new Set(look === null ? [] : PLACE_IDS.filter((p) => look.places[p].active)), [look]);
@@ -346,6 +364,26 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 			g.start = null;
 			g.moved = false;
 		}
+	};
+
+	// The frame clips the scene (overflow hidden): focusing a button near its edge would scroll it and shift the DOM
+	// layer off the canvas. It never scrolls; the camera frames the focused district instead.
+	const keepUnscrolled = (el: HTMLElement): void => {
+		if (el.scrollLeft !== 0) el.scrollLeft = 0;
+		if (el.scrollTop !== 0) el.scrollTop = 0;
+	};
+	const hitPlace = (target: EventTarget | null): PlaceId | null => {
+		if (!(target instanceof HTMLElement) || !target.classList.contains("lm-hit")) return null;
+		return PLACE_IDS.find((p) => p === target.dataset.place) ?? null;
+	};
+	const onFocus = (e: FocusEvent<HTMLDivElement>): void => {
+		keepUnscrolled(e.currentTarget);
+		const place = hitPlace(e.target);
+		if (place !== null) handle.current?.peek(place);
+	};
+	const onBlur = (e: FocusEvent<HTMLDivElement>): void => {
+		// Moving to another district's button: its own focus frames it.
+		if (hitPlace(e.target) !== null && hitPlace(e.relatedTarget) === null) handle.current?.peek(null);
 	};
 
 	const onClick = (e: MouseEvent<HTMLDivElement>): void => {
@@ -410,6 +448,9 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 				className="lm-frame"
 				ref={setFrame}
 				onClick={onClick}
+				onFocus={onFocus}
+				onBlur={onBlur}
+				onScroll={(e) => keepUnscrolled(e.currentTarget)}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={onPointerEnd}

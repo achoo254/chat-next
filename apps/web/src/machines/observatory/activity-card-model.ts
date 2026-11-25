@@ -35,9 +35,11 @@ export interface CardCall {
 	readonly place: PlaceId;
 	/** The release step it is, if one (a GIT call). */
 	readonly step: ReleaseStep | null;
-	/** The subagent's type; "" for the main agent. */
-	readonly agent: string;
+	/** The subagent's type; null for the main agent, "" for a subagent whose type is not known. */
+	readonly agent: string | null;
 	readonly tool: string;
+	/** The MCP server of an MCP tool (its name then names the server); "" otherwise. */
+	readonly mcpServer: string;
 	/** The filtered target (a file, a command's program, a domain); "" when none. */
 	readonly target: string;
 	readonly running: boolean;
@@ -72,7 +74,8 @@ export interface ActivityCard {
 	readonly ticking: boolean;
 }
 
-const agentTypeOf = (state: LiveMapState, agentId: string): string => (agentId === "" ? "" : state.scene.subagents[agentId]?.agentType || "subagent");
+/** The type of the subagent that made a call: null for the main agent, "" when its type is not known (the view names it). */
+export const agentTypeOf = (state: LiveMapState, agentId: string): string | null => (agentId === "" ? null : (state.scene.subagents[agentId]?.agentType ?? ""));
 
 function cardCall(state: LiveMapState, calls: readonly ToolCall[], c: ToolCall, now: number): CardCall {
 	const running = c.endAt === undefined;
@@ -85,6 +88,7 @@ function cardCall(state: LiveMapState, calls: readonly ToolCall[], c: ToolCall, 
 		step: c.steps[c.steps.length - 1] ?? null,
 		agent: agentTypeOf(state, c.event.agentId),
 		tool: c.event.toolName,
+		mcpServer: c.event.mcpServer,
 		target: c.event.target,
 		running,
 		ok: c.ok,

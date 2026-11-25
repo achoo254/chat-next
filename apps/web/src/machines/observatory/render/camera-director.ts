@@ -12,9 +12,13 @@
 //   does not pull back to the core; a longer one does), and an idle session
 //   keeps the last view IDLE_MS before going back to the whole scene. Every
 //   move is counted (`switches`).
-// - free: the person pans (drag) and zooms (wheel, pinch) between 1 and
+// - free: the person pans (drag) and zooms (Ctrl/⌘ + wheel, pinch) between 1 and
 //   MAX_ZOOM; a drag or a zoom in another mode switches to free.
 // - focus: locked on the selected place, zoomed closer.
+//
+// A district the keyboard is on (peek) is framed instead while it is, in auto
+// and focus (free stays where the person put it), so a focused button is
+// always in view.
 //
 // The view eases toward its target with a time constant of EASE_MS; with
 // reduced motion it jumps.
@@ -130,6 +134,7 @@ export class CameraDirector {
 	private readonly scene: SceneTable;
 	private modeNow: CameraMode = "auto";
 	private selectedPlace: PlaceId | null = null;
+	private peekPlace: PlaceId | null = null;
 	private zoneNow: PlaceId | null = null;
 	private zoneSince = -Infinity;
 	/** The raw activity zone and since when (auto's candidate). */
@@ -182,6 +187,16 @@ export class CameraDirector {
 		this.selectedPlace = place;
 	}
 
+	/** The district the keyboard is on (null: none). */
+	get peeked(): PlaceId | null {
+		return this.peekPlace;
+	}
+
+	/** Frames `place` while the keyboard is on it (null: back to the mode's own target). */
+	peek(place: PlaceId | null): void {
+		this.peekPlace = place;
+	}
+
 	/** Moves the view by (dx, dy) scene px (a drag); switches to free. */
 	pan(dx: number, dy: number): void {
 		this.setMode("free");
@@ -204,7 +219,8 @@ export class CameraDirector {
 		this.lastStep = now;
 		const wakeAt = this.follow(activityZone(activity), now);
 		if (this.modeNow === "free") return { view: this.viewNow, settled: true, zone: this.zoneNow, wakeAt: null };
-		const target = this.modeNow === "focus" ? viewFor(this.scene, this.selectedPlace ?? "core", true) : viewFor(this.scene, this.zoneNow, false);
+		const focus = this.modeNow === "focus";
+		const target = this.peekPlace !== null ? viewFor(this.scene, this.peekPlace, focus) : focus ? viewFor(this.scene, this.selectedPlace ?? "core", true) : viewFor(this.scene, this.zoneNow, false);
 		const k = reduceMotion ? 1 : 1 - Math.exp(-dt / EASE_MS);
 		const v = this.viewNow;
 		const next = clampView(this.scene, { x: v.x + (target.x - v.x) * k, y: v.y + (target.y - v.y) * k, s: v.s + (target.s - v.s) * k });

@@ -147,7 +147,9 @@ export function movesOf(anim: Animation, event: LiveMapEvent | undefined, scene:
 					pulse("git");
 					return moves;
 				case "ci_finished":
-					pulse("git", event.flag === false ? "error" : "success");
+					// No flag: the outcome is not known, a plain pulse.
+					if (event.flag === undefined) pulse("git");
+					else pulse("git", event.flag ? "success" : "error");
 					return moves;
 				default:
 					pulse("core");
@@ -267,7 +269,8 @@ function roadsOf(state: LiveMapState, scene: SceneTable, calls: readonly ToolCal
 	return out;
 }
 
-export function lookOf(state: LiveMapState, scene: SceneTable): SceneLook {
+/** The look of `state`; with `now` (machine ms), a CI run with no news for too long reads as unknown (pipeline-model.ts). */
+export function lookOf(state: LiveMapState, scene: SceneTable, now?: number): SceneLook {
 	const mode = modeOf(state);
 	const calls = toolCalls(state);
 	const running = runningCalls(state);
@@ -301,7 +304,7 @@ export function lookOf(state: LiveMapState, scene: SceneTable): SceneLook {
 		drones,
 		contextPercent: state.live?.contextPercent ?? null,
 		tokensPerSecond: state.live?.tokensPerSecond ?? state.scene.tokensPerSecond,
-		pipeline: pipelineOf(state.log),
+		pipeline: pipelineOf(state.log, now),
 		thinkingFor: mode === "think" && newest !== undefined ? newest.id : null,
 	};
 }

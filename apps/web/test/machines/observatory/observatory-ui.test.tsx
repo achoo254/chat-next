@@ -108,7 +108,7 @@ describe("the Observe tab", () => {
 
 describe("the watched session's sink", () => {
 	it("follows the snapshot, waits for it before events, and asks again on a gap", () => {
-		let held: Held = { state: null, failure: null, disconnected: false };
+		let held: Held = { state: null, failure: null, disconnected: false, skewMs: 0 };
 		const sink = sessionSink((change) => {
 			held = change(held);
 		});

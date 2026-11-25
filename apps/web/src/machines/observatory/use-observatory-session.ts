@@ -2,11 +2,15 @@
 // (useThreadSessions), the session's state as the machine sends it
 // (useObservatorySession: a snapshot, then events by the device-side rules of
 // docs/observatory-wire.md section 2, through live-map-state.ts), and what
-// the viewer asks of it: an event's content, a station's numbers. The watch
+// the viewer asks of it: an event's content, a station's numbers. The
+// machine's clock against the viewer's is estimated from the events pushed
+// live (machine-clock.ts), so times compared with "now" read in the machine's
+// clock. The watch
 // lives exactly as long as the component using it: leaving the tab unmounts
 // it and stops watching, nothing is kept mounted while hidden.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyEvents, fromSnapshot, type LiveMapState } from "./live-map-state.ts";
+import { refineSkew } from "./machine-clock.ts";
 import type { LiveMapContent, LiveMapSessionInfo, StationDrill } from "./live-map-types.ts";
 import { eventContent, failureOf, stationDrill, threadSessions, watchSession, type ObservatoryFailure, type ObservatoryLink, type ObservatoryWatch, type WatchOptions, type WatchSink } from "./observatory-client.ts";
 
@@ -17,6 +21,8 @@ export interface ObservatorySession {
 	readonly failure: ObservatoryFailure | null;
 	/** The link has been down for OFFLINE_NOTICE_MS. */
 	readonly disconnected: boolean;
+	/** The machine's clock minus the viewer's (ms), estimated from the events pushed live; 0 before any. */
+	readonly skewMs: number;
 	/** Ask again after a refusal. */
 	readonly retry: () => void;
 }
@@ -25,17 +31,21 @@ export interface Held {
 	readonly state: LiveMapState | null;
 	readonly failure: ObservatoryFailure | null;
 	readonly disconnected: boolean;
+	/** See ObservatorySession.skewMs. */
+	readonly skewMs: number;
 }
 
-const NOTHING: Held = { state: null, failure: null, disconnected: false };
+const NOTHING: Held = { state: null, failure: null, disconnected: false, skewMs: 0 };
 
 /**
  * Where a watch's frames go: the state follows the snapshot and the events,
- * and every change is handed to `publish`. Events before the first snapshot
- * wait for it (the watch asking for it is in flight).
+ * and every change is handed to `publish`; the events pushed live refine the
+ * clock skew (read with `clock`, the viewer's). Events before the first
+ * snapshot wait for it (the watch asking for it is in flight).
  */
-export function sessionSink(publish: (change: (held: Held) => Held) => void): WatchSink {
+export function sessionSink(publish: (change: (held: Held) => Held) => void, clock: () => number = Date.now): WatchSink {
 	let state: LiveMapState | null = null;
+	let skew: number | null = null;
 	return {
 		snapshot(snapshot) {
 			const next = fromSnapshot(snapshot);
@@ -44,11 +54,15 @@ export function sessionSink(publish: (change: (held: Held) => Held) => void): Wa
 		},
 		events(epoch, events) {
 			if (state === null) return "ok";
+			const refined = refineSkew(skew, events, clock());
+			const skewChanged = refined !== skew;
+			skew = refined;
+			const skewMs = skew ?? 0;
 			const result = applyEvents(state, epoch, events);
-			if (result.state !== state) {
+			if (result.state !== state || skewChanged) {
 				const next = result.state;
 				state = next;
-				publish((held) => ({ ...held, state: next }));
+				publish((held) => ({ ...held, state: next, skewMs }));
 			}
 			return result.needSnapshot ? "need-snapshot" : "ok";
 		},

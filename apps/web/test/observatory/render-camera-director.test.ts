@@ -3,7 +3,8 @@
 // think longer than 1.2 s after a call's END goes back to the core, the
 // prototype's stuck-on-the-portal bug); idle goes back to the whole scene
 // after 3 s; a drag or a zoom switches to free; focus locks on the
-// selection; reduced motion jumps instead of easing; the wake time is told.
+// selection; a district the keyboard is on is framed; reduced motion jumps
+// instead of easing; the wake time is told.
 import { describe, expect, it } from "vitest";
 import { activityZone, CameraDirector, HOLD_MS, IDLE_MS, MAX_ZOOM, STABLE_MS, THINK_HOLD_MS, viewFor, type Activity } from "../../src/machines/observatory/render/camera-director.ts";
 import type { PlaceId } from "../../src/machines/observatory/render/scene-table.ts";
@@ -169,5 +170,29 @@ describe("free and focus", () => {
 		cam.setMode("auto");
 		run(cam, exec("files"), 1_000, 2_000, true);
 		expect(cam.zone).toBe("files");
+	});
+});
+
+describe("a district the keyboard is on", () => {
+	it("is framed in auto and in focus, not in free, and the mode's own target comes back once it goes", () => {
+		const cam = new CameraDirector(scene);
+		cam.peek("git");
+		expect(cam.peeked).toBe("git");
+		run(cam, IDLE, 0, 3_000, true);
+		expect(cam.view).toEqual(viewFor(scene, "git", false));
+		// Auto's own zone does not move meanwhile: the person's focus only leans the view.
+		expect(cam.zone).toBeNull();
+		cam.peek(null);
+		run(cam, IDLE, 3_000, 3_100, true);
+		expect(cam.view).toEqual(viewFor(scene, null, false));
+		cam.select("files");
+		cam.setMode("focus");
+		cam.peek("git");
+		run(cam, IDLE, 3_100, 3_200, true);
+		expect(cam.view).toEqual(viewFor(scene, "git", true));
+		cam.pan(10, 0);
+		const free = cam.view;
+		run(cam, IDLE, 3_200, 3_300, true);
+		expect(cam.view).toEqual(free);
 	});
 });

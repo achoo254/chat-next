@@ -69,8 +69,8 @@ export function drawRoads(g: Graphics, roads: readonly RoadLook[], palette: Pale
 	}
 }
 
-/** A step's colour by state; null: the Git district's own (running). */
-const STEP_TONE: Readonly<Record<StepStatus, "success" | "error" | "muted" | null>> = { idle: "muted", run: null, ok: "success", err: "error" };
+/** A step's colour by state; null: the Git district's own (running). An unknown outcome is muted but outlined like an ended step. */
+const STEP_TONE: Readonly<Record<StepStatus, "success" | "error" | "muted" | null>> = { idle: "muted", run: null, ok: "success", err: "error", unknown: "muted" };
 
 /** The release pipeline: a slot per step tinted by its state, a sweep on a running one, the prod light. */
 export function drawPipeline(g: Graphics, scene: SceneTable, pipeline: Pipeline, palette: Palette, t: number, flow: boolean): void {

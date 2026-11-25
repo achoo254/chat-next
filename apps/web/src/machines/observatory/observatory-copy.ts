@@ -96,6 +96,8 @@ export interface ObservatoryCopy {
 		readonly idleKind: string;
 		readonly steps: Readonly<Record<"commit" | "push" | "ci" | "deploy", string>>;
 		readonly subagent: (type: string) => string;
+		/** A subagent whose type is not known. */
+		readonly subagentUnknown: string;
 		readonly runtime: string;
 		readonly waited: string;
 		readonly p95: string;
@@ -152,6 +154,8 @@ export interface ObservatoryCopy {
 		readonly noSubagent: string;
 		readonly subagentRunning: string;
 		readonly workflows: (n: number) => string;
+		/** A CI step whose outcome is not known (the machine stopped following it, or it ran too long without news). */
+		readonly ciUnknown: string;
 		readonly prod: string;
 		readonly waitingFor: (what: string) => string;
 		readonly prompts: (n: number) => string;
@@ -268,6 +272,7 @@ const vi: ObservatoryCopy = {
 		idleKind: "Rảnh",
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		subagent: (type) => `subagent ${type}`,
+		subagentUnknown: "subagent",
 		runtime: "Runtime",
 		waited: "Đã chờ",
 		p95: "p95 lịch sử",
@@ -322,6 +327,7 @@ const vi: ObservatoryCopy = {
 		noSubagent: "không có subagent nào đang chạy",
 		subagentRunning: "đang chạy",
 		workflows: (n) => `${n} workflow`,
+		ciUnknown: "không rõ kết quả",
 		prod: "prod",
 		waitingFor: (what) => (what === "" ? "chờ bạn cấp quyền" : `chờ quyền: ${what}`),
 		prompts: (n) => `${n} prompt`,
@@ -451,6 +457,7 @@ const en: ObservatoryCopy = {
 		idleKind: "Idle",
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		subagent: (type) => `subagent ${type}`,
+		subagentUnknown: "subagent",
 		runtime: "Runtime",
 		waited: "Waited",
 		p95: "p95 history",
@@ -505,6 +512,7 @@ const en: ObservatoryCopy = {
 		noSubagent: "no subagent running",
 		subagentRunning: "running",
 		workflows: (n) => `${n} workflows`,
+		ciUnknown: "outcome unknown",
 		prod: "prod",
 		waitingFor: (what) => (what === "" ? "waiting for your permission" : `waiting for permission: ${what}`),
 		prompts: (n) => `${n} prompts`,
@@ -634,6 +642,7 @@ const zhCN: ObservatoryCopy = {
 		idleKind: "空闲",
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		subagent: (type) => `子代理 ${type}`,
+		subagentUnknown: "子代理",
 		runtime: "运行时间",
 		waited: "已等待",
 		p95: "历史 p95",
@@ -688,6 +697,7 @@ const zhCN: ObservatoryCopy = {
 		noSubagent: "没有正在运行的子代理",
 		subagentRunning: "运行中",
 		workflows: (n) => `${n} 个工作流`,
+		ciUnknown: "结果未知",
 		prod: "prod",
 		waitingFor: (what) => (what === "" ? "等待你授权" : `等待授权：${what}`),
 		prompts: (n) => `${n} 个提示`,

@@ -7,6 +7,7 @@
 // permission lock, what waits; for the input port, the prompt count. The
 // newest ended call is also the one whose output line the board may show
 // (content, asked by id).
+import { agentTypeOf } from "./activity-card-model.ts";
 import { coreStateOf, runningCalls, toolCalls, type ToolCall } from "./call-history.ts";
 import type { LiveMapState } from "./live-map-state.ts";
 import { STATION_PLACE, type PlaceId } from "./render/scene-table.ts";
@@ -15,10 +16,12 @@ import { STATION_CODES } from "./station-catalog.ts";
 export interface BoardRow {
 	readonly eventId: string;
 	readonly tool: string;
+	/** The MCP server of an MCP tool; "" otherwise. */
+	readonly mcpServer: string;
 	/** Filtered target; "" when none. */
 	readonly target: string;
-	/** The subagent's type; "" for the main agent. */
-	readonly agent: string;
+	/** The subagent's type; null for the main agent, "" for a subagent whose type is not known. */
+	readonly agent: string | null;
 	readonly running: boolean;
 	readonly ok: boolean | undefined;
 	readonly runtimeMs: number;
@@ -27,6 +30,7 @@ export interface BoardRow {
 export type DistrictBoard =
 	| { readonly kind: "calls"; readonly rows: readonly BoardRow[]; readonly lastEnded: string | null }
 	| { readonly kind: "model"; readonly apiTurns: number; readonly contextPercent: number | null; readonly tokensPerSecond: number | null; readonly model: string }
+	/** The running subagents' types ("" when not known: the view names it). */
 	| { readonly kind: "subagents"; readonly running: readonly string[] }
 	| { readonly kind: "context"; readonly percent: number | null; readonly tokens: number; readonly window: number }
 	| { readonly kind: "permission"; readonly waiting: boolean; readonly what: string }
@@ -39,8 +43,9 @@ function row(state: LiveMapState, c: ToolCall, now: number): BoardRow {
 	return {
 		eventId: c.event.id,
 		tool: c.event.toolName,
+		mcpServer: c.event.mcpServer,
 		target: c.event.target,
-		agent: c.event.agentId === "" ? "" : state.scene.subagents[c.event.agentId]?.agentType || "subagent",
+		agent: agentTypeOf(state, c.event.agentId),
 		running,
 		ok: c.ok,
 		runtimeMs: Math.max(0, running ? now - c.event.at : (c.event.durationMs ?? 0)),
@@ -58,7 +63,7 @@ export function districtBoardOf(state: LiveMapState, place: PlaceId, now: number
 				model: state.live?.mainModel || state.scene.model,
 			};
 		case "orchestrator":
-			return { kind: "subagents", running: Object.values(state.scene.subagents).filter((s) => s.running).map((s) => s.agentType || "subagent") };
+			return { kind: "subagents", running: Object.values(state.scene.subagents).filter((s) => s.running).map((s) => s.agentType) };
 		case "monitoring":
 			return { kind: "context", percent: state.live?.contextPercent ?? null, tokens: state.live?.contextTokens ?? 0, window: state.live?.contextWindow ?? 0 };
 		case "security": {

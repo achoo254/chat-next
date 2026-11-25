@@ -7,16 +7,16 @@
 // mixed), the release pipeline's step names and times on the Git district,
 // and the holographic board over the district in view with its live content.
 // "Ẩn chi tiết" hides every name the privacy filter kept (files, commands,
-// domains, MCP tools, the account's email).
+// domains, MCP tools through drill-format.ts toolName, the account's email).
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { RELEASE_STEPS } from "../call-history.ts";
 import type { MachinesCopy } from "../../copy-vi.ts";
 import { districtBoardOf, type BoardRow } from "../district-board-model.ts";
-import { duration } from "../drill-format.ts";
+import { duration, toolName } from "../drill-format.ts";
 import { coreOf, type LiveMapState } from "../live-map-state.ts";
 import type { LiveMapEvent } from "../live-map-types.ts";
 import type { ObservatoryCopy } from "../observatory-copy.ts";
-import type { Pipeline } from "../pipeline-model.ts";
+import { pipelineAt, type Pipeline } from "../pipeline-model.ts";
 import { stationAtPlace } from "../place-names.ts";
 import { useToolContent, type ContentSource } from "../use-tool-content.ts";
 import { holoPanelRect, lookOf, pipelineSlots, type RoadLook } from "./prop-map.ts";
@@ -72,8 +72,10 @@ interface Tag {
 	readonly facts: readonly string[];
 	/** A name the filter kept (hidden by "Ẩn chi tiết"). */
 	readonly detail: string;
-	/** The tool at work there now, with its target when shown. */
-	readonly working: string;
+	/** The tool at work there now (null: none), how many more run there, and its target. */
+	readonly working: { readonly tool: string; readonly mcpServer: string } | null;
+	/** Calls running there: more than one adds "+n". */
+	readonly runningCount: number;
 	readonly workingTarget: string;
 	readonly bottleneck: "none" | "warn" | "alert";
 }
@@ -94,10 +96,11 @@ function tagsOf(state: LiveMapState, observe: MachinesCopy["observe"], accountEm
 	return PLACE_IDS.map((place): Tag => {
 		const station = stationAtPlace(place);
 		if (station === null) {
-			if (place === "user-desk") return { place, facts: prompts > 0 ? [t.prompt(prompts)] : [], detail: accountEmail, working: "", workingTarget: "", bottleneck: "none" };
-			if (place === "security") return { place, facts: waiting > 0 ? [t.waiting(waiting)] : [], detail: "", working: "", workingTarget: "", bottleneck: "none" };
+			const none = { working: null, runningCount: 0, workingTarget: "", bottleneck: "none" } as const;
+			if (place === "user-desk") return { place, facts: prompts > 0 ? [t.prompt(prompts)] : [], detail: accountEmail, ...none };
+			if (place === "security") return { place, facts: waiting > 0 ? [t.waiting(waiting)] : [], detail: "", ...none };
 			const assumed = state.live?.contextWindowAssumed === true;
-			return { place, facts: percent === null ? [] : [assumed ? t.contextApprox(Math.round(percent)) : t.context(Math.round(percent))], detail: "", working: "", workingTarget: "", bottleneck: "none" };
+			return { place, facts: percent === null ? [] : [assumed ? t.contextApprox(Math.round(percent)) : t.context(Math.round(percent))], detail: "", ...none };
 		}
 		const st = s.stations[station];
 		const facts: string[] = [];
@@ -111,10 +114,28 @@ function tagsOf(state: LiveMapState, observe: MachinesCopy["observe"], accountEm
 		if (station === "SANDBOX" && s.backgroundShells.size > 0) facts.push(t.shells(s.backgroundShells.size));
 		const last = st.last === null ? undefined : byId.get(st.last);
 		const first = st.running.length === 0 ? undefined : byId.get(st.running[0] ?? "");
-		const more = st.running.length > 1 ? ` +${st.running.length - 1}` : "";
-		const working = first?.kind === "tool" ? `${first.toolName}${more}` : st.running.length > 0 ? `+${st.running.length}` : "";
-		return { place, facts, detail: last?.kind === "tool" ? last.target : "", working, workingTarget: first?.kind === "tool" ? first.target : "", bottleneck: st.bottleneck };
+		const working = first?.kind === "tool" ? { tool: first.toolName, mcpServer: first.mcpServer } : null;
+		return { place, facts, detail: last?.kind === "tool" ? last.target : "", working, runningCount: st.running.length, workingTarget: first?.kind === "tool" ? first.target : "", bottleneck: st.bottleneck };
 	});
+}
+
+/** A tag's "at work" line ("" when nothing runs there): the tool (hidden details: no MCP name, no target), "+n" for more. */
+function workingText(c: ObservatoryCopy, tag: Tag, hide: boolean): string {
+	if (tag.working === null) return tag.runningCount > 0 ? `+${tag.runningCount}` : "";
+	const more = tag.runningCount > 1 ? ` +${tag.runningCount - 1}` : "";
+	const tool = `${toolName(c, tag.working.tool, tag.working.mcpServer, hide)}${more}`;
+	return !hide && tag.workingTarget !== "" ? `${tool} · ${tag.workingTarget}` : tool;
+}
+
+/** Who made a board row's call: "" for the main agent. */
+function agentPrefix(c: ObservatoryCopy, agent: string | null): string {
+	if (agent === null) return "";
+	return `${agent === "" ? c.card.subagentUnknown : agent} › `;
+}
+
+function rowText(c: ObservatoryCopy, r: BoardRow, hide: boolean): string {
+	const tool = toolName(c, r.tool, r.mcpServer, hide);
+	return `${r.running ? "▶ " : ""}${agentPrefix(c, r.agent)}${hide || r.target === "" ? tool : `${tool} ${r.target}`}`;
 }
 
 function roadFigures(c: ObservatoryCopy, road: RoadLook, now: number): string {
@@ -124,11 +145,6 @@ function roadFigures(c: ObservatoryCopy, road: RoadLook, now: number): string {
 	if (road.p95Ms !== null) parts.push(c.board.p95(duration(c, road.p95Ms)));
 	if (road.failures > 0) parts.push(c.board.failures(road.failures));
 	return parts.join(" · ");
-}
-
-function rowText(r: BoardRow, hide: boolean): string {
-	const who = r.agent === "" ? "" : `${r.agent} › `;
-	return `${r.running ? "▶ " : ""}${who}${hide || r.target === "" ? r.tool : `${r.tool} ${r.target}`}`;
 }
 
 /** The newest ended call's result line on a board (content: asked by id like the card). */
@@ -155,7 +171,7 @@ function Board({ props, place }: { props: WorldLayerProps; place: PlaceId }) {
 					<ul>
 						{board.rows.map((row) => (
 							<li key={row.eventId} data-running={row.running || undefined} data-failed={row.ok === false || undefined}>
-								<span>{rowText(row, hide)}</span>
+								<span>{rowText(c, row, hide)}</span>
 								<b>{row.ok === false ? `✗ ${duration(c, row.runtimeMs)}` : duration(c, row.runtimeMs)}</b>
 							</li>
 						))}
@@ -188,7 +204,7 @@ function Board({ props, place }: { props: WorldLayerProps; place: PlaceId }) {
 					<ul>
 						{board.running.map((type, i) => (
 							<li key={`${i}-${type}`} data-running>
-								<span>▶ {type}</span>
+								<span>▶ {type === "" ? c.card.subagentUnknown : type}</span>
 								<b>{c.board.subagentRunning}</b>
 							</li>
 						))}
@@ -222,7 +238,7 @@ function PipelineLabels({ c, scene, pipeline, now }: { c: ObservatoryCopy; scene
 				if (slot === undefined) return null;
 				const st = pipeline.steps[step];
 				const time = st.status === "run" && st.startedAt !== null ? duration(c, Math.max(0, now - st.startedAt)) : st.durationMs !== null ? duration(c, st.durationMs) : "";
-				const mark = st.status === "ok" ? "✓ " : st.status === "err" ? "✗ " : "";
+				const mark = st.status === "ok" ? "✓ " : st.status === "err" ? "✗ " : st.status === "unknown" ? `${c.board.ciUnknown} ` : "";
 				const flows = step === "ci" && pipeline.ci.total > 1 ? ` · ${c.board.workflows(pipeline.ci.total)}` : "";
 				return (
 					<div key={step} className="lm-pipe-step" style={box(slot)} data-id={`observe-pipe-${step}`} data-status={st.status}>
@@ -246,6 +262,8 @@ export function WorldLayer(props: WorldLayerProps) {
 	const { scene, state, now, names, observe, c, accountEmail, hide, selectedPlace, contentZone, batches } = props;
 	const tags = useMemo(() => tagsOf(state, observe, accountEmail), [state, observe, accountEmail]);
 	const look = useMemo(() => lookOf(state, scene), [state, scene]);
+	// A CI run with no news for too long reads as unknown, by the machine's clock now.
+	const pipeline = pipelineAt(look.pipeline, state.log, now);
 	const [cx, cy] = scene.core.centre;
 	const [rx, ry] = scene.core.orbit;
 	return (
@@ -273,7 +291,7 @@ export function WorldLayer(props: WorldLayerProps) {
 					</span>
 				),
 			)}
-			<PipelineLabels c={c} scene={scene} pipeline={look.pipeline} now={now} />
+			<PipelineLabels c={c} scene={scene} pipeline={pipeline} now={now} />
 			{look.tokensPerSecond !== null && (
 				<span className="lm-wave-label" style={{ left: scene.wave.x, top: scene.wave.y + scene.wave.h }}>
 					{c.board.speed(Math.round(look.mode === "think" ? look.tokensPerSecond : 0))}
@@ -281,9 +299,10 @@ export function WorldLayer(props: WorldLayerProps) {
 			)}
 			{tags.map((tag) => {
 				const [x, y] = scene.places[tag.place].label;
-				const cls = ["lm-tag", `is-${tagAlign(scene, tag.place)}`, tag.bottleneck !== "none" ? `is-${tag.bottleneck}` : "", selectedPlace === tag.place ? "is-selected" : "", tag.working !== "" ? "is-working" : "", `tier-${scene.places[tag.place].tier}`]
+				const cls = ["lm-tag", `is-${tagAlign(scene, tag.place)}`, tag.bottleneck !== "none" ? `is-${tag.bottleneck}` : "", selectedPlace === tag.place ? "is-selected" : "", tag.working !== null || tag.runningCount > 0 ? "is-working" : "", `tier-${scene.places[tag.place].tier}`]
 					.filter(Boolean)
 					.join(" ");
+				const working = workingText(c, tag, hide);
 				const batch = batches[tag.place];
 				return (
 					<div key={`tag-${tag.place}`} className={cls} style={{ left: x, top: y }} data-id={`observe-tag-${tag.place}`} data-station={stationAtPlace(tag.place) ?? undefined} aria-hidden="true">
@@ -293,12 +312,12 @@ export function WorldLayer(props: WorldLayerProps) {
 						</b>
 						<i className="lm-tag-sub">{c.places[tag.place]}</i>
 						{tag.facts.length > 0 && <i>{tag.facts.join(" · ")}</i>}
-						{tag.working !== "" && (
+						{working !== "" && (
 							<i className="lm-working" data-id="observe-working">
-								{!hide && tag.workingTarget !== "" ? `${tag.working} · ${tag.workingTarget}` : tag.working}
+								{working}
 							</i>
 						)}
-						{tag.detail !== "" && !hide && tag.working === "" && (
+						{tag.detail !== "" && !hide && working === "" && (
 							<i className="lm-detail" data-id="observe-detail">
 								{tag.detail}
 							</i>

@@ -16,17 +16,22 @@
 // that cannot start under it falls back to the still view.
 //
 // Renderers: WebGL, else PixiJS's Canvas renderer; never WebGPU. Frames
-// (frame-gate.ts): every display frame while something moves with the
-// session (packets, flowing energy, the model thinking, a drone flying, the
-// camera easing); at most 20 per second for the idle scene's gentle motion;
-// none at all under reduced motion or save-data once still. The model stops
-// thinking on the scene when no event came for CORE_SPIN_IDLE_MS; a lost GPU
-// context shows the still plate (context-guard.ts).
+// (frame-gate.ts): every display frame only while something animates (a
+// packet, the model thinking, a drone in flight, the camera easing, a district
+// fading in or out); otherwise at most 20 per second for the steady motion
+// (energy flowing on a busy road, the idle scene breathing), and none at all
+// under reduced motion or save-data, where a timer still wakes the scene when
+// a running call passes its p95 or a CI run turns unknown. A run of tool calls
+// or a wait for permission alone never holds the full display rate. The
+// activity the camera follows is worked out once per update, not per frame.
+// The model stops thinking on the scene when no event came for
+// CORE_SPIN_IDLE_MS; a lost GPU context shows the still plate
+// (context-guard.ts).
 import "pixi.js/unsafe-eval";
 import { Application, Spritesheet, Texture, type SpritesheetData } from "pixi.js";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import { AnimationDirector, type DirectorLogEntry } from "./animation-director.ts";
-import { activityZone, CameraDirector, type CameraMode, type CameraView } from "./camera-director.ts";
+import { activityZone, CameraDirector, type Activity, type CameraMode, type CameraView } from "./camera-director.ts";
 import { guardContext } from "./context-guard.ts";
 import { createFrameGate, intersectionWatcher, type DrawResult, type FrameGateDeps } from "./frame-gate.ts";
 import { activityOf, CORE_SPIN_IDLE_MS, lookOf, sameLook, type SceneLook } from "./prop-map.ts";
@@ -91,6 +96,8 @@ export interface LiveMapHandle {
 	setCameraMode(mode: CameraMode): void;
 	/** The selected place (focus locks on it). */
 	select(place: PlaceId | null): void;
+	/** The district the keyboard is on (null: none): the camera frames it, except in free. */
+	peek(place: PlaceId | null): void;
 	/** A drag by (dx, dy) CSS pixels (switches to free). */
 	pan(dx: number, dy: number): void;
 	/** A zoom by `factor` about the frame point (x, y) (switches to free). */
@@ -175,6 +182,13 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		throw error;
 	}
 	const sheets: Spritesheet[] = [];
+	let glow: Texture | null = null;
+	/** The textures this module made itself (PixiJS's destroy only reaches those still on a sprite). */
+	const releaseOwn = (): void => {
+		for (const sheet of sheets) sheet.destroy(true);
+		if (glow !== null && !glow.destroyed) glow.destroy(true);
+		glow = null;
+	};
 	try {
 		const renderer: RendererKind = app.renderer.name === "webgl" ? "webgl" : "canvas";
 		const gl = glOf(app.renderer);
@@ -183,8 +197,9 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		const [plateImage, atlas] = await Promise.all([loadImage(o.assets.base + plate.file), loadSprites(o.assets)]);
 		sheets.push(...atlas.sheets);
 		const scene = o.assets.scene;
-		const layers = new SceneLayers(scene, { plate: Texture.from(plateImage), // The atlas glow has rays; the soft one drawn in code reads better under data.
-			glow: makeGlowTexture(), sprites: atlas.sprites }, readPalette(o.host));
+		// The atlas glow has rays; the soft one drawn in code reads better under data. Made here, destroyed here.
+		glow = makeGlowTexture();
+		const layers = new SceneLayers(scene, { plate: Texture.from(plateImage), glow, sprites: atlas.sprites }, readPalette(o.host));
 		app.stage.addChild(layers.root);
 		const canvas = app.canvas;
 		canvas.setAttribute("aria-hidden", "true");
@@ -196,8 +211,10 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		let state = o.state;
 		let replayAt: number | null = null;
 		const wall = (): number => replayAt ?? (o.wallClock ?? Date.now)();
-		let look: SceneLook = lookOf(state, scene);
+		let look: SceneLook = lookOf(state, scene, wall());
 		layers.setLook(look);
+		/** What the camera follows, worked out once per state. */
+		let activity: Activity = activityOf(state);
 		/** The newest event the model thinks for and when it came (this clock): past CORE_SPIN_IDLE_MS without a newer one, it stops. */
 		let thinkFor: { eventId: string; since: number } | null = null;
 		const noteThinking = (t: number): void => {
@@ -221,14 +238,25 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 		};
 		place();
 
+		/** The next moment the picture changes by itself (a call past its p95, a CI run turning unknown), machine ms; null: none. */
+		const nextDue = (now: number): number | null => {
+			let due = look.pipeline.ciStaleAt;
+			for (const road of look.roads) for (const job of road.running) if (job.overAt !== null && job.overAt > now && (due === null || job.overAt < due)) due = job.overAt;
+			return due;
+		};
+
 		const draw = (t: number): DrawResult => {
 			const motion = !reduce();
-			const activity = activityOf(state);
+			const at = wall();
+			if (look.pipeline.ciStaleAt !== null && at >= look.pipeline.ciStaleAt) {
+				look = lookOf(state, scene, at);
+				layers.setLook(look);
+			}
 			const before = cameraDirector.view;
 			const cam = cameraDirector.step(activity, t, !motion);
 			if (cam.view !== before) place();
 			const mode = cameraDirector.mode;
-			const contentZone = mode === "focus" ? cameraDirector.selected : mode === "auto" ? cam.zone : activityZone(activity);
+			const contentZone = mode === "free" ? activityZone(activity) : (cameraDirector.peeked ?? (mode === "focus" ? cameraDirector.selected : cam.zone));
 			const next: CameraState = { mode, zone: cam.zone, contentZone, switches: cameraDirector.switches };
 			if (next.mode !== camera.mode || next.zone !== camera.zone || next.contentZone !== camera.contentZone || next.switches !== camera.switches) {
 				camera = next;
@@ -236,11 +264,14 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 			}
 			layers.setFocus(cameraDirector.selected, contentZone);
 			const isThinking = look.mode === "think" && thinking(t);
-			const flying = layers.drawFrame({ t, wall: wall(), moves: director.frame(t), thinking: isThinking, motion });
+			const animating = layers.drawFrame({ t, wall: at, moves: director.frame(t), thinking: isThinking, motion });
 			app.render();
 			if (cam.wakeAt !== null) gate.wakeIn(cam.wakeAt - t);
-			if (director.busy || !cam.settled || flying) return "moving";
-			if (motion && (isThinking || look.mode === "exec" || look.mode === "wait" || look.drones.length > 0)) return "moving";
+			// Packets, the camera easing, a drone in flight, a district fading, the model thinking: the full rate.
+			if (director.busy || !cam.settled || animating || (motion && isThinking)) return "moving";
+			// The steady motion of a busy or idle scene: the ambient rate (none under reduced motion or save-data).
+			const due = nextDue(at);
+			if (due !== null && replayAt === null) gate.wakeIn(Math.max(0, due - at));
 			return "ambient";
 		};
 		const watchOnScreen = intersectionWatcher();
@@ -282,7 +313,8 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 				state = next;
 				replayAt = at;
 				const t = now();
-				const nextLook = lookOf(state, scene);
+				activity = activityOf(state);
+				const nextLook = lookOf(state, scene, wall());
 				const changed = !sameLook(look, nextLook);
 				if (changed) {
 					look = nextLook;
@@ -313,6 +345,10 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 				cameraDirector.select(p);
 				gate.wake();
 			},
+			peek(p) {
+				cameraDirector.peek(p);
+				gate.wake();
+			},
 			pan(dx, dy) {
 				cameraDirector.pan(dx / (placement.scale || 1), dy / (placement.scale || 1));
 				place();
@@ -334,12 +370,12 @@ export async function mountLiveMap(o: LiveMapMountOptions): Promise<LiveMapHandl
 				guard.dispose();
 				director.clear();
 				layers.destroy();
-				for (const sheet of sheets) sheet.destroy(true);
+				releaseOwn();
 				app.destroy(true, { children: true, texture: true, textureSource: true });
 			},
 		};
 	} catch (error) {
-		for (const sheet of sheets) sheet.destroy(true);
+		releaseOwn();
 		app.destroy(true, { children: true, texture: true, textureSource: true });
 		throw error;
 	}

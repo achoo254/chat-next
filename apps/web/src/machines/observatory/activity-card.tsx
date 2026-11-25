@@ -7,10 +7,13 @@
 // (content, asked by id only when the project stores content and "Ẩn chi
 // tiết" is off; otherwise a short reason), an indeterminate bar while it runs
 // (Claude Code reports no percentage), the turn's journey through the
-// districts, and "Xem chi tiết" for the event's detail.
+// districts, and "Xem chi tiết" for the event's detail. "Ẩn chi tiết" hides
+// targets, content and MCP tool names (drill-format.ts toolName). Screen
+// readers hear a short status only when the subject or its status changes,
+// not every runtime tick.
 import { MachineIcon } from "../machine-icons.tsx";
 import type { ActivityCard as Card, CardCall, JourneyStep } from "./activity-card-model.ts";
-import { duration } from "./drill-format.ts";
+import { duration, toolName } from "./drill-format.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
 import { placeIcon } from "./place-names.ts";
 import type { PlaceId } from "./render/scene-table.ts";
@@ -26,8 +29,15 @@ export interface ActivityCardProps {
 	readonly onDetail: (eventId: string) => void;
 }
 
-function callWhat(call: CardCall, hide: boolean): string {
-	return hide || call.target === "" ? call.tool : `${call.tool} ${call.target}`;
+function callWhat(c: ObservatoryCopy, call: CardCall, hide: boolean): string {
+	const tool = toolName(c, call.tool, call.mcpServer, hide);
+	return hide || call.target === "" ? tool : `${tool} ${call.target}`;
+}
+
+/** Who made the call: "" for the main agent. */
+function agentText(c: ObservatoryCopy, agent: string | null): string {
+	if (agent === null) return "";
+	return agent === "" ? c.card.subagentUnknown : c.card.subagent(agent);
 }
 
 function kindLine(c: ObservatoryCopy, card: Card, names: Readonly<Record<PlaceId, string>>): string {
@@ -42,7 +52,7 @@ function kindLine(c: ObservatoryCopy, card: Card, names: Readonly<Record<PlaceId
 		case "run":
 		case "done": {
 			const head = s.kind === "run" ? c.card.running : s.call.ok === false ? c.card.failed : c.card.done;
-			return [head, names[s.call.place], s.call.step === null ? "" : c.card.steps[s.call.step], s.call.agent === "" ? "" : c.card.subagent(s.call.agent)].filter((x) => x !== "").join(" · ");
+			return [head, names[s.call.place], s.call.step === null ? "" : c.card.steps[s.call.step], agentText(c, s.call.agent)].filter((x) => x !== "").join(" · ");
 		}
 	}
 }
@@ -116,20 +126,26 @@ export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCa
 			break;
 		case "idle":
 			what = c.card.idleWhat;
-			if (s.last !== null) desc = c.card.lastJob(callWhat(s.last, hide), s.last.ok !== false, duration(c, s.last.runtimeMs));
+			if (s.last !== null) desc = c.card.lastJob(callWhat(c, s.last, hide), s.last.ok !== false, duration(c, s.last.runtimeMs));
 			break;
 		default:
-			what = callWhat(s.call, hide);
+			what = callWhat(c, s.call, hide);
 			desc = answer.kind === "ok" ? answer.content.description : "";
 			runtime = `${c.card.runtime} ${duration(c, s.call.runtimeMs)}`;
 	}
 	const showBar = s.kind === "run" || s.kind === "think";
+	const kind = kindLine(c, card, names);
+	// What screen readers hear: the subject and its status, never the ticking runtime.
+	const spoken = [kind, what].join(" · ");
 	return (
-		<section className="lm-card" aria-label={c.card.label} aria-live="polite" data-id="observe-card" data-status={card.status} data-station={call?.station}>
+		<section className="lm-card" aria-label={c.card.label} data-id="observe-card" data-status={card.status} data-station={call?.station}>
+			<span className="sr-only" role="status" data-id="observe-card-live">
+				{spoken}
+			</span>
 			<div className="lm-card-main">
 				<div className="lm-card-kind">
 					<span className="lm-card-dot" aria-hidden="true" />
-					<span data-id="observe-card-kind">{kindLine(c, card, names)}</span>
+					<span data-id="observe-card-kind">{kind}</span>
 					<span className="lm-card-pill" data-s={card.status} data-id="observe-card-status">
 						{c.card.status[card.status]}
 					</span>

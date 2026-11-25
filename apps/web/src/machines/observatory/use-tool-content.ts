@@ -4,9 +4,11 @@
 // when the viewer has a session to ask (`source`), "Ẩn chi tiết" is off and
 // the call has ended (Claude Code stores the content with the call's end).
 // The project's content switch is the machine's: an "off" answer says so.
-// And a ticking clock for runtimes that only runs while asked to.
+// And a ticking clock for runtimes, in the machine's time (machine-clock.ts),
+// that only runs while asked to.
 import { useEffect, useState } from "react";
 import { parseToolContent, type ToolContent } from "./activity-card-model.ts";
+import { machineNow } from "./machine-clock.ts";
 import { eventContent, type ObservatoryLink } from "./observatory-client.ts";
 
 /** Where content can be asked: the watched session on its machine's link. */
@@ -51,11 +53,12 @@ export function useToolContent(source: ContentSource | null, eventId: string | n
 }
 
 /**
- * Date.now(): read again whenever `stamp` changes (a new state) and once more
+ * The machine's now (Date.now() plus `skewMs`, the machine's clock minus the
+ * viewer's): read again whenever `stamp` changes (a new state) and once more
  * `settleMs` later (a hold that ends), and every `ms` while `active`; no
  * timer repeats while idle.
  */
-export function useTickingNow(active: boolean, stamp: unknown, settleMs: number, ms = 500): number {
+export function useTickingNow(active: boolean, stamp: unknown, settleMs: number, skewMs = 0, ms = 500): number {
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => {
 		const read = (): void => setNow(Date.now());
@@ -68,5 +71,5 @@ export function useTickingNow(active: boolean, stamp: unknown, settleMs: number,
 			if (timer !== null) window.clearInterval(timer);
 		};
 	}, [active, stamp, settleMs, ms]);
-	return now;
+	return machineNow(now, skewMs);
 }

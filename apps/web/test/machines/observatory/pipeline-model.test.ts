@@ -3,9 +3,10 @@
 // lifecycle events the agent sends while it follows GitHub Actions after a
 // push (ci_started / ci_finished: label = workflow, flag = success, number =
 // duration), several workflows folded into one CI step, a new commit
-// resetting the steps after it, prod lit by a successful deploy.
+// resetting the steps after it, prod lit by a successful deploy; a finish
+// without a flag, or a run too long without one, is unknown.
 import { describe, expect, it } from "vitest";
-import { pipelineOf } from "../../../src/machines/observatory/pipeline-model.ts";
+import { CI_STALE_MS, pipelineAt, pipelineOf } from "../../../src/machines/observatory/pipeline-model.ts";
 import { played } from "../../observatory/render-fixtures.ts";
 import { lifecycle, prompt, tool } from "./live-map-fixtures.ts";
 
@@ -59,6 +60,36 @@ describe("the release pipeline", () => {
 		expect(failed.ci).toEqual({ total: 2, running: 0, failed: 1 });
 		const passed = pipe([...base, ci("ci_finished", "c", 5_000, "web", { flag: true, number: 4_800 }), ci("ci_finished", "d", 6_000, "agent", { flag: true, number: 5_790 })]);
 		expect(passed.steps.ci.status).toBe("ok");
+	});
+
+	it("reads a ci_finished without a flag as unknown (neither ok nor failed), never over a known outcome", () => {
+		const base = [prompt(1, 0), git("p", 10, 2, { ok: true, took: 100 }), ci("ci_started", "a", 200, "web")];
+		const unknown = pipe([...base, ci("ci_finished", "u", 30 * 60_000, "web")]);
+		expect(unknown.steps.ci).toMatchObject({ status: "unknown", durationMs: null });
+		expect(unknown.ci).toEqual({ total: 1, running: 0, failed: 0 });
+		expect(unknown.ciStaleAt).toBeNull();
+		// The real outcome, read after the machine gave up, wins either way round.
+		const known = pipe([...base, ci("ci_finished", "c", 5_000, "web", { flag: true, number: 4_800 }), ci("ci_finished", "u", 30 * 60_000, "web")]);
+		expect(known.steps.ci.status).toBe("ok");
+		const later = pipe([...base, ci("ci_finished", "u", 30 * 60_000, "web"), ci("ci_finished", "c", 31 * 60_000, "web", { flag: false, number: 4_800 })]);
+		expect(later.steps.ci.status).toBe("err");
+		// One unknown workflow beside a passed one: the step is unknown; beside a failed one, failed.
+		const two = [...base, ci("ci_started", "b", 210, "agent"), ci("ci_finished", "c", 5_000, "agent", { flag: true, number: 4_000 }), ci("ci_finished", "u", 30 * 60_000, "web")];
+		expect(pipe(two).steps.ci.status).toBe("unknown");
+	});
+
+	it("ages a CI run with no outcome CI_STALE_MS after it started into unknown, by the machine's now", () => {
+		const { state } = played([prompt(1, 0), git("p", 10, 2, { ok: true, took: 100 }), ci("ci_started", "a", 200, "web")]);
+		const started = state.log.find((e) => e.id === "event:a")?.at ?? 0;
+		const fresh = pipelineOf(state.log, started + CI_STALE_MS - 1);
+		expect(fresh.steps.ci.status).toBe("run");
+		expect(fresh.ciStaleAt).toBe(started + CI_STALE_MS);
+		expect(pipelineAt(fresh, state.log, started + CI_STALE_MS - 1)).toBe(fresh);
+		const stale = pipelineAt(fresh, state.log, started + CI_STALE_MS);
+		expect(stale.steps.ci.status).toBe("unknown");
+		expect(stale.ciStaleAt).toBeNull();
+		// Without a now (the look's own), nothing ages.
+		expect(pipelineOf(state.log).steps.ci.status).toBe("run");
 	});
 
 	it("takes a ci_finished without its start (the watch began late) at its duration", () => {

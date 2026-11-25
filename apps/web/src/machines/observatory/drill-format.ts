@@ -60,13 +60,22 @@ function targetOf(e: Extract<LiveMapEvent, { kind: "tool" }>): string {
 	return "target" in e && typeof e.target === "string" ? e.target : "";
 }
 
+/**
+ * A tool's name where "Ẩn chi tiết" applies (the card, the boards, the name
+ * tags, the event's line): an MCP tool's name (`mcp__<server>__<tool>`) names
+ * the server, so hidden details show the generic "tool" instead.
+ */
+export function toolName(c: ObservatoryCopy, tool: string, mcpServer: string, hideDetails: boolean): string {
+	return hideDetails && mcpServer !== "" ? c.detail.kinds.tool : tool;
+}
+
 /** An event in one line. Hidden details leave out every filtered label and MCP name. */
 export function eventLabel(c: ObservatoryCopy, e: LiveMapEvent, hideDetails: boolean): string {
 	switch (e.kind) {
 		case "prompt":
 			return c.detail.kinds.prompt;
 		case "tool": {
-			if (hideDetails) return e.mcpServer !== "" ? c.detail.kinds.tool : e.toolName;
+			if (hideDetails) return toolName(c, e.toolName, e.mcpServer, true);
 			const target = targetOf(e);
 			// An MCP tool is named `mcp__<server>__<tool>`: shown as `server › tool`.
 			const prefix = `mcp__${e.mcpServer}__`;
