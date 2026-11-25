@@ -36,6 +36,12 @@ export interface SqlDriver {
  */
 export interface SqlDriverFactory {
 	open(name: string): Promise<SqlDriver>;
+	/**
+	 * Gives back what the factory holds on the storage (the OPFS access handles of the
+	 * browser) so another context can open the same files; call it once every database
+	 * it opened is closed. A later open() takes the storage again.
+	 */
+	release?(): Promise<void>;
 }
 
 export type Unsubscribe = () => void;

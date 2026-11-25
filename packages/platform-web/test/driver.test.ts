@@ -2,7 +2,7 @@
 // tokenizer and atomic batches exactly like the native test driver.
 import { describe, expect, it } from "vitest";
 import { EventBus, migrate, Repository, searchLocal, searchText, SCHEMA_VERSION } from "@achoo254/chat-core";
-import { openMemoryFactory } from "../src/driver.ts";
+import { factoryOfPool, openMemoryFactory, type SahpoolLike } from "../src/driver.ts";
 
 async function repository(): Promise<Repository> {
 	const factory = await openMemoryFactory();
@@ -48,5 +48,58 @@ describe("sqlite-wasm driver", () => {
 		const repo = await repository();
 		await repo.driver.close();
 		await expect(repo.driver.query("SELECT 1")).rejects.toThrow("closed");
+	});
+});
+
+describe("opfs-sahpool factory", () => {
+	function fakePool(paused: boolean) {
+		const calls: string[] = [];
+		const opened: string[] = [];
+		let isPaused = paused;
+		const pool = {
+			OpfsSAHPoolDb: function (path: string): never {
+				opened.push(path);
+				throw new Error("a real database is not opened by this test");
+			},
+			unlink: (path: string) => calls.push(`unlink ${path}`),
+			isPaused: () => isPaused,
+			unpauseVfs: async () => {
+				calls.push("unpause");
+				isPaused = false;
+			},
+			pauseVfs: () => {
+				calls.push("pause");
+				isPaused = true;
+			},
+		};
+		return { pool: pool as unknown as SahpoolLike, calls, opened };
+	}
+
+	it("takes the access handles back when the pool it gets was released earlier", async () => {
+		const { pool, calls } = fakePool(true);
+		await factoryOfPool(pool);
+		expect(calls).toEqual(["unpause"]);
+	});
+
+	it("leaves a pool that is in use alone", async () => {
+		const { pool, calls } = fakePool(false);
+		await factoryOfPool(pool);
+		expect(calls).toEqual([]);
+	});
+
+	it("gives the access handles back on release, and takes them again on the next factory", async () => {
+		const { pool, calls } = fakePool(false);
+		const factory = await factoryOfPool(pool);
+		await factory.release?.();
+		expect(calls).toEqual(["pause"]);
+		await factoryOfPool(pool);
+		expect(calls).toEqual(["pause", "unpause"]);
+	});
+
+	it("opens a database inside the pool under the name's path", async () => {
+		const { pool, opened } = fakePool(false);
+		const factory = await factoryOfPool(pool);
+		await expect(factory.open("u1.sqlite3")).rejects.toThrow("a real database");
+		expect(opened).toEqual(["/u1.sqlite3"]);
 	});
 });

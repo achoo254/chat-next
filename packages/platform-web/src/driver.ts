@@ -78,17 +78,23 @@ export interface SahpoolOptions {
 	readonly vfsName?: string;
 }
 
+/** The part of an opfs-sahpool pool the factory uses (sqlite-wasm's SAHPoolUtil). */
+export interface SahpoolLike {
+	readonly OpfsSAHPoolDb: new (path: string) => Database;
+	unlink(path: string): unknown;
+	isPaused(): boolean;
+	unpauseVfs(): Promise<unknown>;
+	pauseVfs(): unknown;
+}
+
 /**
- * Opens the opfs-sahpool VFS (must run in a dedicated worker) and returns a
- * factory for databases inside it.
+ * The factory over an installed pool. sqlite-wasm keeps one pool per name in a worker, so a
+ * pool this worker let go of earlier (release) comes back from the install call paused: its
+ * access handles are taken again here. release() gives the handles back, which is what lets
+ * the tab that leads next open the same files while this tab stays open.
  */
-export async function openSahpoolFactory(options: SahpoolOptions = {}): Promise<SqlDriverFactory> {
-	const sqlite3 = await sqlite3InitModule();
-	const pool = await sqlite3.installOpfsSAHPoolVfs({
-		name: options.vfsName ?? "chat-sahpool",
-		directory: options.directory ?? "/chat-db",
-		initialCapacity: 6,
-	});
+export async function factoryOfPool(pool: SahpoolLike): Promise<SqlDriverFactory> {
+	if (pool.isPaused()) await pool.unpauseVfs();
 	return {
 		open: async (name) => {
 			const path = `/${name}`;
@@ -96,7 +102,30 @@ export async function openSahpoolFactory(options: SahpoolOptions = {}): Promise<
 				pool.unlink(path);
 			});
 		},
+		release: async () => {
+			// Throws when a database is still open: the caller closes them first.
+			pool.pauseVfs();
+		},
 	};
+}
+
+/**
+ * Opens the opfs-sahpool VFS (must run in a dedicated worker) and returns a
+ * factory for databases inside it. A failed install is not remembered
+ * (forceReinitIfPreviouslyFailed): sqlite-wasm would otherwise hand the same
+ * failure to every retry of this worker, however long the other holder of the
+ * files takes to let go.
+ */
+export async function openSahpoolFactory(options: SahpoolOptions = {}): Promise<SqlDriverFactory> {
+	const sqlite3 = await sqlite3InitModule();
+	// The option is read by sqlite-wasm (installOpfsSAHPoolVfs) but missing from its typings.
+	const install: Parameters<typeof sqlite3.installOpfsSAHPoolVfs>[0] & { forceReinitIfPreviouslyFailed: boolean } = {
+		name: options.vfsName ?? "chat-sahpool",
+		directory: options.directory ?? "/chat-db",
+		initialCapacity: 6,
+		forceReinitIfPreviouslyFailed: true,
+	};
+	return factoryOfPool(await sqlite3.installOpfsSAHPoolVfs(install));
 }
 
 /** In-memory databases of the same build (Node tests, or a browser without OPFS). */

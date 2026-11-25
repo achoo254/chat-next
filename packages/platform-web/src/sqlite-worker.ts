@@ -140,7 +140,11 @@ function startHub(config: WorkerConfig): TabHub {
 			return {
 				invoke: (method, args) => invoke(core, method, args),
 				subscribe: (listener) => core.events.subscribeBatches(listener),
-				close: () => core.close(),
+				close: async () => {
+					await core.close();
+					// Another tab leads next: it needs the files this worker holds, and the worker stays alive.
+					await sql.release?.();
+				},
 			};
 		},
 		onEvents: (keys) => post({ type: "events", keys }),
