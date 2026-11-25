@@ -276,7 +276,7 @@ export const enScreens: ScreensCopy = {
 		photo: "Profile photo",
 		whoFinds: "Who can find and contact me",
 		findByPhone: "Find me by phone number",
-		findByPhoneHint: "The number comes from the Telegram or Zalo account you connected and is never shown. Matches only the full number.",
+		findByPhoneHint: "The number comes from the Telegram account you connected and is never shown. Matches only the full number.",
 		findByEmail: "Find me by email",
 		findByEmailHint: "Default: Nobody. Matches only the full email.",
 		findByUsername: "Find me by username",

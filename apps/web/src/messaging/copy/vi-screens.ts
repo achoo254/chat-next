@@ -278,7 +278,7 @@ export const viScreens = {
 		photo: "Ảnh đại diện",
 		whoFinds: "Ai tìm và liên hệ được tôi",
 		findByPhone: "Tìm tôi bằng số điện thoại",
-		findByPhoneHint: "Số lấy từ tài khoản Telegram hoặc Zalo bạn đã kết nối, không hiển thị. Chỉ khớp khi gõ đúng toàn bộ số.",
+		findByPhoneHint: "Số lấy từ tài khoản Telegram bạn đã kết nối, không hiển thị. Chỉ khớp khi gõ đúng toàn bộ số.",
 		findByEmail: "Tìm tôi bằng email",
 		findByEmailHint: "Mặc định: Không ai. Chỉ khớp khi gõ đúng toàn bộ email.",
 		findByUsername: "Tìm tôi bằng username",

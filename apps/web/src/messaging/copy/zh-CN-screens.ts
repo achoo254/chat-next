@@ -276,7 +276,7 @@ export const zhCNScreens: ScreensCopy = {
 		photo: "头像",
 		whoFinds: "谁可以找到并联系我",
 		findByPhone: "通过手机号找到我",
-		findByPhoneHint: "号码来自你已连接的 Telegram 或 Zalo 账号，不会显示。仅匹配完整号码。",
+		findByPhoneHint: "号码来自你已连接的 Telegram 账号，不会显示。仅匹配完整号码。",
 		findByEmail: "通过邮箱找到我",
 		findByEmailHint: "默认：没有人。仅匹配完整邮箱。",
 		findByUsername: "通过用户名找到我",
