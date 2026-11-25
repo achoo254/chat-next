@@ -59,13 +59,11 @@ export const BUNDLE_BUDGET = {
 	 * message bubble imports, so the Connect and protobuf runtime (7.7 KB) and
 	 * the Telegram and Zalo emoji lists entered startup. The check now reads
 	 * the refusal by its shape in its own module (messaging/ui/reaction-refused.ts),
-	 * and the lists stay with the lazy pickers: 155.2 KB, the rest being the
-	 * bubble's own growth (asking AI in a conversation, Zalo reactions, about
-	 * 1 KB). The budget is 156 KB.
+	 * and the lists stay with the lazy pickers: 154.9 KB. The budget stays 155 KB.
 	 */
-	startupJsGzip: 156 * 1024,
+	startupJsGzip: 155 * 1024,
 	/**
-	 * Derived: startup CSS was 13.7 KB gzip when the gate started. 20.6 KB on
+	 * Derived: startup CSS was 13.7 KB gzip when the gate started. 20.4 KB on
 	 * 25/11/2026 with the conversation's Ask AI panel, the quick actions that
 	 * straddle a bubble's corner and Telegram's animated stickers (messaging.css,
 	 * about 0.6 KB); the budget is 21 KB.
