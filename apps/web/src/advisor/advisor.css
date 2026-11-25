@@ -34,6 +34,11 @@
 }
 .adv-flash[data-side="right"] { right: calc(env(safe-area-inset-right) + 56px); }
 .adv-flash[data-side="left"] { left: calc(env(safe-area-inset-left) + 56px); }
+/* A conversation's AI panel open on the right (messaging/ui/ai-panel.tsx, its width in --ai-panel-w): the mascot
+   docked on that side waits left of it, so it never covers the panel; its phone sheet hides the mascot. */
+:root:has(aside.ai-panel) .adv-mascot[data-side="right"]:not([data-dragging]) { right: calc(env(safe-area-inset-right) + var(--ai-panel-w, 400px)); }
+:root:has(aside.ai-panel) .adv-flash[data-side="right"] { right: calc(env(safe-area-inset-right) + var(--ai-panel-w, 400px) + 56px); }
+:root:has(dialog.ai-sheet[open]) :is(.adv-mascot, .adv-flash) { display: none; }
 
 /* The bubble: beside the mascot on wide screens (placed inline), a bottom sheet on phones; head and foot always show, the body scrolls.
    No transform here: its menu is position: fixed against the viewport. */

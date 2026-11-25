@@ -28,7 +28,8 @@ import { connText } from "./session-row.tsx";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { adoptStarted } from "./project-actions.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
-import { aiName, errorText, folderName, providerOf, timeAgo, useHub, useMachineViews, useNow, useWatch, type MachineView } from "./use-machines.ts";
+import { brand } from "../brand.ts";
+import { aiName, errorText, folderName, isChatThread, providerOf, timeAgo, useHub, useMachineViews, useNow, useWatch, type MachineView } from "./use-machines.ts";
 import { chatTakesTerminal, observeOffered, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
@@ -232,7 +233,14 @@ function TileHead({ machine, thread, showMachine, waiting }: { machine: MachineV
 			</h4>
 			<span className="dir">
 				{showMachine && `${machine.entry.name} · `}
-				{folderName(thread.dir)}
+				{isChatThread(thread) ? (
+					<>
+						<MachineIcon name="chat" small />
+						{brand.appName}
+					</>
+				) : (
+					folderName(thread.dir)
+				)}
 			</span>
 		</>
 	);
@@ -337,7 +345,7 @@ function Recent({ list, showMachine, now }: { list: readonly Placed[]; showMachi
 								<small>
 									{showMachine && `${machine.entry.name} · `}
 									{/* Its project, as the sidebar groups it; the folder when no project holds it. */}
-									{locate(projects.projects, machine.entry.id, thread.dir)?.project.name ?? folderName(thread.dir)} · {timeAgo(t, Number(thread.updatedAt), now)}
+									{isChatThread(thread) ? brand.appName : (locate(projects.projects, machine.entry.id, thread.dir)?.project.name ?? folderName(thread.dir))} · {timeAgo(t, Number(thread.updatedAt), now)}
 								</small>
 							</span>
 							<span className="go">{t.agent.home.resume}</span>

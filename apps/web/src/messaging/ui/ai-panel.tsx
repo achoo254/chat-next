@@ -22,6 +22,7 @@ import type { Drafts } from "../data/drafts.ts";
 import { useDialog, useServices } from "../data/services.tsx";
 import { DialogHead, Modal, useDomId } from "./parts.tsx";
 import { useUi, type AiPanelRequest, type AiQuote, type Ui } from "./ui-context.tsx";
+import { plainText } from "./ai-plain-text.ts";
 import { useChatAi, type ChatAi } from "./use-chat-ai.ts";
 
 const AiPanelSession = lazy(() => import("./ai-panel-session.tsx"));
@@ -166,9 +167,19 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 
 	// A quote that comes while the session is open waits in its composer, for a question of the user's own:
 	// once per quote and session (the session's composer takes it through Advisor's fill, as "Gửi sang phiên").
+	// What was put there, so a quick question sent about the quote takes it back out (it is asked already).
+	const prefilled = useRef<{ readonly machine: string; readonly threadId: string; readonly text: string } | null>(null);
 	const fillQuote = useEffectEvent((into: string, at: string) => {
-		if (quote !== null) advisorStore.fill(into, at, aboutQuote(copy, quote, locale, ""));
+		if (quote === null) return;
+		const text = aboutQuote(copy, quote, locale, "");
+		prefilled.current = { machine: into, threadId: at, text };
+		advisorStore.fill(into, at, text);
 	});
+	const takeBackQuote = () => {
+		const put = prefilled.current;
+		prefilled.current = null;
+		if (put !== null) advisorStore.fill(put.machine, put.threadId, put.text, true);
+	};
 	const quoteSeq = quote?.seq ?? 0;
 	useEffect(() => {
 		if (quoteSeq !== 0 && threadId !== "" && machine !== "") fillQuote(machine, threadId);
@@ -212,11 +223,15 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 	const chip = (kind: Chip) => {
 		if (quote === null) return;
 		void ask(aboutQuote(copy, quote, locale, copy.aiPanel.prompt[kind])).then((sent) => {
-			if (sent) setQuote(null);
+			if (!sent) return;
+			setQuote(null);
+			takeBackQuote();
 		});
 	};
 
-	const offerText = (text: string) => {
+	// The chat gets plain text: its people (Telegram, Zalo) would see the markdown's marks as typed.
+	const offerText = (markdown: string) => {
+		const text = plainText(markdown);
 		// An edit in progress is not in the draft: putting the text in would end it, so the user is asked first too.
 		const editing = ui.intents.cell(chat.id).get()?.mode === "edit";
 		const current = drafts.get(chat.id, topicId);
@@ -293,7 +308,7 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 function MachinePicker({ ai, copy }: { ai: ChatAi; copy: FullCopy }) {
 	if (ai.machines.length < 2 || ai.target === null) return null;
 	return (
-		<select className="input ai-machine" aria-label={copy.aiPanel.machine} value={ai.target.entry.ref} onChange={(event) => ai.pickMachine(event.target.value)}>
+		<select className="input ai-machine" aria-label={copy.aiPanel.machine} title={ai.target.entry.name} value={ai.target.entry.ref} onChange={(event) => ai.pickMachine(event.target.value)}>
 			{ai.machines.map((m) => (
 				<option key={m.entry.ref} value={m.entry.ref}>
 					{m.entry.name}
@@ -438,8 +453,12 @@ function AiResizer({ app, label }: { app: RefObject<HTMLDivElement | null>; labe
 		const element = app.current;
 		if (element === null) return;
 		element.style.setProperty("--ai-w", `${width}px`);
+		// The page's floating parts (Advisor's mascot, advisor.css) keep clear of the panel by its width.
+		const root = document.documentElement;
+		root.style.setProperty("--ai-panel-w", `${width}px`);
 		return () => {
 			element.style.removeProperty("--ai-w");
+			root.style.removeProperty("--ai-panel-w");
 		};
 	}, [app, width]);
 	const apply = (next: number) => {

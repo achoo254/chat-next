@@ -13,6 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app.tsx";
 import { aiQuestion } from "../src/messaging/ui/composer.tsx";
+import { plainText } from "../src/messaging/ui/ai-plain-text.ts";
 import { chatContext, chatThread, pickTarget } from "../src/messaging/ui/use-chat-ai.ts";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { defaultAnswer, FakeMachine, type Body } from "./machines/fake-machine.ts";
@@ -24,7 +25,9 @@ import { routerFetch } from "./support/router-fetch.ts";
 
 const LONG = { timeout: 8000 };
 const QUESTION = "mai họp lúc mấy giờ?";
-const REPLY = "Dạ, mai họp lúc 9 giờ ạ.";
+const REPLY = "Dạ, mai họp lúc **9 giờ** ạ, ở `phòng 2`.";
+/** The reply as the chat's composer gets it: plain text, no markdown marks. */
+const REPLY_PLAIN = "Dạ, mai họp lúc 9 giờ ạ, ở phòng 2.";
 
 let device: KeyPair;
 
@@ -203,7 +206,7 @@ describe("the chat's session on the machine", () => {
 		const use = await within(shown).findByRole("button", { name: "Đưa vào ô soạn tin" }, { timeout: 15_000 });
 		await userEvent.click(use);
 		const box = screen.getByRole("textbox", { name: /Tin nhắn tới/ });
-		await waitFor(() => expect(boxValue(box)).toBe(REPLY), LONG);
+		await waitFor(() => expect(boxValue(box)).toBe(REPLY_PLAIN), LONG);
 		// Replying to Lan's message, sent by the user, not by the panel.
 		await waitFor(() => expect(document.querySelector(".compose-bar")?.textContent ?? "").toContain(QUESTION), LONG);
 		expect(fixture.server.expectedMessages(chatId, fixture.selfId).filter((m) => m.fromId === fixture.selfId)).toHaveLength(0);
@@ -228,7 +231,7 @@ describe("the chat's session on the machine", () => {
 
 		await userEvent.click(within(shown).getByRole("button", { name: "Đưa vào ô soạn tin" }));
 		await userEvent.click(within(await screen.findByRole("dialog", { name: "Thay nội dung đang soạn?" }, LONG)).getByRole("button", { name: "Thay" }));
-		await waitFor(() => expect(boxValue(box)).toBe(REPLY), LONG);
+		await waitFor(() => expect(boxValue(box)).toBe(REPLY_PLAIN), LONG);
 		// Asked from the header, not about a message: no reply is set.
 		expect(document.querySelector(".compose-bar")).toBeNull();
 	});
@@ -302,10 +305,36 @@ describe("the chat's session on the machine", () => {
 
 		await userEvent.click(use);
 		await userEvent.click(within(await screen.findByRole("dialog", { name: "Thay nội dung đang soạn?" }, LONG)).getByRole("button", { name: "Thay" }));
-		await waitFor(() => expect(boxValue(box)).toBe(REPLY), LONG);
+		await waitFor(() => expect(boxValue(box)).toBe(REPLY_PLAIN), LONG);
 		// The edit is over (no bar) and the message kept its text.
 		await waitFor(() => expect(document.querySelector(".compose-bar")).toBeNull(), LONG);
 		expect(fixture.server.expectedMessages(chatId, fixture.selfId).some((m) => m.text === "tin cũ của tôi")).toBe(true);
+	});
+
+	it("takes the quote back out of the session's box once a quick question about it is sent", async () => {
+		const { fixture, chatId } = lanChat();
+		const { machines, sends } = await withMachine();
+		renderWith(fixture, machines, `/c/${chatId}`);
+		// The chat's session exists already.
+		await userEvent.click(await screen.findByRole("button", { name: "Hỏi AI" }, LONG));
+		let shown = await panel();
+		const ask = await within(shown).findByRole("textbox", { name: "Hỏi AI về hội thoại này…" }, LONG);
+		await waitFor(() => expect((ask as HTMLTextAreaElement).disabled).toBe(false), LONG);
+		await userEvent.type(ask, "chào{Enter}");
+		const sessionBox = await within(shown).findByRole("textbox", { name: "Tin nhắn" }, { timeout: 15_000 });
+
+		await openMenuOf(QUESTION);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Hỏi AI" }, LONG));
+		shown = await panel();
+		// The quote waits in the session's box for a question of the user's own.
+		await waitFor(() => expect(boxValue(sessionBox)).toContain(QUESTION), LONG);
+		const summarize = within(shown).getByRole("button", { name: "Tóm tắt" });
+		await waitFor(() => expect((summarize as HTMLButtonElement).disabled).toBe(false), LONG);
+		await userEvent.click(summarize);
+		await waitFor(() => expect(sends.map((x) => x.text).some((text) => text.includes(QUESTION) && text.includes("Tóm tắt tin này"))).toBe(true), LONG);
+		// Asked already: nothing of it is left to send again.
+		await waitFor(() => expect(boxValue(sessionBox)).toBe(""), LONG);
+		expect(within(shown).queryByRole("region", { name: "Tin đang hỏi" })).toBeNull();
 	});
 
 	it("asks nothing about a chat hidden from AI until it is shown again", async () => {
@@ -359,6 +388,15 @@ describe("qua AI", () => {
 });
 
 describe("helpers", () => {
+	it("turns the AI's markdown into plain text for a chat message", () => {
+		expect(plainText("Mai họp **9 giờ**, _phòng_ `2` ~~cũ~~.")).toBe("Mai họp 9 giờ, phòng 2 cũ.");
+		expect(plainText("Xem [lịch](https://lich.example/a) hoặc https://x.example")).toBe("Xem lịch (https://lich.example/a) hoặc https://x.example");
+		expect(plainText("# Việc\n\n- **một**\n- hai\n\n1. ba\n2. bốn")).toBe("Việc\n\n- một\n- hai\n\n1. ba\n2. bốn");
+		expect(plainText("Dòng một  \ndòng hai\n\n```json\n{\"a\": 1}\n```")).toBe('Dòng một\ndòng hai\n\n{"a": 1}');
+		expect(plainText("- [x] xong\n- [ ] chưa\n  - con")).toBe("- [x] xong\n- [ ] chưa\n  - con");
+		expect(plainText("Giá \\*không\\* đổi & <b>x</b>")).toBe("Giá *không* đổi & <b>x</b>");
+	});
+
 	it("reads '/ai' commands only", () => {
 		expect(aiQuestion("/ai tóm tắt")).toBe("tóm tắt");
 		expect(aiQuestion("  /ai  ")).toBe("");

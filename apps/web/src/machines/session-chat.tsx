@@ -44,7 +44,8 @@ import { StatusBar } from "./status-bar.tsx";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block, type ShownAttachment } from "./transcript/tool-fold.ts";
 import { messageCount, splitConversations } from "./transcript/conversation-break.ts";
-import { aiName, errorText, folderName, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
+import { brand } from "../brand.ts";
+import { aiName, errorText, folderName, isChatThread, modelName, providerOf, useEntry, useHub, useLink, useWatch } from "./use-machines.ts";
 import { useAttachments } from "./use-attachments.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
@@ -277,9 +278,16 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 								</Suspense>
 							</span>
 						)}
-						<span className="mono" title={dir}>
-							{placed?.project.name ?? workspace}
-						</span>
+						{thread !== null && isChatThread(thread) ? (
+							<span title={dir}>
+								<MachineIcon name="chat" small />
+								{brand.appName}
+							</span>
+						) : (
+							<span className="mono" title={dir}>
+								{placed?.project.name ?? workspace}
+							</span>
+						)}
 						{branch !== "" && <span className="hide-narrow">· {branch}</span>}
 						{thread !== null && mode === "chat" && (
 							// The workspace's folder when the session is in one, so its switch shows the same level.

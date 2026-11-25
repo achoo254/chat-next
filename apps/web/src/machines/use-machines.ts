@@ -284,6 +284,14 @@ export function isRunning(thread: ThreadStateOf): boolean {
 	return key === "running" || key === "queued" || key === "elsewhere";
 }
 
+/**
+ * A Chat conversation's session (ThreadCreate.chat, the Chat app's AI panel): its folder is one the machine keeps
+ * for that chat, named by the chat's id, so headers and lists name the app instead. Older machines send no chat_id.
+ */
+export function isChatThread(thread: Pick<ThreadSummary, "chatId">): boolean {
+	return Boolean(thread.chatId);
+}
+
 /** The last path segment, for headers and tiles ("~/code/chat-next" → "chat-next"). */
 export function folderName(dir: string): string {
 	const parts = dir.split(/[\\/]+/).filter((p) => p !== "");

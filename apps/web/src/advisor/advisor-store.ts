@@ -110,6 +110,13 @@ export interface Dock {
 
 export const DEFAULT_DOCK: Dock = { side: "right", y: 0.62 };
 
+/** Text for a composer from outside; `remove`: take it back out of the box instead (session composers only). */
+export interface ComposerFillText {
+	readonly text: string;
+	readonly id: number;
+	readonly remove?: boolean;
+}
+
 export interface AdvisorState {
 	readonly copies: readonly CopyRecord[];
 	/** Copies attached or dismissed: never offered again. */
@@ -135,7 +142,7 @@ export interface AdvisorState {
 	/** The chat open now (its composer is showing), for "Điền vào ô soạn tin"; never leaves the page. */
 	readonly chat: { readonly chatId: number; readonly topicId: number } | null;
 	/** Text for a composer, by `${machine}\n${threadId}` (a session) or `chat\n${chatId}\n${topicId}` (a chat). */
-	readonly fills: ReadonlyMap<string, { readonly text: string; readonly id: number }>;
+	readonly fills: ReadonlyMap<string, ComposerFillText>;
 }
 
 /** Copies kept, newest first. */
@@ -417,10 +424,13 @@ export class AdvisorStore {
 
 	// --- "Gửi sang phiên" ------------------------------------------------------
 
-	/** Puts `text` in the composer of a session (it fills when the session shows). */
-	fill(machine: string, threadId: string, text: string): void {
+	/**
+	 * Puts `text` in the composer of a session (it fills when the session shows); `remove`: takes that text
+	 * back out of the box, when it is still there (the Chat app's AI panel sent the question it was for).
+	 */
+	fill(machine: string, threadId: string, text: string, remove = false): void {
 		const fills = new Map(this.state.fills);
-		fills.set(fillKey(machine, threadId), { text, id: ++this.nextFill });
+		fills.set(fillKey(machine, threadId), { text, id: ++this.nextFill, ...(remove ? { remove } : {}) });
 		this.set({ fills });
 	}
 
@@ -489,7 +499,7 @@ export function useAdvisorState(store: AdvisorStore = advisorStore): AdvisorStat
 }
 
 /** Text Advisor put in this session's composer, until the composer takes it (session-chat.tsx). */
-export function useSessionFill(machine: string, threadId: string): { readonly text: string; readonly id: number } | undefined {
+export function useSessionFill(machine: string, threadId: string): ComposerFillText | undefined {
 	return useAdvisorState().fills.get(fillKey(machine, threadId));
 }
 

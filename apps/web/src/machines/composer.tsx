@@ -50,8 +50,11 @@ interface ComposerProps {
 	attach?: Attachments | undefined;
 	/** Changes when another session opens in this box: the caret goes into it. */
 	focusKey?: string | undefined;
-	/** Text put in the box from outside (Advisor's "Gửi sang phiên"): a new id adds it after what is typed, then onFilled runs. */
-	fill?: { readonly text: string; readonly id: number } | undefined;
+	/**
+	 * Text put in the box from outside (Advisor's "Gửi sang phiên"): a new id adds it after what is typed, then
+	 * onFilled runs. With `remove` it takes that text back out of the box, when it is still there.
+	 */
+	fill?: { readonly text: string; readonly id: number; readonly remove?: boolean } | undefined;
 	onFilled?: ((id: number) => void) | undefined;
 	onSend: (text: string, files: readonly ShownAttachment[]) => Promise<void>;
 	onStop: () => Promise<void>;
@@ -83,8 +86,9 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	const [filled, setFilled] = useState(0);
 	if (fill !== undefined && fill.id !== filled) {
 		setFilled(fill.id);
-		// What the user was typing stays: the text goes after it.
-		setText(text.trim() === "" ? fill.text : `${text.trimEnd()}\n\n${fill.text}`);
+		// What the user was typing stays: the text goes after it (or, taken back, only it leaves).
+		if (fill.remove === true) setText(text.includes(fill.text) ? text.replace(fill.text, "").trim() : text);
+		else setText(text.trim() === "" ? fill.text : `${text.trimEnd()}\n\n${fill.text}`);
 	}
 
 	const [error, setError] = useState("");

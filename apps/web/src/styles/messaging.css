@@ -1015,7 +1015,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 .ai-resize:hover, .ai-resize:focus-visible { background: color-mix(in srgb, var(--c-primary) 35%, transparent); outline: none; }
 .ai-head { display: flex; flex: none; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
 .ai-head h2 { flex: 1; margin: 0; font-size: 1rem; font-weight: 600; }
-.ai-head .ai-machine { width: auto; max-width: 50%; }
+.ai-head .ai-machine { width: auto; min-width: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-note { flex: none; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .ai-note p { margin: 0; flex: 1 1 12rem; }
 .ai-quote { display: grid; flex: none; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
@@ -1030,6 +1030,9 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 .ai-state strong { color: var(--c-text); }
 .ai-compose { display: flex; flex: none; align-items: flex-end; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); }
 .ai-compose textarea { flex: 1; resize: none; }
+/* The session's status line in the panel's narrow column: its items wrap to a second line instead of overlapping. */
+:is(.ai-panel, .ai-sheet) .mx-status-row { flex-wrap: wrap; row-gap: 0; }
+:is(.ai-panel, .ai-sheet) .mx-status-row > .mx-usage { flex: none; }
 /* The session's own back link goes to AI Agent: inside the panel, its close button stands for it. */
 .ai-panel .mx-back, .ai-sheet .mx-back { display: none; }
 /* Phone: a sheet near full height, header fixed on top and the composer at the bottom (docs: modal-popup-design). */
