@@ -9,6 +9,7 @@ import { request } from "node:http";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { ConfigStore } from "../../src/config.ts";
+import type { GhRunner } from "../../src/observatory/ci/gh-runner.ts";
 import { ObservatoryService } from "../../src/observatory/observatory-service.ts";
 import type { FilteredRecord, ObservatorySink } from "../../src/observatory/privacy/filtered-record.ts";
 import { pickFreePort } from "../../src/observatory/receiver/receiver-port.ts";
@@ -30,7 +31,7 @@ afterEach(async () => {
 
 type Made = { s: ObservatoryService; config: ConfigStore; data: string };
 
-async function service(dir: string, sink: ObservatorySink = { accept: async () => undefined }, now: () => number = Date.now): Promise<Made> {
+async function service(dir: string, sink: ObservatorySink = { accept: async () => undefined }, now: () => number = Date.now, runGh?: GhRunner): Promise<Made> {
   const config = new ConfigStore(join(dir, "config"));
   const port = await pickFreePort();
   config.update((c) => (c.observatory = { otlpPort: port ?? 47_399, enabled: true }));
@@ -44,7 +45,7 @@ async function service(dir: string, sink: ObservatorySink = { accept: async () =
     },
   });
   const data = join(dir, "data");
-  const s = new ObservatoryService({ config, dataDir: data, log: () => undefined, knownSecrets: () => [config.get().machineSecret ?? ""], ingest, now, tokenTimings: { tokenRetryMs: [] } });
+  const s = new ObservatoryService({ config, dataDir: data, log: () => undefined, knownSecrets: () => [config.get().machineSecret ?? ""], ingest, now, tokenTimings: { tokenRetryMs: [] }, ...(runGh ? { runGh } : {}) });
   await s.start();
   stops.push(() => s.stop());
   return { s, config, data };
@@ -222,6 +223,25 @@ describe("the spool's live tail through the service", () => {
 });
 
 describe("the service's lifecycle", () => {
+  it("ends the CI watches around a wipe, and follows pushes again after it", async () => {
+    const asked: string[][] = [];
+    const runGh: GhRunner = async (args) => {
+      asked.push([...args]);
+      return args[0] === "run" ? "[]" : "";
+    };
+    const { s } = await service(obsTempDir("service"), undefined, Date.now, runGh);
+    const push = { sessionId: "s1", at: Date.now(), projectKey: "https://github.com/acme/app.git", branch: "main" };
+    s.ci.pushed(push);
+    expect(s.ci.watching).toBe(1);
+    await s.wipe();
+    expect(s.ci.watching).toBe(0);
+    s.ci.pushed({ ...push, at: Date.now() });
+    expect(s.ci.watching).toBe(1);
+    await s.stop();
+    expect(s.ci.watching).toBe(0);
+    expect(asked).toEqual([]);
+  });
+
   it("starts again after a stop", async () => {
     const { s } = await service(obsTempDir("service"));
     await s.stop();

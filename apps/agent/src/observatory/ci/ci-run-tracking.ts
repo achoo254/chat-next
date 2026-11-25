@@ -8,10 +8,16 @@
 // when it was read. Each run gives `ci_started` the first time it is seen and
 // `ci_finished` once it completed; both are keyed by the run's id, so a run
 // seen again, or by a second watch of the session, is stored once. A watch is
-// done once every run it saw completed and no new run came for QUIET_POLLS
-// polls, or MAX_WATCH_MS after its last push. Only the workflow's name, the
-// run's outcome and its times are kept: never a URL, a commit message or a
-// person's name.
+// done once it saw a run, every run it saw completed and no new run came for
+// QUIET_POLLS polls; before its first run it waits FIRST_RUN_GRACE_MS after
+// the last push (GitHub can take a while to queue a run); and it ends
+// MAX_WATCH_MS after its last push whatever its runs do. A watch that ends
+// with runs not completed (its deadline, the switch, `gh` failing, the agent
+// stopping) writes `ci_finished` for each of them with no flag: the outcome is
+// unknown, so a device never shows such a run as running for ever. That event
+// has its own key, so a real outcome read later is still stored beside it.
+// Only the workflow's name, the run's outcome and its times are kept: never a
+// URL, a commit message or a person's name.
 import { z } from "zod";
 import { sessionEventOp } from "../ingest/session-event-write.ts";
 import { labelValue } from "../privacy/privacy-labels.ts";
@@ -19,8 +25,10 @@ import type { WriteOp } from "../store/write-ops.ts";
 
 /** Runs created this long before the push still count as the push's. */
 export const PUSH_SLACK_MS = 30_000;
-/** Polls without a running or new run before a watch is done. */
+/** Polls without a running or new run before a watch is done (counted once a run was seen). */
 export const QUIET_POLLS = 2;
+/** Before its first run, a watch waits this long after the last push. */
+export const FIRST_RUN_GRACE_MS = 3 * 60_000;
 /** A watch ends this long after its last push, however its runs stand. */
 export const MAX_WATCH_MS = 30 * 60_000;
 /** Runs read per poll. */
@@ -83,22 +91,26 @@ export type CiWatchState = {
   since: number;
   /** The pushed branch, when read: runs of other branches are not the push's. */
   branch: string | undefined;
+  /** The last push's time: the grace before the first run counts from it. */
+  pushedAt: number;
   /** The watch ends at this time. */
   deadline: number;
-  started: Set<number>;
+  /** Runs whose `ci_started` was written, by id (kept to end them as unknown). */
+  started: Map<number, CiRun>;
   finished: Set<number>;
   quietPolls: number;
 };
 
 /** A watch of `repo` for the push of `sessionId` at `at`. */
 export function newWatch(sessionId: string, repo: string, at: number, branch: string | undefined): CiWatchState {
-  return { sessionId, repo, since: at - PUSH_SLACK_MS, branch, deadline: at + MAX_WATCH_MS, started: new Set(), finished: new Set(), quietPolls: 0 };
+  return { sessionId, repo, since: at - PUSH_SLACK_MS, branch, pushedAt: at, deadline: at + MAX_WATCH_MS, started: new Map(), finished: new Set(), quietPolls: 0 };
 }
 
 /** Another push of the same session and repository: one watch goes on, longer; a push of another (or an unknown) branch widens it to every branch. */
 export function mergePush(state: CiWatchState, at: number, branch: string | undefined): void {
   state.since = Math.min(state.since, at - PUSH_SLACK_MS);
   state.deadline = Math.max(state.deadline, at + MAX_WATCH_MS);
+  state.pushedAt = Math.max(state.pushedAt, at);
   if (branch !== state.branch) state.branch = undefined;
   state.quietPolls = 0;
 }
@@ -124,7 +136,7 @@ export function stepWatch(state: CiWatchState, runs: readonly CiRun[], now: numb
     if (run.createdAt < state.since) continue;
     if (state.branch !== undefined && run.headBranch !== state.branch) continue;
     if (!state.started.has(run.id)) {
-      state.started.add(run.id);
+      state.started.set(run.id, run);
       ops.push(runEventOp(state, run, "ci_started"));
       busy = true;
     }
@@ -134,6 +146,24 @@ export function stepWatch(state: CiWatchState, runs: readonly CiRun[], now: numb
       ops.push(runEventOp(state, run, "ci_finished"));
     }
   }
-  state.quietPolls = busy ? 0 : state.quietPolls + 1;
-  return { ops, done: state.quietPolls >= QUIET_POLLS || now >= state.deadline };
+  // Quiet polls count only once a run was seen; before that, the grace after the push decides.
+  const seen = state.started.size > 0;
+  state.quietPolls = busy || !seen ? 0 : state.quietPolls + 1;
+  const quiet = seen ? state.quietPolls >= QUIET_POLLS : now >= state.pushedAt + FIRST_RUN_GRACE_MS;
+  return { ops, done: quiet || now >= state.deadline };
+}
+
+/**
+ * The events that end a watch at `now` with runs not completed: a
+ * `ci_finished` without a flag (outcome unknown) for each, keyed apart from
+ * the real one. Marks them finished, so calling it twice writes nothing more.
+ */
+export function endWatch(state: CiWatchState, now: number): WriteOp[] {
+  const ops: WriteOp[] = [];
+  for (const [id, run] of state.started) {
+    if (state.finished.has(id)) continue;
+    state.finished.add(id);
+    ops.push(sessionEventOp("ci_finished", { sessionId: state.sessionId, at: Math.max(now, run.createdAt), station: "GIT", label: run.name }, [id, "unknown"]));
+  }
+  return ops;
 }

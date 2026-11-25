@@ -1,8 +1,10 @@
 // The CI watcher's pure logic: which project keys are GitHub repositories,
 // reading `gh run list --json`, and one poll's step of a watch (events of runs
-// newer than the push on its branch, each once; done when quiet or too old).
+// newer than the push on its branch, each once; done when quiet after a run,
+// after the grace when no run came, or too old; runs left running end as
+// unknown).
 import { describe, expect, it } from "vitest";
-import { MAX_WATCH_MS, PUSH_SLACK_MS, type CiRun, mergePush, newWatch, parseRunList, runListArgs, stepWatch } from "../../src/observatory/ci/ci-run-tracking.ts";
+import { endWatch, FIRST_RUN_GRACE_MS, MAX_WATCH_MS, PUSH_SLACK_MS, type CiRun, mergePush, newWatch, parseRunList, runListArgs, stepWatch } from "../../src/observatory/ci/ci-run-tracking.ts";
 import { githubRepoOf } from "../../src/observatory/ci/github-repo.ts";
 import type { SessionEventWrite, WriteOp } from "../../src/observatory/store/write-ops.ts";
 
@@ -114,10 +116,27 @@ describe("stepWatch", () => {
     expect(stepWatch(w, [done], PUSH_AT + 45_000).done).toBe(true);
   });
 
-  it("is done after two quiet polls when no run comes at all", () => {
+  it("does not count quiet polls before the first run: it waits the grace after the push", () => {
     const w = newWatch("s1", "acme/app", PUSH_AT, "main");
-    expect(stepWatch(w, [], PUSH_AT + 15_000).done).toBe(false);
-    expect(stepWatch(w, [], PUSH_AT + 30_000).done).toBe(true);
+    for (let t = 15_000; t < FIRST_RUN_GRACE_MS; t += 15_000) expect(stepWatch(w, [], PUSH_AT + t).done, String(t)).toBe(false);
+    expect(w.quietPolls).toBe(0);
+    expect(stepWatch(w, [], PUSH_AT + FIRST_RUN_GRACE_MS).done).toBe(true);
+  });
+
+  it("counts the grace from the last push merged in", () => {
+    const w = newWatch("s1", "acme/app", PUSH_AT, "main");
+    mergePush(w, PUSH_AT + 60_000, "main");
+    expect(stepWatch(w, [], PUSH_AT + FIRST_RUN_GRACE_MS).done).toBe(false);
+    expect(stepWatch(w, [], PUSH_AT + 60_000 + FIRST_RUN_GRACE_MS).done).toBe(true);
+  });
+
+  it("a run that comes late in the grace is followed, then the quiet polls count", () => {
+    const w = newWatch("s1", "acme/app", PUSH_AT, "main");
+    expect(stepWatch(w, [], PUSH_AT + 150_000).done).toBe(false);
+    const late = run(1, { createdAt: PUSH_AT + 160_000, completed: true, success: true, updatedAt: PUSH_AT + 170_000 });
+    expect(events(stepWatch(w, [late], PUSH_AT + 175_000).ops).map((e) => e.kind)).toEqual(["ci_started", "ci_finished"]);
+    expect(stepWatch(w, [late], PUSH_AT + 190_000).done).toBe(false);
+    expect(stepWatch(w, [late], PUSH_AT + 205_000).done).toBe(true);
   });
 
   it("goes on while a run is running, and ends at its deadline whatever runs", () => {
@@ -126,11 +145,25 @@ describe("stepWatch", () => {
     expect(stepWatch(w, [run(1)], PUSH_AT + MAX_WATCH_MS).done).toBe(true);
   });
 
+  it("ends the runs not completed as unknown: ci_finished without a flag, keyed apart from the real outcome, once", () => {
+    const w = newWatch("s1", "acme/app", PUSH_AT, "main");
+    const real = stepWatch(w, [run(1), run(2, { completed: true, success: true, updatedAt: PUSH_AT + 9_000 })], PUSH_AT + 15_000);
+    const end = events(endWatch(w, PUSH_AT + MAX_WATCH_MS));
+    expect(end.map((e) => [e.kind, e.at, e.label, e.station, e.flag, e.number])).toEqual([["ci_finished", PUSH_AT + MAX_WATCH_MS, "CI", "GIT", undefined, undefined]]);
+    expect(end[0]?.dedupeKey).toContain('1,"unknown"');
+    // The real outcome of the same run keys apart, so it is still stored if it is read later.
+    const finishedLater = stepWatch(newWatch("s1", "acme/app", PUSH_AT, "main"), [run(1, { completed: true, success: true })], PUSH_AT);
+    const realKeys = [...events(real.ops), ...events(finishedLater.ops)].map((e) => e.dedupeKey);
+    expect(realKeys).not.toContain(end[0]?.dedupeKey);
+    expect(endWatch(w, PUSH_AT + MAX_WATCH_MS + 1)).toEqual([]);
+  });
+
   it("merges a later push: longer deadline, quiet count reset, every branch when the branches differ", () => {
     const w = newWatch("s1", "acme/app", PUSH_AT, "main");
     stepWatch(w, [], PUSH_AT + 15_000);
     mergePush(w, PUSH_AT + 20_000, "feature");
     expect(w.quietPolls).toBe(0);
+    expect(w.pushedAt).toBe(PUSH_AT + 20_000);
     expect(w.deadline).toBe(PUSH_AT + 20_000 + MAX_WATCH_MS);
     expect(w.since).toBe(PUSH_AT - PUSH_SLACK_MS);
     expect(w.branch).toBeUndefined();

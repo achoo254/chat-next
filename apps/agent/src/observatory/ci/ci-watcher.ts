@@ -7,24 +7,32 @@
 //
 // - One watch per session and repository: more pushes of the session merge
 //   into it; another session pushing the same repository gets its own.
-// - `gh` is checked once per agent run, at the first push (`gh --version`,
-//   then `gh auth status`): missing or signed out, the watcher stays off,
-//   silently, until the agent starts again.
+// - `gh` is checked at the first poll (`gh --version`, then `gh auth
+//   status`). Missing (`--version` fails): the watcher stays off, silently,
+//   until the agent starts again. Signed out: the pushes of the next
+//   AUTH_RETRY_MS are not followed, then the next push checks again.
 // - A poll that fails (no network, `gh` failing) is reported to the throttled
 //   problem log (no content) and tried again at the next poll; it writes
 //   nothing. Switched off (the config or the Observatory switch), a watch ends
-//   at its next poll.
+//   at its next poll and writes nothing more.
+// - A watch that ends otherwise with runs not completed (its deadline, `gh`
+//   signed out, stop()) writes their outcome as unknown (ci-run-tracking.ts
+//   endWatch), so a device never shows them running for ever.
+// - At most MAX_WATCHES watches poll at once: 8 watches at 4 polls a minute
+//   stay under 2 000 calls an hour, well inside GitHub's 5 000 an hour.
 // - A push older than a watch's whole life (a spool read again after a
 //   restart) starts nothing.
 import type { PushToWatch } from "../ingest/normalized-record.ts";
 import type { WriteOp } from "../store/write-ops.ts";
-import { type CiWatchState, MAX_WATCH_MS, mergePush, newWatch, parseRunList, runListArgs, stepWatch } from "./ci-run-tracking.ts";
+import { type CiWatchState, endWatch, MAX_WATCH_MS, mergePush, newWatch, parseRunList, runListArgs, stepWatch } from "./ci-run-tracking.ts";
 import { type GhRunner, execGh } from "./gh-runner.ts";
 import { githubRepoOf } from "./github-repo.ts";
 
 export const POLL_MS = 15_000;
-/** Watches at once, at most: a push past this is not followed. */
-const MAX_WATCHES = 32;
+/** Watches at once, at most: a push past this is not followed (keeps the polls far below GitHub's hourly limit). */
+export const MAX_WATCHES = 8;
+/** After `gh auth status` failed, pushes are not followed for this long; the next push then checks again. */
+export const AUTH_RETRY_MS = 10 * 60_000;
 
 export type CiWatcherOptions = {
   /** Whether the watcher may run now (the Observatory and CI switches, the service started). */
@@ -44,10 +52,12 @@ export class CiWatcher {
   private readonly watches = new Map<string, Watch>();
   private readonly now: () => number;
   private readonly runGh: GhRunner;
-  /** The one check of `gh` this agent run; undefined until the first push. */
+  /** The check of `gh` in effect; undefined until the first poll, and again after a sign-in check failed. */
   private ghCheck: Promise<boolean> | undefined;
-  /** `gh` is missing or signed out: nothing is followed until the agent starts again. */
-  private ghOff = false;
+  /** `gh` is missing: nothing is followed until the agent starts again. */
+  private ghMissing = false;
+  /** `gh` was signed out: pushes before this time are not followed. */
+  private authRetryAt = 0;
 
   constructor(private readonly opts: CiWatcherOptions) {
     this.now = opts.now ?? Date.now;
@@ -62,7 +72,7 @@ export class CiWatcher {
   /** A push that succeeded: starts (or extends) the watch of its session and repository. Never throws. */
   pushed(push: PushToWatch): void {
     try {
-      if (this.ghOff || !this.opts.enabled()) return;
+      if (this.ghMissing || this.now() < this.authRetryAt || !this.opts.enabled()) return;
       const repo = githubRepoOf(push.projectKey);
       if (!repo || this.now() - push.at > MAX_WATCH_MS) return;
       const key = `${push.sessionId}\n${repo}`;
@@ -80,10 +90,31 @@ export class CiWatcher {
     }
   }
 
-  /** Ends every watch (the service stops); the check of `gh` is kept for this agent run. */
+  /**
+   * Ends every watch (the service stops, a wipe), writing the runs not
+   * completed as unknown; pushes start new watches afterwards. The check of
+   * `gh` is kept.
+   */
   stop(): void {
-    for (const watch of this.watches.values()) clearTimeout(watch.timer);
-    this.watches.clear();
+    for (const key of [...this.watches.keys()]) this.end(key);
+  }
+
+  /**
+   * Ends the watch of `key`: its timer cleared, its runs not completed written as unknown unless `quiet`
+   * (switched off: nothing more is written once the user turned Observatory or CI off; a device ages a run
+   * left running out by itself, pipeline-model.ts).
+   */
+  private end(key: string, quiet = false): void {
+    const watch = this.watches.get(key);
+    if (!watch) return;
+    clearTimeout(watch.timer);
+    this.watches.delete(key);
+    if (quiet) return;
+    try {
+      for (const op of endWatch(watch.state, this.now())) this.opts.push(op);
+    } catch (err) {
+      this.opts.problems("ci-watch", err);
+    }
   }
 
   private schedule(key: string, watch: Watch): void {
@@ -100,7 +131,7 @@ export class CiWatcher {
     try {
       if (!this.live(key, watch)) return;
       if (!this.opts.enabled()) {
-        this.watches.delete(key);
+        this.end(key, true);
         return;
       }
       if (!(await this.ghReady())) {
@@ -115,25 +146,23 @@ export class CiWatcher {
         this.opts.problems("ci-watch", err);
       }
       if (!this.live(key, watch)) return;
-      if (stdout !== undefined) {
-        const step = stepWatch(watch.state, parseRunList(stdout), this.now());
-        for (const op of step.ops) this.opts.push(op);
-        if (step.done) {
-          this.watches.delete(key);
-          return;
-        }
-      } else if (this.now() >= watch.state.deadline) {
-        this.watches.delete(key);
-        return;
-      }
-      this.schedule(key, watch);
+      const done = stdout === undefined ? this.now() >= watch.state.deadline : this.step(watch.state, stdout);
+      if (done) this.end(key);
+      else this.schedule(key, watch);
     } catch (err) {
       // Output that is not a run list: tried again at the next poll, until the watch's deadline.
       this.opts.problems("ci-watch", err);
       if (!this.live(key, watch)) return;
-      if (this.now() >= watch.state.deadline) this.watches.delete(key);
+      if (this.now() >= watch.state.deadline) this.end(key);
       else this.schedule(key, watch);
     }
+  }
+
+  /** One poll's runs: their events written; whether the watch is done. Throws when the output is not a run list. */
+  private step(state: CiWatchState, stdout: string): boolean {
+    const step = stepWatch(state, parseRunList(stdout), this.now());
+    for (const op of step.ops) this.opts.push(op);
+    return step.done;
   }
 
   private ghReady(): Promise<boolean> {
@@ -141,14 +170,24 @@ export class CiWatcher {
     return this.ghCheck;
   }
 
-  /** `gh` installed and signed in to github.com; either failing switches the watcher off for this agent run. */
+  /**
+   * `gh` installed and signed in to github.com. Missing switches the watcher
+   * off for this agent run; signed out holds pushes back for AUTH_RETRY_MS,
+   * after which the next push checks again.
+   */
   private async checkGh(): Promise<boolean> {
     try {
       await this.runGh(["--version"]);
+    } catch {
+      this.ghMissing = true;
+      return false;
+    }
+    try {
       await this.runGh(["auth", "status", "--hostname", "github.com"]);
       return true;
     } catch {
-      this.ghOff = true;
+      this.authRetryAt = this.now() + AUTH_RETRY_MS;
+      this.ghCheck = undefined;
       return false;
     }
   }

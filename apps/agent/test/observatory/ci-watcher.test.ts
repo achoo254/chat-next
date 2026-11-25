@@ -1,10 +1,12 @@
 // The CI watcher with a fake `gh` (no test ever starts the real one): a push
 // of a GitHub project polls every 15 s and writes ci_started / ci_finished of
 // the pushing session; it stops when the runs are done, when switched off, and
-// never starts without gh or a GitHub remote. The ingest hands it every push
-// that succeeded, and nothing else.
+// never starts without gh or a GitHub remote; signed out, it tries again
+// later. A watch that ends with runs not completed writes them as unknown. The
+// ingest hands it every push that succeeded, and nothing else.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CiWatcher, POLL_MS } from "../../src/observatory/ci/ci-watcher.ts";
+import { FIRST_RUN_GRACE_MS } from "../../src/observatory/ci/ci-run-tracking.ts";
+import { AUTH_RETRY_MS, CiWatcher, MAX_WATCHES, POLL_MS } from "../../src/observatory/ci/ci-watcher.ts";
 import type { GhRunner } from "../../src/observatory/ci/gh-runner.ts";
 import type { PushToWatch } from "../../src/observatory/ingest/normalized-record.ts";
 import { ObservatoryIngest } from "../../src/observatory/ingest/observatory-ingest.ts";
@@ -109,13 +111,17 @@ describe("CiWatcher", () => {
     ]);
   });
 
-  it("leaves out runs created before the push", async () => {
+  it("leaves out runs created before the push, and gives up once the grace after the push passed without a run", async () => {
     const r = rig();
     r.gh.runs = [{ ...raw(1, "completed", "success"), createdAt: iso(PUSH_AT - 10 * 60_000), updatedAt: iso(PUSH_AT - 9 * 60_000) }];
     r.watcher.pushed(pushOf());
     await vi.advanceTimersByTimeAsync(POLL_MS * 3);
     expect(r.ops).toEqual([]);
+    // No run yet: the quiet polls do not end it before the grace.
+    expect(r.watcher.watching).toBe(1);
+    await vi.advanceTimersByTimeAsync(FIRST_RUN_GRACE_MS);
     expect(r.watcher.watching).toBe(0);
+    expect(r.ops).toEqual([]);
   });
 
   it("merges pushes of one session into one watch, and gives another session its own", async () => {
@@ -146,32 +152,105 @@ describe("CiWatcher", () => {
     expect(brief(r.ops)).toEqual([["s1", "ci_started", "CI", undefined, undefined, "GIT"]]);
   });
 
-  it("stops after 30 minutes however the runs stand", async () => {
+  it("stops after 30 minutes however the runs stand, writing a run still running as unknown", async () => {
     const r = rig();
     r.gh.runs = [raw(1, "in_progress")];
     r.watcher.pushed(pushOf());
     await vi.advanceTimersByTimeAsync(30 * 60_000);
     expect(r.watcher.watching).toBe(0);
+    expect(brief(r.ops)).toEqual([
+      ["s1", "ci_started", "CI", undefined, undefined, "GIT"],
+      ["s1", "ci_finished", "CI", undefined, undefined, "GIT"],
+    ]);
     const asked = listCalls(r.gh).length;
     await vi.advanceTimersByTimeAsync(POLL_MS * 4);
     expect(listCalls(r.gh).length).toBe(asked);
+    expect(r.ops).toHaveLength(2);
   });
 
-  it("does not run without gh, nor when gh is signed out, until the agent starts again", async () => {
-    for (const fault of ["missing", "signedOut"] as const) {
-      const r = rig();
-      r.gh[fault] = true;
-      r.gh.runs = [raw(1, "in_progress")];
-      r.watcher.pushed(pushOf());
-      await vi.advanceTimersByTimeAsync(POLL_MS);
-      expect(listCalls(r.gh), fault).toEqual([]);
-      expect(r.watcher.watching).toBe(0);
-      r.gh[fault] = false;
-      r.watcher.pushed(pushOf({ at: PUSH_AT + 20_000 }));
-      await vi.advanceTimersByTimeAsync(POLL_MS * 2);
-      expect(listCalls(r.gh), fault).toEqual([]);
-      expect(r.ops).toEqual([]);
-    }
+  it("writes a run still running as unknown when gh keeps failing until the deadline", async () => {
+    const r = rig();
+    r.gh.runs = [raw(1, "in_progress")];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    r.gh.runs = new Error("network");
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+    expect(r.watcher.watching).toBe(0);
+    expect(brief(r.ops).map((e) => (e as unknown[]).slice(1, 4))).toEqual([
+      ["ci_started", "CI", undefined],
+      ["ci_finished", "CI", undefined],
+    ]);
+  });
+
+  it("writes nothing more once switched off, writes the runs still running as unknown when stopped, and follows pushes again after a stop", async () => {
+    const r = rig();
+    r.gh.runs = [raw(1, "in_progress")];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    r.on.value = false;
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(r.watcher.watching).toBe(0);
+    // Switched off: the started run gets no outcome row; a device ages it out by itself.
+    expect(events(r.ops).map((e) => [e.kind, e.flag])).toEqual([["ci_started", undefined]]);
+    r.on.value = true;
+    r.ops.length = 0;
+    r.gh.runs = [raw(2, "in_progress")];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    r.watcher.stop();
+    expect(r.watcher.watching).toBe(0);
+    expect(events(r.ops).map((e) => [e.kind, e.flag])).toEqual([
+      ["ci_started", undefined],
+      ["ci_finished", undefined],
+    ]);
+    r.watcher.pushed(pushOf());
+    expect(r.watcher.watching).toBe(1);
+  });
+
+  it("does not run without gh until the agent starts again", async () => {
+    const r = rig();
+    r.gh.missing = true;
+    r.gh.runs = [raw(1, "in_progress")];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(listCalls(r.gh)).toEqual([]);
+    expect(r.watcher.watching).toBe(0);
+    r.gh.missing = false;
+    vi.setSystemTime(PUSH_AT + AUTH_RETRY_MS * 3);
+    r.watcher.pushed(pushOf({ at: Date.now() }));
+    expect(r.watcher.watching).toBe(0);
+    await vi.advanceTimersByTimeAsync(POLL_MS * 2);
+    expect(listCalls(r.gh)).toEqual([]);
+    expect(r.ops).toEqual([]);
+  });
+
+  it("signed out, holds pushes back for a while and checks again at the next push after that", async () => {
+    const r = rig();
+    r.gh.signedOut = true;
+    r.gh.runs = [raw(1, "in_progress")];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(listCalls(r.gh)).toEqual([]);
+    expect(r.watcher.watching).toBe(0);
+    r.gh.signedOut = false;
+    // Within the back-off: not followed, gh not asked again.
+    r.watcher.pushed(pushOf({ at: Date.now() }));
+    expect(r.watcher.watching).toBe(0);
+    await vi.advanceTimersByTimeAsync(AUTH_RETRY_MS);
+    r.gh.runs = [{ ...raw(2, "in_progress"), createdAt: iso(Date.now() + 1_000), updatedAt: iso(Date.now() + 2_000) }];
+    r.watcher.pushed(pushOf({ at: Date.now() }));
+    expect(r.watcher.watching).toBe(1);
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(r.gh.calls.filter((c) => c[0] === "auth")).toHaveLength(2);
+    expect(listCalls(r.gh)).toHaveLength(1);
+    expect(brief(r.ops)).toEqual([["s1", "ci_started", "CI", undefined, undefined, "GIT"]]);
+  });
+
+  it("follows at most MAX_WATCHES watches at once", () => {
+    const r = rig();
+    for (let i = 0; i < MAX_WATCHES + 3; i++) r.watcher.pushed(pushOf({ sessionId: `s${i}` }));
+    expect(r.watcher.watching).toBe(MAX_WATCHES);
+    expect(MAX_WATCHES * (3_600_000 / POLL_MS)).toBeLessThan(2_500);
   });
 
   it("does not run when switched off, and a running watch ends at its next poll once switched off", async () => {

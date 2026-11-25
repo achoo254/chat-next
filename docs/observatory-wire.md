@@ -120,7 +120,11 @@ cache_write_tokens=9, cost_usd_estimate=10, has_cost=11, git_ops=12, session_eve
 - `ci_started` / `ci_finished`: một lượt chạy GitHub Actions sau `git push` của phiên (agent theo dõi bằng `gh run list` mỗi 15 giây, chỉ khi `project_key` là
   remote GitHub, `gh` đã đăng nhập và công tắc `observatory.ci.enabled` bật; `apps/agent/src/observatory/ci/ci-watcher.ts`). `label` là tên workflow,
   `station` là `GIT`; `ci_started` có `at` là lúc lượt chạy được tạo; `ci_finished` có `at` là lúc xong, `flag` là kết quả `success`, `number` là thời gian
-  chạy (ms). Khoá trùng theo id lượt chạy và loại. Không có URL, commit message hay tên người.
+  chạy (ms). Khoá trùng theo id lượt chạy và loại. Không có URL, commit message hay tên người. Lượt theo dõi kết thúc khi lượt chạy chưa xong (hết 30 phút,
+  `gh` đăng xuất, agent dừng hoặc xoá dữ liệu) thì ghi `ci_finished` **không đặt `flag`** và không có `number`: kết quả không rõ, `at` là lúc
+  agent bỏ theo dõi; khoá trùng riêng (id lượt chạy kèm `unknown`), nên kết quả thật đọc được sau vẫn được lưu và thắng. Thiết bị hiện `flag` không đặt là "không
+  rõ" (không ✓ cũng không ✗), và coi một lượt `ci_started` chưa có `ci_finished` quá 45 phút là không rõ (agent khởi động lại giữa chừng, hoặc người dùng tắt
+  công tắc: khi đã tắt, agent không ghi thêm dòng nào).
 - Một dòng được ghi lại y hệt (đọc lại spool, nguồn thứ hai) không gửi sự kiện mới. Agent nhớ bản gửi cuối của 2 000 dòng gần nhất mỗi phiên; dòng cũ hơn ghi lại
   thì gửi lại cùng `id`, vô hại.
 

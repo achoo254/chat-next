@@ -35,7 +35,9 @@
 //
 // The CI watcher (ci/ci-watcher.ts) hears every push the ingest takes and,
 // for a GitHub repository, writes the session's CI runs through the same
-// writer while the service runs and its switch (`observatory.ci`) is on.
+// writer while the service runs and its switch (`observatory.ci`) is on. Its
+// watches end when the service stops and around a wipe (runs not completed
+// written as unknown); pushes after that start new ones.
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
@@ -269,6 +271,8 @@ export class ObservatoryService {
     await this.intake.pauseSpool();
     // Its read connection is closed before the files go (Windows cannot delete an open file).
     this.bottlenecks.stop();
+    // Its watches end (their unknown outcomes are queued and wiped with the rest); pushes after the wipe start new ones.
+    this.ci.stop();
     let failure = await this.store.wipe(this.started && this.enabled);
     await clearSpool(this.opts.dataDir).catch((err: unknown) => (failure ??= err));
     // The keys stored under the old salt are gone with the database; new ones start from a new salt.
