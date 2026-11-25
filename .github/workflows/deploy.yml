@@ -15,6 +15,11 @@ name: deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      if_ahead:
+        description: Deploy only when main is ahead of the last successful deploy (what the evening run does)
+        type: boolean
+        default: false
   # Every evening at 22:00 Asia/Saigon (15:00 UTC; GitHub may start it some
   # minutes late) main goes out if it is ahead of the last deploy, so a day's
   # work reaches production even when no session deployed it.
@@ -30,8 +35,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # The evening run deploys only when main moved since the last successful
-  # deploy; a run started by hand always deploys (for example to redeploy).
+  # The evening run, and a run started by hand with if_ahead, deploys only
+  # when main moved since the last successful deploy; any other run started by
+  # hand always deploys (for example to redeploy).
   check:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -46,8 +52,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
           EVENT: ${{ github.event_name }}
+          IF_AHEAD: ${{ inputs.if_ahead }}
         run: |
-          if [ "$EVENT" != schedule ]; then
+          if [ "$EVENT" != schedule ] && [ "$IF_AHEAD" != true ]; then
             echo "needed=true" >>"$GITHUB_OUTPUT"
             exit 0
           fi
