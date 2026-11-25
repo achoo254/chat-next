@@ -14,16 +14,15 @@
 //   involved dim while the AI works), the drones (running subagents) and the
 //   district each flies to, the context's fill, the release pipeline.
 //
-// Geometry the renderer and the DOM share also lives here: a point along a
-// road, dashes along it, a drone's flight path, the holographic board above a
-// district, the pipeline's slots on the Git district.
+// Geometry the renderer shares also lives here: a point along a trace, the
+// part of a trace to a fraction of its length.
 import { FLAG, historyBefore, modeOf, percentile, runningCalls, toolCalls, type ActivityMode, type ToolCall } from "../call-history.ts";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import type { LiveMapEvent } from "../live-map-types.ts";
 import { pipelineOf, type Pipeline } from "../pipeline-model.ts";
 import { stationOf, STATION_CODES, type StationCode } from "../station-catalog.ts";
 import type { Activity } from "./camera-director.ts";
-import { PLACE_IDS, STATION_PLACE, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
+import { PLACE_IDS, STATION_PLACE, type PlaceId, type Point, type SceneTable } from "./scene-table.ts";
 
 export { FLAG };
 
@@ -214,8 +213,6 @@ export interface PlaceLook {
 export interface DroneLook {
 	readonly agentId: string;
 	readonly agentType: string;
-	/** Where it is going: the district of its running call, else home (the drones' area by the core). */
-	readonly target: PlaceId;
 	/** Its order among the running subagents (where it idles on the orbit). */
 	readonly slot: number;
 }
@@ -292,10 +289,7 @@ export function lookOf(state: LiveMapState, scene: SceneTable, now?: number): Sc
 		places[id] = { presence, active, involved: involved.has(id), used, bottleneck: st?.bottleneck ?? "none" };
 	}
 	const subagents = Object.values(state.scene.subagents).filter((s) => s.running);
-	const drones = subagents.map((s, slot): DroneLook => {
-		const call = running.filter((c) => c.event.agentId === s.agentId).at(-1);
-		return { agentId: s.agentId, agentType: s.agentType, target: call === undefined ? "orchestrator" : STATION_PLACE[call.station], slot };
-	});
+	const drones = subagents.map((s, slot): DroneLook => ({ agentId: s.agentId, agentType: s.agentType, slot }));
 	const newest = state.log[state.log.length - 1];
 	return {
 		mode,
@@ -314,11 +308,6 @@ export function sameLook(a: SceneLook, b: SceneLook): boolean {
 	return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** The road's width (scene px) for a number of calls: thin when unused, thicker with use. */
-export function roadWidth(calls: number): number {
-	return 2.4 + Math.min(14, Math.log2(1 + calls) * 3.4);
-}
-
 function lengths(path: readonly Point[]): { legs: number[]; total: number } {
 	const legs: number[] = [];
 	let total = 0;
@@ -330,10 +319,6 @@ function lengths(path: readonly Point[]): { legs: number[]; total: number } {
 		total += len;
 	}
 	return { legs, total };
-}
-
-export function pathLength(path: readonly Point[]): number {
-	return lengths(path).total;
 }
 
 /** The point at `t` (0 to 1) along a path of straight legs, by length. */
@@ -380,61 +365,3 @@ export function subPath(path: readonly Point[], t: number): Point[] {
 	return out;
 }
 
-/** Dashes along a path: `dash` on, `gap` off, starting `offset` along it (an offset growing with time makes them flow). */
-export function dashes(path: readonly Point[], dash: number, gap: number, offset: number): Array<[Point, Point]> {
-	const { total } = lengths(path);
-	const period = dash + gap;
-	if (total === 0 || period <= 0) return [];
-	const out: Array<[Point, Point]> = [];
-	let start = (((offset % period) + period) % period) - period;
-	for (; start < total; start += period) {
-		const a = Math.max(0, start);
-		const b = Math.min(total, start + dash);
-		if (b > a) out.push([pathPoint(path, a / total), pathPoint(path, b / total)]);
-	}
-	return out;
-}
-
-/** Where a drone idles: its slot on the ellipse around the core's base, turning slowly with `turn` (radians). */
-export function orbitPoint(scene: SceneTable, slot: number, turn: number): Point {
-	const [cx, cy] = scene.core.centre;
-	const [rx, ry] = scene.core.orbit;
-	const a = turn + slot * 2.1;
-	return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry];
-}
-
-/** Where a drone hovers over a district while its call runs: above the road's end. */
-export function hoverPoint(scene: SceneTable, place: PlaceId): Point {
-	const road = roadOf(scene, place);
-	const end = road[road.length - 1] ?? scene.core.centre;
-	return [end[0], end[1] - 70];
-}
-
-/** A drone's flight from `from` to `to`: along the roads, through the core's base when it changes district. */
-export function dronePath(scene: SceneTable, from: Point, fromPlace: PlaceId, to: PlaceId, home: Point): Point[] {
-	const goingHome = to === "orchestrator" || to === "core";
-	const leave = fromPlace === "orchestrator" || fromPlace === "core" ? [] : [...roadOf(scene, fromPlace)].reverse();
-	const arrive = goingHome ? [home] : [...roadOf(scene, to), hoverPoint(scene, to)];
-	return [from, ...leave, ...arrive];
-}
-
-/** The holographic board above a district (scene px): where its live content shows. */
-export function holoPanelRect(scene: SceneTable, place: PlaceId): Rect {
-	const r = place === "orchestrator" ? scene.places.core.rect : scene.places[place].rect;
-	const w = Math.min(560, Math.max(380, r.w * 0.9));
-	const h = 190;
-	const x = Math.min(scene.space.width - w, Math.max(0, r.x + r.w / 2 - w / 2));
-	const y = Math.max(0, Math.min(scene.space.height - h, r.y - h * 0.55));
-	return { x, y, w, h };
-}
-
-/** The four release steps' slots on the Git district and prod's light, in scene px. */
-export function pipelineSlots(scene: SceneTable): { readonly steps: readonly Rect[]; readonly prod: Point } {
-	const r = scene.places.git.rect;
-	const top = r.y + r.h - 64;
-	const gap = 14;
-	const prodRoom = 44;
-	const w = (r.w - 24 - prodRoom - gap * 4) / 4;
-	const steps = [0, 1, 2, 3].map((i) => ({ x: r.x + 12 + i * (w + gap), y: top, w, h: 44 }));
-	return { steps, prod: [r.x + r.w - 12 - prodRoom / 2, top + 22] };
-}

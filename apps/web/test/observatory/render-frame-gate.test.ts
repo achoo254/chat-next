@@ -4,10 +4,8 @@
 // (and none with reduced motion or save-data), none while
 // the page is hidden, the Capacitor app is in the background, the canvas is
 // off screen or the GPU context is lost (work asked for meanwhile is drawn on
-// return); and a lost context shows the still plate, a second loss within a
-// minute stays still.
+// return).
 import { describe, expect, it, vi } from "vitest";
-import { guardContext, REPEAT_LOSS_MS } from "../../src/machines/observatory/render/context-guard.ts";
 import { AMBIENT_FPS, createFrameGate, type DrawResult, type FrameGateDeps } from "../../src/machines/observatory/render/frame-gate.ts";
 
 /** A fake requestAnimationFrame at 60 frames per second. */
@@ -279,57 +277,5 @@ describe("the frame gate", () => {
 		await Promise.resolve();
 		await Promise.resolve();
 		expect(offApp).toHaveBeenCalledOnce();
-	});
-});
-
-describe("the context guard", () => {
-	function guarded() {
-		const canvas = new EventTarget();
-		let now = 0;
-		const handlers = { lost: vi.fn(), restored: vi.fn(), givenUp: vi.fn() };
-		const guard = guardContext(canvas, handlers, () => now);
-		return { canvas, handlers, guard, at: (ms: number) => (now = ms) };
-	}
-
-	it("shows the still plate on loss and draws again on restore", () => {
-		const { canvas, handlers, guard } = guarded();
-		canvas.dispatchEvent(new Event("webglcontextlost"));
-		expect(handlers.lost).toHaveBeenCalledOnce();
-		expect(guard.lost).toBe(true);
-		canvas.dispatchEvent(new Event("webglcontextrestored"));
-		expect(handlers.restored).toHaveBeenCalledOnce();
-		expect(guard.lost).toBe(false);
-	});
-
-	it("stays still after a second loss within a minute", () => {
-		const { canvas, handlers, guard, at } = guarded();
-		at(1_000);
-		canvas.dispatchEvent(new Event("webglcontextlost"));
-		canvas.dispatchEvent(new Event("webglcontextrestored"));
-		at(1_000 + REPEAT_LOSS_MS - 1);
-		canvas.dispatchEvent(new Event("webglcontextlost"));
-		expect(handlers.givenUp).toHaveBeenCalledOnce();
-		canvas.dispatchEvent(new Event("webglcontextrestored"));
-		expect(handlers.restored).toHaveBeenCalledOnce();
-		expect(guard.givenUp).toBe(true);
-	});
-
-	it("a loss more than a minute after the last one is handled again", () => {
-		const { canvas, handlers, at } = guarded();
-		at(0);
-		canvas.dispatchEvent(new Event("webglcontextlost"));
-		canvas.dispatchEvent(new Event("webglcontextrestored"));
-		at(REPEAT_LOSS_MS + 1);
-		canvas.dispatchEvent(new Event("webglcontextlost"));
-		canvas.dispatchEvent(new Event("webglcontextrestored"));
-		expect(handlers.givenUp).not.toHaveBeenCalled();
-		expect(handlers.restored).toHaveBeenCalledTimes(2);
-	});
-
-	it("dispose stops listening", () => {
-		const { canvas, handlers, guard } = guarded();
-		guard.dispose();
-		canvas.dispatchEvent(new Event("webglcontextlost"));
-		expect(handlers.lost).not.toHaveBeenCalled();
 	});
 });

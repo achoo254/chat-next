@@ -1,119 +1,52 @@
-// The Live Map's scene table (format 2) and asset table: read and checked as
-// the renderer does (13 places, every rect and point on the plate, tiers,
-// frame names, plain file names only, clear errors otherwise); the plate
-// chosen by MAX_TEXTURE_SIZE, frame width and save-data; points projected
-// into the frame and back; a click found in a district's rect, the drones'
-// area as an ellipse around the core's base.
-import { describe, expect, it, vi } from "vitest";
-import {
-	ASSET_TABLE_FILE,
-	choosePlate,
-	fitScene,
-	loadSceneAssets,
-	parseAssetTable,
-	parseSceneTable,
-	PLACE_IDS,
-	placeAt,
-	project,
-	unproject,
-} from "../../src/machines/observatory/render/scene-table.ts";
-import { assetJson, fixtureFile, fixtureScene, fixtureTable, SCENE_FILE, sceneJson } from "./render-fixtures.ts";
+// The scene of the machine's interior as the approved design lays it out:
+// 13 places on the 1200 × 720 board, every rect and trace on it, tiers as the
+// design gives them, every trace starting at the model; the board fitted into
+// a frame; a click found on the model's lattice or in a module's box (its
+// name under it counts too).
+import { describe, expect, it } from "vitest";
+import { fitScene, INTERIOR, PLACE_IDS, placeAt } from "../../src/machines/observatory/render/scene-table.ts";
 
-type Raw = { places: { id: string; rect: number[]; label: number[]; tier: unknown; sprite: unknown; route: unknown }[] } & Record<string, unknown>;
-const raw = (): Raw => structuredClone(sceneJson()) as Raw;
-
-describe("the scene table", () => {
-	it("reads all 13 places with their rect, tier, frame, label and road", () => {
-		const scene = fixtureScene();
-		expect(Object.keys(scene.places).sort()).toEqual([...PLACE_IDS].sort());
-		expect(scene.space).toEqual({ width: 2400, height: 1440 });
+describe("the interior scene", () => {
+	it("holds all 13 places on the board, each trace from the model to its module", () => {
+		expect(Object.keys(INTERIOR.places).sort()).toEqual([...PLACE_IDS].sort());
+		expect(INTERIOR.space).toEqual({ width: 1200, height: 720 });
+		const inside = (x: number, y: number): boolean => x >= 0 && y >= 0 && x <= INTERIOR.space.width && y <= INTERIOR.space.height;
 		for (const id of PLACE_IDS) {
-			const p = scene.places[id];
-			expect(p.rect.w).toBeGreaterThan(0);
-			expect([1, 2, 3]).toContain(p.tier);
-			expect(p.sprite).toMatch(/^[a-z0-9-]+$/);
+			const p = INTERIOR.places[id];
+			expect(inside(p.rect.x, p.rect.y) && inside(p.rect.x + p.rect.w, p.rect.y + p.rect.h)).toBe(true);
+			for (const [x, y] of p.route) expect(inside(x, y)).toBe(true);
+			const [ex, ey] = p.route.at(-1) ?? [p.rect.x, p.rect.y];
+			// The trace ends on its module's edge.
+			expect(ex >= p.rect.x && ex <= p.rect.x + p.rect.w && ey >= p.rect.y && ey <= p.rect.y + p.rect.h).toBe(true);
 		}
-		expect(scene.places.files.route.length).toBeGreaterThanOrEqual(2);
-		expect(scene.places.core.route).toEqual([]);
-		expect(scene.core.radius).toBeGreaterThan(0);
+		// Every trace leaves from the model's box.
+		const m = INTERIOR.places.core.rect;
+		for (const id of ["files", "sandbox", "testing", "git", "mcp", "external", "memory", "skills", "security", "user-desk"] as const) {
+			const [sx, sy] = INTERIOR.places[id].route[0] ?? [0, 0];
+			expect(sx >= m.x && sx <= m.x + m.w && sy >= m.y && sy <= m.y + m.h).toBe(true);
+		}
 	});
 
-	it("loads both tables through fetch", async () => {
-		const fetcher = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(fixtureFile(url.slice("/observatory/".length))))));
-		const assets = await loadSceneAssets("/observatory/", fetcher as unknown as typeof fetch);
-		expect(fetcher.mock.calls.map(([u]) => u)).toEqual([`/observatory/${ASSET_TABLE_FILE}`, `/observatory/${SCENE_FILE}`]);
-		expect(assets.scene.places.core.label).toEqual(fixtureScene().places.core.label);
+	it("gives the design's tiers: main, secondary, background", () => {
+		const tier = (id: (typeof PLACE_IDS)[number]): number => INTERIOR.places[id].tier;
+		expect(["core", "monitoring", "files", "sandbox", "testing", "git"].map((id) => tier(id as (typeof PLACE_IDS)[number]))).toEqual([1, 1, 1, 1, 1, 1]);
+		expect([tier("mcp"), tier("external")]).toEqual([2, 2]);
+		expect([tier("memory"), tier("skills"), tier("security"), tier("user-desk")]).toEqual([3, 3, 3, 3]);
 	});
 
-	it("fails on an answer that is not 200", async () => {
-		const fetcher = vi.fn(() => Promise.resolve(new Response("", { status: 404 })));
-		await expect(loadSceneAssets("/observatory/", fetcher as unknown as typeof fetch)).rejects.toThrow(/404/);
+	it("fits the board into a frame, letterboxed", () => {
+		expect(fitScene(INTERIOR.space, { width: 600, height: 360 })).toEqual({ scale: 0.5, offsetX: 0, offsetY: 0 });
+		expect(fitScene(INTERIOR.space, { width: 1200, height: 1000 })).toEqual({ scale: 1, offsetX: 0, offsetY: 140 });
+		expect(fitScene(INTERIOR.space, { width: 0, height: 10 }).scale).toBe(0);
 	});
 
-	it("refuses the old format 1 table, a missing place, a rect or point off the plate, a bad tier or frame name", () => {
-		expect(() => parseSceneTable({ ...raw(), formatVersion: 1 })).toThrow(/format 1 is not 2/);
-		const r = raw();
-		expect(() => parseSceneTable({ ...r, places: r.places.filter((p) => p.id !== "monitoring") })).toThrow(/places missing: monitoring/);
-		const off = raw();
-		const first = off.places[0];
-		if (first !== undefined) first.rect = [2300, 10, 200, 10];
-		expect(() => parseSceneTable(off)).toThrow(/rect is outside the plate/);
-		const label = raw();
-		if (label.places[1] !== undefined) label.places[1].label = [9_999, 10];
-		expect(() => parseSceneTable(label)).toThrow(/label is outside the plate/);
-		const tier = raw();
-		if (tier.places[0] !== undefined) tier.places[0].tier = 4;
-		expect(() => parseSceneTable(tier)).toThrow(/tier is not 1, 2 or 3/);
-		const frame = raw();
-		if (frame.places[0] !== undefined) frame.places[0].sprite = "../x";
-		expect(() => parseSceneTable(frame)).toThrow(/sprite is not a frame name/);
-		const road = raw();
-		if (road.places[3] !== undefined) road.places[3].route = [[10, 10]];
-		expect(() => parseSceneTable(road)).toThrow(/route has a single point/);
-		expect(() => parseSceneTable({ ...raw(), core: undefined })).toThrow(/core is missing/);
-	});
-
-	it("refuses an asset file name that is a path or a URL, and another asset format", () => {
-		for (const scene of ["../secret.json", "https://elsewhere/x.json", "a/b.json", ".hidden"]) expect(() => parseAssetTable({ ...assetJson(), scene })).toThrow(/file name/);
-		expect(() => parseAssetTable({ ...assetJson(), formatVersion: 2 })).toThrow(/format/);
-	});
-});
-
-describe("choosing the plate", () => {
-	const table = fixtureTable();
-	it("takes the full plate only when the GPU takes it, the frame is wide and data is not saved", () => {
-		expect(choosePlate(table, { maxTextureSize: 4096, frameWidth: 1200, saveData: false })).toBe(table.plate.full);
-		expect(choosePlate(table, { maxTextureSize: 2400, frameWidth: 900, saveData: false })).toBe(table.plate.full);
-		expect(choosePlate(table, { maxTextureSize: 2048, frameWidth: 1200, saveData: false })).toBe(table.plate.half);
-		expect(choosePlate(table, { maxTextureSize: 4096, frameWidth: 899, saveData: false })).toBe(table.plate.half);
-		expect(choosePlate(table, { maxTextureSize: 4096, frameWidth: 1200, saveData: true })).toBe(table.plate.half);
-		expect(choosePlate(table, { maxTextureSize: null, frameWidth: 1200, saveData: false })).toBe(table.plate.full);
-	});
-});
-
-describe("projecting and hitting", () => {
-	const space = { width: 2400, height: 1440 };
-	it("fits the scene whole and centred, and maps points both ways", () => {
-		const tall = fitScene(space, { width: 600, height: 900 });
-		expect(tall.scale).toBe(0.25);
-		expect(project([1200, 720], tall)).toEqual({ x: 300, y: 450 });
-		const back = unproject(300, 450, tall);
-		expect(back[0]).toBeCloseTo(1200);
-		expect(back[1]).toBeCloseTo(720);
-		expect(fitScene(space, { width: 0, height: 500 }).scale).toBe(0);
-	});
-
-	it("finds a district by its rect, and the drones' area around the core's base", () => {
-		const scene = fixtureScene();
-		const r = scene.places.files.rect;
-		expect(placeAt(scene, [r.x + r.w / 2, r.y + r.h / 2])).toBe("files");
-		const s = scene.places.security.rect;
-		expect(placeAt(scene, [s.x + 2, s.y + 2])).toBe("security");
-		expect(placeAt(scene, [2399, 1439])).toBeNull();
-		const [cx, cy] = scene.core.centre;
-		const [rx] = scene.core.orbit;
-		// On the drones' ellipse, right of the tower and in no district's rect.
-		expect(placeAt(scene, [cx + rx * 0.9, cy])).toBe("orchestrator");
-		expect(placeAt(scene, [cx + rx * 1.2, cy - 400])).not.toBe("orchestrator");
+	it("finds the model within its radius, a module in its box or on its name, nothing on empty ground", () => {
+		expect(placeAt(INTERIOR, INTERIOR.core.centre)).toBe("core");
+		expect(placeAt(INTERIOR, [200, 560])).toBe("files");
+		expect(placeAt(INTERIOR, [200, 640])).toBe("files");
+		expect(placeAt(INTERIOR, [880, 560])).toBe("sandbox");
+		expect(placeAt(INTERIOR, [380, 300])).toBe("monitoring");
+		expect(placeAt(INTERIOR, [20, 330])).toBe("user-desk");
+		expect(placeAt(INTERIOR, [40, 40])).toBeNull();
 	});
 });

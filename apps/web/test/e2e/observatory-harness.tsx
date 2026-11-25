@@ -1,9 +1,9 @@
 // The page observatory.e2e.ts opens: the real Live Map view (LiveMapView,
-// with its PixiJS stage, drawer, detail and replay bar, on the app's styles
-// and the AI-drawn plate of public/observatory/) watching one session of a
-// fake machine. The machine is a link answering Observatory's requests in the
-// page: the watch with a snapshot of a session that began 90 s ago, a
-// station's numbers, an event's content, no older events. The test reads the
+// with its activity card, scene, session gauges, detail and event list, on
+// the app's styles) watching one session of a fake machine. The machine is a
+// link answering Observatory's requests in the page: the watch with a
+// snapshot of a session that began 90 s ago, a station's numbers, an event's
+// content, no older events. The test reads the
 // requests asked and makes the machine send a live event through
 // window.__observeHarness.
 import { create } from "@bufbuild/protobuf";
@@ -52,7 +52,7 @@ type Body = Frame["body"];
 type Request = Parameters<ObservatoryLink["request"]>[0];
 
 const SESSION = "s1";
-/** Within the 90 days a replay keeps, so the bar plays. */
+/** A session that began 90 s ago. */
 const START = Date.now() - 90_000;
 /** A Unix-ms moment of the session as the wire carries it. */
 const at = (ms: number): bigint => BigInt(START + ms);

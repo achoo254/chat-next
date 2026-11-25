@@ -1,24 +1,17 @@
-// What the session's events make the Live Map's city do: every move names
+// What the session's events make the Live Map's scene do: every move names
 // its source event (packets out along a district's road when a call starts,
 // back when it ends, red when it failed; pulses at a place), the camera's
 // activity, the roads' numbers (calls, failures, the running calls and when
 // each passes its kind's p95 of the session, the actor), the districts'
 // presence and activity, the drones and their districts, the context, the
-// thinking spin; and the shared geometry (points along a road, dashes, a
-// drone's flight, the board over a district, the pipeline's slots).
+// thinking spin; and the shared geometry (points along a trace, the part of
+// a trace to a fraction of its length).
 import { describe, expect, it } from "vitest";
 import {
 	activityOf,
-	dashes,
-	dronePath,
-	holoPanelRect,
 	lookOf,
 	movesOf,
-	pathLength,
 	pathPoint,
-	pipelineSlots,
-	roadOf,
-	roadWidth,
 	sameLook,
 	subPath,
 } from "../../src/machines/observatory/render/prop-map.ts";
@@ -102,8 +95,8 @@ describe("the activity and the look", () => {
 		const { state } = played([prompt(1, 0), subagent("ag", 5), subagent("ag2", 6), tool("r", 10, { agentId: "ag", station: "SANDBOX" })]);
 		const look = lookOf(state, scene);
 		expect(look.drones).toEqual([
-			{ agentId: "ag", agentType: "Explore", target: "sandbox", slot: 0 },
-			{ agentId: "ag2", agentType: "Explore", target: "orchestrator", slot: 1 },
+			{ agentId: "ag", agentType: "Explore", slot: 0 },
+			{ agentId: "ag2", agentType: "Explore", slot: 1 },
 		]);
 		const job = look.roads.find((r) => r.place === "sandbox")?.running[0];
 		expect(job?.agentId).toBe("ag");
@@ -125,7 +118,6 @@ describe("geometry", () => {
 	] as const;
 
 	it("walks a path by length, also on diagonal roads", () => {
-		expect(pathLength(path)).toBe(200);
 		expect(pathPoint(path, 0.5)).toEqual([100, 0]);
 		expect(pathPoint(path, 0.75)).toEqual([100, 50]);
 		expect(pathPoint([[0, 0], [30, 40]], 0.5)).toEqual([15, 20]);
@@ -133,40 +125,5 @@ describe("geometry", () => {
 			[0, 0],
 			[50, 0],
 		]);
-	});
-
-	it("cuts dashes that move along with the offset", () => {
-		const a = dashes(path, 20, 10, 0);
-		expect(a[0]).toEqual([
-			[0, 0],
-			[20, 0],
-		]);
-		const b = dashes(path, 20, 10, 5);
-		expect(b[0]?.[1]).toEqual([25, 0]);
-		expect(dashes([[0, 0]], 20, 10, 0)).toEqual([]);
-	});
-
-	it("widens a road with its calls", () => {
-		expect(roadWidth(0)).toBeLessThan(roadWidth(5));
-		expect(roadWidth(1_000)).toBeLessThanOrEqual(roadWidth(10_000));
-	});
-
-	it("flies a drone along the roads through the core's base and keeps boards and slots on the scene", () => {
-		const home: [number, number] = [scene.core.centre[0] + 100, scene.core.centre[1]];
-		const out = dronePath(scene, home, "orchestrator", "files", home);
-		expect(out[0]).toEqual(home);
-		expect(out.slice(1, 1 + roadOf(scene, "files").length)).toEqual(roadOf(scene, "files"));
-		const back = dronePath(scene, [1, 1], "files", "orchestrator", home);
-		expect(back.at(-1)).toEqual(home);
-		for (const id of ["files", "sandbox", "core", "user-desk"] as const) {
-			const r = holoPanelRect(scene, id);
-			expect(r.x).toBeGreaterThanOrEqual(0);
-			expect(r.y).toBeGreaterThanOrEqual(0);
-			expect(r.x + r.w).toBeLessThanOrEqual(scene.space.width);
-		}
-		const slots = pipelineSlots(scene);
-		expect(slots.steps).toHaveLength(4);
-		const git = scene.places.git.rect;
-		for (const s of slots.steps) expect(s.x >= git.x && s.x + s.w <= git.x + git.w).toBe(true);
 	});
 });

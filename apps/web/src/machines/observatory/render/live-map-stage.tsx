@@ -1,71 +1,60 @@
-// The Live Map's frame: the activity card (the main read) with the session's
-// figures and "Ẩn chi tiết" (remembered on this device, it hides file names,
-// domains, commands, MCP tool names, the account's email and content), then
-// the scene: the plate and the PixiJS canvas (live-map-app.ts, its own chunk,
-// loaded when the frame mounts and destroyed when it unmounts), and over it
-// the DOM world layer the camera moves (stage-world-layer.tsx: buttons, tags,
-// road figures, the pipeline's steps, the board of the district in view), the
-// camera's modes, the overview map and the legend.
+// The Live Map, laid out as the approved design (prototype v6): on the left
+// the activity card (the main read) over the scene of the machine's interior
+// (a 2D canvas drawn by live-map-app.ts, mounted when the frame mounts and
+// dropped when it unmounts) with the camera's modes; on the right the
+// session's gauges, the detail of what was picked and the event list
+// (live-map-side.tsx, event-feed.tsx); under them how to read the scene.
+// "Ẩn chi tiết" (remembered on this device) hides file names, domains,
+// commands, MCP tool names and content.
 //
 // Camera: auto follows the AI; a drag, a pinch or Ctrl/⌘ + wheel switches to
 // free, where the wheel alone zooms too (elsewhere a plain wheel scrolls the
-// page past the map); a click on a district selects it (its drawer opens as
-// before) and switches to focus; a click on empty ground clears the selection
-// and goes back to auto. Tab onto a district's button frames it (the camera
-// leans to it, and the frame never scrolls under the canvas); Enter selects
-// it. A click on a moving packet opens its source event. Live times read in
-// the machine's clock (machine-clock.ts). When neither WebGL
-// nor Canvas can draw, or the GPU context is lost, the plate shows as a still
-// picture with the same tags and buttons (the camera then stays on the whole
-// scene).
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type MouseEvent, type PointerEvent } from "react";
+// page past the map); a click on a module picks it (its detail shows) and
+// switches to focus; a click on empty ground clears the pick and goes back
+// to auto. Each module is also a button under the canvas, reachable with
+// Tab: focusing one frames it (the frame never scrolls), Enter picks it. A
+// click on a moving packet opens its source event. Live times read in the
+// machine's clock (machine-clock.ts). A browser without a 2D canvas shows
+// the card and the column only.
+import { useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent } from "react";
 import { activityCardOf, DONE_HOLD_MS } from "../activity-card-model.ts";
 import { ActivityCard } from "../activity-card.tsx";
+import { EventFeed, feedRowsOf } from "../event-feed.tsx";
+import { duration } from "../drill-format.ts";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
+import { DetailBox, SessionBox, type SidePick } from "../live-map-side.tsx";
+import { machineNow } from "../machine-clock.ts";
 import { useObservatoryCopy } from "../observatory-copy.ts";
 import { placeNames } from "../place-names.ts";
-import { machineNow } from "../machine-clock.ts";
 import { useTickingNow, type ContentSource } from "../use-tool-content.ts";
 import { useMachinesCopy } from "../../use-machines-copy.ts";
 import "../live-map.css";
-import "../station-palette.css";
-import type { CameraMode, CameraView } from "./camera-director.ts";
-import type { CameraState, LiveMapHandle, LiveMapMountOptions } from "./live-map-app.ts";
+import type { CameraMode } from "./camera-director.ts";
+import type { CameraState, LiveMapHandle, LiveMapMountOptions, PaintWords, RootPlacement } from "./live-map-app.ts";
 import { lookOf } from "./prop-map.ts";
-import type { RootPlacement } from "./scene-layers.ts";
-import { CameraControls, Legend, Minimap } from "./stage-camera-controls.tsx";
-import { WorldLayer } from "./stage-world-layer.tsx";
-import { assetBase, choosePlate, fitScene, loadSceneAssets, PLACE_IDS, type PlaceId, type SceneAssets } from "./scene-table.ts";
+import { fitScene, INTERIOR, PLACE_IDS, type PlaceId } from "./scene-table.ts";
 
 export const HIDE_DETAILS_KEY = "observe.hideDetails";
 /** "1" keeps the animation log and exposes the scene as window.__liveMap (acceptance runs). */
 export const ANIMATION_LOG_KEY = "observe.animationLog";
 
-type Mount = (options: LiveMapMountOptions) => Promise<LiveMapHandle>;
+type Mount = (options: LiveMapMountOptions) => LiveMapHandle;
 
 export interface LiveMapStageProps {
 	readonly state: LiveMapState;
-	/** The signed-in chat account's email: the input port's tag. */
-	readonly accountEmail: string;
-	readonly selectedPlace: PlaceId | null;
-	readonly onStation: (place: PlaceId) => void;
-	readonly onEvent: (eventId: string) => void;
-	/** A click on empty ground: the selection goes. */
-	readonly onDeselect?: () => void;
-	/** "Ẩn chi tiết" was switched: the drawer and the detail follow it. */
-	readonly onHideDetails?: (hide: boolean) => void;
-	/** The replayed moment (machine ms); absent while live. */
-	readonly replayAt?: number | undefined;
+	/** Open with this event's detail (a link's `?event=`). */
+	readonly initialEvent?: string | undefined;
+	/** The pick changed (the page marks it for tests and links). */
+	readonly onPick?: (pick: SidePick) => void;
 	/** The machine's clock minus the viewer's (ms): live times are compared with the machine's now (machine-clock.ts). */
 	readonly clockSkewMs?: number | undefined;
-	/** Where the card and boards may ask a call's content; absent: they say it is not available. */
+	/** Where the card and the detail may ask a call's content; absent: they say it is not available. */
 	readonly contentSource?: ContentSource | undefined;
-	/** Test seams: the asset loader and the renderer's module. */
-	readonly loadAssets?: () => Promise<SceneAssets>;
+	/** Test seam: the renderer's module. */
 	readonly loadRenderer?: () => Promise<{ mountLiveMap: Mount }>;
 }
 
-type RenderStatus = "loading" | "ready" | "still" | "lost";
+type RenderStatus = "loading" | "ready" | "still";
 
 function readFlag(key: string): boolean {
 	try {
@@ -105,7 +94,6 @@ function appStateWatcher(): LiveMapMountOptions["watchAppState"] {
 	return (onChange) => import("../../../native/native-app.ts").then((native) => native.subscribeAppState(onChange));
 }
 
-const defaultAssets = (): Promise<SceneAssets> => loadSceneAssets(assetBase(import.meta.env.BASE_URL));
 const defaultRenderer = (): Promise<{ mountLiveMap: Mount }> => import("./live-map-app.ts");
 
 /** The frame's size, followed with ResizeObserver. */
@@ -123,24 +111,27 @@ function useSize(el: HTMLElement | null): { width: number; height: number } {
 	return size;
 }
 
-/** Moves the DOM world layer and the overview's view box with the camera (no React render). */
-function applyView(world: HTMLElement | null, minimapView: HTMLElement | null, p: RootPlacement, view: CameraView, space: { width: number; height: number }): void {
-	if (world !== null) {
-		world.style.transform = `translate(${p.x}px, ${p.y}px) scale(${p.scale})`;
-		world.style.setProperty("--lm-inv", String(p.scale > 0 ? 1 / p.scale : 1));
-	}
-	if (minimapView !== null) {
-		const w = 1 / view.s;
-		minimapView.style.left = `${((view.x - space.width * w * 0.5) / space.width) * 100}%`;
-		minimapView.style.top = `${((view.y - space.height * w * 0.5) / space.height) * 100}%`;
-		minimapView.style.width = `${w * 100}%`;
-		minimapView.style.height = `${w * 100}%`;
-	}
+/** Moves the modules' buttons with the camera (no React render). */
+function applyView(world: HTMLElement | null, p: RootPlacement): void {
+	if (world === null) return;
+	world.style.transform = `translate(${p.x}px, ${p.y}px) scale(${p.scale})`;
 }
 
 const AUTO: CameraState = { mode: "auto", zone: null, contentZone: null, switches: 0 };
 
-export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, onEvent, onDeselect, onHideDetails, replayAt, clockSkewMs = 0, contentSource, loadAssets = defaultAssets, loadRenderer = defaultRenderer }: LiveMapStageProps) {
+/** The legend's paragraph: bold and plain parts, bold first. */
+function LegendParagraph({ parts }: { parts: readonly string[] }) {
+	return (
+		<div>
+			{parts.map((part, i) =>
+				// The parts never move: their index is their identity.
+				i % 2 === 0 ? <b key={i}>{part}</b> : <span key={i}>{part}</span>,
+			)}
+		</div>
+	);
+}
+
+export function LiveMapStage({ state, initialEvent, onPick, clockSkewMs = 0, contentSource, loadRenderer = defaultRenderer }: LiveMapStageProps) {
 	const observe = useMachinesCopy().observe;
 	const t = observe.map;
 	const c = useObservatoryCopy();
@@ -148,44 +139,34 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 	const [frame, setFrame] = useState<HTMLDivElement | null>(null);
 	const host = useRef<HTMLDivElement | null>(null);
 	const world = useRef<HTMLDivElement | null>(null);
-	const minimapView = useRef<HTMLDivElement | null>(null);
 	const size = useSize(frame);
-	const [assets, setAssets] = useState<SceneAssets | null>(null);
-	const [assetsFailed, setAssetsFailed] = useState(false);
 	const [status, setStatus] = useState<RenderStatus>("loading");
-	const [renderer, setRenderer] = useState<string>("");
 	const [hide, setHide] = useState(() => readFlag(HIDE_DETAILS_KEY));
-	const [batches, setBatches] = useState<Partial<Record<PlaceId, number>>>({});
 	const [camera, setCamera] = useState<CameraState>(AUTO);
+	const [pick, setPickState] = useState<SidePick>(initialEvent === undefined ? null : { kind: "event", eventId: initialEvent });
+	/** The module the camera's focus is on: kept while an event's detail is opened, as in the design. */
+	const [focused, setFocused] = useState<PlaceId | null>(null);
 	const handle = useRef<LiveMapHandle | null>(null);
 	const played = useRef(new WeakSet<Animation>());
 	const latest = useRef(state);
 	const skew = useRef(clockSkewMs);
-	const onEventRef = useRef(onEvent);
+	const hideRef = useRef(hide);
+	const words: PaintWords = useMemo(() => ({ copy: c.scene, duration: (ms: number) => duration(c, ms) }), [c]);
+	const wordsRef = useRef(words);
 	const gesture = useRef<{ pointers: Map<number, { x: number; y: number }>; moved: boolean; start: { x: number; y: number } | null; suppressClick: boolean }>({ pointers: new Map(), moved: false, start: null, suppressClick: false });
 	useEffect(() => {
 		latest.current = state;
 		skew.current = clockSkewMs;
-		onEventRef.current = onEvent;
+		hideRef.current = hide;
+		wordsRef.current = words;
 	});
 
-	useEffect(() => {
-		let alive = true;
-		loadAssets().then(
-			(a) => {
-				if (alive) setAssets(a);
-			},
-			(error: unknown) => {
-				console.warn("live map: scene assets did not load", error);
-				if (alive) setAssetsFailed(true);
-			},
-		);
-		return () => {
-			alive = false;
-		};
-	}, [loadAssets]);
+	const setPick = (next: SidePick): void => {
+		setPickState(next);
+		onPick?.(next);
+	};
 
-	const ready = assets !== null && size.width > 0 && size.height > 0;
+	const ready = size.width > 0 && size.height > 0;
 	// The renderer mounts once per frame lifetime; size changes go through resize.
 	const mountSize = useRef(size);
 	useEffect(() => {
@@ -193,7 +174,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 	});
 	useEffect(() => {
 		const el = host.current;
-		if (!ready || assets === null || el === null) return;
+		if (!ready || el === null) return;
 		let alive = true;
 		let mounted: LiveMapHandle | null = null;
 		const record = readFlag(ANIMATION_LOG_KEY);
@@ -204,26 +185,17 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 			.then((module) =>
 				module.mountLiveMap({
 					host: el,
-					assets,
 					state: latest.current,
 					width: mountSize.current.width,
 					height: mountSize.current.height,
+					words: wordsRef.current,
+					hide: hideRef.current,
 					saveData: saveData(),
 					reduceMotion,
 					wallClock: () => machineNow(Date.now(), skew.current),
 					record,
-					onBatch: (place, count) => setBatches((b) => ({ ...b, [place]: count ?? undefined })),
-					onView: (p, view) => applyView(world.current, minimapView.current, p, view, assets.scene.space),
+					onView: (p) => applyView(world.current, p),
 					onCamera: setCamera,
-					onStill: (reason) => {
-						if (reason === "given-up") {
-							mounted?.destroy();
-							mounted = null;
-							handle.current = null;
-							setStatus("still");
-						} else setStatus("lost");
-					},
-					onRestored: () => setStatus("ready"),
 					...(watchAppState === undefined ? {} : { watchAppState }),
 				}),
 			)
@@ -236,11 +208,10 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 					mounted = h;
 					handle.current = h;
 					if (record) Reflect.set(window, "__liveMap", h);
-					setRenderer(h.renderer);
 					setStatus("ready");
 				},
 				(error: unknown) => {
-					console.warn("live map: the renderer could not start, showing the still scene", error);
+					console.warn("live map: the scene could not start", error);
 					if (alive) setStatus("still");
 				},
 			);
@@ -251,31 +222,39 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 			handle.current = null;
 			if (record) Reflect.deleteProperty(window, "__liveMap");
 		};
-	}, [ready, assets, loadRenderer]);
+	}, [ready, loadRenderer]);
 
 	useEffect(() => {
 		const h = handle.current;
 		if (h === null || status !== "ready") return;
 		const fresh = state.animations.filter((a) => !played.current.has(a));
 		for (const a of fresh) played.current.add(a);
-		h.update(state, fresh, replayAt ?? null);
-	}, [state, status, replayAt]);
+		h.update(state, fresh);
+	}, [state, status]);
 
 	useEffect(() => {
 		handle.current?.resize(size.width, size.height);
 	}, [size.width, size.height, status]);
 
-	// Without the renderer, the world layer stays on the whole scene.
 	useEffect(() => {
-		if (assets === null || status === "ready") return;
-		const fit = fitScene(assets.scene.space, size);
-		applyView(world.current, minimapView.current, { scale: fit.scale, x: fit.offsetX, y: fit.offsetY }, { x: assets.scene.space.width / 2, y: assets.scene.space.height / 2, s: 1 }, assets.scene.space);
-	}, [assets, size, status]);
+		handle.current?.setWords(words);
+	}, [words, status]);
 
 	useEffect(() => {
-		handle.current?.select(selectedPlace);
-		if (selectedPlace === null && camera.mode === "focus") handle.current?.setCameraMode("auto");
-	}, [selectedPlace, camera.mode, status]);
+		handle.current?.setHide(hide);
+	}, [hide, status]);
+
+	// Without the scene, the buttons stay on the whole board.
+	useEffect(() => {
+		if (status === "ready") return;
+		const fit = fitScene(INTERIOR.space, size);
+		applyView(world.current, { scale: fit.scale, x: fit.offsetX, y: fit.offsetY });
+	}, [size, status]);
+
+	useEffect(() => {
+		handle.current?.select(focused);
+		if (focused === null && camera.mode === "focus") handle.current?.setCameraMode("auto");
+	}, [focused, camera.mode, status]);
 
 	// Ctrl/⌘ + wheel zooms the scene (and switches to free); in free the wheel alone does. Otherwise the page scrolls.
 	// A native listener: React's is passive.
@@ -297,26 +276,31 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 		return () => frame.removeEventListener("wheel", onWheel);
 	}, [frame]);
 
-	const look = useMemo(() => (assets === null ? null : lookOf(state, assets.scene)), [state, assets]);
-	const busy = look !== null && look.mode !== "idle";
+	const look = useMemo(() => lookOf(state, INTERIOR), [state]);
+	const busy = look.mode !== "idle";
 	// Live: the clock ticks while the AI works; a finished call's hold is read again once it is over.
 	// A CI run's timer ticks too (it runs after Claude's turn), and it turns unknown once stale.
-	const ciRunning = look !== null && look.pipeline.steps.ci.status === "run";
-	const tick = useTickingNow(replayAt === undefined && (busy || ciRunning), state, DONE_HOLD_MS + 50, clockSkewMs);
-	const now = replayAt ?? tick;
+	const ciRunning = look.pipeline.steps.ci.status === "run";
+	const now = useTickingNow(busy || ciRunning, state, DONE_HOLD_MS + 50, clockSkewMs);
 	const card = activityCardOf(state, now);
-	const active = useMemo(() => new Set(look === null ? [] : PLACE_IDS.filter((p) => look.places[p].active)), [look]);
+	const feed = useMemo(() => feedRowsOf(c, state, hide), [c, state, hide]);
 
 	const toggleHide = (): void => {
 		const next = !hide;
 		writeFlag(HIDE_DETAILS_KEY, next);
 		setHide(next);
-		onHideDetails?.(next);
+	};
+
+	const pickPlace = (place: PlaceId): void => {
+		setPick({ kind: "place", place });
+		setFocused(place);
+		handle.current?.select(place);
+		handle.current?.setCameraMode("focus");
 	};
 
 	const setMode = (mode: CameraMode): void => {
 		handle.current?.setCameraMode(mode);
-		if (mode === "focus" && selectedPlace === null) onStation(camera.zone ?? "core");
+		if (mode === "focus" && focused === null) pickPlace(camera.zone ?? "core");
 	};
 
 	const local = (e: { clientX: number; clientY: number; currentTarget: Element }): { x: number; y: number } => {
@@ -366,8 +350,8 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 		}
 	};
 
-	// The frame clips the scene (overflow hidden): focusing a button near its edge would scroll it and shift the DOM
-	// layer off the canvas. It never scrolls; the camera frames the focused district instead.
+	// The frame clips the scene (overflow hidden): focusing a button near its edge would scroll it and shift the
+	// buttons off the canvas. It never scrolls; the camera frames the focused module instead.
 	const keepUnscrolled = (el: HTMLElement): void => {
 		if (el.scrollLeft !== 0) el.scrollLeft = 0;
 		if (el.scrollTop !== 0) el.scrollTop = 0;
@@ -382,7 +366,7 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 		if (place !== null) handle.current?.peek(place);
 	};
 	const onBlur = (e: FocusEvent<HTMLDivElement>): void => {
-		// Moving to another district's button: its own focus frames it.
+		// Moving to another module's button: its own focus frames it.
 		if (hitPlace(e.target) !== null && hitPlace(e.relatedTarget) === null) handle.current?.peek(null);
 	};
 
@@ -392,105 +376,112 @@ export function LiveMapStage({ state, accountEmail, selectedPlace, onStation, on
 			g.suppressClick = false;
 			return;
 		}
-		// The controls over the scene handle their own clicks.
-		if (e.target instanceof Element && e.target.closest(".lm-camctl, .lm-minimap, .lm-legend") !== null) return;
+		// The camera's controls handle their own clicks.
+		if (e.target instanceof Element && e.target.closest(".lm-camctl") !== null) return;
 		const h = handle.current;
+		const p = local(e);
 		// A pointer click (not Enter on a button) on a moving packet opens its event.
 		if (h !== null && e.detail > 0) {
-			const p = local(e);
 			const id = h.hitEvent(p.x, p.y);
 			if (id !== null) {
-				onEventRef.current(id);
+				setPick({ kind: "event", eventId: id });
 				return;
 			}
 		}
-		const place = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-place]")?.dataset.place : undefined;
-		const id = PLACE_IDS.find((p) => p === place);
-		if (id !== undefined) {
-			onStation(id);
-			h?.select(id);
-			h?.setCameraMode("focus");
-		} else if (e.detail > 0) {
-			onDeselect?.();
+		const button = e.target instanceof Element ? e.target.closest<HTMLElement>("[data-place]")?.dataset.place : undefined;
+		const place = PLACE_IDS.find((x) => x === button) ?? (h !== null && e.detail > 0 ? h.placeAt(p.x, p.y) : null);
+		if (place !== null) pickPlace(place === "orchestrator" ? "core" : place);
+		else if (e.detail > 0) {
+			// Empty ground clears the pick; only focus goes back to auto (free stays where the person put it), as in the design.
+			setPick(null);
+			setFocused(null);
 			h?.select(null);
-			h?.setCameraMode("auto");
+			if (camera.mode === "focus") h?.setCameraMode("auto");
 		}
 	};
 
-	const plate = assets === null ? null : choosePlate(assets.table, { maxTextureSize: null, frameWidth: size.width, saveData: saveData() });
-	const showPlate = status !== "ready";
-	const note = assetsFailed || status === "still" ? t.still : status === "lost" ? t.lost : null;
-	const percent = state.live?.contextPercent ?? null;
-	const tps = state.live?.tokensPerSecond ?? state.scene.tokensPerSecond;
-	const model = state.live?.mainModel || state.scene.model;
-	const contentZone = status === "ready" ? camera.contentZone : selectedPlace;
-	const where = camera.mode === "free" ? c.camera.free : camera.mode === "focus" ? (selectedPlace === null ? c.camera.whole : names[selectedPlace]) : camera.zone === null ? c.camera.whole : names[camera.zone];
+	const where = camera.mode === "free" ? c.camera.free : camera.mode === "focus" ? (focused === null ? c.camera.whole : names[focused]) : camera.zone === null ? c.camera.whole : names[camera.zone];
+	const modes: readonly CameraMode[] = ["auto", "free", "focus"];
 
 	return (
-		<section className={`lm-stage${hide ? " is-hidden-details" : ""}`} aria-label={t.label} data-id="observe-stage" data-status={assetsFailed ? "still" : status} data-renderer={renderer} data-camera={camera.mode}>
-			<div className="lm-meta" data-id="observe-meta">
-				{percent !== null && (
-					<span title={state.live?.contextWindowAssumed === true ? t.contextApproxHint : undefined} data-id="observe-context">
-						{state.live?.contextWindowAssumed === true ? t.contextApprox(Math.round(percent)) : t.context(Math.round(percent))}
-					</span>
-				)}
-				{tps !== null && <span>{t.speed(Math.round(tps))}</span>}
-				{model !== "" && <span>{model}</span>}
-				<label className="lm-toggle" title={t.hideDetailsHint}>
-					<input type="checkbox" checked={hide} onChange={toggleHide} data-id="observe-hide-details" />
-					{t.hideDetails}
-				</label>
-			</div>
-			<ActivityCard card={card} names={names} hide={hide} source={contentSource ?? null} onDetail={(id) => onEventRef.current(id)} />
-			{/* Pointer gestures only move the camera; every action is also a button reachable with Tab. */}
-			{/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
-			<div
-				className="lm-frame"
-				ref={setFrame}
-				onClick={onClick}
-				onFocus={onFocus}
-				onBlur={onBlur}
-				onScroll={(e) => keepUnscrolled(e.currentTarget)}
-				onPointerDown={onPointerDown}
-				onPointerMove={onPointerMove}
-				onPointerUp={onPointerEnd}
-				onPointerCancel={onPointerEnd}
-				style={assets === null ? undefined : ({ "--lm-ratio": assets.scene.space.width / assets.scene.space.height } as CSSProperties)}
-			>
-				<div className="lm-canvas-host" ref={host} />
-				<div className="lm-world" ref={world} style={assets === null ? undefined : { width: assets.scene.space.width, height: assets.scene.space.height }}>
-					{showPlate && plate !== null && assets !== null && <img className="lm-plate" src={assets.base + plate.file} alt="" />}
-					{assets !== null && (
-						<WorldLayer
-							scene={assets.scene}
-							state={state}
-							now={now}
-							names={names}
-							observe={observe}
-							c={c}
-							accountEmail={accountEmail}
-							hide={hide}
-							selectedPlace={selectedPlace}
-							contentZone={contentZone}
-							source={contentSource ?? null}
-							batches={batches}
-						/>
-					)}
+		<section className={`lm-stage${hide ? " is-hidden-details" : ""}`} aria-label={t.label} data-id="observe-stage" data-status={status} data-camera={camera.mode}>
+			<div className="lm-main">
+				<div className="lm-col">
+					<ActivityCard
+						card={card}
+						names={names}
+						hide={hide}
+						source={contentSource ?? null}
+						tokensPerSecond={state.live?.tokensPerSecond ?? state.scene.tokensPerSecond}
+						contextPercent={state.live?.contextPercent ?? null}
+						onDetail={(id) => setPick({ kind: "event", eventId: id })}
+					/>
+					{/* Pointer gestures only move the camera; every action is also a button reachable with Tab. */}
+					{/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+					<div
+						className="lm-board"
+						ref={setFrame}
+						onClick={onClick}
+						onFocus={onFocus}
+						onBlur={onBlur}
+						onScroll={(e) => keepUnscrolled(e.currentTarget)}
+						onPointerDown={onPointerDown}
+						onPointerMove={onPointerMove}
+						onPointerUp={onPointerEnd}
+						onPointerCancel={onPointerEnd}
+					>
+						<div className="lm-canvas-host" ref={host} />
+						<div className="lm-world" ref={world} style={{ width: INTERIOR.space.width, height: INTERIOR.space.height }}>
+							{PLACE_IDS.filter((p) => p !== "orchestrator").map((p) => {
+								const r = INTERIOR.places[p].rect;
+								return (
+									<button
+										key={p}
+										type="button"
+										className="lm-hit"
+										data-place={p}
+										data-id={`observe-place-${p}`}
+										aria-pressed={pick?.kind === "place" && pick.place === p}
+										aria-label={names[p]}
+										style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+									/>
+								);
+							})}
+						</div>
+						{status === "ready" && (
+							<div className="lm-camctl">
+								<div className="lm-seg" role="group" aria-label={c.camera.label}>
+									{modes.map((m) => (
+										<button key={m} type="button" aria-pressed={camera.mode === m} data-id={`observe-camera-${m}`} onClick={() => setMode(m)}>
+											{c.camera[m]}
+										</button>
+									))}
+								</div>
+								<span className="lm-camnote" data-id="observe-camera-note">
+									{c.camera.note(where, camera.switches, feed.total)}
+								</span>
+							</div>
+						)}
+						{status === "still" && (
+							<p className="note lm-note" role="status" data-id="observe-still">
+								{t.still}
+							</p>
+						)}
+					</div>
 				</div>
-				{assets !== null && <Minimap c={c} scene={assets.scene} active={active} viewRef={minimapView} />}
-				{status === "ready" && <CameraControls c={c} mode={camera.mode} where={where} switches={camera.switches} onMode={setMode} />}
-				<Legend c={c} />
+				<div className="lm-col">
+					<SessionBox state={state} hide={hide} hideLabel={t.hideDetails} hideHint={t.hideDetailsHint} approxHint={t.contextApproxHint} onHide={toggleHide} />
+					<DetailBox state={state} pick={pick} now={now} hide={hide} source={contentSource ?? null} names={names} />
+					<EventFeed feed={feed} onEvent={(eventId) => setPick({ kind: "event", eventId })} onPlace={pickPlace} />
+				</div>
 			</div>
-			{note !== null && (
-				<p className="note lm-note" role="status" data-id="observe-still">
-					{note}
-				</p>
-			)}
-			{status === "loading" && !assetsFailed && (
-				<p className="note lm-note" role="status">
-					{t.loading}
-				</p>
-			)}
+			<div className="lm-legend">
+				{c.legend.map((parts, i) => (
+					// The paragraphs never move: their index is their identity.
+					<LegendParagraph key={i} parts={parts} />
+				))}
+			</div>
 		</section>
 	);
 }
+

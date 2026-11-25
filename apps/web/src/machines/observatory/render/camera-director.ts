@@ -40,13 +40,13 @@ export const THINK_HOLD_MS = 1_200;
 export const IDLE_MS = 3_000;
 export const EASE_MS = 420;
 export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 2.5;
+export const MAX_ZOOM = 2.4;
 const AUTO_ZOOM = 1.32;
 const FOCUS_ZOOM = 1.7;
 /** Auto leans this far toward its zone; the rest of the scene stays in view. */
 const AUTO_LEAN = 0.8;
 /** Room around a zone's box, scene px. */
-const MARGIN = 320;
+const MARGIN = 160;
 /** Close enough to the target (scene px; a fraction of a screen pixel at any zoom). */
 const SETTLED = 2;
 

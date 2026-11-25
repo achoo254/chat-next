@@ -1,3 +1,3 @@
 /* The harness page of observatory-csp.e2e.ts: a fixed frame for the scene. */
 html, body { margin: 0; }
-#host { position: relative; width: 1200px; height: 900px; }
+#host { position: relative; width: 1200px; height: 720px; }

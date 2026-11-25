@@ -1,21 +1,23 @@
-// The Live Map's activity card: the main read over the scene. It names what
-// Claude does now (waiting for permission, a call running or just finished,
-// thinking, idle with its last job), the call's runtime this time, the p95 of
-// the session's earlier calls of the same kind apart from it (never mixed:
-// each figure has its own label), the calls of that kind, Claude's
-// description of the call and the last line of its output once it ended
-// (content, asked by id only when the project stores content and "Ẩn chi
-// tiết" is off; otherwise a short reason), an indeterminate bar while it runs
-// (Claude Code reports no percentage), the turn's journey through the
-// districts, and "Xem chi tiết" for the event's detail. "Ẩn chi tiết" hides
+// The Live Map's activity card: the main read over the scene, laid out as the
+// approved design (prototype v6). Its first line names what Claude does now
+// (waiting for permission, a call running or just finished with its module,
+// release step and subagent, thinking, idle) with the status pill and the
+// runtime of this run; under it the call in large type, Claude's description
+// of it, an indeterminate bar while it runs (Claude Code reports no
+// percentage; amber once past the p95 history), the last line of its output
+// once it ended, then the p95 of the session's earlier calls of the same
+// kind apart from the runtime (never mixed: each figure has its own label),
+// "Xem chi tiết" and the turn's journey through the modules. Description and
+// output are content: asked by id only when the project stores content and
+// "Ẩn chi tiết" is off; otherwise a short reason. "Ẩn chi tiết" hides
 // targets, content and MCP tool names (drill-format.ts toolName). Screen
 // readers hear a short status only when the subject or its status changes,
 // not every runtime tick.
-import { MachineIcon } from "../machine-icons.tsx";
+import type { CSSProperties } from "react";
 import type { ActivityCard as Card, CardCall, JourneyStep } from "./activity-card-model.ts";
 import { duration, toolName } from "./drill-format.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
-import { placeIcon } from "./place-names.ts";
+import { PLACE_COLOR } from "./render/interior-painter.ts";
 import type { PlaceId } from "./render/scene-table.ts";
 import { useToolContent, type ContentSource, type ToolContentAnswer } from "./use-tool-content.ts";
 
@@ -26,6 +28,9 @@ export interface ActivityCardProps {
 	readonly hide: boolean;
 	/** Where content can be asked; null: nowhere (the card says so). */
 	readonly source: ContentSource | null;
+	/** The main agent's output rate and the context's fill, for the thinking line; null when unknown. */
+	readonly tokensPerSecond: number | null;
+	readonly contextPercent: number | null;
 	readonly onDetail: (eventId: string) => void;
 }
 
@@ -81,48 +86,58 @@ function outputText(c: ObservatoryCopy, answer: ToolContentAnswer): string {
 }
 
 function Journey({ steps, names, c }: { steps: readonly JourneyStep[]; names: Readonly<Record<PlaceId, string>>; c: ObservatoryCopy }) {
+	if (steps.length === 0) return null;
 	return (
-		<div className="lm-card-journey" data-id="observe-card-journey">
-			<span className="lm-card-label">{c.card.journey}</span>
-			{steps.length === 0 ? (
-				<span className="lm-card-muted">{c.card.journeyNone}</span>
-			) : (
-				<ol>
-					{steps.map((step, i) => (
-						// Steps are positional (the same district can come back later): the index is part of their identity.
-						<li key={`${i}-${step.place}`} className={step.failed ? "is-failed" : undefined} data-place={step.place}>
-							<MachineIcon name={placeIcon(step.place)} small />
-							<span>
-								{names[step.place]}
-								{step.count > 1 ? ` ×${step.count}` : ""}
-								{step.failed ? " ✗" : ""}
-							</span>
-						</li>
-					))}
-				</ol>
-			)}
+		<div className="lm-journey" data-id="observe-card-journey">
+			{c.card.journey}:{" "}
+			{steps.map((step, i) => (
+				// Steps are positional (the same module can come back later): the index is part of their identity.
+				<span key={`${i}-${step.place}`}>
+					{i > 0 && " → "}
+					<span className={step.failed ? "is-failed" : "is-step"} data-place={step.place}>
+						{names[step.place]}
+						{step.count > 1 ? ` ×${step.count}` : ""}
+						{step.failed ? " ✗" : ""}
+					</span>
+				</span>
+			))}
 		</div>
 	);
 }
 
-export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCardProps) {
+/** The card's edge and kind colour: the module's for a call, amber while waiting, violet while thinking. */
+function colourOf(card: Card, call: CardCall | null): string {
+	switch (card.status) {
+		case "wait":
+			return "var(--lm-warn)";
+		case "think":
+			return "var(--lm-think)";
+		case "idle":
+			return "var(--lm-muted)";
+		default:
+			return call === null ? "var(--lm-muted)" : PLACE_COLOR[call.place];
+	}
+}
+
+export function ActivityCard({ card, names, hide, source, tokensPerSecond, contextPercent, onDetail }: ActivityCardProps) {
 	const c = useObservatoryCopy();
 	const s = card.subject;
 	const call = s.kind === "run" || s.kind === "done" ? s.call : null;
 	const answer = useToolContent(source, call?.eventId ?? null, call !== null && !call.running, hide);
-	const detailId = s.kind === "wait" ? s.eventId : call?.eventId ?? (s.kind === "idle" ? (s.last?.eventId ?? null) : null);
+	const detailId = s.kind === "wait" ? s.eventId : (call?.eventId ?? (s.kind === "idle" ? (s.last?.eventId ?? null) : null));
 	let what: string;
 	let desc = "";
-	let runtime: string | null = null;
+	let runtime = "";
 	switch (s.kind) {
 		case "wait":
-			what = c.card.waitWhat(hide ? "" : s.what);
+			what = hide || s.what === "" ? c.card.waitWhat("") : s.what;
 			desc = c.card.waitDesc;
 			runtime = `${c.card.waited} ${duration(c, s.waitingMs)}`;
 			break;
 		case "think":
 			what = c.card.thinking;
-			runtime = duration(c, s.sinceMs);
+			desc = [tokensPerSecond === null ? "" : `${Math.round(tokensPerSecond)} tok/s`, contextPercent === null ? "" : `${c.side.context} ${Math.round(contextPercent)}%`].filter((x) => x !== "").join(" · ");
+			runtime = `${c.card.runtime} ${duration(c, s.sinceMs)}`;
 			break;
 		case "idle":
 			what = c.card.idleWhat;
@@ -131,64 +146,59 @@ export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCa
 		default:
 			what = callWhat(c, s.call, hide);
 			desc = answer.kind === "ok" ? answer.content.description : "";
-			// The row is labelled Runtime already (dt): the value is the duration alone.
-			runtime = duration(c, s.call.runtimeMs);
+			runtime = `${c.card.runtime} ${duration(c, s.call.runtimeMs)}`;
 	}
 	const showBar = s.kind === "run" || s.kind === "think";
 	const kind = kindLine(c, card, names);
 	// What screen readers hear: the subject and its status, never the ticking runtime.
 	const spoken = [kind, what].join(" · ");
+	const history = call === null ? null : call.history === null ? c.card.noHistory : `${c.card.p95} ${duration(c, call.history.p95Ms)} ${c.card.historyCount(call.history.count)}`;
 	return (
-		<section className="lm-card" aria-label={c.card.label} data-id="observe-card" data-status={card.status} data-station={call?.station}>
+		<section className="lm-card" aria-label={c.card.label} data-id="observe-card" data-status={card.status} data-station={call?.station} style={{ "--fc": colourOf(card, call) } as CSSProperties}>
 			<span className="sr-only" role="status" data-id="observe-card-live">
 				{spoken}
 			</span>
-			<div className="lm-card-main">
-				<div className="lm-card-kind">
-					<span className="lm-card-dot" aria-hidden="true" />
-					<span data-id="observe-card-kind">{kind}</span>
-					<span className="lm-card-pill" data-s={card.status} data-id="observe-card-status">
+			<div className="lm-card-k">
+				<span className="lm-card-kind" data-id="observe-card-kind">
+					{kind}
+				</span>
+				<span className="lm-card-right">
+					<span className="lm-pill" data-s={card.status} data-id="observe-card-status">
 						{c.card.status[card.status]}
 					</span>
-				</div>
-				<div className="lm-card-what" data-id="observe-card-what">
-					{what}
-				</div>
-				{desc !== "" && (
-					<div className="lm-card-desc" data-id="observe-card-desc">
-						{desc}
-					</div>
-				)}
-				{showBar && (
-					<div className={`lm-card-bar${call?.overP95 === true ? " is-over" : ""}`} role="progressbar" aria-label={c.card.status[card.status]} data-id="observe-card-bar">
-						<i />
-					</div>
-				)}
-				{call !== null && (
-					<div className="lm-card-output" data-id="observe-card-output">
-						{c.card.output}: <b>{outputText(c, answer)}</b>
-					</div>
-				)}
+					<span data-id="observe-card-runtime">{runtime}</span>
+				</span>
 			</div>
-			<dl className="lm-card-figures">
-				<dt>{c.card.runtime}</dt>
-				<dd data-id="observe-card-runtime">{runtime ?? "–"}</dd>
-				<dt>{c.card.p95}</dt>
-				<dd data-id="observe-card-history">
-					{call === null ? "–" : call.history === null ? c.card.noHistory : `${duration(c, call.history.p95Ms)} ${c.card.historyCount(call.history.count)}`}
-					{call?.overP95 === true && <em className="lm-card-over"> · {c.card.overP95}</em>}
-				</dd>
-				<dt>{c.card.calls}</dt>
-				<dd data-id="observe-card-calls">{card.calls ?? "–"}</dd>
-			</dl>
-			<div className="lm-card-side">
-				<Journey steps={card.journey} names={names} c={c} />
+			<div className="lm-card-what" data-id="observe-card-what">
+				{what}
+			</div>
+			{desc !== "" && (
+				<div className="lm-card-desc" data-id="observe-card-desc">
+					{desc}
+				</div>
+			)}
+			{showBar && (
+				<div className={`lm-bar${call?.overP95 === true ? " is-over" : ""}`} role="progressbar" aria-label={c.card.status[card.status]} data-id="observe-card-bar">
+					<i />
+				</div>
+			)}
+			{call !== null && (
+				<div className="lm-card-out" data-id="observe-card-output">
+					{c.card.output}: <b>{outputText(c, answer)}</b>
+				</div>
+			)}
+			<div className="lm-card-foot">
+				<span className="lm-card-hist" data-id="observe-card-history">
+					{history}
+					{call?.overP95 === true && <span className="lm-warnx"> · {c.card.overP95}</span>}
+				</span>
 				{detailId !== null && (
-					<button type="button" className="btn btn-sm" data-id="observe-card-more" onClick={() => onDetail(detailId)}>
+					<button type="button" className="lm-btn" data-id="observe-card-more" onClick={() => onDetail(detailId)}>
 						{c.card.more}
 					</button>
 				)}
 			</div>
+			<Journey steps={card.journey} names={names} c={c} />
 		</section>
 	);
 }

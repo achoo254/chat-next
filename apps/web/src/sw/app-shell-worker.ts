@@ -15,18 +15,13 @@
 //   tabs still run, since nginx serves only the current release's files and
 //   those tabs load lazy chunks of their own build. Tabs then show the
 //   "Đã có bản mới" bar (register-service-worker.ts); nothing reloads them.
-// - The Live Map's hashed assets live in their own cache (OBSERVATORY_CACHE),
-//   kept across builds: cache first, cached on the way in. Its asset list is
-//   network first, so a new bake is seen at once, with the cached copy
-//   offline; a newly fetched list drops the cached files it no longer names.
-//   The 3D office's cache (RETIRED_CACHES) is deleted on activate.
+// - Caches no build reads any more (RETIRED_CACHES: the 3D office's, the
+//   Live Map's old pictures) are deleted on activate.
 import { answerBuild, askBuild, isBuildQuery, type MessageTarget } from "./build-messages.ts";
 import {
 	CACHE_PREFIX,
 	cachesToDelete,
 	isHashedAsset,
-	OBSERVATORY_CACHE,
-	observatoryEntriesToDelete,
 	RETIRED_CACHES,
 	SHELL_PAGE,
 	shellRoute,
@@ -104,8 +99,6 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 		const route = shellRoute(event.request, scope.location.origin, files);
 		if (route === "page") event.respondWith(page(event.request));
 		else if (route === "file") event.respondWith(file(event.request));
-		else if (route === "observatory-file") event.respondWith(observatoryFile(event));
-		else if (route === "observatory-manifest") event.respondWith(observatoryManifest(event));
 	});
 
 	scope.addEventListener("message", (event) => {
@@ -139,61 +132,6 @@ export function startAppShellWorker(scope: ServiceWorkerScopeLike, build: AppShe
 				.catch(() => undefined);
 		}
 		return response;
-	}
-
-	async function observatoryFile(event: FetchEventLike): Promise<Response> {
-		const { request } = event;
-		const cached = await caches.match(request, { cacheName: OBSERVATORY_CACHE });
-		if (cached !== undefined) return cached;
-		const response = await fetch(request);
-		// Stored in the background: the page reads the file while it streams in.
-		if (keepable(response)) event.waitUntil(storeObservatory(request, response.clone()));
-		return response;
-	}
-
-	async function observatoryManifest(event: FetchEventLike): Promise<Response> {
-		const { request } = event;
-		let response: Response;
-		try {
-			response = await fetch(request);
-		} catch (err) {
-			const cached = await caches.match(request, { cacheName: OBSERVATORY_CACHE });
-			if (cached !== undefined) return cached;
-			throw err;
-		}
-		if (keepable(response)) {
-			// Stored before answering, so an offline open reads the list the page saw; the earlier bake's files go in the background.
-			await storeObservatory(request, response.clone());
-			event.waitUntil(pruneObservatory(response.clone()));
-		}
-		return response;
-	}
-
-	/** Only whole same-origin answers are worth keeping (no errors, no 206 parts). */
-	function keepable(response: Response): boolean {
-		return response.status === 200 && response.type === "basic";
-	}
-
-	async function storeObservatory(request: Request, response: Response): Promise<void> {
-		try {
-			const cache = await caches.open(OBSERVATORY_CACHE);
-			await cache.put(request, response);
-		} catch {
-			// Out of quota or storage gone: not caching only costs a download next time.
-		}
-	}
-
-	/** Deletes the cached Live Map files the fresh asset list no longer names. */
-	async function pruneObservatory(list: Response): Promise<void> {
-		try {
-			const json: unknown = await list.json();
-			const cache = await caches.open(OBSERVATORY_CACHE);
-			const cached = (await cache.keys()).map((key) => new URL(key.url).pathname);
-			await Promise.all(observatoryEntriesToDelete(cached, json).map((path) => cache.delete(path)));
-		} catch (err) {
-			// A list that does not parse, or storage gone: the files stay until the next list.
-			console.warn("service worker: pruning the Live Map cache:", err);
-		}
 	}
 
 	async function dropRetiredCaches(): Promise<void> {

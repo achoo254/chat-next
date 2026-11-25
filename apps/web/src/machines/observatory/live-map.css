@@ -1,132 +1,114 @@
-/* The Live Map (render/live-map-stage.tsx): the activity card on top, the scene under it (the plate and canvas fill the frame; the DOM
-   world layer in scene pixels moves with the camera), the camera's modes, the overview map and the legend over the scene. Colours,
-   spacing and radii are the web's tokens and the station palette (station-palette.css); font sizes follow machines.css. */
-.lm-stage { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; container-type: inline-size; }
-.lm-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); font-size: 0.8125rem; color: var(--c-text-muted); }
-.lm-toggle { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: auto; color: var(--c-text); cursor: pointer; }
-
-/* The activity card: what is happening now, its figures, the journey. */
-.lm-card { --fc: var(--c-text-muted); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.9fr); gap: var(--space-2) var(--space-4); align-items: start; padding: var(--space-3) var(--space-4); border: 1px solid var(--c-border); border-left: 3px solid var(--fc); border-radius: var(--radius-md); background: var(--c-surface); }
-.lm-card[data-status="run"] { --fc: var(--station, var(--c-primary)); }
-.lm-card[data-status="ok"] { --fc: var(--c-success); }
-.lm-card[data-status="err"] { --fc: var(--c-error); }
-.lm-card[data-status="wait"] { --fc: var(--c-warning); }
-.lm-card[data-status="think"] { --fc: var(--c-station-core); }
-.lm-card-main { display: grid; gap: var(--space-1); min-width: 0; }
-.lm-card-kind { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fc); }
-.lm-card-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--fc); }
-.lm-card-pill { padding: 0 var(--space-2); border: 1px solid currentColor; border-radius: 999px; text-transform: none; letter-spacing: 0; }
-.lm-card-what { font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(1.05rem, 2.2cqi, 1.6rem); font-weight: 600; line-height: 1.25; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lm-card-desc { font-size: 0.9rem; color: var(--c-text); }
-.lm-card-output { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.8125rem; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lm-card-output b { font-weight: 400; color: var(--c-text); }
-/* Indeterminate: Claude Code reports no percentage for a call. */
-.lm-card-bar { position: relative; height: 6px; overflow: hidden; border-radius: 3px; background: var(--c-bar-track, var(--c-surface-subtle)); }
-.lm-card-bar i { position: absolute; inset: 0 auto 0 0; width: 28%; border-radius: 3px; background: var(--fc); animation: lm-ind 1.3s ease-in-out infinite; }
-.lm-card-bar.is-over i { background: var(--c-warning); }
-@keyframes lm-ind { from { left: -28%; } to { left: 100%; } }
-.lm-card-figures { display: grid; grid-template-columns: auto auto; gap: var(--space-1) var(--space-3); margin: 0; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
-.lm-card-figures dt { color: var(--c-text-muted); }
-.lm-card-figures dd { margin: 0; font-family: var(--font-mono, ui-monospace, monospace); color: var(--c-text); }
-.lm-card-over { font-style: normal; color: var(--c-warning-text); }
-.lm-card-side { display: grid; gap: var(--space-2); justify-items: start; min-width: 0; }
-.lm-card-journey { display: grid; gap: var(--space-1); min-width: 0; font-size: 0.75rem; }
-.lm-card-label { color: var(--c-text-muted); }
-.lm-card-muted { color: var(--c-text-muted); }
-.lm-card-journey ol { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.lm-card-journey li { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem var(--space-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); color: var(--c-text); }
-.lm-card-journey li + li::before { content: "→"; margin-right: 0.25rem; color: var(--c-text-muted); }
-.lm-card-journey li:last-child { border-color: var(--fc); }
-.lm-card-journey li.is-failed { border-color: var(--c-error); color: var(--c-error-text); }
-@container (max-width: 720px) {
-	.lm-card { grid-template-columns: minmax(0, 1fr); }
+/* The Live Map (render/live-map-stage.tsx), as the approved design (prototype v6): the activity card on top, the scene of the
+   machine's interior under it with the camera's modes, the session's gauges, the detail and the event list beside, how to read
+   the scene under both. One dark look on purpose (the inside of a running machine), whatever the app's theme: the colours are
+   the design's own (the station colours are those of render/interior-painter.ts PLACE_COLOR). */
+.lm-stage {
+	--lm-bg: #0a0d12;
+	--lm-panel: #11161e;
+	--lm-line: #222b37;
+	--lm-fg: #dfe6ee;
+	--lm-muted: #8593a3;
+	--lm-ok: #3dd68c;
+	--lm-warn: #ffc53d;
+	--lm-err: #ff6369;
+	--lm-accent: #70b8ff;
+	--lm-think: #baa7ff;
+	--lm-mono: var(--font-mono, "IBM Plex Mono", ui-monospace, Consolas, monospace);
+	color-scheme: dark;
+	display: grid;
+	gap: 12px;
+	padding: 12px;
+	border-radius: var(--radius-md, 10px);
+	background: var(--lm-bg);
+	color: var(--lm-fg);
+	container-type: inline-size;
 }
+.lm-main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+@container (max-width: 980px) { .lm-main { grid-template-columns: minmax(0, 1fr); } }
+.lm-col { display: grid; gap: 12px; min-width: 0; }
 
-/* The scene. The frame has the scene's own proportions (--lm-ratio) and is as wide as the room allows up to 72dvh tall. */
-.lm-frame { position: relative; align-self: center; width: min(100%, calc(72dvh * var(--lm-ratio, 1.67))); aspect-ratio: var(--lm-ratio, 1.67); overflow: hidden; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface-subtle); touch-action: none; user-select: none; cursor: grab; }
+.lm-btn, .lm-stage button.lm-btn { font: inherit; font-size: 12.5px; color: var(--lm-fg); background: #18202b; border: 1px solid var(--lm-line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.lm-btn:hover { border-color: var(--lm-accent); }
+.lm-stage button:focus-visible { outline: 2px solid var(--lm-accent); outline-offset: 2px; }
+
+/* The activity card. */
+.lm-card { --fc: var(--lm-muted); display: grid; gap: 6px; padding: 14px 18px; background: var(--lm-panel); border: 1px solid var(--lm-line); border-left: 3px solid var(--fc); border-radius: 10px; }
+.lm-card-k { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lm-card-kind { font-family: var(--lm-mono); font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; color: var(--fc); text-transform: uppercase; }
+.lm-card-right { display: flex; align-items: center; gap: 10px; font-family: var(--lm-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.lm-pill { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.lm-pill[data-s="run"] { color: var(--fc); }
+.lm-pill[data-s="ok"] { color: var(--lm-ok); }
+.lm-pill[data-s="err"] { color: var(--lm-err); }
+.lm-pill[data-s="wait"] { color: var(--lm-warn); }
+.lm-pill[data-s="think"] { color: var(--lm-think); }
+.lm-pill[data-s="idle"] { color: var(--lm-muted); }
+.lm-card-what { font-family: var(--lm-mono); font-size: clamp(18px, 2.2cqi, 26px); font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-card-desc { font-size: 15px; opacity: 0.9; }
+/* Indeterminate: Claude Code reports no percentage for a call. */
+.lm-bar { position: relative; height: 6px; margin-block: 2px; overflow: hidden; border-radius: 3px; background: #1d2632; }
+.lm-bar i { position: absolute; inset: 0 auto 0 0; width: 28%; border-radius: 3px; background: var(--fc); animation: lm-ind 1.3s ease-in-out infinite; }
+.lm-bar.is-over i { background: var(--lm-warn); }
+@keyframes lm-ind { from { left: -28%; } to { left: 100%; } }
+.lm-card-out { font-family: var(--lm-mono); font-size: 13px; color: var(--lm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-card-out b { font-weight: 400; color: var(--lm-fg); }
+.lm-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--lm-muted); }
+.lm-card-hist { font-family: var(--lm-mono); font-variant-numeric: tabular-nums; }
+.lm-warnx { color: var(--lm-warn); }
+.lm-journey { font-family: var(--lm-mono); font-size: 12px; color: var(--lm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-journey .is-step { color: var(--lm-fg); }
+.lm-journey .is-failed { color: var(--lm-err); }
+
+/* The scene: the design's 1200 × 720 board, as wide as the column. */
+.lm-board { position: relative; width: 100%; aspect-ratio: 1200 / 720; overflow: hidden; background: var(--lm-panel); border: 1px solid var(--lm-line); border-radius: 8px; touch-action: none; user-select: none; cursor: grab; }
 .lm-canvas-host, .lm-canvas-host > canvas { position: absolute; inset: 0; display: block; pointer-events: none; }
-/* The world layer: scene pixels, moved and scaled with the camera (its transform is set by the stage). --lm-inv undoes the scale for text kept at one size. */
+/* The modules' buttons, in scene pixels, moved and scaled with the camera (the stage sets the transform). */
 .lm-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-.lm-plate { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
-.lm-hit { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 24px; background: transparent; cursor: pointer; }
-.lm-hit.is-round { border-radius: 50%; }
-.lm-hit:hover { background: color-mix(in srgb, var(--c-primary) 8%, transparent); }
-.lm-hit:focus-visible { outline: none; background: color-mix(in srgb, var(--c-primary) 26%, transparent); }
-.lm-hit[aria-pressed="true"] { background: color-mix(in srgb, var(--c-primary) 12%, transparent); }
+.lm-hit { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.lm-hit:focus-visible { outline: 2px solid var(--lm-accent); outline-offset: 4px; }
+.lm-camctl { position: absolute; right: 10px; bottom: 10px; display: grid; gap: 4px; justify-items: end; pointer-events: none; }
+.lm-seg { display: inline-flex; pointer-events: auto; padding: 2px; background: rgb(10 13 18 / 0.88); border: 1px solid var(--lm-line); border-radius: 7px; }
+.lm-seg button { font: inherit; font-size: 12.5px; padding: 4px 10px; color: var(--lm-muted); background: transparent; border: 0; border-radius: 5px; cursor: pointer; }
+.lm-seg button[aria-pressed="true"] { color: var(--lm-fg); background: #223044; }
+.lm-camnote { font-family: var(--lm-mono); font-size: 11px; color: var(--lm-muted); background: rgb(10 13 18 / 0.8); padding: 2px 6px; border-radius: 4px; }
+.lm-note { position: absolute; inset: auto 12px 12px 12px; margin: 0; color: var(--lm-muted); }
 
-/* Name tags: one screen size whatever the zoom, the name row on its anchor, the facts growing downward. */
-.lm-tag { position: absolute; display: grid; gap: 0; max-width: 240px; padding: var(--space-1) var(--space-2); transform-origin: 0 0; transform: scale(var(--lm-inv, 1)); border: 1px solid var(--c-border); border-left: 3px solid var(--station, var(--c-border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 86%, transparent); box-shadow: var(--shadow-sm); font-size: 0.75rem; line-height: 1.3; pointer-events: none; white-space: nowrap; }
-.lm-tag.is-centre { transform: scale(var(--lm-inv, 1)) translateX(-50%); justify-items: center; text-align: center; }
-.lm-tag b { font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--c-text); }
-.lm-tag i { font-style: normal; color: var(--c-text-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.lm-tag.tier-3 { opacity: 0.85; font-size: 0.6875rem; }
-.lm-tag.is-warn { border-color: var(--c-warning); }
-.lm-tag.is-warn b span { color: var(--c-warning-text); }
-.lm-tag.is-alert { border-color: var(--c-error); }
-.lm-tag.is-alert b span { color: var(--c-error-text); }
-.lm-tag.is-selected { border-color: var(--c-primary); box-shadow: var(--shadow-focus-primary); }
-.lm-tag.is-working { border-color: var(--station, var(--c-primary)); }
-.lm-tag i.lm-working { color: var(--station, var(--c-primary)); font-weight: 600; }
-.lm-tag i.lm-working::before { content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-right: 0.35em; border-radius: 50%; background: currentColor; animation: lm-pulse 1.4s ease-in-out infinite; }
-.lm-batch { font-style: normal; font-weight: 700; color: var(--c-primary); }
-@keyframes lm-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+/* The column: boxes with a small caps header. */
+.lm-box { min-width: 0; background: var(--lm-panel); border: 1px solid var(--lm-line); border-radius: 8px; }
+.lm-box h2 { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 10px 12px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lm-muted); border-bottom: 1px solid var(--lm-line); }
+.lm-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 10px 12px; font-family: var(--lm-mono); font-size: 12.5px; color: var(--lm-muted); }
+.lm-gauges b { font-weight: 500; color: var(--lm-fg); font-variant-numeric: tabular-nums; }
+.lm-toggle { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; font-size: 12.5px; color: var(--lm-muted); cursor: pointer; }
+.lm-detail { display: grid; gap: 6px; padding: 10px 12px; font-size: 13px; color: var(--lm-muted); }
+.lm-detail b { font-weight: 500; color: var(--lm-fg); }
+.lm-row { display: flex; justify-content: space-between; gap: 8px; font-family: var(--lm-mono); font-size: 12.5px; }
+.lm-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-row b { text-align: right; overflow-wrap: anywhere; }
+.lm-row b.err { color: var(--lm-err); }
+.lm-row b.ok { color: var(--lm-ok); }
+.lm-live { color: var(--lm-warn); }
+.lm-detail pre { margin: 0; padding: 8px; max-height: 220px; overflow: auto; font-family: var(--lm-mono); font-size: 12px; color: var(--lm-fg); background: #0b1016; border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
 
-/* A road's figures: runtime while a call runs, else calls and the p95 of the session. */
-.lm-road { position: absolute; transform-origin: 0 0; transform: scale(var(--lm-inv, 1)) translate(-50%, -130%); padding: 0 var(--space-1); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 82%, transparent); font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.6875rem; font-variant-numeric: tabular-nums; color: var(--station, var(--c-text-muted)); white-space: nowrap; pointer-events: none; }
-.lm-road[data-running] { font-weight: 600; }
-.lm-wave-label { position: absolute; transform-origin: 0 0; transform: scale(var(--lm-inv, 1)); font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.6875rem; color: var(--c-text-muted); pointer-events: none; }
+/* The event list. */
+.lm-feed { max-height: 340px; margin: 0; padding: 4px 0; overflow-y: auto; list-style: none; font-family: var(--lm-mono); font-size: 12.5px; }
+.lm-feed button { display: grid; grid-template-columns: 64px 8px minmax(0, 1fr) auto; gap: 8px; align-items: center; width: 100%; padding: 5px 12px; font: inherit; text-align: left; color: var(--lm-fg); background: transparent; border: 0; cursor: pointer; }
+.lm-feed button:hover { background: #18202b; }
+.lm-feed li.is-fresh button { animation: lm-fresh 1.2s ease-out; }
+@keyframes lm-fresh { from { background: rgb(112 184 255 / 0.14); } to { background: transparent; } }
+.lm-feed li.is-think .x { color: var(--lm-think); }
+.lm-feed .t { color: var(--lm-muted); font-variant-numeric: tabular-nums; }
+.lm-feed .sw { width: 8px; height: 8px; border-radius: 2px; background: var(--station, var(--lm-muted)); }
+.lm-feed .x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-feed .d { color: var(--lm-muted); font-variant-numeric: tabular-nums; }
+.lm-feed .d.ok::after { content: " ✓"; color: var(--lm-ok); }
+.lm-feed .d.err { color: var(--lm-err); }
+.lm-feed .d.run { color: var(--lm-warn); }
 
-/* The release pipeline's steps on the Git district (scene pixels: they scale with the scene). */
-.lm-pipe-step { position: absolute; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 10px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 18px; color: var(--c-text-muted); pointer-events: none; white-space: nowrap; overflow: hidden; }
-.lm-pipe-step b { color: var(--c-text); font-weight: 600; }
-.lm-pipe-step[data-status="ok"] span { color: var(--c-success-text, var(--c-success)); }
-.lm-pipe-step[data-status="err"] span { color: var(--c-error-text); }
-.lm-pipe-step[data-status="run"] span { color: var(--c-station-git); }
-.lm-pipe-prod { position: absolute; transform: translateX(-50%); font-family: var(--font-mono, ui-monospace, monospace); font-size: 16px; color: var(--c-text-muted); pointer-events: none; }
-.lm-pipe-prod[data-on] { color: var(--c-success-text, var(--c-success)); }
-
-/* The holographic board over the district in view (scene pixels, over the holo-panel sprite). */
-/* Its glass reads in both themes: a theme surface over the sprite, the district's colour on the edge. */
-.lm-board { position: absolute; display: grid; align-content: start; gap: 6px; padding: 22px 28px; overflow: hidden; border: 2px solid var(--station, var(--c-primary)); border-radius: 14px; background: color-mix(in srgb, var(--c-surface) 84%, transparent); box-shadow: var(--shadow-sm); font-family: var(--font-mono, ui-monospace, monospace); font-size: 22px; line-height: 1.3; color: var(--c-text); pointer-events: none; }
-.lm-board h4 { margin: 0; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-text-muted); }
-.lm-board ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.lm-board li { display: flex; justify-content: space-between; gap: 16px; min-width: 0; }
-.lm-board li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lm-board li b { font-weight: 400; color: var(--c-text-muted); }
-.lm-board li[data-running] { color: var(--c-primary); }
-.lm-board li[data-failed] b { color: var(--c-error-text); }
-.lm-board p { margin: 0; }
-.lm-board-muted { color: var(--c-text-muted); }
-.lm-board-result { color: var(--c-success-text, var(--c-text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* Over the scene: camera modes (bottom centre), overview (bottom left), legend (bottom right). */
-.lm-camctl { position: absolute; left: 50%; bottom: var(--space-2); display: grid; justify-items: center; gap: var(--space-1); transform: translateX(-50%); }
-.lm-seg { display: inline-flex; padding: 2px; border: 1px solid var(--c-border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--c-surface) 90%, transparent); }
-.lm-seg button { padding: var(--space-1) var(--space-3); white-space: nowrap; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--c-text-muted); font: inherit; font-size: 0.8125rem; cursor: pointer; }
-.lm-seg button[aria-pressed="true"] { background: color-mix(in srgb, var(--c-primary) 18%, transparent); color: var(--c-text); }
-.lm-seg button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 1px; }
-.lm-camnote { padding: 0 var(--space-1); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 82%, transparent); font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.6875rem; color: var(--c-text-muted); }
-.lm-minimap { position: absolute; left: var(--space-2); bottom: var(--space-2); width: min(160px, 22%); border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 88%, transparent); overflow: hidden; pointer-events: none; }
-.lm-minimap-title { position: absolute; left: 4px; top: 2px; font-size: 0.625rem; color: var(--c-text-muted); }
-.lm-minimap i { position: absolute; border-radius: 2px; background: color-mix(in srgb, var(--c-text-muted) 35%, transparent); }
-.lm-minimap i[data-active] { background: var(--c-primary); }
-.lm-minimap-view { position: absolute; border: 1px solid var(--c-text); border-radius: 2px; }
-.lm-legend { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c-surface) 88%, transparent); list-style: none; font-size: 0.6875rem; color: var(--c-text-muted); }
-.lm-legend li::before { content: ""; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.3rem; border-radius: 2px; vertical-align: -0.05rem; }
-.lm-legend li[data-s="run"]::before { background: var(--c-warning); }
-.lm-legend li[data-s="wait"]::before { background: var(--c-text-muted); }
-.lm-legend li[data-s="ok"]::before { background: var(--c-success); }
-.lm-legend li[data-s="err"]::before { background: var(--c-error); }
-.lm-note { margin: 0; }
+/* How to read the scene. */
+.lm-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 6px 24px; font-size: 12.5px; line-height: 1.5; color: var(--lm-muted); }
+.lm-legend b { font-weight: 500; color: var(--lm-fg); }
 
 @media (prefers-reduced-motion: reduce) {
-	.lm-tag i.lm-working::before { animation: none; }
-	.lm-card-bar i { animation: none; width: 100%; opacity: 0.4; }
-}
-/* A phone: tags keep their names only; no legend, overview, road figures or camera note; compact camera buttons. */
-@container (max-width: 600px) {
-	.lm-tag { max-width: 150px; padding: 0 var(--space-1); }
-	.lm-tag i { display: none; }
-	.lm-legend, .lm-minimap, .lm-camnote, .lm-road, .lm-wave-label { display: none; }
-	.lm-seg button { padding: 2px var(--space-2); font-size: 0.75rem; }
+	.lm-bar i { animation: none; width: 100%; opacity: 0.4; }
+	.lm-feed li.is-fresh button { animation: none; }
 }

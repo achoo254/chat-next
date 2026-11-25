@@ -1,16 +1,16 @@
 // The page observatory-csp.e2e.ts opens: built with the app (same Vite config,
-// same chunks of the Live Map renderer) and served under the production CSP.
-// It mounts the scene on the shipped assets (following the page's reduced
-// motion as the app does), plays a few real events through
-// the reducer, and reports what happened on window.__liveMapHarness and
-// document.body's data-status ("ready" or "still" with the error).
+// same chunk of the Live Map's scene) and served under the production CSP.
+// It mounts the scene (following the page's reduced motion as the app does),
+// plays a few real events through the reducer, and reports what happened on
+// window.__liveMapHarness and document.body's data-status ("ready" or
+// "still" with the error).
 import { applyEvents, fromSnapshot, takeAnimations, type LiveMapState } from "../../src/machines/observatory/live-map-state.ts";
 import type { LiveMapEvent } from "../../src/machines/observatory/live-map-types.ts";
 import type { LiveMapHandle } from "../../src/machines/observatory/render/live-map-app.ts";
-import { assetBase, loadSceneAssets } from "../../src/machines/observatory/render/scene-table.ts";
+import { duration } from "../../src/machines/observatory/drill-format.ts";
+import { OBSERVATORY_COPY } from "../../src/machines/observatory/observatory-copy.ts";
 
 interface Harness {
-	readonly renderer: string;
 	frames(): number;
 	play(): number;
 	log(): readonly { eventId: string; kind: string }[];
@@ -35,13 +35,13 @@ const EVENTS: LiveMapEvent[] = [
 async function start(): Promise<void> {
 	const host = document.getElementById("host");
 	if (host === null) throw new Error("no host");
-	const assets = await loadSceneAssets(assetBase(import.meta.env.BASE_URL));
 	let state: LiveMapState = fromSnapshot({ sessionId: "s1", epoch: 1n, seq: 0, info: null, live: null, events: [], earlier: "" });
 	const { mountLiveMap } = await import("../../src/machines/observatory/render/live-map-app.ts");
 	const reduceMotion = (): boolean => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-	const handle: LiveMapHandle = await mountLiveMap({ host, assets, state, width: host.clientWidth, height: host.clientHeight, saveData: false, reduceMotion, record: true });
+	const c = OBSERVATORY_COPY.vi;
+	const words = { copy: c.scene, duration: (ms: number) => duration(c, ms) };
+	const handle: LiveMapHandle = mountLiveMap({ host, state, words, width: host.clientWidth, height: host.clientHeight, saveData: false, reduceMotion, record: true });
 	window.__liveMapHarness = {
-		renderer: handle.renderer,
 		frames: () => handle.frames(),
 		play() {
 			state = applyEvents(state, state.epoch, EVENTS).state;

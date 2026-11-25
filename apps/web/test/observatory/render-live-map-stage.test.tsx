@@ -1,16 +1,17 @@
-// The Live Map's frame with a stand-in renderer: the activity card over the
-// scene; a name tag per place (the account's email at the input port, the
-// last file at the files district); "Ẩn chi tiết" hides names (remembered on
-// the device); the context reads as approximate when its window was assumed;
-// each place is a button reachable by keyboard that selects it and switches
-// the camera to focus, a click on empty ground clears the selection and goes
-// back to auto, a drag pans (free), the camera's buttons and note; a click on
-// a moving packet opens its event; new animations go to the renderer once; a
-// renderer that cannot start leaves the still plate with its note; leaving
-// destroys the renderer. MCP tool names stay hidden in tags and boards with
-// "Ẩn chi tiết"; a focused district's button never scrolls the frame and the
-// camera frames it; a plain wheel scrolls the page unless the camera is free;
-// live times read in the machine's clock.
+// The Live Map with a stand-in scene, laid out as the approved design: the
+// activity card over the scene, its "Xem chi tiết" opening the event's
+// detail in the column; the session's gauges (the context approximate when
+// its window was assumed); the event list, newest first, a click on a call
+// opening its detail and on another row picking its module; each module a
+// button reachable by keyboard that picks it (its detail shows) and switches
+// the camera to focus, a click on empty ground clearing the pick and going
+// back to auto, a drag panning (free), the camera's buttons and note; a click
+// on a moving packet opening its event; new animations going to the scene
+// once; a scene that cannot start leaving a note; leaving dropping the scene;
+// "Ẩn chi tiết" hiding names (remembered on the device, handed to the
+// scene); a focused module's button never scrolling the frame; a plain wheel
+// scrolling the page unless the camera is free; live times read in the
+// machine's clock; no drawer and no replay bar.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,8 +22,8 @@ import type { LiveMapLiveState } from "../../src/machines/observatory/live-map-t
 import { OBSERVATORY_COPY } from "../../src/machines/observatory/observatory-copy.ts";
 import type { CameraState, LiveMapHandle, LiveMapMountOptions } from "../../src/machines/observatory/render/live-map-app.ts";
 import { HIDE_DETAILS_KEY, LiveMapStage } from "../../src/machines/observatory/render/live-map-stage.tsx";
-import { prompt, T0, tool } from "../machines/observatory/live-map-fixtures.ts";
-import { fixtureAssets, played } from "./render-fixtures.ts";
+import { lifecycle, prompt, T0, tool } from "../machines/observatory/live-map-fixtures.ts";
+import { played } from "./render-fixtures.ts";
 
 const t = viMachines.observe;
 const c = OBSERVATORY_COPY.vi;
@@ -31,6 +32,7 @@ type Fake = LiveMapHandle & {
 	update: ReturnType<typeof vi.fn>;
 	destroy: ReturnType<typeof vi.fn>;
 	setCameraMode: ReturnType<typeof vi.fn>;
+	setHide: ReturnType<typeof vi.fn>;
 	select: ReturnType<typeof vi.fn>;
 	pan: ReturnType<typeof vi.fn>;
 	peek: ReturnType<typeof vi.fn>;
@@ -39,12 +41,13 @@ type Fake = LiveMapHandle & {
 
 function fakeHandle(over: Partial<LiveMapHandle> = {}): Fake {
 	return {
-		renderer: "webgl",
-		plate: fixtureAssets().table.plate.full,
 		canvas: document.createElement("canvas"),
 		update: vi.fn(),
 		resize: vi.fn(),
+		setWords: vi.fn(),
+		setHide: vi.fn(),
 		hitEvent: () => null,
+		placeAt: () => null,
 		toScene: (x: number, y: number) => [x, y] as const,
 		setCameraMode: vi.fn(),
 		select: vi.fn(),
@@ -78,24 +81,24 @@ const live = (over: Partial<LiveMapLiveState>): LiveMapLiveState => ({
 	...over,
 });
 
-function setup(state: LiveMapState, handle = fakeHandle(), mount?: (o: LiveMapMountOptions) => Promise<LiveMapHandle>, selectedPlace: LiveMapStageProps["selectedPlace"] = null, extra: Partial<LiveMapStageProps> = {}) {
-	const onStation = vi.fn();
-	const onEvent = vi.fn();
-	const onDeselect = vi.fn();
+type StageProps = Parameters<typeof LiveMapStage>[0];
+type Mount = (o: LiveMapMountOptions) => LiveMapHandle;
+
+function setup(state: LiveMapState, handle = fakeHandle(), mount?: Mount, extra: Partial<StageProps> = {}) {
+	const onPick = vi.fn();
 	const mounted: LiveMapMountOptions[] = [];
-	const mountLiveMap = mount ?? ((o: LiveMapMountOptions) => (mounted.push(o), Promise.resolve(handle)));
-	const loadAssets = () => Promise.resolve(fixtureAssets());
+	const mountLiveMap: Mount = mount ?? ((o) => (mounted.push(o), handle));
 	const loadRenderer = () => Promise.resolve({ mountLiveMap });
 	const view = (s: LiveMapState) => (
 		<I18nProvider>
-			<LiveMapStage state={s} accountEmail="ban@example.com" selectedPlace={selectedPlace} onStation={onStation} onEvent={onEvent} onDeselect={onDeselect} loadAssets={loadAssets} loadRenderer={loadRenderer} {...extra} />
+			<LiveMapStage state={s} onPick={onPick} loadRenderer={loadRenderer} {...extra} />
 		</I18nProvider>
 	);
 	const r = render(view(state));
-	return { ...r, onStation, onEvent, onDeselect, mounted, handle, rerenderWith: (s: LiveMapState) => r.rerender(view(s)) };
+	return { ...r, onPick, mounted, handle, rerenderWith: (s: LiveMapState) => r.rerender(view(s)) };
 }
 
-type LiveMapStageProps = Parameters<typeof LiveMapStage>[0];
+const text = (root: HTMLElement, id: string): string => root.querySelector(`[data-id=${id}]`)?.textContent ?? "";
 
 beforeEach(() => {
 	localStorage.clear();
@@ -105,112 +108,174 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("the Live Map frame", () => {
-	it("tags every place, the input port with the account's email and the prompt count, the files with their last file", async () => {
-		const { state } = played([prompt(1, 0), prompt(2, 10), tool("r1", 20, { target: "src/app.ts" }), tool("r1", 30, { target: "src/app.ts", success: true })]);
+describe("the Live Map", () => {
+	it("shows the card, the session's gauges, the detail hint, the events and the legend; no drawer, no replay bar", async () => {
+		const { state } = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "SANDBOX" })]);
+		const { container } = setup({ ...state, live: live({ core: "idle" }) });
+		await flush();
+		expect(container.querySelector("[data-id=observe-card]")?.getAttribute("data-status")).toBe("run");
+		expect(text(container, "observe-card-what")).toBe("Bash pnpm");
+		expect(container.querySelector("[data-id=observe-card-bar]")).not.toBeNull();
+		expect(text(container, "observe-session")).toContain("claude-opus-4");
+		expect(text(container, "observe-context")).toBe(`${c.side.context} 62%`);
+		expect(text(container, "observe-detail-body")).toBe(c.side.detailHint);
+		expect(text(container, "observe-feed-count")).toBe("2");
+		const rows = [...container.querySelectorAll(".lm-feed li")].map((li) => li.querySelector(".x")?.textContent);
+		expect(rows).toEqual(["Bash pnpm", c.feed.prompt]);
+		expect(container.querySelector(".lm-feed li .d")?.textContent).toBe(c.feed.running);
+		expect(container.querySelectorAll(".lm-legend > div")).toHaveLength(c.legend.length);
+		expect(container.querySelector("[data-id=lmd-drawer], [data-id=lmd-replay]")).toBeNull();
+	});
+
+	it("the card's details button and a call's row open the event's detail; another row picks its module", async () => {
+		const { state } = played([prompt(1, 0), tool("r1", 10, { target: "src/app.ts" }), tool("r1", 30, { target: "src/app.ts", success: true, durationMs: 20 }), lifecycle("stop", "s1", 40)]);
+		const { container, onPick } = setup(state);
+		await flush();
+		await userEvent.click(screen.getByRole("button", { name: c.card.more }));
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "event", eventId: "tool:r1" });
+		expect(text(container, "observe-detail-title")).toContain("Read");
+		expect(text(container, "observe-detail-status")).toContain(c.side.ok);
+		expect(text(container, "observe-detail-body")).toContain("src/app.ts");
+		await userEvent.click(screen.getByText(c.feed.stop));
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "core" });
+		expect(text(container, "observe-detail-title")).toBe(t.stations.CORE);
+		await userEvent.click(screen.getByText("Read src/app.ts"));
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "event", eventId: "tool:r1" });
+	});
+
+	it("a module's detail: its calls, p50 / p95 history, failures and recent calls", async () => {
+		const { state } = played([prompt(1, 0), tool("r1", 10), tool("r1", 30, { success: true, durationMs: 20 }), tool("r2", 40), tool("r2", 90, { success: false, durationMs: 50 })]);
 		const { container } = setup(state);
 		await flush();
-		expect(container.querySelectorAll(".lm-tag")).toHaveLength(13);
-		const desk = container.querySelector("[data-id=observe-tag-user-desk]");
-		expect(desk?.textContent).toContain("ban@example.com");
-		expect(desk?.textContent).toContain(t.map.prompt(2));
-		const files = container.querySelector("[data-id=observe-tag-files]");
-		expect(files?.textContent).toContain("src/app.ts");
-		expect(files?.textContent).toContain(t.map.calls(1, 0));
-		expect(container.querySelector("[data-id=observe-road-files]")?.textContent).toContain(c.board.calls(1));
+		await userEvent.click(screen.getByRole("button", { name: t.stations.FILES }));
+		const body = text(container, "observe-detail-body");
+		expect(body).toContain(c.side.p50p95);
+		expect(body).toContain(`${c.side.errors}1 / 2`);
+		expect(body).toContain(c.side.recent);
 	});
 
-	it("shows the activity card over the scene, and its details button opens the event", async () => {
-		const { state } = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "SANDBOX" })]);
-		const { container, onEvent } = setup(state);
+	it("shows the context as approximate when its window was assumed", async () => {
+		const { state } = played([prompt(1, 0)]);
+		const { container } = setup({ ...state, live: live({ contextWindowAssumed: true }) });
 		await flush();
-		const card = container.querySelector("[data-id=observe-card]");
-		expect(card?.getAttribute("data-status")).toBe("run");
-		expect(container.querySelector("[data-id=observe-card-what]")?.textContent).toBe("Bash pnpm");
-		expect(container.querySelector("[data-id=observe-card-bar]")).not.toBeNull();
-		await userEvent.click(screen.getByRole("button", { name: c.card.more }));
-		expect(onEvent).toHaveBeenCalledWith("tool:b1");
+		const context = container.querySelector("[data-id=observe-context]");
+		expect(context?.textContent).toBe(`${c.side.context} ~62%`);
+		expect(context?.getAttribute("title")).toBe(t.map.contextApproxHint);
 	});
 
-	it("a place with a running call is at work: its tag names the tool and target, the details switch hides the target, and it stops when the call ends", async () => {
-		const running = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "TESTING" }), tool("b2", 21, { toolName: "Bash", target: "git", station: "TESTING" })]).state;
-		const { container, rerenderWith } = setup(running);
+	it("'Ẩn chi tiết' hides names in the card and the events, is remembered and reaches the scene", async () => {
+		const { state } = played([prompt(1, 0), tool("r1", 10, { target: "src/view.tsx" })]);
+		const { container, handle } = setup(state);
 		await flush();
-		const testing = container.querySelector("[data-id=observe-tag-testing] [data-id=observe-working]");
-		expect(testing?.textContent).toBe("Bash +1 · pnpm");
-		expect(container.querySelector("[data-id=observe-place-testing]")?.hasAttribute("data-working")).toBe(true);
+		expect(container.textContent).toContain("src/view.tsx");
 		await userEvent.click(screen.getByLabelText(t.map.hideDetails));
-		expect(container.querySelector("[data-id=observe-tag-testing] [data-id=observe-working]")?.textContent).toBe("Bash +1");
-		expect(container.querySelector("[data-id=observe-card-what]")?.textContent).toBe("Bash");
-		rerenderWith(played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "TESTING" }), tool("b1", 30, { toolName: "Bash", target: "pnpm", station: "TESTING", success: true })]).state);
-		await flush();
-		expect(container.querySelector("[data-id=observe-tag-testing] [data-id=observe-working]")).toBeNull();
-	});
-
-	it("'Ẩn chi tiết' hides file names and the email, and is remembered", async () => {
-		const { state } = played([tool("r1", 20, { target: "src/app.ts", success: true })]);
-		const first = setup(state);
-		await flush();
-		await userEvent.click(screen.getByLabelText(t.map.hideDetails));
-		expect(first.container.textContent).not.toContain("src/app.ts");
-		expect(first.container.textContent).not.toContain("ban@example.com");
+		expect(container.textContent).not.toContain("src/view.tsx");
 		expect(localStorage.getItem(HIDE_DETAILS_KEY)).toBe("1");
-		first.unmount();
-		const again = setup(state);
-		await flush();
-		expect(again.container.textContent).not.toContain("src/app.ts");
-		expect((screen.getByLabelText(t.map.hideDetails) as HTMLInputElement).checked).toBe(true);
+		expect(handle.setHide).toHaveBeenLastCalledWith(true);
 	});
 
-	it("'Ẩn chi tiết' hides an MCP tool's name in the tag, the board and the card", async () => {
-		const mcp = tool("m1", 20, { toolName: "mcp__acme-crm__lookup_customer", mcpServer: "acme-crm", target: "acme-crm › lookup_customer", station: "MCP" });
-		const ended = tool("m0", 5, { toolName: "mcp__acme-crm__list", mcpServer: "acme-crm", target: "acme-crm › list", station: "MCP", success: true, durationMs: 3 });
-		const { state } = played([prompt(1, 0), ended, mcp]);
-		let report: ((c: CameraState) => void) | undefined;
-		const handle = fakeHandle();
-		const { container } = setup(state, handle, (o) => ((report = o.onCamera), Promise.resolve(handle)));
+	it("each module is a button: Tab reaches it, Enter picks it and focuses the camera on it", async () => {
+		const { state } = played([]);
+		const { onPick, handle } = setup(state);
 		await flush();
-		act(() => report?.({ mode: "auto", zone: "mcp", contentZone: "mcp", switches: 1 }));
-		expect(container.querySelector("[data-id=observe-board-mcp]")?.textContent).toContain("mcp__acme-crm__lookup_customer");
-		await userEvent.click(screen.getByLabelText(t.map.hideDetails));
-		expect(container.querySelector("[data-id=observe-tag-mcp] [data-id=observe-working]")?.textContent).toBe(c.detail.kinds.tool);
-		expect(container.querySelector("[data-id=observe-board-mcp]")?.textContent).toContain(`▶ ${c.detail.kinds.tool}`);
-		expect(container.querySelector("[data-id=observe-card-what]")?.textContent).toBe(c.detail.kinds.tool);
-		expect(container.textContent).not.toContain("mcp__");
-		expect(container.textContent).not.toContain("acme-crm");
+		const core = screen.getByRole("button", { name: t.stations.CORE });
+		core.focus();
+		await userEvent.keyboard("{Enter}");
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "core" });
+		expect(handle.select).toHaveBeenCalledWith("core");
+		expect(handle.setCameraMode).toHaveBeenLastCalledWith("focus");
+		await userEvent.click(screen.getByRole("button", { name: t.map.gateway }));
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "security" });
 	});
 
-	it("focusing a district's button never scrolls the frame and frames the district; leaving the map lets the camera go", async () => {
+	it("focusing a module's button never scrolls the frame and frames it; leaving the scene lets the camera go", async () => {
 		const { state } = played([]);
 		const { handle, container } = setup(state);
 		await flush();
-		const frame = container.querySelector<HTMLElement>(".lm-frame");
+		const frame = container.querySelector<HTMLElement>(".lm-board");
 		if (frame === null) throw new Error("no frame");
-		const git = screen.getByRole("button", { name: t.stations.GIT });
 		frame.scrollLeft = 120;
-		frame.scrollTop = 40;
-		act(() => git.focus());
+		act(() => screen.getByRole("button", { name: t.stations.GIT }).focus());
 		expect(handle.peek).toHaveBeenLastCalledWith("git");
-		expect([frame.scrollLeft, frame.scrollTop]).toEqual([0, 0]);
-		// The browser scrolls the clipped frame to show a focused child: it is put back at once.
-		frame.scrollLeft = 300;
-		fireEvent.scroll(frame);
 		expect(frame.scrollLeft).toBe(0);
-		// From one district to the next: the next is framed, the camera is not let go in between.
 		act(() => screen.getByRole("button", { name: t.stations.CORE }).focus());
-		expect(handle.peek).toHaveBeenLastCalledWith("core");
 		expect(handle.peek).not.toHaveBeenCalledWith(null);
 		act(() => screen.getByLabelText(t.map.hideDetails).focus());
 		expect(handle.peek).toHaveBeenLastCalledWith(null);
 	});
 
+	it("a drag pans and is not a click; empty ground clears the pick", async () => {
+		const { state } = played([]);
+		const { onPick, handle, container } = setup(state);
+		await flush();
+		const frame = container.querySelector(".lm-board");
+		if (frame === null) throw new Error("no frame");
+		fireEvent.pointerDown(frame, { pointerId: 1, clientX: 100, clientY: 100 });
+		fireEvent.pointerMove(frame, { pointerId: 1, clientX: 140, clientY: 110 });
+		fireEvent.pointerMove(frame, { pointerId: 1, clientX: 160, clientY: 110 });
+		fireEvent.pointerUp(frame, { pointerId: 1, clientX: 160, clientY: 110 });
+		fireEvent.click(frame, { detail: 1 });
+		expect(handle.pan).toHaveBeenCalled();
+		expect(onPick).not.toHaveBeenCalled();
+		// Not in focus (the scene says auto): empty ground clears the pick and leaves the camera's mode alone.
+		fireEvent.click(frame, { detail: 1 });
+		expect(onPick).toHaveBeenLastCalledWith(null);
+		expect(handle.setCameraMode).not.toHaveBeenCalledWith("auto");
+	});
+
+	it("in focus, empty ground goes back to auto; an event's detail keeps the focused module", async () => {
+		const { state } = played([prompt(1, 0), tool("r1", 10)]);
+		let report: ((cam: CameraState) => void) | undefined;
+		const handle = fakeHandle();
+		const { onPick, container } = setup(state, handle, (o) => ((report = o.onCamera), handle));
+		await flush();
+		await userEvent.click(screen.getByRole("button", { name: t.stations.FILES }));
+		act(() => report?.({ mode: "focus", zone: null, contentZone: "files", switches: 0 }));
+		handle.select.mockClear();
+		await userEvent.click(screen.getByRole("button", { name: c.card.more }));
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "event", eventId: "tool:r1" });
+		expect(handle.select).not.toHaveBeenCalledWith(null);
+		const frame = container.querySelector(".lm-board");
+		if (frame === null) throw new Error("no frame");
+		fireEvent.click(frame, { detail: 1 });
+		expect(handle.setCameraMode).toHaveBeenLastCalledWith("auto");
+	});
+
+	it("a pointer click picks the module the scene finds, or the moving packet's event", async () => {
+		const handle = fakeHandle({ placeAt: () => "external" });
+		const { state } = played([]);
+		const { onPick, container } = setup(state, handle);
+		await flush();
+		const frame = container.querySelector(".lm-board");
+		if (frame === null) throw new Error("no frame");
+		fireEvent.click(frame, { detail: 1 });
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "external" });
+		handle.hitEvent = () => "tool:r1";
+		fireEvent.click(frame, { detail: 1 });
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "event", eventId: "tool:r1" });
+	});
+
+	it("the camera's buttons switch its mode; focus with nothing picked picks the zone; the note tells where it looks", async () => {
+		const { state } = played([prompt(1, 0)]);
+		let report: ((cam: CameraState) => void) | undefined;
+		const handle = fakeHandle();
+		const { onPick, container } = setup(state, handle, (o) => ((report = o.onCamera), handle));
+		await flush();
+		await userEvent.click(screen.getByRole("button", { name: c.camera.free }));
+		expect(handle.setCameraMode).toHaveBeenLastCalledWith("free");
+		act(() => report?.({ mode: "auto", zone: "files", contentZone: "files", switches: 1 }));
+		expect(text(container, "observe-camera-note")).toBe(c.camera.note(t.stations.FILES, 1, 1));
+		await userEvent.click(screen.getByRole("button", { name: c.camera.focus }));
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "files" });
+	});
+
 	it("a plain wheel scrolls the page; Ctrl or Cmd + wheel zooms, and in free the wheel alone does", async () => {
 		const { state } = played([]);
-		let report: ((c: CameraState) => void) | undefined;
+		let report: ((cam: CameraState) => void) | undefined;
 		const handle = fakeHandle();
-		const { container } = setup(state, handle, (o) => ((report = o.onCamera), Promise.resolve(handle)));
+		const { container } = setup(state, handle, (o) => ((report = o.onCamera), handle));
 		await flush();
-		const frame = container.querySelector(".lm-frame");
+		const frame = container.querySelector(".lm-board");
 		if (frame === null) throw new Error("no frame");
 		const wheel = (init: WheelEventInit): boolean => frame.dispatchEvent(new WheelEvent("wheel", { deltaY: 100, cancelable: true, bubbles: true, ...init }));
 		expect(wheel({})).toBe(true);
@@ -223,104 +288,26 @@ describe("the Live Map frame", () => {
 		expect(handle.zoomAt).toHaveBeenCalledTimes(3);
 	});
 
-	it("reads live times in the machine's clock: the card's runtime and the renderer's clock", async () => {
+	it("reads live times in the machine's clock: the card's runtime and the scene's clock", async () => {
 		vi.useFakeTimers({ toFake: ["Date"] });
 		try {
 			// The viewer's clock is 5 s behind the machine's: 2 s after the call started there.
 			vi.setSystemTime(T0 + 20 + 2_000 - 5_000);
 			const { state } = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "SANDBOX" })]);
-			const { container, mounted } = setup(state, fakeHandle(), undefined, null, { clockSkewMs: 5_000 });
+			const { container, mounted } = setup(state, fakeHandle(), undefined, { clockSkewMs: 5_000 });
 			await flush();
-			expect(container.querySelector("[data-id=observe-card-runtime]")?.textContent).toBe("2 s");
+			expect(text(container, "observe-card-runtime")).toBe(`${c.card.runtime} 2 s`);
 			expect(mounted[0]?.wallClock?.()).toBe(T0 + 20 + 2_000);
 		} finally {
 			vi.useRealTimers();
 		}
 	});
 
-	it("shows the context as approximate when its window was assumed", async () => {
-		const { state } = played([prompt(1, 0)]);
-		const exact = setup({ ...state, live: live({}) });
-		await flush();
-		expect(exact.container.querySelector("[data-id=observe-context]")?.textContent).toBe(t.map.context(62));
-		exact.unmount();
-		const assumed = setup({ ...state, live: live({ contextWindowAssumed: true }) });
-		await flush();
-		const context = assumed.container.querySelector("[data-id=observe-context]");
-		expect(context?.textContent).toBe(t.map.contextApprox(62));
-		expect(context?.getAttribute("title")).toBe(t.map.contextApproxHint);
-	});
-
-	it("each place is a button: Tab reaches it, Enter selects it and focuses the camera on it", async () => {
-		const { state } = played([]);
-		const { onStation, handle } = setup(state);
-		await flush();
-		const core = screen.getByRole("button", { name: t.stations.CORE });
-		core.focus();
-		await userEvent.keyboard("{Enter}");
-		expect(onStation).toHaveBeenCalledWith("core");
-		expect(handle.select).toHaveBeenCalledWith("core");
-		expect(handle.setCameraMode).toHaveBeenLastCalledWith("focus");
-		await userEvent.click(screen.getByRole("button", { name: t.map.gateway }));
-		expect(onStation).toHaveBeenLastCalledWith("security");
-	});
-
-	it("a click on empty ground clears the selection and goes back to auto", async () => {
-		const { state } = played([]);
-		const { onDeselect, handle, container } = setup(state);
-		await flush();
-		const frame = container.querySelector(".lm-frame");
-		if (frame === null) throw new Error("no frame");
-		fireEvent.click(frame, { detail: 1 });
-		expect(onDeselect).toHaveBeenCalledOnce();
-		expect(handle.setCameraMode).toHaveBeenLastCalledWith("auto");
-	});
-
-	it("a drag pans the camera (free) and is not a click", async () => {
-		const { state } = played([]);
-		const { onDeselect, handle, container } = setup(state);
-		await flush();
-		const frame = container.querySelector(".lm-frame");
-		if (frame === null) throw new Error("no frame");
-		fireEvent.pointerDown(frame, { pointerId: 1, clientX: 100, clientY: 100 });
-		fireEvent.pointerMove(frame, { pointerId: 1, clientX: 140, clientY: 110 });
-		fireEvent.pointerMove(frame, { pointerId: 1, clientX: 160, clientY: 110 });
-		fireEvent.pointerUp(frame, { pointerId: 1, clientX: 160, clientY: 110 });
-		fireEvent.click(frame, { detail: 1 });
-		expect(handle.pan).toHaveBeenCalled();
-		expect(onDeselect).not.toHaveBeenCalled();
-	});
-
-	it("the camera's buttons switch its mode; focus with nothing selected selects the zone; the note tells where it looks", async () => {
-		const { state } = played([]);
-		let report: ((c: CameraState) => void) | undefined;
-		const { handle, onStation, container } = setup(state, fakeHandle(), (o) => ((report = o.onCamera), Promise.resolve(handle)));
-		await flush();
-		await userEvent.click(screen.getByRole("button", { name: c.camera.free }));
-		expect(handle.setCameraMode).toHaveBeenLastCalledWith("free");
-		act(() => report?.({ mode: "auto", zone: "files", contentZone: "files", switches: 1 }));
-		expect(container.querySelector("[data-id=observe-camera-note]")?.textContent).toBe(c.camera.note(t.stations.FILES, 1));
-		expect(container.querySelector("[data-id=observe-board-files]")).not.toBeNull();
-		await userEvent.click(screen.getByRole("button", { name: c.camera.focus }));
-		expect(onStation).toHaveBeenLastCalledWith("files");
-	});
-
-	it("a click on a moving packet opens its source event", async () => {
-		const handle = fakeHandle({ hitEvent: () => "tool:r1" });
-		const { state } = played([]);
-		const { onEvent, onStation } = setup(state, handle);
-		await flush();
-		await userEvent.click(screen.getByRole("button", { name: t.stations.FILES }));
-		expect(onEvent).toHaveBeenCalledWith("tool:r1");
-		expect(onStation).not.toHaveBeenCalled();
-	});
-
-	it("gives the renderer each new animation once, and destroys it on leaving", async () => {
+	it("gives the scene each new animation once, and drops it on leaving", async () => {
 		const first = played([prompt(1, 0)]);
-		const { mounted, handle, rerenderWith, unmount, container } = setup(first.state);
+		const { mounted, handle, rerenderWith, unmount } = setup(first.state);
 		await flush();
 		expect(mounted).toHaveLength(1);
-		expect(container.querySelector("[data-id=observe-stage]")?.getAttribute("data-renderer")).toBe("webgl");
 		const run = played([prompt(1, 0), tool("r1", 10)]);
 		const next = { ...run.state, animations: run.animations };
 		rerenderWith(next);
@@ -334,32 +321,23 @@ describe("the Live Map frame", () => {
 		expect(handle.destroy).toHaveBeenCalledOnce();
 	});
 
-	it("without WebGL or Canvas shows the still plate, the tags and a note, and no camera controls", async () => {
+	it("without a 2D canvas says so, keeps the modules' buttons and shows no camera controls", async () => {
+		vi.spyOn(console, "warn").mockImplementation(() => {});
 		const { state } = played([]);
-		const { container } = setup(state, fakeHandle(), () => Promise.reject(new Error("No available renderer for the current environment")));
+		const { container } = setup(state, fakeHandle(), () => {
+			throw new Error("live map: no 2D canvas");
+		});
 		await flush();
 		expect(container.querySelector("[data-id=observe-stage]")?.getAttribute("data-status")).toBe("still");
-		expect(container.querySelector(".lm-plate")).not.toBeNull();
 		expect(screen.getByText(t.map.still)).toBeTruthy();
-		expect(container.querySelectorAll(".lm-hit")).toHaveLength(13);
-		expect(container.querySelector("[data-id=observe-camera]")).toBeNull();
+		expect(container.querySelectorAll(".lm-hit")).toHaveLength(12);
+		expect(container.querySelector(".lm-camctl")).toBeNull();
 	});
 
-	it("a lost context shows the plate until it is restored; a second loss keeps it still and destroys the renderer", async () => {
-		const handle = fakeHandle();
-		let opts: LiveMapMountOptions | null = null;
-		const { state } = played([]);
-		const { container } = setup(state, handle, (o) => ((opts = o), Promise.resolve(handle)));
+	it("opens with a link's event in the detail", async () => {
+		const { state } = played([prompt(1, 0), tool("r1", 10, { target: "src/app.ts" })]);
+		const { container } = setup(state, fakeHandle(), undefined, { initialEvent: "tool:r1" });
 		await flush();
-		const o = opts as LiveMapMountOptions | null;
-		if (o === null) throw new Error("not mounted");
-		act(() => o.onStill?.("lost"));
-		expect(screen.getByText(t.map.lost)).toBeTruthy();
-		expect(container.querySelector(".lm-plate")).not.toBeNull();
-		act(() => o.onRestored?.());
-		expect(container.querySelector(".lm-plate")).toBeNull();
-		act(() => o.onStill?.("given-up"));
-		expect(handle.destroy).toHaveBeenCalledOnce();
-		expect(screen.getByText(t.map.still)).toBeTruthy();
+		expect(text(container, "observe-detail-status")).toContain(c.side.running);
 	});
 });

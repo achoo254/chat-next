@@ -1,12 +1,10 @@
-// What the holographic board over a district shows when the camera is on it
-// (pure): the district's last calls, newest first, the running ones first and
+// What a module shows when the camera is on it, and what its detail reads
+// (pure): the module's last calls, newest first, the running ones first and
 // marked (files: 4, terminal: 4, tests: 3, MCP: the last call per server,
 // internet: 3 domains, others: 3), each with its tool, target and runtime;
-// for the AI core, its last API request; for the drones' area, the running
+// for the model, its API turns; for the subagents' ring, the running
 // subagents; for the context reservoir, the context's fill; for the
-// permission lock, what waits; for the input port, the prompt count. The
-// newest ended call is also the one whose output line the board may show
-// (content, asked by id).
+// permission lock, what waits; for the input port, the prompt count.
 import { agentTypeOf } from "./activity-card-model.ts";
 import { coreStateOf, runningCalls, toolCalls, type ToolCall } from "./call-history.ts";
 import type { LiveMapState } from "./live-map-state.ts";
@@ -28,7 +26,7 @@ export interface BoardRow {
 }
 
 export type DistrictBoard =
-	| { readonly kind: "calls"; readonly rows: readonly BoardRow[]; readonly lastEnded: string | null }
+	| { readonly kind: "calls"; readonly rows: readonly BoardRow[] }
 	| { readonly kind: "model"; readonly apiTurns: number; readonly contextPercent: number | null; readonly tokensPerSecond: number | null; readonly model: string }
 	/** The running subagents' types ("" when not known: the view names it). */
 	| { readonly kind: "subagents"; readonly running: readonly string[] }
@@ -87,5 +85,5 @@ export function districtBoardOf(state: LiveMapState, place: PlaceId, now: number
 		recent = recent.filter((c) => (seen.has(c.event.mcpServer) ? false : (seen.add(c.event.mcpServer), true)));
 	}
 	const rows = recent.slice(0, ROWS[place] ?? 3).map((c) => row(state, c, now));
-	return { kind: "calls", rows, lastEnded: ended[0]?.event.id ?? null };
+	return { kind: "calls", rows };
 }

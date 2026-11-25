@@ -80,22 +80,14 @@ export const BUNDLE_BUDGET = {
 export const LIVE_MAP_MODULE = "src/machines/observatory/live-map-view.tsx";
 export const MACHINES_SCREEN_MODULE = "src/machines/machines-screen.tsx";
 
-/**
- * PixiJS's own on-demand parts a browser loads for the Live Map: its browser
- * extensions and both renderers it may pick (WebGL, else Canvas; both counted,
- * though only one loads). Its WebGPU renderer (never asked for) and its web
- * worker environment are not counted.
- */
-const PIXI_ON_DEMAND = /\/pixi\.js\/lib\/(environment-browser\/browserAll|rendering\/renderers\/gl\/WebGLRenderer|rendering\/renderers\/canvas\/CanvasRenderer)\.mjs$/;
-
 /** On-demand parts that belong to the Live Map's count. */
 export function liveMapPart(key: string): boolean {
-	return key.startsWith("src/machines/observatory/") || PIXI_ON_DEMAND.test(key);
+	return key.startsWith("src/machines/observatory/");
 }
 
 export const LIVE_MAP_BUDGET = {
-	/** The Live Map chunk under 350 KB gzip, images and other assets not counted. */
-	jsGzip: 350 * 1024,
+	/** The Live Map's chunks under 80 KB gzip (45.5 KB on 26/11/2026 once drawn on a 2D canvas, no renderer library). */
+	jsGzip: 80 * 1024,
 } as const;
 
 /** GitHub Actions and most CI systems set CI=true. */

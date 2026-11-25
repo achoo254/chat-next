@@ -1,19 +1,17 @@
-// The Live Map's PixiJS renderer under the production Content Security
-// Policy. Dev server, vitest and the perf gate send no CSP, so nothing else
-// would notice PixiJS generating code with `new Function` (no 'unsafe-eval'
-// in script-src) or starting a worker from a blob: URL (worker-src 'self').
-// The app is built for production with one extra page
-// (observatory-csp-harness.html, which mounts the renderer on the shipped
-// assets and plays real events through the reducer) and served by a small
-// server that sends the CSP header read, at run time, from
-// infra/chat/nginx/chat.hoandat.com.conf. No backend is needed.
+// The Live Map's scene under the production Content Security Policy. Dev
+// server, vitest and the perf gate send no CSP, so nothing else would notice
+// the scene needing code generated at run time (no 'unsafe-eval' in
+// script-src), a worker from a blob: URL (worker-src 'self') or a source the
+// policy does not name. The app is built for production with one extra page
+// (observatory-csp-harness.html, which mounts the scene and plays real events
+// through the reducer) and served by a small server that sends the CSP header
+// read, at run time, from infra/chat/nginx/chat.hoandat.com.conf. No backend
+// is needed.
 //
-// Checks: with WebGL, no CSP violation and no console error, the renderer is
-// WebGL, the canvas shows more than one colour, the events play (the
-// animation log names them), the idle scene moves at 20 frames a second at
-// most, and with reduced motion it goes still afterwards; with WebGL
-// switched off, the Canvas renderer or the still view, still without a CSP
-// violation.
+// Checks: no CSP violation and no console error, the canvas shows many
+// colours, the events play (the animation log names them), the idle scene
+// moves at 20 frames a second at most, and with reduced motion it goes still
+// afterwards; with the GPU's 3D switched off the 2D canvas still draws.
 //
 //   node --test apps/web/test/e2e/observatory-csp.e2e.ts    (on its own)
 import assert from "node:assert/strict";
@@ -154,15 +152,14 @@ async function colours(page: Page): Promise<number> {
 	}, png);
 }
 
-test("draws with WebGL under the production CSP and goes still after its events", async () => {
-	const { page, violations, errors } = await open(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]);
+test("draws under the production CSP and goes still after its events", async () => {
+	const { page, violations, errors } = await open([]);
 	const status = await page.evaluate(() => [document.body.dataset.status, document.body.dataset.error ?? ""]);
 	assert.deepEqual(status, ["ready", ""], `the scene started: ${status[1]}`);
-	assert.equal(await page.evaluate(() => window.__liveMapHarness?.renderer), "webgl");
 	const played = await page.evaluate(() => window.__liveMapHarness?.play() ?? 0);
 	assert.ok(played >= 3, `animations queued: ${played}`);
 	await page.waitForTimeout(400);
-	assert.ok((await colours(page)) > 20, "the canvas shows the plate and its pieces");
+	assert.ok((await colours(page)) > 20, "the canvas shows the modules and their traces");
 	// Every move ends within 1.5 s; the core stopped (a Stop came), so with reduced motion nothing moves after.
 	await page.waitForTimeout(2_000);
 	const settled = await page.evaluate(() => window.__liveMapHarness?.frames() ?? -1);
@@ -175,7 +172,7 @@ test("draws with WebGL under the production CSP and goes still after its events"
 });
 
 test("without reduced motion the idle scene moves gently, at 20 frames a second at most", async () => {
-	const { page, violations, errors } = await open(["--use-angle=swiftshader", "--enable-unsafe-swiftshader"], "no-preference");
+	const { page, violations, errors } = await open([], "no-preference");
 	assert.equal(await page.evaluate(() => document.body.dataset.status), "ready");
 	await page.evaluate(() => window.__liveMapHarness?.play());
 	await page.waitForTimeout(3_000);
@@ -188,15 +185,11 @@ test("without reduced motion the idle scene moves gently, at 20 frames a second 
 	assert.deepEqual(errors, [], "no console error");
 });
 
-test("with WebGL switched off, falls back to Canvas or the still view, still within the CSP", async (t) => {
-	const { page, violations } = await open(["--disable-webgl", "--disable-3d-apis"]);
-	const status = await page.evaluate(() => document.body.dataset.status);
-	t.diagnostic(`without WebGL: ${status === "ready" ? `renderer ${await page.evaluate(() => window.__liveMapHarness?.renderer)}` : `still view (${await page.evaluate(() => document.body.dataset.error ?? "")})`}`);
-	if (status === "ready") {
-		assert.equal(await page.evaluate(() => window.__liveMapHarness?.renderer), "canvas");
-		await page.evaluate(() => window.__liveMapHarness?.play());
-		await page.waitForTimeout(400);
-		assert.ok((await colours(page)) > 20, "the Canvas renderer draws the plate");
-	} else assert.equal(status, "still");
+test("with the GPU's 3D switched off, the 2D canvas still draws within the CSP", async () => {
+	const { page, violations } = await open(["--disable-webgl", "--disable-3d-apis", "--disable-gpu"]);
+	assert.equal(await page.evaluate(() => document.body.dataset.status), "ready");
+	await page.evaluate(() => window.__liveMapHarness?.play());
+	await page.waitForTimeout(400);
+	assert.ok((await colours(page)) > 20, "the canvas draws the modules");
 	assert.deepEqual(violations, [], "no CSP violation");
 });

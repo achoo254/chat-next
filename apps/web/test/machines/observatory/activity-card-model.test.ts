@@ -112,15 +112,15 @@ describe("the journey", () => {
 });
 
 describe("the content read for the card", () => {
-	it("takes the input's description and the output's last line", () => {
+	it("takes the input's description, the output's last line and the whole output", () => {
 		const text = JSON.stringify({ input: JSON.stringify({ command: "pnpm install", description: "Cài dependencies" }), output: "Progress\nDone in 2.6s · 812 packages\n" });
-		expect(parseToolContent(text)).toEqual({ description: "Cài dependencies", outputLine: "Done in 2.6s · 812 packages" });
+		expect(parseToolContent(text)).toEqual({ description: "Cài dependencies", outputLine: "Done in 2.6s · 812 packages", output: "Progress\nDone in 2.6s · 812 packages" });
 	});
 
 	it("reads a description out of an input cut short, falls back to the error, and never throws", () => {
-		expect(parseToolContent(JSON.stringify({ input: '{"description":"Chạy test","command":"pnpm te', error: "FAIL a.test.ts\n1 failed, 41 passed" }))).toEqual({ description: "Chạy test", outputLine: "1 failed, 41 passed" });
-		expect(parseToolContent("not json\nlast")).toEqual({ description: "", outputLine: "last" });
-		expect(parseToolContent("null")).toEqual({ description: "", outputLine: "" });
+		expect(parseToolContent(JSON.stringify({ input: '{"description":"Chạy test","command":"pnpm te', error: "FAIL a.test.ts\n1 failed, 41 passed" }))).toEqual({ description: "Chạy test", outputLine: "1 failed, 41 passed", output: "FAIL a.test.ts\n1 failed, 41 passed" });
+		expect(parseToolContent("not json\nlast")).toEqual({ description: "", outputLine: "last", output: "not json\nlast" });
+		expect(parseToolContent("null")).toEqual({ description: "", outputLine: "", output: "" });
 	});
 });
 
@@ -131,7 +131,6 @@ describe("a district's board", () => {
 		if (board.kind !== "calls") throw new Error("not calls");
 		expect(board.rows.map((r) => r.eventId)).toEqual(["tool:f", "tool:e", "tool:d", "tool:c"]);
 		expect(board.rows[0]).toMatchObject({ running: true, runtimeMs: 300 });
-		expect(board.lastEnded).toBe("tool:e");
 	});
 
 	it("shows the model's last request at the core, the drones at their area, the context at the reservoir", () => {

@@ -215,6 +215,8 @@ export interface ToolContent {
 	readonly description: string;
 	/** The output's (or the error's) last non-empty line; "" when none. */
 	readonly outputLine: string;
+	/** The whole output (or error); "" when none. */
+	readonly output: string;
 }
 
 const lastLine = (text: string): string =>
@@ -230,9 +232,9 @@ export function parseToolContent(text: string): ToolContent {
 	try {
 		parsed = JSON.parse(text);
 	} catch {
-		return { description: "", outputLine: lastLine(text) };
+		return { description: "", outputLine: lastLine(text), output: text };
 	}
-	if (typeof parsed !== "object" || parsed === null) return { description: "", outputLine: "" };
+	if (typeof parsed !== "object" || parsed === null) return { description: "", outputLine: "", output: "" };
 	const part = (name: string): string => {
 		const v: unknown = Reflect.get(parsed, name);
 		return typeof v === "string" ? v : "";
@@ -250,5 +252,5 @@ export function parseToolContent(text: string): ToolContent {
 		}
 	}
 	const output = part("output") || part("error") || part("reason");
-	return { description, outputLine: lastLine(output) };
+	return { description, outputLine: lastLine(output), output: output.trim() };
 }

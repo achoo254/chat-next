@@ -30,7 +30,7 @@ function show(state: LiveMapState, now: number, { hide = false, fake = null as F
 	const source = fake === null ? null : { link: fake.link, sessionId: "s1", online: true };
 	const view = render(
 		<I18nProvider>
-			<ActivityCard card={activityCardOf(state, now)} names={names} hide={hide} source={source} onDetail={onDetail} />
+			<ActivityCard card={activityCardOf(state, now)} names={names} hide={hide} source={source} tokensPerSecond={null} contextPercent={null} onDetail={onDetail} />
 		</I18nProvider>,
 	);
 	const text = (id: string): string => view.container.querySelector(`[data-id=${id}]`)?.textContent ?? "";
@@ -53,7 +53,7 @@ describe("the activity card", () => {
 		expect(text("observe-card-status")).toBe(c.card.status.run);
 		expect(text("observe-card-kind")).toBe(`${c.card.running} · ${names.testing}`);
 		expect(text("observe-card-what")).toBe("Bash pnpm");
-		expect(text("observe-card-runtime")).toBe("2 s");
+		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 2 s`);
 		expect(text("observe-card-history")).toBe(c.card.noHistory);
 		const bar = container.querySelector("[data-id=observe-card-bar]");
 		expect(bar?.getAttribute("role")).toBe("progressbar");
@@ -63,9 +63,8 @@ describe("the activity card", () => {
 
 	it("keeps Runtime and the p95 history apart, and says when the run is longer than that p95", () => {
 		const { text } = show(played([prompt(1, 0), tool("a", 10, { station: "TESTING", success: true, durationMs: 1_000 }), bash(2_000)]).state, T0 + 6_000);
-		expect(text("observe-card-runtime")).toBe("4 s");
-		expect(text("observe-card-history")).toBe(`1 s ${c.card.historyCount(1)} · ${c.card.overP95}`);
-		expect(text("observe-card-calls")).toBe("2");
+		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 4 s`);
+		expect(text("observe-card-history")).toBe(`${c.card.p95} 1 s ${c.card.historyCount(1)} · ${c.card.overP95}`);
 	});
 
 	it("once the call ended asks its content by id and shows the description and the output's last line", async () => {
@@ -103,7 +102,7 @@ describe("the activity card", () => {
 	it("waiting for permission, thinking and idle each say so", () => {
 		const wait = show(played([prompt(1, 0), lifecycle("permission_request", "q", 10, { label: "Bash" })]).state, T0 + 3_010);
 		expect(wait.text("observe-card-status")).toBe(c.card.status.wait);
-		expect(wait.text("observe-card-what")).toBe(c.card.waitWhat("Bash"));
+		expect(wait.text("observe-card-what")).toBe("Bash");
 		wait.unmount();
 		const think = show(played([prompt(1, 0)]).state, T0 + 500);
 		expect(think.text("observe-card-status")).toBe(c.card.status.think);
@@ -144,10 +143,10 @@ describe("the activity card", () => {
 		// The runtime ticks; the spoken status does not.
 		rerender(
 			<I18nProvider>
-				<ActivityCard card={activityCardOf(sub.state, T0 + 5_000)} names={names} hide={false} source={null} onDetail={() => undefined} />
+				<ActivityCard card={activityCardOf(sub.state, T0 + 5_000)} names={names} hide={false} source={null} tokensPerSecond={null} contextPercent={null} onDetail={() => undefined} />
 			</I18nProvider>,
 		);
-		expect(text("observe-card-runtime")).toBe("5 s");
+		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 5 s`);
 		expect(container.querySelector("[data-id=observe-card-live]")?.textContent).toBe(spoken);
 		expect(spoken).not.toContain("5 s");
 	});

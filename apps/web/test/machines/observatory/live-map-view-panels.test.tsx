@@ -1,9 +1,8 @@
-// The Live Map view with its panels mounted: a click on a station opens its
-// drawer (numbers asked up to the replayed moment), a click on a piece or on
-// an event opens its detail (content asked by id), the replay bar sits under
-// the map and rebuilds the scene at the replayed moment, "Live" goes back, a
-// link's event opens at its moment, and another session starts clean. The
-// stage (PixiJS, plate, DOM tags) is a stand-in with one button per click.
+// The Live Map view around its stage: the session's core state and the pick
+// marked on the map (for tests and links), a link's event handed to the stage,
+// no drawer, no replay bar and no station numbers asked of the machine, and
+// another session starts clean. The stage is a stand-in with one button per
+// pick.
 import { create } from "@bufbuild/protobuf";
 import { MachineInfoSchema, ObservatoryCoreState, ObservatoryEventSchema, ObservatorySessionSource, ObservatorySnapshotSchema, type Frame } from "@achoo254/chat-proto/remote/remote";
 import { act, render } from "@testing-library/react";
@@ -15,12 +14,10 @@ import type { LiveMapStageProps } from "../../../src/machines/observatory/render
 import { FakeLink } from "./fake-observatory-link.ts";
 
 vi.mock("../../../src/machines/observatory/render/live-map-stage.tsx", () => ({
-	readHideDetails: () => false,
-	LiveMapStage: ({ state, onStation, onEvent }: LiveMapStageProps) => (
-		<div data-id="stage" data-events={state.log.length}>
-			<button type="button" data-id="stub-station" onClick={() => onStation("files")} />
-			<button type="button" data-id="stub-desk" onClick={() => onStation("user-desk")} />
-			<button type="button" data-id="stub-piece" onClick={() => onEvent("prompt:p1")} />
+	LiveMapStage: ({ state, onPick, initialEvent }: LiveMapStageProps) => (
+		<div data-id="stage" data-events={state.log.length} data-initial={initialEvent}>
+			<button type="button" data-id="stub-station" onClick={() => onPick?.({ kind: "place", place: "files" })} />
+			<button type="button" data-id="stub-piece" onClick={() => onPick?.({ kind: "event", eventId: "prompt:p1" })} />
 		</div>
 	),
 }));
@@ -65,73 +62,29 @@ async function open(focus?: { at?: number; event?: string }) {
 
 const id = (view: { container: HTMLElement }, name: string): Element | null => view.container.querySelector(`[data-id=${name}]`);
 
-describe("the Live Map view with its panels", () => {
-	it("puts the replay bar under the map, live at the end", async () => {
-		const { view } = await open();
-		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("live");
-		expect(id(view, "lmd-drawer")).toBeNull();
-		expect(id(view, "lmd-detail")).toBeNull();
-	});
-
-	it("opens a station's drawer on a click, asks its numbers for the whole session, and closes it", async () => {
+describe("the Live Map view around its stage", () => {
+	it("marks the core's state and the pick on the map, and asks the machine no station numbers", async () => {
 		const { fake, view } = await open();
-		await userEvent.click(id(view, "stub-station") as Element);
-		expect(id(view, "lmd-drawer")?.getAttribute("data-station")).toBe("FILES");
-		expect(fake.sent.at(-1)).toEqual({ case: "observatoryStation", value: { sessionId: "s1", station: "FILES", at: 0n } });
-		await userEvent.click(id(view, "lmd-close") as Element);
-		expect(id(view, "lmd-drawer")).toBeNull();
-	});
-
-	it("opens nothing for a place that is not a station", async () => {
-		const { view } = await open();
-		await userEvent.click(id(view, "stub-desk") as Element);
-		expect(id(view, "lmd-drawer")).toBeNull();
-		expect(id(view, "observe-map")?.getAttribute("data-selected-place")).toBe("user-desk");
-	});
-
-	it("opens a piece's event with its content asked by id", async () => {
-		const { fake, view } = await open();
-		await userEvent.click(id(view, "stub-piece") as Element);
-		expect(id(view, "lmd-detail")?.getAttribute("data-kind")).toBe("prompt");
-		expect(fake.sent.at(-1)).toEqual({ case: "observatoryContent", value: { sessionId: "s1", eventId: "prompt:p1" } });
-	});
-
-	it("replays on play, asks the drawer's numbers up to the replayed moment, and goes back live", async () => {
-		const { fake, view } = await open();
-		await userEvent.click(id(view, "stub-station") as Element);
-		await userEvent.click(id(view, "lmd-play") as Element);
-		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("replay");
-		const asked = fake.sent.filter((b) => b.case === "observatoryStation");
-		const last = asked.at(-1);
-		expect(last?.case === "observatoryStation" && (last.value.at ?? 0n) > 0n).toBe(true);
-		await userEvent.click(id(view, "lmd-live") as Element);
-		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("live");
-		const again = fake.sent.filter((b) => b.case === "observatoryStation").at(-1);
-		expect(again?.case === "observatoryStation" && again.value.at).toBe(0n);
-	});
-
-	it("replays to the event's moment from its detail, the core as it was then", async () => {
-		const { view } = await open();
 		expect(id(view, "observe-map")?.getAttribute("data-core")).toBe("waiting_permission");
+		await userEvent.click(id(view, "stub-station") as Element);
+		expect(id(view, "observe-map")?.getAttribute("data-selected-place")).toBe("files");
 		await userEvent.click(id(view, "stub-piece") as Element);
-		await userEvent.click(id(view, "lmd-replay-here") as Element);
-		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("replay");
-		// At the prompt the core thought; the machine's state now (waiting for permission) is not that moment's.
-		expect(id(view, "observe-map")?.getAttribute("data-core")).toBe("thinking");
-		await userEvent.click(id(view, "lmd-live") as Element);
-		expect(id(view, "observe-map")?.getAttribute("data-core")).toBe("waiting_permission");
+		expect(id(view, "observe-map")?.getAttribute("data-selected-event")).toBe("prompt:p1");
+		expect(id(view, "observe-map")?.hasAttribute("data-selected-place")).toBe(false);
+		expect(fake.sent.some((b) => b.case === "observatoryStation")).toBe(false);
+		expect(id(view, "lmd-replay")).toBeNull();
+		expect(id(view, "lmd-drawer")).toBeNull();
 	});
 
-	it("opens at the event a link names, at its moment", async () => {
+	it("hands the event a link names to the stage", async () => {
 		const { view } = await open({ event: "prompt:p1" });
-		expect(id(view, "lmd-detail")?.getAttribute("data-kind")).toBe("prompt");
-		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("replay");
+		expect(id(view, "stage")?.getAttribute("data-initial")).toBe("prompt:p1");
+		expect(id(view, "observe-map")?.getAttribute("data-selected-event")).toBe("prompt:p1");
 	});
 
 	it("starts another session clean", async () => {
 		const { fake, view } = await open();
 		await userEvent.click(id(view, "stub-station") as Element);
-		expect(id(view, "lmd-drawer")).not.toBeNull();
 		view.rerender(
 			<I18nProvider>
 				<LiveMapView link={fake.link} machine="1" info={machine} online target={{ kind: "session", sessionId: "s2" }} />
@@ -139,7 +92,6 @@ describe("the Live Map view with its panels", () => {
 		);
 		act(() => fake.deliver(snapshot(3n, 1n, "s2"), false));
 		await flush();
-		expect(id(view, "lmd-replay")?.getAttribute("data-state")).toBe("live");
-		expect(id(view, "lmd-drawer")).toBeNull();
+		expect(id(view, "observe-map")?.hasAttribute("data-selected-place")).toBe(false);
 	});
 });

@@ -1,50 +1,22 @@
-// Copy of the Live Map's drawer, event detail and replay bar in the three UI
-// languages. It ships with the Live Map's own chunk (all three are small), so
-// nothing is fetched on first use. Station names stay in copy-*.ts
-// (`observe.stations`).
+// Copy of the Live Map (the activity card, the scene, the column beside it,
+// the event list, the legend) in the three UI languages. It ships with the
+// Live Map's own chunk (all three are small), so nothing is fetched on first
+// use. Station names stay in copy-*.ts (`observe.stations`).
 import { useI18n, type Locale } from "../../i18n/i18n.tsx";
+
+type PlaceKey = "core" | "user-desk" | "orchestrator" | "memory" | "skills" | "files" | "mcp" | "external" | "security" | "sandbox" | "testing" | "git" | "monitoring";
+
+/** A token count the way the reservoir shows it: "820", "184k", "1M". */
+function tokenSize(n: number): string {
+	if (n >= 1_000_000) return `${Math.round((n / 1_000_000) * 10) / 10}M`;
+	if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+	return String(n);
+}
 
 export interface ObservatoryCopy {
 	/** For Intl formatting of times and numbers. */
 	readonly locale: string;
 	readonly close: string;
-	readonly drawer: {
-		readonly label: (station: string) => string;
-		readonly scopeLive: (start: string) => string;
-		readonly scopeReplay: (at: string) => string;
-		readonly loading: string;
-		readonly calls: string;
-		readonly latency: string;
-		readonly sampled: string;
-		readonly errorRate: string;
-		readonly tokens: string;
-		readonly tokenParts: (input: string, output: string, cache: string) => string;
-		readonly cost: string;
-		readonly noCost: string;
-		readonly costNote: string;
-		readonly withoutCost: (n: number) => string;
-		readonly parts: Readonly<Record<string, string>>;
-		readonly partsOther: string;
-		readonly hiddenPart: (n: number) => string;
-		readonly partLine: (calls: string, p95: string) => string;
-		readonly previous: string;
-		readonly previousOver: (n: number) => string;
-		readonly previousNone: string;
-		readonly compareP95: string;
-		readonly compareErrors: string;
-		readonly compareTokens: string;
-		readonly compareNone: string;
-		readonly slowest: string;
-		readonly recent: string;
-		readonly noEvents: string;
-		readonly findings: string;
-		readonly noFindings: string;
-		readonly open: string;
-		readonly closed: string;
-		readonly evidence: (n: number) => string;
-		readonly finding: (rule: string, value: string, threshold: string) => string;
-		readonly findingN: (n: number) => string;
-	};
 	readonly rules: {
 		readonly tool_slow: string;
 		readonly api_slow: string;
@@ -56,33 +28,8 @@ export interface ObservatoryCopy {
 		readonly cost_spike: string;
 		readonly unknown: string;
 	};
-	readonly severity: { readonly warn: string; readonly alert: string };
-	readonly units: { readonly perToken: string; readonly perMinute: string; readonly reads: string; readonly limited: string };
 	readonly detail: {
-		readonly label: string;
 		readonly kinds: Readonly<Record<"prompt" | "tool" | "subagent" | "api" | "instruction" | "git" | "lifecycle" | "bottleneck", string>>;
-		readonly kind: string;
-		readonly station: string;
-		readonly estimated: string;
-		readonly time: string;
-		readonly duration: string;
-		readonly result: string;
-		readonly running: string;
-		readonly ok: string;
-		readonly failed: string;
-		readonly ended: string;
-		readonly provisional: string;
-		readonly labels: string;
-		readonly model: string;
-		readonly tokens: string;
-		readonly tokenLine: (output: string, context: string | null) => string;
-		readonly content: string;
-		readonly contentLoading: string;
-		readonly contentOff: string;
-		readonly contentNone: string;
-		readonly contentNotYet: string;
-		readonly hidden: string;
-		readonly replayHere: string;
 	};
 	/** The activity card over the scene (activity-card.tsx). */
 	readonly card: {
@@ -121,107 +68,128 @@ export interface ObservatoryCopy {
 		readonly outputFailed: string;
 		readonly outputUnavailable: string;
 		readonly journey: string;
-		readonly journeyNone: string;
 		readonly more: string;
 	};
-	/** The camera's controls, the overview map and the status legend of the scene. */
+	/** The camera's modes and the note under them. */
 	readonly camera: {
 		readonly label: string;
 		readonly auto: string;
 		readonly free: string;
 		readonly focus: string;
 		readonly whole: string;
-		readonly note: (where: string, n: number) => string;
-		readonly minimap: string;
-		readonly legend: string;
-		readonly legendRun: string;
-		readonly legendWait: string;
-		readonly legendOk: string;
-		readonly legendErr: string;
+		readonly note: (where: string, n: number, events: number) => string;
 	};
-	/** The holographic board over a district, the roads' labels and the pipeline's steps. */
-	readonly board: {
-		readonly label: (place: string) => string;
-		readonly empty: string;
-		readonly result: string;
+	/** The words drawn inside the machine's scene (render/interior-painter.ts). */
+	readonly scene: {
+		/** Each module's name tag. */
+		readonly tags: Readonly<Record<PlaceKey, string>>;
+		/** The line under each module's name. */
+		readonly subs: Readonly<Record<PlaceKey, string>>;
 		readonly calls: (n: number) => string;
-		readonly failures: (n: number) => string;
 		readonly p95: (d: string) => string;
+		readonly failures: (n: number) => string;
 		readonly runtime: (d: string) => string;
-		readonly apiTurn: (n: number) => string;
-		readonly context: (percent: number) => string;
-		readonly speed: (tps: number) => string;
-		readonly noSubagent: string;
-		readonly subagentRunning: string;
-		readonly workflows: (n: number) => string;
+		readonly noCalls: string;
+		readonly modelTitle: (model: string) => string;
+		readonly thinking: string;
+		readonly waiting: string;
+		readonly executing: string;
+		readonly idle: string;
+		readonly apiLine: (turn: number, kTokens: number, tps: number) => string;
+		/** The reservoir's line: percent (null: unknown), tokens used and the window. */
+		readonly contextLine: (percent: number | null, tokens: number, window: number) => string;
+		readonly wave: (tps: number) => string;
+		readonly portal: string;
+		readonly subagent: (type: string) => string;
+		/** A subagent whose type is not known. */
+		readonly subagentShort: string;
+		/** An MCP tool's name while "Ẩn chi tiết" is on. */
+		readonly mcpTool: string;
+		/** An MCP server's name while "Ẩn chi tiết" is on. */
+		readonly mcpServer: (n: number) => string;
+		readonly noMcp: string;
+		readonly moreServers: (n: number) => string;
+		readonly steps: Readonly<Record<"commit" | "push" | "ci" | "deploy", string>>;
+		readonly stepFailed: string;
 		/** A CI step whose outcome is not known (the machine stopped following it, or it ran too long without news). */
-		readonly ciUnknown: string;
+		readonly stepUnknown: string;
 		readonly prod: string;
-		readonly waitingFor: (what: string) => string;
-		readonly prompts: (n: number) => string;
 	};
-	/** A line under each district's name. */
-	readonly places: Readonly<Record<"core" | "user-desk" | "orchestrator" | "memory" | "skills" | "files" | "mcp" | "external" | "security" | "sandbox" | "testing" | "git" | "monitoring", string>>;
-	readonly replay: {
+	/** The column beside the scene: the session's gauges and the detail (live-map-side.tsx). */
+	readonly side: {
+		readonly session: string;
+		readonly context: string;
+		readonly speed: string;
+		readonly tokPerSec: string;
+		readonly tools: string;
+		readonly subagents: string;
+		readonly detail: string;
+		readonly detailHint: string;
+		readonly status: string;
+		readonly running: string;
+		readonly ok: string;
+		readonly failed: string;
+		readonly runtimeNow: string;
+		readonly p95Place: string;
+		readonly none: string;
+		readonly callsPlace: string;
+		readonly target: string;
+		readonly agent: string;
+		readonly mainAgent: string;
+		readonly description: string;
+		readonly output: string;
+		readonly outputRunning: string;
+		readonly contentNote: string;
+		readonly kind: string;
+		readonly time: string;
 		readonly label: string;
-		readonly title: string;
-		readonly play: string;
-		readonly pause: string;
-		readonly live: string;
-		readonly speed: (n: number) => string;
-		readonly previous: string;
-		readonly next: string;
-		readonly slider: string;
-		readonly position: (at: string, end: string) => string;
-		readonly silence: string;
-		readonly keys: string;
-		readonly loading: string;
-		readonly expired: string;
-		readonly partial: (start: string) => string;
-		readonly held: (n: number) => string;
+		readonly doing: string;
+		readonly modes: Readonly<Record<"think" | "exec" | "wait" | "idle", string>>;
+		readonly apiTurns: string;
+		readonly speedRow: string;
+		readonly subagentRow: string;
+		readonly used: string;
+		readonly ratio: string;
+		readonly noCallsYet: string;
+		readonly p50p95: string;
+		readonly errors: string;
+		readonly recent: string;
+		readonly stepRow: (step: string, n: number, p95: string) => string;
+		readonly stepState: Readonly<Record<"idle" | "run" | "ok" | "err" | "unknown", string>>;
+		readonly waitingFor: string;
+		readonly prompts: string;
 	};
+	/** The event list beside the scene (event-feed.tsx). */
+	readonly feed: {
+		readonly title: string;
+		readonly running: string;
+		readonly failed: (d: string) => string;
+		readonly prompt: string;
+		readonly api: (turn: number, tokens: string) => string;
+		readonly subStart: (type: string) => string;
+		readonly subEnd: (type: string) => string;
+		readonly instruction: (what: string) => string;
+		readonly permAsk: (what: string) => string;
+		readonly permOk: (what: string) => string;
+		readonly permDenied: (what: string) => string;
+		readonly compactStart: string;
+		readonly compactEnd: string;
+		readonly stop: string;
+		readonly stopFailure: string;
+		readonly apiError: (code: string) => string;
+		readonly bottleneck: (rule: string) => string;
+		readonly bottleneckClosed: (rule: string) => string;
+		readonly ciStart: (name: string) => string;
+		readonly ciEnd: (name: string, ok: boolean | undefined) => string;
+		readonly git: (kind: string) => string;
+	};
+	/** How to read the scene, under it: each paragraph alternates bold and plain parts, bold first. */
+	readonly legend: readonly (readonly string[])[];
 }
 
 const vi: ObservatoryCopy = {
 	locale: "vi-VN",
 	close: "Đóng",
-	drawer: {
-		label: (station) => `Khoan sâu: ${station}`,
-		scopeLive: (start) => `Phiên này · từ ${start} đến nay`,
-		scopeReplay: (at) => `Phiên này · đến mốc tua ${at}`,
-		loading: "Đang tải số của trạm…",
-		calls: "Số lần gọi",
-		latency: "p50 / p95",
-		sampled: "lấy mẫu",
-		errorRate: "Tỷ lệ lỗi",
-		tokens: "Token",
-		tokenParts: (input, output, cache) => `vào ${input} · ra ${output} · cache ${cache}`,
-		cost: "Chi phí ước tính",
-		noCost: "không có chi phí",
-		costNote: "* ước tính của Claude Code theo giá API",
-		withoutCost: (n) => `${n} lượt API không có ước tính`,
-		parts: { mcp_server: "Theo server", file: "Theo tệp", domain: "Theo tên miền", program: "Theo chương trình", tool: "Theo tool", model: "Theo model" },
-		partsOther: "Theo khoá con",
-		hiddenPart: (n) => `Mục ${n}`,
-		partLine: (calls, p95) => `${calls} · ${p95}`,
-		previous: "So với 5 phiên trước",
-		previousOver: (n) => `trung bình ${n} phiên trước cùng repo`,
-		previousNone: "Chưa có phiên trước cùng repo để so.",
-		compareP95: "Thời gian p95",
-		compareErrors: "Tỷ lệ lỗi",
-		compareTokens: "Token mỗi lượt API",
-		compareNone: "chưa đủ số",
-		slowest: "Chậm nhất",
-		recent: "Sự kiện gần đây",
-		noEvents: "Chưa có sự kiện.",
-		findings: "Điểm nghẽn",
-		noFindings: "Không có điểm nghẽn ở trạm này trong phiên.",
-		open: "đang mở",
-		closed: "đã đóng",
-		evidence: (n) => `Bằng chứng ${n}`,
-		finding: (rule, value, threshold) => `${rule}: ${value} so với ngưỡng ${threshold}`,
-		findingN: (n) => `n = ${n}`,
-	},
 	rules: {
 		tool_slow: "Tool chậm hơn p95 của chính nó",
 		api_slow: "API chậm",
@@ -233,33 +201,8 @@ const vi: ObservatoryCopy = {
 		cost_spike: "Lượt tốn bất thường",
 		unknown: "Điểm nghẽn",
 	},
-	severity: { warn: "cảnh báo", alert: "nghiêm trọng" },
-	units: { perToken: "ms/token", perMinute: "token/phút", reads: "lần đọc", limited: "lượt bị chặn" },
 	detail: {
-		label: "Chi tiết sự kiện",
 		kinds: { prompt: "Prompt", tool: "Gọi tool", subagent: "Subagent", api: "Lượt API", instruction: "Nạp hướng dẫn", git: "Git", lifecycle: "Sự kiện phiên", bottleneck: "Điểm nghẽn" },
-		kind: "Loại",
-		station: "Trạm",
-		estimated: "ước lượng",
-		time: "Giờ",
-		duration: "Thời lượng",
-		result: "Kết quả",
-		running: "đang chạy",
-		ok: "xong",
-		failed: "lỗi",
-		ended: "đã dừng",
-		provisional: "tạm, máy chưa lưu",
-		labels: "Nhãn",
-		model: "Model",
-		tokens: "Token",
-		tokenLine: (output, context) => (context === null ? `ra ${output}` : `ra ${output} · ngữ cảnh ${context}`),
-		content: "Nội dung",
-		contentLoading: "Đang xin nội dung từ máy…",
-		contentOff: "Dự án này tắt lưu nội dung nên không có nội dung để xem.",
-		contentNone: "Sự kiện này không có nội dung được lưu.",
-		contentNotYet: "Sự kiện còn tạm, máy chưa lưu nên chưa có nội dung. Mở lại sau ít giây.",
-		hidden: "Đang bật Ẩn chi tiết: nhãn và nội dung được giấu.",
-		replayHere: "Tua tới đây",
 	},
 	card: {
 		label: "Hoạt động hiện tại",
@@ -277,7 +220,7 @@ const vi: ObservatoryCopy = {
 		waited: "Đã chờ",
 		p95: "p95 lịch sử",
 		calls: "Lần gọi",
-		noHistory: "lần đầu trong phiên, chưa có lịch sử",
+		noHistory: "Lần đầu trong phiên · chưa có lịch sử",
 		historyCount: (n) => `(${n} lần trước)`,
 		overP95: "lâu hơn p95 lịch sử",
 		thinking: "Claude đang suy nghĩ",
@@ -286,7 +229,7 @@ const vi: ObservatoryCopy = {
 		idleWhat: "chờ prompt tiếp theo",
 		lastJob: (what, ok, runtime) => `Việc cuối: ${what} · ${ok ? "thành công" : "lỗi"} · runtime ${runtime}`,
 		output: "Output",
-		outputPending: "chưa có, Claude Code gửi output khi lệnh xong",
+		outputPending: "chưa có — Claude Code gửi output khi lệnh xong",
 		outputEmpty: "(trống)",
 		outputHidden: "đang bật Ẩn chi tiết",
 		outputOff: "dự án tắt lưu nội dung",
@@ -296,7 +239,6 @@ const vi: ObservatoryCopy = {
 		outputFailed: "chưa lấy được từ máy",
 		outputUnavailable: "chưa xem được ở đây",
 		journey: "Hành trình",
-		journeyNone: "chưa đi qua khối nào",
 		more: "Xem chi tiết",
 	},
 	camera: {
@@ -305,108 +247,145 @@ const vi: ObservatoryCopy = {
 		free: "Tự do",
 		focus: "Tập trung",
 		whole: "toàn cảnh",
-		note: (where, n) => `góc: ${where} · đổi ${n} lần`,
-		minimap: "Bản đồ tổng quan",
-		legend: "Chú giải",
-		legendRun: "Đang chạy",
-		legendWait: "Chờ",
-		legendOk: "Thành công",
-		legendErr: "Thất bại",
+		note: (where, n, events) => `góc: ${where} · đổi ${n} lần / ${events} sự kiện`,
 	},
-	board: {
-		label: (place) => `Bảng của ${place}`,
-		empty: "chưa có lần gọi nào",
-		result: "Kết quả",
+	scene: {
+		tags: {
+			core: "MODEL",
+			"user-desk": "NHẬP",
+			orchestrator: "SUBAGENT",
+			memory: "BỘ NHỚ",
+			skills: "KỸ NĂNG",
+			files: "KHO TỆP",
+			mcp: "CỔNG MCP",
+			external: "CỔNG KHÔNG GIAN",
+			security: "KHOÁ",
+			sandbox: "TERMINAL",
+			testing: "KIỂM THỬ",
+			git: "GIT · CI/CD",
+			monitoring: "BỂ NGỮ CẢNH",
+		},
+		subs: {
+			core: "model",
+			"user-desk": "prompt",
+			orchestrator: "subagent",
+			memory: "CLAUDE.md",
+			skills: "skill",
+			files: "đọc · sửa · tìm",
+			mcp: "máy chủ MCP",
+			external: "internet",
+			security: "quyền",
+			sandbox: "lệnh shell",
+			testing: "test",
+			git: "đường ống phát hành",
+			monitoring: "ngữ cảnh",
+		},
 		calls: (n) => `${n} lần gọi`,
+		p95: (d) => `p95 ls ${d}`,
 		failures: (n) => `${n} lỗi`,
-		p95: (d) => `p95 lịch sử ${d}`,
 		runtime: (d) => `runtime ${d}`,
-		apiTurn: (n) => `lượt API #${n}`,
-		context: (percent) => `ngữ cảnh ${percent}%`,
-		speed: (tps) => `${tps} tok/s`,
-		noSubagent: "không có subagent nào đang chạy",
-		subagentRunning: "đang chạy",
-		workflows: (n) => `${n} workflow`,
-		ciUnknown: "không rõ kết quả",
+		noCalls: "chưa có lần gọi nào",
+		modelTitle: (model) => (model === "" ? "MODEL" : `MODEL · ${model}`),
+		thinking: "SUY NGHĨ",
+		waiting: "CHỜ BẠN",
+		executing: "đã giao việc, chờ kết quả",
+		idle: "rảnh",
+		apiLine: (turn, k, tps) => `lượt API #${turn} · ${k}k ngữ cảnh · ${tps} tok/s`,
+		contextLine: (percent, tokens, window) => `${percent === null ? "–" : `${percent}%`} · ${tokenSize(tokens)} / ${window > 0 ? tokenSize(window) : "?"}`,
+		wave: (tps) => `SÓNG TOKEN · ${tps} tok/s`,
+		portal: "CỔNG KHÔNG GIAN · internet",
+		subagent: (type) => `subagent · ${type}`,
+		subagentShort: "subagent",
+		mcpTool: "tool MCP",
+		mcpServer: (n) => `máy chủ ${n}`,
+		noMcp: "chưa dùng máy chủ MCP nào",
+		moreServers: (n) => `+${n} máy chủ khác`,
+		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
+		stepFailed: "✗ lỗi",
+		stepUnknown: "? không rõ",
 		prod: "prod",
-		waitingFor: (what) => (what === "" ? "chờ bạn cấp quyền" : `chờ quyền: ${what}`),
-		prompts: (n) => `${n} prompt`,
 	},
-	places: {
-		core: "model · ngữ cảnh · suy luận",
-		"user-desk": "prompt",
-		orchestrator: "drone bay tới khối đang làm",
-		memory: "CLAUDE.md",
-		skills: "skill",
-		files: "đọc · sửa · tìm",
-		mcp: "công cụ · tích hợp",
-		external: "duyệt web · tải tài nguyên",
-		security: "quyền",
-		sandbox: "thực thi lệnh · script",
-		testing: "chạy test · kiểm tra",
-		git: "commit · push · CI · deploy",
-		monitoring: "ngữ cảnh đã dùng",
+	side: {
+		session: "Phiên",
+		context: "ngữ cảnh",
+		speed: "tốc độ",
+		tokPerSec: "tok/s",
+		tools: "lần gọi tool",
+		subagents: "subagent",
+		detail: "Chi tiết",
+		detailHint: "Bấm \"Xem chi tiết\" trên thẻ hoạt động, bấm một khối, hoặc bấm một dòng sự kiện.",
+		status: "Trạng thái",
+		running: "đang chạy",
+		ok: "thành công",
+		failed: "lỗi",
+		runtimeNow: "Runtime (lần này)",
+		p95Place: "p95 lịch sử của khối",
+		none: "chưa có",
+		callsPlace: "Lần gọi của khối",
+		target: "Đích",
+		agent: "Tác nhân",
+		mainAgent: "agent chính",
+		description: "Mô tả của Claude",
+		output: "Output",
+		outputRunning: "chưa có (Claude Code gửi output khi lệnh xong)",
+		contentNote: "Mô tả và output là nội dung: chỉ hiện khi dự án bật lưu nội dung và Ẩn chi tiết tắt.",
+		kind: "Loại",
+		time: "Giờ",
+		label: "Nhãn",
+		doing: "Đang",
+		modes: { think: "suy nghĩ", exec: "thực thi (chờ tool)", wait: "chờ bạn", idle: "rảnh" },
+		apiTurns: "Lượt API",
+		speedRow: "Tốc độ",
+		subagentRow: "Subagent",
+		used: "Đã dùng",
+		ratio: "Tỷ lệ",
+		noCallsYet: "Chưa có lần gọi nào trong phiên này.",
+		p50p95: "p50 / p95 lịch sử",
+		errors: "Lỗi",
+		recent: "Gần đây (runtime từng lần)",
+		stepRow: (step, n, p95) => `${step} · ${n} lần · p95 ls ${p95}`,
+		stepState: { idle: "–", run: "đang chạy", ok: "đạt", err: "lỗi", unknown: "không rõ" },
+		waitingFor: "Đang chờ quyền",
+		prompts: "Prompt trong phiên",
 	},
-	replay: {
-		label: "Thanh thời gian của phiên",
-		title: "Tua lại",
-		play: "Phát",
-		pause: "Tạm dừng",
-		live: "Trực tiếp",
-		speed: (n) => `Tốc độ ${n}×`,
-		previous: "Sự kiện trước",
-		next: "Sự kiện sau",
-		slider: "Mốc tua",
-		position: (at, end) => `${at} / ${end}`,
-		silence: "Khoảng lặng quá 10 giây phát trong 1 giây.",
-		keys: "Space: phát hoặc dừng · ←/→: sự kiện trước, sau",
-		loading: "Đang nạp các sự kiện cũ…",
-		expired: "Chi tiết đã quá 90 ngày, chỉ còn số tổng hợp.",
-		partial: (start) => `Chỉ tua được từ ${start}: giữ tối đa 20 000 sự kiện.`,
-		held: (n) => `${n} sự kiện mới đang chờ`,
+	feed: {
+		title: "Sự kiện",
+		running: "chạy…",
+		failed: (d) => `lỗi · ${d}`,
+		prompt: "prompt",
+		api: (turn, tokens) => `suy nghĩ · lượt API #${turn}${tokens === "" ? "" : ` · ${tokens} token ngữ cảnh`}`,
+		subStart: (type) => `subagent ${type} bắt đầu`,
+		subEnd: (type) => `subagent ${type} xong`,
+		instruction: (what) => `nạp ${what}`,
+		permAsk: (what) => `chờ bạn cấp quyền${what === "" ? "" : ` · ${what}`}`,
+		permOk: (what) => `đã cấp quyền${what === "" ? "" : ` · ${what}`}`,
+		permDenied: (what) => `từ chối quyền${what === "" ? "" : ` · ${what}`}`,
+		compactStart: "bắt đầu nén ngữ cảnh",
+		compactEnd: "nén ngữ cảnh xong",
+		stop: "lượt xong, chờ bạn",
+		stopFailure: "lượt dừng vì lỗi",
+		apiError: (code) => `lỗi API ${code}`,
+		bottleneck: (rule) => `⚠ điểm nghẽn · ${rule}`,
+		bottleneckClosed: (rule) => `điểm nghẽn đã đóng · ${rule}`,
+		ciStart: (name) => `CI${name === "" ? "" : ` ${name}`} bắt đầu`,
+		ciEnd: (name, ok) => `CI${name === "" ? "" : ` ${name}`} ${ok === undefined ? "không rõ kết quả" : ok ? "đạt" : "lỗi"}`,
+		git: (kind) => `git ${kind}`,
 	},
+	legend: [
+		["Camera theo hành động.", " Đọc 20 tệp liên tiếp thì camera đứng yên ở kho tệp; chỉ đổi góc khi việc chuyển sang khối khác và giữ được ít nhất nửa giây, mỗi góc giữ tối thiểu 1,5 giây. Khoảng suy nghĩ ngắn giữa hai lần gọi không kéo camera về model."],
+		["Tự động", " theo hoạt động AI · ", "Tự do", " kéo để pan, Ctrl/⌘ + cuộn để zoom (kéo hay zoom khi đang Tự động cũng tự chuyển sang Tự do) · ", "Tập trung", " khoá vào khối đang chọn (bấm một khối)."],
+		["Runtime", " là thời gian của lần chạy hiện tại. ", "p95 lịch sử", " là thống kê các lần chạy trước của cùng khối. ", "Lần gọi", " là số lần gọi tool. Ba số này luôn có nhãn riêng."],
+		["Tiến độ.", " Claude Code không báo phần trăm cho một lệnh, nên thanh chạy kiểu không xác định; chỉ hiện phần trăm khi có số thật."],
+		["Output.", " Claude Code gửi output khi lệnh xong, nên thẻ hiện output ngay khi lệnh kết thúc; lúc đang chạy ghi rõ là chưa có."],
+		["Đường dẫn", " nối đúng tác nhân (agent chính ở model, hoặc subagent đang bay quanh) tới khối nó dùng; dòng \"Hành trình\" ghi chuỗi các khối đã đi qua."],
+		["Khối được lấy nét", " hiện nội dung thật: kho tệp liệt kê tệp vừa đọc/sửa, terminal hiện các lệnh, kiểm thử hiện các lần chạy, cổng MCP hiện tool vừa gọi, internet hiện tên miền."],
+		["Độ dày đường dẫn", " = số lần gọi trong phiên; phần đỏ = tỷ lệ lỗi. ", "Cấp độ", ": khối chính to và rõ, khối nền nhỏ và mờ khi chưa dùng."],
+	],
 };
 
 const en: ObservatoryCopy = {
 	locale: "en-US",
 	close: "Close",
-	drawer: {
-		label: (station) => `Drill-down: ${station}`,
-		scopeLive: (start) => `This session · from ${start} until now`,
-		scopeReplay: (at) => `This session · up to the replayed moment ${at}`,
-		loading: "Loading the station's numbers…",
-		calls: "Calls",
-		latency: "p50 / p95",
-		sampled: "sampled",
-		errorRate: "Error rate",
-		tokens: "Tokens",
-		tokenParts: (input, output, cache) => `in ${input} · out ${output} · cache ${cache}`,
-		cost: "Estimated cost",
-		noCost: "no cost",
-		costNote: "* Claude Code's estimate at API prices",
-		withoutCost: (n) => `${n} API requests without an estimate`,
-		parts: { mcp_server: "By server", file: "By file", domain: "By domain", program: "By program", tool: "By tool", model: "By model" },
-		partsOther: "By sub-key",
-		hiddenPart: (n) => `Item ${n}`,
-		partLine: (calls, p95) => `${calls} · ${p95}`,
-		previous: "Compared with the 5 previous sessions",
-		previousOver: (n) => `average of ${n} previous sessions of this repository`,
-		previousNone: "No previous session of this repository to compare with.",
-		compareP95: "p95 time",
-		compareErrors: "Error rate",
-		compareTokens: "Tokens per API request",
-		compareNone: "not enough data",
-		slowest: "Slowest",
-		recent: "Recent events",
-		noEvents: "No events yet.",
-		findings: "Bottlenecks",
-		noFindings: "No bottleneck at this station in this session.",
-		open: "open",
-		closed: "closed",
-		evidence: (n) => `Evidence ${n}`,
-		finding: (rule, value, threshold) => `${rule}: ${value} against a threshold of ${threshold}`,
-		findingN: (n) => `n = ${n}`,
-	},
 	rules: {
 		tool_slow: "Tool slower than its own p95",
 		api_slow: "Slow API",
@@ -418,33 +397,8 @@ const en: ObservatoryCopy = {
 		cost_spike: "Unusually costly turn",
 		unknown: "Bottleneck",
 	},
-	severity: { warn: "warning", alert: "critical" },
-	units: { perToken: "ms/token", perMinute: "tokens/min", reads: "reads", limited: "limited requests" },
 	detail: {
-		label: "Event detail",
 		kinds: { prompt: "Prompt", tool: "Tool call", subagent: "Subagent", api: "API request", instruction: "Instructions loaded", git: "Git", lifecycle: "Session event", bottleneck: "Bottleneck" },
-		kind: "Kind",
-		station: "Station",
-		estimated: "estimated",
-		time: "Time",
-		duration: "Duration",
-		result: "Result",
-		running: "running",
-		ok: "done",
-		failed: "failed",
-		ended: "stopped",
-		provisional: "provisional, not stored yet",
-		labels: "Labels",
-		model: "Model",
-		tokens: "Tokens",
-		tokenLine: (output, context) => (context === null ? `out ${output}` : `out ${output} · context ${context}`),
-		content: "Content",
-		contentLoading: "Asking the machine for the content…",
-		contentOff: "This project does not store content, so there is nothing to show.",
-		contentNone: "This event has no stored content.",
-		contentNotYet: "This event is provisional and not stored yet, so it has no content. Open it again in a few seconds.",
-		hidden: "Hide details is on: labels and content are hidden.",
-		replayHere: "Replay to here",
 	},
 	card: {
 		label: "Current activity",
@@ -481,7 +435,6 @@ const en: ObservatoryCopy = {
 		outputFailed: "could not get it from the machine",
 		outputUnavailable: "not available here",
 		journey: "Journey",
-		journeyNone: "no district yet",
 		more: "View details",
 	},
 	camera: {
@@ -490,108 +443,145 @@ const en: ObservatoryCopy = {
 		free: "Free",
 		focus: "Focus",
 		whole: "whole scene",
-		note: (where, n) => `view: ${where} · moved ${n} times`,
-		minimap: "Overview",
-		legend: "Legend",
-		legendRun: "Running",
-		legendWait: "Waiting",
-		legendOk: "Succeeded",
-		legendErr: "Failed",
+		note: (where, n, events) => `view: ${where} · moved ${n} times / ${events} events`,
 	},
-	board: {
-		label: (place) => `${place} board`,
-		empty: "no calls yet",
-		result: "Result",
-		calls: (n) => `${n} calls`,
+	scene: {
+		tags: {
+			core: "MODEL",
+			"user-desk": "INPUT",
+			orchestrator: "SUBAGENT",
+			memory: "MEMORY",
+			skills: "SKILLS",
+			files: "FILES",
+			mcp: "MCP GATE",
+			external: "SPACE PORTAL",
+			security: "LOCK",
+			sandbox: "TERMINAL",
+			testing: "TESTING",
+			git: "GIT · CI/CD",
+			monitoring: "CONTEXT POOL",
+		},
+		subs: {
+			core: "model",
+			"user-desk": "prompt",
+			orchestrator: "subagent",
+			memory: "CLAUDE.md",
+			skills: "skill",
+			files: "read · edit · search",
+			mcp: "MCP servers",
+			external: "internet",
+			security: "permissions",
+			sandbox: "shell commands",
+			testing: "tests",
+			git: "release pipeline",
+			monitoring: "context",
+		},
+		calls: (n) => `${n} ${n === 1 ? "call" : "calls"}`,
+		p95: (d) => `p95 hist ${d}`,
 		failures: (n) => `${n} failed`,
-		p95: (d) => `p95 history ${d}`,
 		runtime: (d) => `runtime ${d}`,
-		apiTurn: (n) => `API request #${n}`,
-		context: (percent) => `context ${percent}%`,
-		speed: (tps) => `${tps} tok/s`,
-		noSubagent: "no subagent running",
-		subagentRunning: "running",
-		workflows: (n) => `${n} workflows`,
-		ciUnknown: "outcome unknown",
+		noCalls: "no calls yet",
+		modelTitle: (model) => (model === "" ? "MODEL" : `MODEL · ${model}`),
+		thinking: "THINKING",
+		waiting: "WAITING FOR YOU",
+		executing: "work handed out, waiting for results",
+		idle: "idle",
+		apiLine: (turn, k, tps) => `API turn #${turn} · ${k}k context · ${tps} tok/s`,
+		contextLine: (percent, tokens, window) => `${percent === null ? "–" : `${percent}%`} · ${tokenSize(tokens)} / ${window > 0 ? tokenSize(window) : "?"}`,
+		wave: (tps) => `TOKEN WAVE · ${tps} tok/s`,
+		portal: "SPACE PORTAL · internet",
+		subagent: (type) => `subagent · ${type}`,
+		subagentShort: "subagent",
+		mcpTool: "MCP tool",
+		mcpServer: (n) => `server ${n}`,
+		noMcp: "no MCP server used yet",
+		moreServers: (n) => `+${n} more servers`,
+		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
+		stepFailed: "✗ failed",
+		stepUnknown: "? unknown",
 		prod: "prod",
-		waitingFor: (what) => (what === "" ? "waiting for your permission" : `waiting for permission: ${what}`),
-		prompts: (n) => `${n} prompts`,
 	},
-	places: {
-		core: "model · context · reasoning",
-		"user-desk": "prompt",
-		orchestrator: "drones fly to the district at work",
-		memory: "CLAUDE.md",
-		skills: "skills",
-		files: "read · edit · search",
-		mcp: "tools · integrations",
-		external: "web · downloads",
-		security: "permissions",
-		sandbox: "commands · scripts",
-		testing: "tests · checks",
-		git: "commit · push · CI · deploy",
-		monitoring: "context used",
+	side: {
+		session: "Session",
+		context: "context",
+		speed: "speed",
+		tokPerSec: "tok/s",
+		tools: "tool calls",
+		subagents: "subagents",
+		detail: "Detail",
+		detailHint: "Click \"See detail\" on the activity card, a module, or an event.",
+		status: "Status",
+		running: "running",
+		ok: "succeeded",
+		failed: "failed",
+		runtimeNow: "Runtime (this run)",
+		p95Place: "Module's p95 history",
+		none: "none yet",
+		callsPlace: "Module's calls",
+		target: "Target",
+		agent: "Agent",
+		mainAgent: "main agent",
+		description: "Claude's description",
+		output: "Output",
+		outputRunning: "none yet (Claude Code sends the output when the call ends)",
+		contentNote: "Description and output are content: shown only when the project stores content and Hide details is off.",
+		kind: "Kind",
+		time: "Time",
+		label: "Label",
+		doing: "Doing",
+		modes: { think: "thinking", exec: "executing (waiting for tools)", wait: "waiting for you", idle: "idle" },
+		apiTurns: "API turns",
+		speedRow: "Speed",
+		subagentRow: "Subagents",
+		used: "Used",
+		ratio: "Share",
+		noCallsYet: "No calls in this session yet.",
+		p50p95: "p50 / p95 history",
+		errors: "Failures",
+		recent: "Recent (runtime of each)",
+		stepRow: (step, n, p95) => `${step} · ${n}× · p95 hist ${p95}`,
+		stepState: { idle: "–", run: "running", ok: "passed", err: "failed", unknown: "unknown" },
+		waitingFor: "Waiting for permission",
+		prompts: "Prompts in the session",
 	},
-	replay: {
-		label: "Session timeline",
-		title: "Replay",
-		play: "Play",
-		pause: "Pause",
-		live: "Live",
-		speed: (n) => `Speed ${n}×`,
-		previous: "Previous event",
-		next: "Next event",
-		slider: "Replayed moment",
-		position: (at, end) => `${at} / ${end}`,
-		silence: "Silences longer than 10 seconds play in 1 second.",
-		keys: "Space: play or pause · ←/→: previous, next event",
-		loading: "Loading older events…",
-		expired: "Details are older than 90 days; only the totals remain.",
-		partial: (start) => `Replay starts at ${start}: at most 20,000 events are kept.`,
-		held: (n) => `${n} new events waiting`,
+	feed: {
+		title: "Events",
+		running: "running…",
+		failed: (d) => `failed · ${d}`,
+		prompt: "prompt",
+		api: (turn, tokens) => `thinking · API turn #${turn}${tokens === "" ? "" : ` · ${tokens} context tokens`}`,
+		subStart: (type) => `subagent ${type} started`,
+		subEnd: (type) => `subagent ${type} done`,
+		instruction: (what) => `loaded ${what}`,
+		permAsk: (what) => `waiting for your permission${what === "" ? "" : ` · ${what}`}`,
+		permOk: (what) => `permission granted${what === "" ? "" : ` · ${what}`}`,
+		permDenied: (what) => `permission denied${what === "" ? "" : ` · ${what}`}`,
+		compactStart: "compacting the context",
+		compactEnd: "context compacted",
+		stop: "turn done, waiting for you",
+		stopFailure: "turn stopped on an error",
+		apiError: (code) => `API error ${code}`,
+		bottleneck: (rule) => `⚠ bottleneck · ${rule}`,
+		bottleneckClosed: (rule) => `bottleneck closed · ${rule}`,
+		ciStart: (name) => `CI${name === "" ? "" : ` ${name}`} started`,
+		ciEnd: (name, ok) => `CI${name === "" ? "" : ` ${name}`} ${ok === undefined ? "outcome unknown" : ok ? "passed" : "failed"}`,
+		git: (kind) => `git ${kind}`,
 	},
+	legend: [
+		["The camera follows actions.", " Twenty file reads in a row keep it still on the files; it moves only when the work goes to another module and stays at least half a second, and holds each view at least 1.5 seconds. A short think between two calls does not pull it back to the model."],
+		["Auto", " follows the AI · ", "Free", " drag to pan, Ctrl/⌘ + scroll to zoom (a drag or a zoom in Auto switches to Free) · ", "Focus", " locks on the selected module (click one)."],
+		["Runtime", " is this run's time. ", "p95 history", " is over the module's earlier runs. ", "Calls", " counts tool calls. Each number has its own label."],
+		["Progress.", " Claude Code reports no percentage for a call, so the bar is indeterminate; a percentage shows only when a real one is known."],
+		["Output.", " Claude Code sends the output when the call ends, so the card shows it then; while it runs it says there is none yet."],
+		["Traces", " join the right agent (the main one at the model, or a subagent circling it) to the module it uses; the \"Journey\" line lists the modules passed."],
+		["The module in focus", " shows real content: files read or edited, terminal commands, test runs, MCP tools called, internet domains."],
+		["Trace width", " = calls in the session; the red share = the failure rate. ", "Tiers", ": main modules large and clear, background ones small and dim until used."],
+	],
 };
 
 const zhCN: ObservatoryCopy = {
 	locale: "zh-CN",
 	close: "关闭",
-	drawer: {
-		label: (station) => `深入查看：${station}`,
-		scopeLive: (start) => `本会话 · 从 ${start} 至今`,
-		scopeReplay: (at) => `本会话 · 截至回放时刻 ${at}`,
-		loading: "正在加载该站点的数据…",
-		calls: "调用次数",
-		latency: "p50 / p95",
-		sampled: "抽样",
-		errorRate: "错误率",
-		tokens: "Token",
-		tokenParts: (input, output, cache) => `输入 ${input} · 输出 ${output} · 缓存 ${cache}`,
-		cost: "估算费用",
-		noCost: "无费用数据",
-		costNote: "* Claude Code 按 API 价格的估算",
-		withoutCost: (n) => `${n} 次 API 请求没有估算`,
-		parts: { mcp_server: "按服务器", file: "按文件", domain: "按域名", program: "按程序", tool: "按工具", model: "按模型" },
-		partsOther: "按子键",
-		hiddenPart: (n) => `项目 ${n}`,
-		partLine: (calls, p95) => `${calls} · ${p95}`,
-		previous: "与前 5 个会话相比",
-		previousOver: (n) => `同一仓库前 ${n} 个会话的平均值`,
-		previousNone: "同一仓库还没有可比较的会话。",
-		compareP95: "p95 耗时",
-		compareErrors: "错误率",
-		compareTokens: "每次 API 请求的 Token",
-		compareNone: "数据不足",
-		slowest: "最慢",
-		recent: "最近事件",
-		noEvents: "还没有事件。",
-		findings: "瓶颈",
-		noFindings: "本会话中该站点没有瓶颈。",
-		open: "未关闭",
-		closed: "已关闭",
-		evidence: (n) => `证据 ${n}`,
-		finding: (rule, value, threshold) => `${rule}：${value}，阈值 ${threshold}`,
-		findingN: (n) => `n = ${n}`,
-	},
 	rules: {
 		tool_slow: "工具慢于自身 p95",
 		api_slow: "API 缓慢",
@@ -603,33 +593,8 @@ const zhCN: ObservatoryCopy = {
 		cost_spike: "本轮花费异常",
 		unknown: "瓶颈",
 	},
-	severity: { warn: "警告", alert: "严重" },
-	units: { perToken: "毫秒/token", perMinute: "token/分钟", reads: "次读取", limited: "次被限速" },
 	detail: {
-		label: "事件详情",
 		kinds: { prompt: "提示", tool: "工具调用", subagent: "子代理", api: "API 请求", instruction: "加载指令", git: "Git", lifecycle: "会话事件", bottleneck: "瓶颈" },
-		kind: "类型",
-		station: "站点",
-		estimated: "估计",
-		time: "时间",
-		duration: "耗时",
-		result: "结果",
-		running: "运行中",
-		ok: "完成",
-		failed: "失败",
-		ended: "已停止",
-		provisional: "临时，机器尚未保存",
-		labels: "标签",
-		model: "模型",
-		tokens: "Token",
-		tokenLine: (output, context) => (context === null ? `输出 ${output}` : `输出 ${output} · 上下文 ${context}`),
-		content: "内容",
-		contentLoading: "正在向机器请求内容…",
-		contentOff: "此项目关闭了内容保存，没有可查看的内容。",
-		contentNone: "此事件没有保存的内容。",
-		contentNotYet: "此事件仍是临时的，机器尚未保存，因此还没有内容。请几秒后再打开。",
-		hidden: "已开启「隐藏详情」：标签和内容被隐藏。",
-		replayHere: "回放到这里",
 	},
 	card: {
 		label: "当前活动",
@@ -666,7 +631,6 @@ const zhCN: ObservatoryCopy = {
 		outputFailed: "未能从机器获取",
 		outputUnavailable: "此处无法查看",
 		journey: "路径",
-		journeyNone: "尚未经过任何区域",
 		more: "查看详情",
 	},
 	camera: {
@@ -675,71 +639,145 @@ const zhCN: ObservatoryCopy = {
 		free: "自由",
 		focus: "聚焦",
 		whole: "全景",
-		note: (where, n) => `视角：${where} · 切换 ${n} 次`,
-		minimap: "总览图",
-		legend: "图例",
-		legendRun: "运行中",
-		legendWait: "等待",
-		legendOk: "成功",
-		legendErr: "失败",
+		note: (where, n, events) => `视角：${where} · 切换 ${n} 次 / ${events} 个事件`,
 	},
-	board: {
-		label: (place) => `${place} 面板`,
-		empty: "还没有调用",
-		result: "结果",
+	scene: {
+		tags: {
+			core: "模型",
+			"user-desk": "输入",
+			orchestrator: "子代理",
+			memory: "记忆",
+			skills: "技能",
+			files: "文件库",
+			mcp: "MCP 网关",
+			external: "空间门户",
+			security: "锁",
+			sandbox: "终端",
+			testing: "测试",
+			git: "GIT · CI/CD",
+			monitoring: "上下文池",
+		},
+		subs: {
+			core: "模型",
+			"user-desk": "提示",
+			orchestrator: "子代理",
+			memory: "CLAUDE.md",
+			skills: "技能",
+			files: "读 · 改 · 搜",
+			mcp: "MCP 服务器",
+			external: "互联网",
+			security: "权限",
+			sandbox: "shell 命令",
+			testing: "测试",
+			git: "发布流水线",
+			monitoring: "上下文",
+		},
 		calls: (n) => `${n} 次调用`,
-		failures: (n) => `${n} 次失败`,
 		p95: (d) => `历史 p95 ${d}`,
-		runtime: (d) => `运行时间 ${d}`,
-		apiTurn: (n) => `第 ${n} 次 API 请求`,
-		context: (percent) => `上下文 ${percent}%`,
-		speed: (tps) => `${tps} tok/s`,
-		noSubagent: "没有正在运行的子代理",
-		subagentRunning: "运行中",
-		workflows: (n) => `${n} 个工作流`,
-		ciUnknown: "结果未知",
+		failures: (n) => `${n} 次失败`,
+		runtime: (d) => `运行 ${d}`,
+		noCalls: "还没有调用",
+		modelTitle: (model) => (model === "" ? "模型" : `模型 · ${model}`),
+		thinking: "思考中",
+		waiting: "等你操作",
+		executing: "已分派任务，等待结果",
+		idle: "空闲",
+		apiLine: (turn, k, tps) => `第 ${turn} 次 API 请求 · ${k}k 上下文 · ${tps} tok/s`,
+		contextLine: (percent, tokens, window) => `${percent === null ? "–" : `${percent}%`} · ${tokenSize(tokens)} / ${window > 0 ? tokenSize(window) : "?"}`,
+		wave: (tps) => `TOKEN 波 · ${tps} tok/s`,
+		portal: "空间门户 · 互联网",
+		subagent: (type) => `子代理 · ${type}`,
+		subagentShort: "子代理",
+		mcpTool: "MCP 工具",
+		mcpServer: (n) => `服务器 ${n}`,
+		noMcp: "尚未使用 MCP 服务器",
+		moreServers: (n) => `另有 ${n} 个服务器`,
+		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
+		stepFailed: "✗ 失败",
+		stepUnknown: "? 未知",
 		prod: "prod",
-		waitingFor: (what) => (what === "" ? "等待你授权" : `等待授权：${what}`),
-		prompts: (n) => `${n} 个提示`,
 	},
-	places: {
-		core: "模型 · 上下文 · 推理",
-		"user-desk": "提示",
-		orchestrator: "无人机飞往正在工作的区域",
-		memory: "CLAUDE.md",
-		skills: "技能",
-		files: "读取 · 编辑 · 搜索",
-		mcp: "工具 · 集成",
-		external: "网页 · 下载",
-		security: "权限",
-		sandbox: "命令 · 脚本",
-		testing: "测试 · 检查",
-		git: "commit · push · CI · deploy",
-		monitoring: "已用上下文",
+	side: {
+		session: "会话",
+		context: "上下文",
+		speed: "速度",
+		tokPerSec: "tok/s",
+		tools: "工具调用",
+		subagents: "子代理",
+		detail: "详情",
+		detailHint: "点击活动卡片上的「查看详情」、某个模块或某条事件。",
+		status: "状态",
+		running: "运行中",
+		ok: "成功",
+		failed: "失败",
+		runtimeNow: "运行时间（本次）",
+		p95Place: "模块历史 p95",
+		none: "暂无",
+		callsPlace: "模块调用次数",
+		target: "目标",
+		agent: "执行者",
+		mainAgent: "主代理",
+		description: "Claude 的说明",
+		output: "输出",
+		outputRunning: "暂无（Claude Code 在调用结束后发送输出）",
+		contentNote: "说明和输出属于内容：仅当项目保存内容且「隐藏详情」关闭时显示。",
+		kind: "类型",
+		time: "时间",
+		label: "标签",
+		doing: "正在",
+		modes: { think: "思考", exec: "执行（等待工具）", wait: "等你操作", idle: "空闲" },
+		apiTurns: "API 请求",
+		speedRow: "速度",
+		subagentRow: "子代理",
+		used: "已用",
+		ratio: "比例",
+		noCallsYet: "本会话还没有调用。",
+		p50p95: "历史 p50 / p95",
+		errors: "失败",
+		recent: "最近（每次运行时间）",
+		stepRow: (step, n, p95) => `${step} · ${n} 次 · 历史 p95 ${p95}`,
+		stepState: { idle: "–", run: "运行中", ok: "通过", err: "失败", unknown: "未知" },
+		waitingFor: "等待授权",
+		prompts: "会话中的提示",
 	},
-	replay: {
-		label: "会话时间轴",
-		title: "回放",
-		play: "播放",
-		pause: "暂停",
-		live: "实时",
-		speed: (n) => `速度 ${n}×`,
-		previous: "上一个事件",
-		next: "下一个事件",
-		slider: "回放时刻",
-		position: (at, end) => `${at} / ${end}`,
-		silence: "超过 10 秒的空闲以 1 秒播放。",
-		keys: "空格：播放或暂停 · ←/→：上一个、下一个事件",
-		loading: "正在加载更早的事件…",
-		expired: "详情已超过 90 天，只剩汇总数据。",
-		partial: (start) => `只能从 ${start} 开始回放：最多保留 20,000 个事件。`,
-		held: (n) => `${n} 个新事件等待中`,
+	feed: {
+		title: "事件",
+		running: "运行中…",
+		failed: (d) => `失败 · ${d}`,
+		prompt: "提示",
+		api: (turn, tokens) => `思考 · 第 ${turn} 次 API 请求${tokens === "" ? "" : ` · 上下文 ${tokens} token`}`,
+		subStart: (type) => `子代理 ${type} 开始`,
+		subEnd: (type) => `子代理 ${type} 完成`,
+		instruction: (what) => `加载 ${what}`,
+		permAsk: (what) => `等待你授权${what === "" ? "" : ` · ${what}`}`,
+		permOk: (what) => `已授权${what === "" ? "" : ` · ${what}`}`,
+		permDenied: (what) => `拒绝授权${what === "" ? "" : ` · ${what}`}`,
+		compactStart: "开始压缩上下文",
+		compactEnd: "上下文压缩完成",
+		stop: "本轮完成，等你操作",
+		stopFailure: "本轮因错误停止",
+		apiError: (code) => `API 错误 ${code}`,
+		bottleneck: (rule) => `⚠ 瓶颈 · ${rule}`,
+		bottleneckClosed: (rule) => `瓶颈已关闭 · ${rule}`,
+		ciStart: (name) => `CI${name === "" ? "" : ` ${name}`} 开始`,
+		ciEnd: (name, ok) => `CI${name === "" ? "" : ` ${name}`} ${ok === undefined ? "结果未知" : ok ? "通过" : "失败"}`,
+		git: (kind) => `git ${kind}`,
 	},
+	legend: [
+		["镜头跟随动作。", " 连续读取 20 个文件时镜头停在文件库；只有工作转到其他模块并持续至少半秒才切换，每个视角至少保持 1.5 秒。两次调用之间的短暂思考不会把镜头拉回模型。"],
+		["自动", " 跟随 AI · ", "自由", " 拖动平移，Ctrl/⌘ + 滚轮缩放（在自动模式下拖动或缩放会切到自由） · ", "聚焦", " 锁定所选模块（点击一个模块）。"],
+		["运行时间", " 是本次运行的时间。", "历史 p95", " 统计同一模块之前的运行。", "调用次数", " 是工具调用次数。三个数字各有标签。"],
+		["进度。", " Claude Code 不报告单次调用的百分比，所以进度条是不确定式的；只有真实数字时才显示百分比。"],
+		["输出。", " Claude Code 在调用结束后发送输出，所以卡片在结束时显示；运行中会注明暂无。"],
+		["连线", " 把正确的执行者（模型处的主代理，或绕行的子代理）连到它使用的模块；「路径」一行列出经过的模块。"],
+		["聚焦的模块", " 显示真实内容：读取或修改的文件、终端命令、测试运行、调用的 MCP 工具、互联网域名。"],
+		["连线粗细", " = 本会话调用次数；红色部分 = 失败率。", "层级", "：主模块大而清晰，背景模块小，未使用时变暗。"],
+	],
 };
 
 export const OBSERVATORY_COPY: Readonly<Record<Locale, ObservatoryCopy>> = { vi, en, "zh-CN": zhCN };
 
-/** The Live Map's drawer, detail and replay copy in the UI language. */
+/** The Live Map's copy in the UI language. */
 export function useObservatoryCopy(): ObservatoryCopy {
 	return OBSERVATORY_COPY[useI18n().locale];
 }
