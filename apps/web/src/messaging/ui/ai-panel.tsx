@@ -145,7 +145,8 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 		if (request.ask !== "") setWaiting({ id: request.id, text: request.ask });
 	}
 	const [busy, setBusy] = useState(false);
-	const [confirm, setConfirm] = useState<string | null>(null);
+	// The text waiting for «Thay» and the answer its reply's button waits for (true: it went into the composer).
+	const [confirm, setConfirm] = useState<{ readonly text: string; readonly done: (filled: boolean) => void } | null>(null);
 	const machine = ai.target?.entry.ref ?? "";
 	const threadId = ai.thread?.id ?? "";
 
@@ -230,20 +231,20 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 	};
 
 	// The chat gets plain text: its people (Telegram, Zalo) would see the markdown's marks as typed.
-	const offerText = (markdown: string) => {
+	// Resolves true once the text is in the composer (the reply's button says so), false when the user kept their own.
+	const offerText = (markdown: string): Promise<boolean> => {
 		const text = plainText(markdown);
 		// An edit in progress is not in the draft: putting the text in would end it, so the user is asked first too.
 		const editing = ui.intents.cell(chat.id).get()?.mode === "edit";
 		const current = drafts.get(chat.id, topicId);
 		if (editing || (current.trim() !== "" && current.trim() !== text.trim())) {
-			setConfirm(text);
-			return;
+			return new Promise((resolve) => setConfirm({ text, done: resolve }));
 		}
 		fill(text);
+		return Promise.resolve(true);
 	};
 	const fill = (text: string) => {
 		putInComposer(drafts, ui, { chatId: chat.id, topicId, replyToSeq: replyTo }, text);
-		toasts.show(copy.aiPanel.filled);
 		// On a phone the sheet covers the conversation: it gives way to the composer.
 		if (phone) onClose();
 	};
@@ -293,9 +294,13 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 			{confirm !== null && (
 				<ReplaceDialog
 					copy={copy}
-					onCancel={() => setConfirm(null)}
+					onCancel={() => {
+						confirm.done(false);
+						setConfirm(null);
+					}}
 					onConfirm={() => {
-						fill(confirm);
+						fill(confirm.text);
+						confirm.done(true);
 						setConfirm(null);
 					}}
 				/>

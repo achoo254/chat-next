@@ -312,6 +312,7 @@ export const zhCNMachines: MachinesCopy = {
 	},
 	transcript: {
 		useText: "放入消息输入框",
+		usedText: "已放入消息输入框",
 		earlier: (n: number) => `查看之前的 ${n} 项`,
 		older: "加载更早的内容",
 		loadingOlder: "正在加载更早的内容…",

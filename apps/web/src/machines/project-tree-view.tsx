@@ -30,7 +30,7 @@ import { ShellRows, type ShellsByWorkspace } from "./sidebar-shells.tsx";
 import { StatusGlyph } from "./status-glyph.tsx";
 import { modePath, projectMode, terminalOffered } from "./session-mode.tsx";
 import { RemoteError } from "./link/machine-link.ts";
-import { aiName, errorText, sessionProvider, type MachineView } from "./use-machines.ts";
+import { aiName, errorText, placeName, sessionProvider, type MachineView } from "./use-machines.ts";
 import { samePath } from "./projects-view.ts";
 import { useServices } from "../messaging/data/services.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
@@ -407,7 +407,8 @@ function LooseItem({ folder, ctx, onArchive }: { folder: LooseFolder; ctx: TreeC
 	const { machine, dir } = folder;
 	const [dialog, setDialog] = useState<"pick" | "sensitive" | null>(null);
 	const [error, setError] = useState("");
-	const name = folderName(dir);
+	// A Chat conversation's folder shows as the app, not as the chat's id.
+	const name = placeName(dir);
 	const host = { id: machine.entry.id, link: machine.link, state: machine.state };
 	// The development machine has no record on the server.
 	const placeable = machine.entry.id > 0 && machine.conn.kind === "on";

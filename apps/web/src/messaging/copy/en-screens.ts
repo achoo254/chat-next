@@ -697,7 +697,6 @@ export const enScreens: ScreensCopy = {
 		replaceTitle: "Replace what you are typing?",
 		replaceBody: "The message box has text in it. Replace it with the AI's reply?",
 		replace: "Replace",
-		filled: "Put in the message box",
 	},
 	menu: {
 		askAi: "Ask AI",

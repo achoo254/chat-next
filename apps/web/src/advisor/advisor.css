@@ -39,6 +39,11 @@
 :root:has(aside.ai-panel) .adv-mascot[data-side="right"]:not([data-dragging]) { right: calc(env(safe-area-inset-right) + var(--ai-panel-w, 400px)); }
 :root:has(aside.ai-panel) .adv-flash[data-side="right"] { right: calc(env(safe-area-inset-right) + var(--ai-panel-w, 400px) + 56px); }
 :root:has(dialog.ai-sheet[open]) :is(.adv-mascot, .adv-flash) { display: none; }
+/* Below 1100px the panel lies over the conversation (styles/messaging.css): left of it the mascot would cover the
+   conversation's messages, so it hides while the panel is open. */
+@media (max-width: 1100px) {
+	:root:has(aside.ai-panel) :is(.adv-mascot, .adv-flash) { display: none; }
+}
 
 /* The bubble: beside the mascot on wide screens (placed inline), a bottom sheet on phones; head and foot always show, the body scrolls.
    No transform here: its menu is position: fixed against the viewport. */

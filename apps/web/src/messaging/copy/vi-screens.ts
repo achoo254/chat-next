@@ -700,7 +700,6 @@ export const viScreens = {
 		replaceTitle: "Thay nội dung đang soạn?",
 		replaceBody: "Ô soạn tin đang có chữ. Thay bằng câu trả lời của AI?",
 		replace: "Thay",
-		filled: "Đã đưa vào ô soạn tin",
 	},
 	menu: {
 		/** Opens the chat's AI panel about this message. */

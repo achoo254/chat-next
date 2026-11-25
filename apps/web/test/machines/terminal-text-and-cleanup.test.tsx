@@ -266,6 +266,14 @@ describe("Chưa phân loại: archive all, then undo", () => {
 		await waitFor(() => expect([...archivedIds(mac.sent, false), ...archivedIds(pc.sent, false)].sort()).toEqual(["a1", "b1", "b2"]));
 	});
 
+	it("names a Chat conversation's folder «Chat», not by the chat's id", async () => {
+		const mac = host(1, "Mac");
+		wrap(<LooseGroup folders={[folder(mac.view, "/Users/me/.tunelo/chat-sessions/48", ["c1"]), folder(mac.view, "/tmp/a", ["a1"])]} ctx={await looseCtx([mac.view])} open onToggle={() => undefined} />);
+		expect(screen.getByRole("button", { name: "Tuỳ chọn cho workspace Chat" })).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Tuỳ chọn cho workspace a" })).toBeTruthy();
+		expect(screen.queryByText("48")).toBeNull();
+	});
+
 	it("Hoàn tác goes away by itself after a while", async () => {
 		vi.useFakeTimers({ shouldAdvanceTime: true });
 		const mac = host(1, "Mac");

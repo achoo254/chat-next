@@ -292,6 +292,14 @@ export function isChatThread(thread: Pick<ThreadSummary, "chatId">): boolean {
 	return Boolean(thread.chatId);
 }
 
+/** A folder tunelo keeps for one Chat conversation's session (<tunelo data>/chat-sessions/<chat id>). */
+const CHAT_SESSIONS_FOLDER = /[\\/]chat-sessions[\\/]\d+[\\/]?$/;
+
+/** A folder's name for lists: the app for a Chat conversation's folder (named by the chat's id), else its last segment. */
+export function placeName(dir: string): string {
+	return CHAT_SESSIONS_FOLDER.test(dir) ? brand.appName : folderName(dir);
+}
+
 /** The last path segment, for headers and tiles ("~/code/chat-next" → "chat-next"). */
 export function folderName(dir: string): string {
 	const parts = dir.split(/[\\/]+/).filter((p) => p !== "");

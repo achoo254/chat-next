@@ -88,11 +88,45 @@ function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
 }
 
+/** Takes an AI reply's text (the Chat app's AI panel); resolves true once the text went where it goes. */
+export type UseText = (text: string) => Promise<boolean>;
+
+/** How long the reply's button says the text went in. */
+const USED_MS = 2_000;
+
+/**
+ * «Đưa vào ô soạn tin» under a reply: once the text went in, the button itself says so for a moment (a notice
+ * elsewhere would cover the composer it went into), then offers it again.
+ */
+function UseTextButton({ text, onUseText, t }: { text: string; onUseText: UseText; t: MachinesCopy }) {
+	const [used, setUsed] = useState(false);
+	useEffect(() => {
+		if (!used) return;
+		const timer = window.setTimeout(() => setUsed(false), USED_MS);
+		return () => window.clearTimeout(timer);
+	}, [used]);
+	return (
+		<button
+			type="button"
+			className="btn btn-sm"
+			aria-live="polite"
+			onClick={() => {
+				void onUseText(text).then((went) => {
+					if (went) setUsed(true);
+				});
+			}}
+		>
+			<Icon name={used ? "check" : "edit"} small />
+			{used ? t.transcript.usedText : t.transcript.useText}
+		</button>
+	);
+}
+
 /**
  * `onUseText`: each of the AI's text replies offers to put its text somewhere
  * (the Chat app's AI panel: «Đưa vào ô soạn tin»); absent on the AI Agent screens.
  */
-export function SessionChat({ machine, threadId, mode, onUseText }: { machine: string; threadId: string; mode: SessionMode; onUseText?: (text: string) => void }) {
+export function SessionChat({ machine, threadId, mode, onUseText }: { machine: string; threadId: string; mode: SessionMode; onUseText?: UseText }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
@@ -729,7 +763,7 @@ interface TranscriptProps {
 	/** The AI's commands and skills, so a sent "/skill" stands out; none while unknown. */
 	commands?: readonly SlashCommand[] | undefined;
 	/** Offers each finished text reply of the AI to the caller (a button under it); none when absent. */
-	onUseText?: ((text: string) => void) | undefined;
+	onUseText?: UseText | undefined;
 }
 
 /**
@@ -1002,7 +1036,7 @@ interface BlockViewProps {
 	onSend: ((text: string) => Promise<void>) | undefined;
 	sendLocked: boolean;
 	commands: readonly SlashCommand[];
-	onUseText: ((text: string) => void) | undefined;
+	onUseText: UseText | undefined;
 }
 
 function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked, commands, onUseText }: BlockViewProps) {
@@ -1029,10 +1063,7 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, on
 			return (
 				<div className="mx-reply-use">
 					<AgentText text={block.text} streaming={false} />
-					<button type="button" className="btn btn-sm" onClick={() => onUseText(block.text)}>
-						<Icon name="edit" small />
-						{t.transcript.useText}
-					</button>
+					<UseTextButton text={block.text} onUseText={onUseText} t={t} />
 				</div>
 			);
 		case "who":

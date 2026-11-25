@@ -1009,7 +1009,11 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 
 /* ---------- AI panel of a conversation (ai-panel.tsx) ---------- */
 /* The column takes the info column's place; its width is dragged (--ai-w, kept on the device). */
-.app.ai-open { grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr) var(--ai-w, 400px); }
+/* The conversation keeps a readable width (--ai-convo-min): a panel dragged wide gives way first, down to its minimum. */
+.app.ai-open {
+	--ai-convo-min: 360px;
+	grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr) min(var(--ai-w, 400px), max(320px, 100vw - var(--rail-w) - var(--list-w) - var(--ai-convo-min)));
+}
 .ai-panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--c-border-subtle); background: var(--c-surface); }
 .ai-resize { position: absolute; top: 0; bottom: 0; left: -3px; z-index: 2; width: 6px; cursor: col-resize; touch-action: none; }
 .ai-resize:hover, .ai-resize:focus-visible { background: color-mix(in srgb, var(--c-primary) 35%, transparent); outline: none; }
@@ -1030,6 +1034,15 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 .ai-state strong { color: var(--c-text); }
 .ai-compose { display: flex; flex: none; align-items: flex-end; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); }
 .ai-compose textarea { flex: 1; resize: none; }
+/* A short window (a laptop, the phone sheet): the quote takes at most about a third of the panel, its text three
+   lines and its quick questions one row that scrolls sideways, so the AI's conversation keeps room below it. */
+@media (max-height: 800px) {
+	.ai-quote { max-height: 30dvh; overflow-y: auto; gap: var(--space-1); padding: var(--space-2) var(--space-3); }
+	.ai-quote blockquote { display: -webkit-box; max-height: none; overflow: hidden; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; }
+	.ai-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+	.ai-chips .chip { flex: none; }
+	.ai-body { min-height: 40dvh; }
+}
 /* The session's status line in the panel's narrow column: its items wrap to a second line instead of overlapping. */
 :is(.ai-panel, .ai-sheet) .mx-status-row { flex-wrap: wrap; row-gap: 0; }
 :is(.ai-panel, .ai-sheet) .mx-status-row > .mx-usage { flex: none; }

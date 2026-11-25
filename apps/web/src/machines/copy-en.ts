@@ -315,6 +315,7 @@ export const enMachines: MachinesCopy = {
 	},
 	transcript: {
 		useText: "Put in the message box",
+		usedText: "Added to the message box",
 		earlier: (n: number) => (n === 1 ? "Show 1 earlier item" : `Show ${n} earlier items`),
 		older: "Load earlier messages",
 		loadingOlder: "Loading earlier messages…",

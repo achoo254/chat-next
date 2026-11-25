@@ -696,7 +696,6 @@ export const zhCNScreens: ScreensCopy = {
 		replaceTitle: "替换正在输入的内容？",
 		replaceBody: "消息输入框中已有文字。要用 AI 的回复替换吗？",
 		replace: "替换",
-		filled: "已放入消息输入框",
 	},
 	menu: {
 		askAi: "问 AI",

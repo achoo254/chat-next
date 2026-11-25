@@ -322,6 +322,8 @@ export const viMachines = {
 	transcript: {
 		/** Under each AI reply in the Chat app's AI panel: the text goes into the chat's composer, for the user to send. */
 		useText: "Đưa vào ô soạn tin",
+		/** The same button for a moment once the text went in. */
+		usedText: "Đã đưa vào ô soạn tin",
 		earlier: (n: number) => `Xem ${n} mục trước`,
 		/** The machine still holds older items of the session than this device loaded. */
 		older: "Tải nội dung cũ hơn",
