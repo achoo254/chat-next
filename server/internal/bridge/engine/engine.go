@@ -173,6 +173,10 @@ type runner struct {
 	reactionsTick int
 	// pending are the chats waiting for their first import, oldest queued first.
 	pending []*chatLink
+	// stickerQueue are the chats whose label-only stickers are given their picture
+	// (sticker_restore.go); stickerTried are the ones already tried in this run.
+	stickerQueue []*chatLink
+	stickerTried map[string]bool
 	// syncNow asks the runner to read the account's switch again and list the conversations.
 	syncNow chan struct{}
 	// conversationsTick counts the looks at the state, to list the conversations once in a while.
@@ -254,6 +258,7 @@ func (r *runner) run(ctx context.Context) error {
 			return r.settle(runCtx, err)
 		}
 	}
+	r.queueStickerRestore(caughtUp)
 	outbox := time.NewTicker(e.cfg.OutboxPoll)
 	defer outbox.Stop()
 	imports := time.NewTicker(e.cfg.OutboxPoll)
@@ -292,6 +297,9 @@ func (r *runner) run(ctx context.Context) error {
 				continue
 			}
 			if err := r.skipBusy(r.importNext(busyCtx), "sync", ""); err != nil {
+				return r.settle(runCtx, err)
+			}
+			if err := r.skipBusy(r.restoreStickersNext(busyCtx), "sync", ""); err != nil {
 				return r.settle(runCtx, err)
 			}
 		case <-r.syncNow:

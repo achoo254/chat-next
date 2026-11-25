@@ -122,6 +122,14 @@ func (r *runner) copyFile(ctx context.Context, m bridge.Message) (*appv1.Message
 		r.logger.Warn("copying a file failed; the message is imported with a label", "kind", med.Kind, "reason", err.Error())
 		return nil, nil
 	}
+	return r.storeStream(ctx, med, kind, stream)
+}
+
+// storeStream stores the file of stream as a file of the account's owner and
+// closes the stream. It returns nil, nil for a file over the cap and for a
+// failed store (the caller then keeps its label).
+func (r *runner) storeStream(ctx context.Context, med bridge.Media, kind appv1.MediaKind, stream bridge.MediaStream) (*appv1.Message, error) {
+	limit := r.e.cfg.MediaMaxBytes
 	defer func() { _ = stream.Close() }()
 	if size := stream.Size(); size > limit {
 		return nil, nil
