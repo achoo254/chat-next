@@ -53,7 +53,7 @@ describe("the activity card", () => {
 		expect(text("observe-card-status")).toBe(c.card.status.run);
 		expect(text("observe-card-kind")).toBe(`${c.card.running} · ${names.testing}`);
 		expect(text("observe-card-what")).toBe("Bash pnpm");
-		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 2 s`);
+		expect(text("observe-card-runtime")).toBe("2 s");
 		expect(text("observe-card-history")).toBe(c.card.noHistory);
 		const bar = container.querySelector("[data-id=observe-card-bar]");
 		expect(bar?.getAttribute("role")).toBe("progressbar");
@@ -63,7 +63,7 @@ describe("the activity card", () => {
 
 	it("keeps Runtime and the p95 history apart, and says when the run is longer than that p95", () => {
 		const { text } = show(played([prompt(1, 0), tool("a", 10, { station: "TESTING", success: true, durationMs: 1_000 }), bash(2_000)]).state, T0 + 6_000);
-		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 4 s`);
+		expect(text("observe-card-runtime")).toBe("4 s");
 		expect(text("observe-card-history")).toBe(`1 s ${c.card.historyCount(1)} · ${c.card.overP95}`);
 		expect(text("observe-card-calls")).toBe("2");
 	});
@@ -147,7 +147,7 @@ describe("the activity card", () => {
 				<ActivityCard card={activityCardOf(sub.state, T0 + 5_000)} names={names} hide={false} source={null} onDetail={() => undefined} />
 			</I18nProvider>,
 		);
-		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 5 s`);
+		expect(text("observe-card-runtime")).toBe("5 s");
 		expect(container.querySelector("[data-id=observe-card-live]")?.textContent).toBe(spoken);
 		expect(spoken).not.toContain("5 s");
 	});

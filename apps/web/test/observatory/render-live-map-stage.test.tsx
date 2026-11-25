@@ -231,7 +231,7 @@ describe("the Live Map frame", () => {
 			const { state } = played([prompt(1, 0), tool("b1", 20, { toolName: "Bash", target: "pnpm", station: "SANDBOX" })]);
 			const { container, mounted } = setup(state, fakeHandle(), undefined, null, { clockSkewMs: 5_000 });
 			await flush();
-			expect(container.querySelector("[data-id=observe-card-runtime]")?.textContent).toBe(`${c.card.runtime} 2 s`);
+			expect(container.querySelector("[data-id=observe-card-runtime]")?.textContent).toBe("2 s");
 			expect(mounted[0]?.wallClock?.()).toBe(T0 + 20 + 2_000);
 		} finally {
 			vi.useRealTimers();

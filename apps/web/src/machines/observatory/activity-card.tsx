@@ -122,7 +122,7 @@ export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCa
 			break;
 		case "think":
 			what = c.card.thinking;
-			runtime = `${c.card.runtime} ${duration(c, s.sinceMs)}`;
+			runtime = duration(c, s.sinceMs);
 			break;
 		case "idle":
 			what = c.card.idleWhat;
@@ -131,7 +131,8 @@ export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCa
 		default:
 			what = callWhat(c, s.call, hide);
 			desc = answer.kind === "ok" ? answer.content.description : "";
-			runtime = `${c.card.runtime} ${duration(c, s.call.runtimeMs)}`;
+			// The row is labelled Runtime already (dt): the value is the duration alone.
+			runtime = duration(c, s.call.runtimeMs);
 	}
 	const showBar = s.kind === "run" || s.kind === "think";
 	const kind = kindLine(c, card, names);
