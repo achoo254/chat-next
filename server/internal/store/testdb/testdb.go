@@ -135,6 +135,11 @@ func Start(dir string, port uint32) (*Server, error) {
 	var logs bytes.Buffer
 	pg := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
 		Version(version).
+		// Set here, not taken from the environment: a shell without LANG made
+		// initdb pick SQL_ASCII, under which the Vietnamese folding of names
+		// (chat_fold_name) breaks. Production is UTF8; C.UTF-8 is what CI ran with.
+		Encoding("UTF8").
+		Locale("C.UTF-8").
 		Port(port).
 		Username(user).
 		Password(password).
