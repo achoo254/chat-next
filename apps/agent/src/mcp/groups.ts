@@ -5,8 +5,12 @@
  * token leaves it.
  *
  * - `tunnel`: the tools of the Tunelo CLI 1.x, run in the service.
- * - `chat`, `localman`: a few tools of the Chat and Localman MCP servers,
- *   which the service calls with the account's token for that app.
+ * - `chat`, `localman`, `kb`: a few tools of the Chat, Localman and
+ *   Knowledge Base MCP servers, which the service calls with the account's
+ *   token for that app. `chat`
+ *   also has `send_file`, run in the service (chat-file-tools.ts): it
+ *   uploads files of the session's folder with the server's internal upload
+ *   tools, which no agent sees.
  *
  * `writeTools` act for the user where others see it (a message, a request,
  * a public tunnel). In a session tunelo opens, they always go through an
@@ -21,6 +25,7 @@ import { failure } from "./mcp-result.js";
 import { registerTunnelTools } from "./mcp-server.js";
 import type { McpContext } from "./mcp-context.js";
 import type { LocalTunnels } from "./local-tunnels.js";
+import { type ChatFileSession, registerChatFileTools } from "./chat-file-tools.js";
 
 export interface ToolAnnotations {
 	readOnlyHint?: boolean;
@@ -87,9 +92,16 @@ export interface McpSession {
 	context: McpContext;
 	/** Tunnels this client opened; they close with the session. */
 	tunnels: LocalTunnels;
+	/**
+	 * A session tunelo opened (it presented a ticket): it has the tools that
+	 * work on its thread's folder. `chatFiles` runs them; absent where the
+	 * tools are only listed.
+	 */
+	ticketed?: boolean;
+	chatFiles?: ChatFileSession;
 }
 
-export const GROUP_NAMES = ["tunnel", "chat", "localman"] as const;
+export const GROUP_NAMES = ["tunnel", "chat", "localman", "kb"] as const;
 export type GroupName = (typeof GROUP_NAMES)[number];
 
 export interface ToolGroup {
@@ -104,6 +116,10 @@ export interface ToolGroup {
 	maskHeaderTools?: readonly string[];
 	/** Tools run in the service itself; absent for a group served by its app's MCP server. */
 	register?: (tools: ToolRegistrar, session: McpSession) => void;
+	/** Set when the group also has tools on its app's MCP server: the ones `register` runs (every other tool goes to the server). */
+	localTools?: readonly string[];
+	/** Tools of the app's server the service calls itself (RemoteProxy.callInternal): never listed, never called by an agent. */
+	internalTools?: readonly string[];
 }
 
 export const TOOL_GROUPS: readonly ToolGroup[] = [
@@ -148,10 +164,22 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
 			"search_users",
 			"resolve_username",
 			"get_users",
+			"list_people",
+			"get_contacts",
 			"send_message",
+			"send_media",
+			"forward_messages",
+			"start_private_chat",
+			"send_file",
 		],
-		writeTools: ["send_message"],
+		writeTools: ["send_message", "send_media", "forward_messages", "start_private_chat", "send_file"],
 		twoStepTools: [],
+		register: (tools, session) => {
+			if (session.ticketed) registerChatFileTools(tools, session.chatFiles);
+		},
+		localTools: ["send_file"],
+		// Bytes never travel in a tool call: send_file PUTs them to the URLs these answer.
+		internalTools: ["start_media_upload", "complete_media_upload"],
 	},
 	{
 		// localman-next apps/api: collections, api-client history and proxy, tunelo machines
@@ -166,12 +194,33 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
 			"list_machines",
 			"list_machine_ports",
 			"send_request",
+			// client.createCollectionNode: adds a request (or folder, example) to a collection.
+			"create_collection_node",
 		],
-		writeTools: ["send_request"],
+		writeTools: ["send_request", "create_collection_node"],
 		twoStepTools: [],
 		maskHeaderTools: ["list_history", "get_history_entry", "send_request"],
 	},
+	{
+		// kb-next apps/server/src/mcp: read the Knowledge Base as the user, save a private note
+		name: "kb",
+		app: "kb",
+		allowedTools: ["search", "get_document", "list_spaces", "recent", "save_note"],
+		writeTools: ["save_note"],
+		// The call without confirm_token only previews; the one with it saves.
+		twoStepTools: ["save_note"],
+	},
 ];
+
+/** The tool runs in the service (the group's `register`), not on its app's MCP server. */
+export function runsInService(group: ToolGroup, tool: string): boolean {
+	return group.register !== undefined && (group.localTools?.includes(tool) ?? true);
+}
+
+/** The group has tools on its app's MCP server. */
+export function hasAppServer(group: ToolGroup): boolean {
+	return group.register === undefined || group.localTools !== undefined;
+}
 
 export function toolGroup(name: string): ToolGroup | undefined {
 	return TOOL_GROUPS.find((group) => group.name === name);
@@ -220,6 +269,9 @@ export function actsForUser(group: ToolGroup, tool: string, input: unknown): boo
 	const token = (input as { confirm_token?: unknown } | null)?.confirm_token;
 	return typeof token === "string" && token !== "";
 }
+
+/** Why a write's approval card asks (English; devices word their own from ApprovalWrite). */
+export const WRITE_APPROVAL_REASON = "It acts as you in Chat, Localman or on the internet: tunelo asks you every time.";
 
 /** actsForUser, for a tool name as tunelo's MCP serves it. */
 export function needsApproval(exposed: string, input: unknown): boolean {

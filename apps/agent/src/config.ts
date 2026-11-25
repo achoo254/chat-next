@@ -59,7 +59,7 @@ export type AgentConfig = {
   /** Automatic Advisor for every session of this machine (AdvisorSetAuto); unset is off. */
   advisorAuto?: boolean;
   /** The MCP tool groups served on this machine (mcp/groups.ts); unset is all of them. */
-  mcpGroups?: ("tunnel" | "chat" | "localman")[];
+  mcpGroups?: ("tunnel" | "chat" | "localman" | "kb")[];
   /** The user's projects on this machine (projects/projects.ts), in their order. */
   projects?: ProjectRecord[];
   /** The usage rules switched on or off by the user (usage/rules.ts), by rule code; unset rules keep their default. */

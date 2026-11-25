@@ -56,6 +56,11 @@ import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-lin
 import { ObservatoryService, type ObservatoryServiceOptions } from "./observatory/observatory-service.ts";
 import { observatoryDataDirFor } from "./observatory/spool/observatory-data-dir.ts";
 import { ObservatorySessionObserver } from "./observatory/session-observer.ts";
+import { ChatInbox } from "./chat-inbox/chat-inbox.ts";
+import { InboxStore } from "./chat-inbox/inbox-store.ts";
+import { chatInboxStateBody } from "./chat-inbox/inbox-wire.ts";
+import { toolGroup } from "./mcp/groups.ts";
+import { RemoteProxy, identityAccess } from "./mcp/remote-proxy.ts";
 
 const MAX_CONNECTIONS = 16;
 /** How long a macOS prompt for a protected folder may wait on the machine's screen before tunelo stops asking. */
@@ -140,6 +145,10 @@ export class Machine {
   /** Observatory's part in the Claude sessions and terminals this machine opens. */
   private readonly sessionObserver: ObservatorySessionObserver;
   private readonly updater: AgentUpdater;
+  /** Chats whose new messages go into their AI session (chat-inbox/chat-inbox.ts). */
+  readonly chatInbox: ChatInbox;
+  /** The inbox's client of Chat's MCP, with the machine's sign-in. */
+  private readonly chatRemote: RemoteProxy;
   private announcingProjects: ReturnType<typeof setTimeout> | undefined;
   /** Localman's requests for localhost on this machine. */
   readonly localForward: LocalForward;
@@ -324,6 +333,23 @@ export class Machine {
         }
       },
     });
+    const access = identityAccess(dir);
+    this.chatRemote = new RemoteProxy(access);
+    const chatGroup = toolGroup("chat");
+    this.chatInbox = new ChatInbox({
+      store: new InboxStore(dataDir, this.log),
+      // The service's own reads, with the machine's sign-in: no agent lists or runs them.
+      callChat: (tool, args) => (chatGroup ? this.chatRemote.call(chatGroup, tool, args) : Promise.resolve({ isError: true, content: [{ type: "text", text: "Chat's tools are unknown" }] })),
+      account: () => access.account(),
+      threads: this.core,
+      // The machine's first signed-in AI, as devices pick it for a chat's session (never one AI by name).
+      provider: async () => (await this.machineInfo()).providers.find((p) => p.loginState !== LoginState.NEEDS_LOGIN)?.id ?? "",
+      log: this.log,
+    });
+    this.chatInbox.onChange((items) => {
+      const value = chatInboxStateBody(items);
+      for (const c of this.connections) if (c.isOpen) c.announce({ case: "chatInboxState", value });
+    });
     // Only an answer: a question that failed, ran out of time or was stopped is not worth a push.
     this.core.onAdvisorAnswer((threadId, _clientMsgId, state) => {
       if (state === TurnState.COMPLETED) void this.advisorAnswered(threadId);
@@ -442,6 +468,7 @@ export class Machine {
   async start(port = this.config.get().port ?? 0): Promise<number> {
     this.key = await machineKey(this.config.dir);
     this.core.start();
+    this.chatInbox.start();
     // Saved values are hidden from every output from the start, not only once used.
     void this.secrets.store.loadForRedaction().catch((err: unknown) => this.log(`secrets: ${(err as Error).message}`));
     void this.advisorKeys.loadForRedaction().catch((err: unknown) => this.log(`advisor: ${redact((err as Error).message)}`));
@@ -487,6 +514,8 @@ export class Machine {
   }
 
   async stop(): Promise<void> {
+    this.chatInbox.stop();
+    await this.chatRemote.close();
     this.secrets.close();
     await this.browser.close();
     this.screenShare.stop();
@@ -675,6 +704,7 @@ export class Machine {
         advisorAuto: { available: () => this.sessionMcpEnabled(), set: (on, device) => this.setAdvisorAuto(on, device) },
         macFolders: this.macFolders,
         observatory: this.observatory.hub,
+        chatInbox: this.chatInbox,
         onPing: () => (this.lastPing = Date.now()),
       },
     );
@@ -922,7 +952,7 @@ export function sessionMcpFor(
       configDir: config.dir,
       ...url,
       approveWrite: (exposed, input) => mcp.approve(ticket, exposed, input),
-      describeWrite: (exposed, input) => mcp.describeWrite(exposed, input),
+      describeWrite: (exposed, input) => mcp.describeWrite(exposed, input, ticket),
       ...(env ? { secrets: env } : {}),
       ...(browser ? { browserNotices: () => browser.takeNotices(ticket) } : {}),
       release: () => {

@@ -328,6 +328,7 @@ describe("identity session", () => {
 			tunnel: "https://tunnel.example",
 			chat: "https://chat.example/mcp",
 			localman: "https://localman.example/mcp",
+			kb: "https://kb.example/mcp",
 		});
 		await session.replace(
 			issuer,
@@ -336,13 +337,35 @@ describe("identity session", () => {
 			AGENT_CLIENT_ID,
 			Object.values(resources),
 		);
-		for (const app of ["chat", "localman", "tunnel"] as const) {
+		for (const app of ["chat", "localman", "tunnel", "kb"] as const) {
 			expect(session.covers(app)).toBe(true);
 			await session.getAppToken(app);
 		}
-		expect(fake.used.map((u) => u.resource)).toEqual([resources.chat, resources.localman, resources.tunnel]);
+		expect(fake.used.map((u) => u.resource)).toEqual([resources.chat, resources.localman, resources.tunnel, resources.kb]);
 		expect(fake.used.every((u) => u.clientId === AGENT_CLIENT_ID)).toBe(true);
-		expect(JSON.parse(sessionText()).resources).toEqual([resources.tunnel, resources.chat, resources.localman]);
+		expect(JSON.parse(sessionText()).resources).toEqual([resources.tunnel, resources.chat, resources.localman, resources.kb]);
+	});
+
+	test("a sign-in from before the Knowledge Base refreshes its own apps and never asks for kb", async () => {
+		const fake = rotatingRefresh();
+		const session = new IdentitySession(dir, deps(fake.refresh));
+		const resources = appResources("https://auth.example");
+		// What `tunelo login` recorded before kb joined the sign-in.
+		await session.replace(
+			"https://auth.example",
+			{ accessToken: "at-old", refreshToken: "rt-1", idToken: fakeJwt("acc_alice"), expiresIn: 0 },
+			resources.tunnel,
+			AGENT_CLIENT_ID,
+			[resources.tunnel, resources.chat, resources.localman],
+		);
+		await expect(session.getAppToken("kb")).rejects.toBeInstanceOf(ResourceNotGrantedError);
+		expect(fake.used).toEqual([]);
+		for (const app of ["chat", "localman", "tunnel"] as const) await session.getAppToken(app);
+		await expect(session.getAppToken("kb")).rejects.toBeInstanceOf(ResourceNotGrantedError);
+		expect(fake.used.map((u) => u.resource)).toEqual([resources.chat, resources.localman, resources.tunnel]);
+		expect(session.covers("kb")).toBe(false);
+		// The refresh token rotated through all of it and still works.
+		expect(fake.used.map((u) => u.refreshToken)).toEqual(["rt-1", "rt-2", "rt-3"]);
 	});
 
 	test("a session file written before resources were recorded keeps what its client always held", async () => {
@@ -356,6 +379,8 @@ describe("identity session", () => {
 		writeFileSync(join(dir, SESSION_FILE), JSON.stringify({ ...stored, clientId: AGENT_CLIENT_ID }));
 		expect(session.covers("chat")).toBe(true);
 		expect(session.covers("localman")).toBe(true);
+		// None of those sign-ins had the Knowledge Base: never asked for it.
+		expect(session.covers("kb")).toBe(false);
 	});
 
 	describe("renewal", () => {

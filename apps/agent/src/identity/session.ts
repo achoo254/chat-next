@@ -1,11 +1,11 @@
 /**
  * The machine's one account session at the shared IdP: one rotating refresh
- * token for every resource (tunnel, Chat, Localman), kept in
+ * token for every resource (tunnel, Chat, Localman, Knowledge Base), kept in
  * `<config dir>/session.json` sealed with the OS key store (keystore.ts), and
  * short-lived access tokens per resource, sealed beside it.
  *
- * `tunelo login` signs in as the client `tunelo-agent` for the three
- * resources at once. A session of the client `tunelo-cli` (taken over from an
+ * `tunelo login` signs in as the client `tunelo-agent` for every resource
+ * at once (a sign-in before the Knowledge Base holds the first three only). A session of the client `tunelo-cli` (taken over from an
  * older install) holds the tunnel only and stays in use until such a sign-in
  * replaces it. The session records the resources its grant holds, and a
  * token is never asked for another one: the IdP answers that with
@@ -47,20 +47,26 @@ export { SessionExpiredError } from "@tunelo/client";
 
 export const SESSION_FILE = "session.json";
 
-/** The OAuth client of `tunelo login`: one grant for the tunnel, Chat and Localman. */
+/** The OAuth client of `tunelo login`: one grant for the tunnel, Chat, Localman and the Knowledge Base. */
 export const AGENT_CLIENT_ID = "tunelo-agent";
 /** Everything `tunelo-agent` asks for (the IdP grants this client no more). */
 export const AGENT_SCOPE =
-	"openid offline_access email tunnels:open tunnels:read chat:read chat:write machines:write mock:read mock:write client:read client:write client:send";
+	"openid offline_access email tunnels:open tunnels:read chat:read chat:write machines:write mock:read mock:write client:read client:write client:send kb:read kb:write";
 
 /** The apps of the one sign-in. */
-export const APPS = ["tunnel", "chat", "localman"] as const;
+export const APPS = ["tunnel", "chat", "localman", "kb"] as const;
 export type AppName = (typeof APPS)[number];
 
 /**
+ * The apps of a `tunelo-agent` sign-in from before the session recorded its
+ * resources (none had the Knowledge Base): never asked for another one.
+ */
+const FIRST_AGENT_APPS: readonly AppName[] = ["tunnel", "chat", "localman"];
+
+/**
  * The resource (token `aud`) of each app for the IdP `issuer`:
- * `https://auth.<d>` signs in for `https://tunnel.<d>`, `https://chat.<d>/mcp`
- * and `https://localman.<d>/mcp`. Another issuer (a local or staging IdP)
+ * `https://auth.<d>` signs in for `https://tunnel.<d>`, `https://chat.<d>/mcp`,
+ * `https://localman.<d>/mcp` and `https://kb.<d>/mcp`. Another issuer (a local or staging IdP)
  * keeps the domain of the default tunnel resource, as resourceOfIssuer does.
  */
 export function appResources(issuer: string): Record<AppName, string> {
@@ -69,6 +75,7 @@ export function appResources(issuer: string): Record<AppName, string> {
 		tunnel: `https://tunnel.${domain}`,
 		chat: `https://chat.${domain}/mcp`,
 		localman: `https://localman.${domain}/mcp`,
+		kb: `https://kb.${domain}/mcp`,
 	};
 }
 
@@ -231,9 +238,9 @@ function parseResources(value: unknown, issuer: string, clientId: string): strin
 		const list = value.filter((r): r is string => typeof r === "string" && r.length > 0);
 		if (list.length > 0) return list;
 	}
-	return clientId === AGENT_CLIENT_ID
-		? Object.values(appResources(issuer))
-		: [resourceOfIssuer(issuer)];
+	if (clientId !== AGENT_CLIENT_ID) return [resourceOfIssuer(issuer)];
+	const resources = appResources(issuer);
+	return FIRST_AGENT_APPS.map((app) => resources[app]);
 }
 
 function writeSession(dir: string, session: SessionFile): void {

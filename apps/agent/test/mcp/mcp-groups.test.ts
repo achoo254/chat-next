@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { ConfigStore } from "../../src/config.ts";
 import { callControl } from "../../src/control-socket.ts";
 import { sessionMcpFor } from "../../src/machine.ts";
@@ -20,6 +20,9 @@ import { LOCAL_WRITES_FILE, LocalWritesSetting } from "../../src/mcp/local-write
 import { McpHost, type McpHostOptions } from "../../src/mcp/mcp-host.ts";
 import { WriteApprovals } from "../../src/mcp/write-approvals.ts";
 import { RemoteProxy } from "../../src/mcp/remote-proxy.ts";
+import { Decision, PromptState } from "@achoo254/chat-proto/remote/remote";
+import { fakeProvider } from "../fake-provider.ts";
+import { byCase, makeCore } from "../harness.ts";
 import { type FakeMcpApp, startFakeMcpApp } from "../support/fake-mcp-app.ts";
 import { startFakeTunnelServer, type FakeTunnelServer } from "../support/fake-tunnel-server.ts";
 import { buildCliBundle, buildServiceBundle, machineEnv, mcpClient, startService, textOf } from "../support/mcp-harness.ts";
@@ -29,15 +32,19 @@ const CHAT_TOKEN = "eyJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJjaGF0In0.c2lnY2hhdA";
 const LOCALMAN_TOKEN = "eyJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJsbSJ9.c2lnbG0";
 
 describe("the tool groups", () => {
-	test("are tunnel, chat and localman, each write tool allowed, each two-step tool a write tool", () => {
-		expect(TOOL_GROUPS.map((g) => g.name)).toEqual(["tunnel", "chat", "localman"]);
+	test("are tunnel, chat, localman and kb, each write tool allowed, each two-step tool a write tool", () => {
+		expect(TOOL_GROUPS.map((g) => g.name)).toEqual(["tunnel", "chat", "localman", "kb"]);
 		for (const group of TOOL_GROUPS) {
 			expect(group.app).toBe(group.name);
 			for (const tool of group.writeTools) expect(group.allowedTools).toContain(tool);
 			for (const tool of group.twoStepTools) expect(group.writeTools).toContain(tool);
 		}
-		expect(toolGroup("chat")?.writeTools).toEqual(["send_message"]);
-		expect(toolGroup("localman")?.writeTools).toEqual(["send_request"]);
+		expect(toolGroup("chat")?.writeTools).toEqual(["send_message", "send_media", "forward_messages", "start_private_chat", "send_file"]);
+		// The upload tools are the service's own: never allowed to an agent.
+		for (const tool of toolGroup("chat")?.internalTools ?? []) expect(toolGroup("chat")?.allowedTools).not.toContain(tool);
+		expect(toolGroup("chat")?.internalTools).toEqual(["start_media_upload", "complete_media_upload"]);
+		expect(toolGroup("localman")?.writeTools).toEqual(["send_request", "create_collection_node"]);
+		expect(toolGroup("kb")).toMatchObject({ writeTools: ["save_note"], twoStepTools: ["save_note"] });
 	});
 
 	test("the tunnel group allows exactly the tools the service runs", () => {
@@ -53,10 +60,26 @@ describe("the tool groups", () => {
 		expect(sessionTool("chat_send_message")).toMatchObject({ tool: "send_message", group: { name: "chat" } });
 		expect(sessionTool("whoami")).toMatchObject({ tool: "whoami", group: { name: "tunnel" } });
 		expect(sessionTool("chat_delete_messages")).toBeUndefined();
+		expect(sessionTool("chat_start_media_upload")).toBeUndefined();
+		expect(sessionTool("chat_send_file")).toMatchObject({ tool: "send_file", group: { name: "chat" } });
+	});
+
+	test("the chat group runs send_file in the service, only for a session tunelo opened; the rest on Chat's server", () => {
+		const context = createMcpContext("wss://tunnel.example", mkdtempSync(join(tmpdir(), "tunelo-groups-")));
+		const chat = toolGroup("chat");
+		const listed = (ticketed: boolean) => {
+			const table = new ToolTable();
+			chat?.register?.(table, { context, tunnels: new LocalTunnels(context), ...(ticketed ? { ticketed } : {}) });
+			return table.entries().map(([name]) => name);
+		};
+		expect(listed(true)).toEqual(["send_file"]);
+		expect(listed(false)).toEqual([]);
 	});
 
 	test("approval: write tools, two-step ones only with their confirm token", () => {
 		expect(needsApproval("chat_send_message", {})).toBe(true);
+		for (const tool of ["chat_send_media", "chat_forward_messages", "chat_start_private_chat", "chat_send_file"]) expect(needsApproval(tool, {})).toBe(true);
+		expect(needsApproval("chat_list_people", {})).toBe(false);
 		expect(needsApproval("localman_send_request", {})).toBe(true);
 		expect(needsApproval("chat_list_chats", {})).toBe(false);
 		expect(needsApproval("revoke_linked_machine", { dry_run: true })).toBe(false);
@@ -198,19 +221,158 @@ describe("the service's MCP host", () => {
 		await lm.close();
 	});
 
-	test("a card names the chat a message goes to, or the request sent", async () => {
+	test("a card names the chat a message goes to, or the request sent, with the details devices word it from", async () => {
 		const { h } = host();
-		expect(await h.describeWrite("chat_send_message", SEND)).toBe("Send to «Team» (12 members): hi");
-		expect(await h.describeWrite("chat_send_message", { chat_id: 8, text: "hi" })).toBe("Send to «Lan»: hi");
+		expect(await h.describeWrite("chat_send_message", SEND)).toEqual({
+			summary: "Send to «Team» (12 members): hi",
+			write: { tool: "chat_send_message", chatId: 7n, chatTitle: "Team", chatMembers: 12, text: "hi", textLength: 2 },
+		});
+		expect(await h.describeWrite("chat_send_message", { chat_id: 8, text: "hi" })).toMatchObject({ summary: "Send to «Lan»: hi", write: { chatTitle: "Lan", chatMembers: 0 } });
 		const long = "x".repeat(400);
-		expect(await h.describeWrite("chat_send_message", { chat_id: 7, text: long })).toMatch(/… \(400 characters\)$/);
-		expect(await h.describeWrite("localman_send_request", { method: "post", url: "http://localhost:5173/api" })).toBe("POST http://localhost:5173/api");
+		const cut = await h.describeWrite("chat_send_message", { chat_id: 7, text: long });
+		expect(cut?.summary).toMatch(/… \(400 characters\)$/);
+		expect(cut?.write).toMatchObject({ text: "x".repeat(300), textLength: 400 });
+		expect(await h.describeWrite("localman_send_request", { method: "post", url: "http://localhost:5173/api" })).toEqual({
+			summary: "POST http://localhost:5173/api (through your machine)",
+			write: { tool: "localman_send_request", method: "POST", url: "http://localhost:5173/api", headers: [], text: "", textLength: 0, reachesLocal: true },
+		});
+		// Other writes: the details only; reads: nothing.
+		expect(await h.describeWrite("open_http_tunnel", { port: 3000 })).toEqual({ summary: "", write: { tool: "open_http_tunnel" } });
+		expect(await h.describeWrite("chat_get_messages", { chat_id: 7 })).toBeUndefined();
 		chat.accepted.delete(CHAT_TOKEN);
 		const { h: refused } = host();
-		expect(await refused.describeWrite("chat_send_message", SEND)).toBe("Send to chat 7: hi");
+		expect(await refused.describeWrite("chat_send_message", SEND)).toMatchObject({ summary: "Send to chat 7: hi", write: { chatId: 7n, chatTitle: "" } });
 		chat.accepted.add(CHAT_TOKEN);
 		h.endAll();
 		refused.endAll();
+	});
+
+	describe("a session whose every write the user approves (a Chat conversation's AI thread)", () => {
+		type Asked = { owner: string; name: string; summary: string; tool: string; signal: AbortSignal };
+		function asking(answer: (a: Asked) => Promise<boolean>, extra: Partial<McpHostOptions> = {}) {
+			const asked: Asked[] = [];
+			const made = host(undefined, {
+				asksEveryWrite: (who) => who === "chat-thread",
+				askWrite: (owner, call, signal) => {
+					const a = { owner, name: call.name, summary: call.card?.summary ?? "", tool: call.card?.write.tool ?? "", signal };
+					asked.push(a);
+					return answer(a);
+				},
+				...extra,
+			});
+			return { ...made, asked };
+		}
+		const sentCount = () => chat.calls.filter((c) => c.name === "send_message").length;
+
+		test("a write its AI never asked about gets a card from the service, and runs once allowed", async () => {
+			const { h, asked } = asking(async () => true);
+			const id = h.open("wss://tunnel.example", h.tickets.issue("chat-thread"));
+			const before = sentCount();
+			expect((await h.call(id, "chat", "send_message", SEND)).isError).toBeUndefined();
+			expect(sentCount() - before).toBe(1);
+			expect(asked.map((a) => [a.owner, a.name, a.summary, a.tool])).toEqual([["chat-thread", "chat_send_message", "Send to «Team» (12 members): hi", "chat_send_message"]]);
+			h.endAll();
+		});
+
+		test("declined, nothing goes", async () => {
+			const { h, asked } = asking(async () => false);
+			const id = h.open("wss://tunnel.example", h.tickets.issue("chat-thread"));
+			const before = sentCount();
+			expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/not approved/);
+			expect(sentCount() - before).toBe(0);
+			expect(asked).toHaveLength(1);
+			h.endAll();
+		});
+
+		test("approved already by the AI's own card: no second card", async () => {
+			const { h, asked } = asking(async () => true);
+			const ticket = h.tickets.issue("chat-thread");
+			const id = h.open("wss://tunnel.example", ticket);
+			h.approve(ticket, "chat_send_message", SEND);
+			expect((await h.call(id, "chat", "send_message", SEND)).isError).toBeUndefined();
+			expect(asked).toHaveLength(0);
+			h.endAll();
+		});
+
+		test("an ordinary session is still refused without asking", async () => {
+			const { h, asked } = asking(async () => true);
+			const id = h.open("wss://tunnel.example", h.tickets.issue("thread-1"));
+			expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/not approved/);
+			expect(asked).toHaveLength(0);
+			h.endAll();
+		});
+
+		test("a card nobody answers in time, or whose session ends, refuses the write", async () => {
+			const waitAbort = (a: Asked) => new Promise<boolean>((resolve) => a.signal.addEventListener("abort", () => resolve(false)));
+			const timed = asking(waitAbort, { writeAskMs: 20 });
+			const id = timed.h.open("wss://tunnel.example", timed.h.tickets.issue("chat-thread"));
+			expect(textOf(await timed.h.call(id, "chat", "send_message", SEND))).toMatch(/not approved/);
+			timed.h.endAll();
+
+			const ended = asking(waitAbort);
+			const ticket = ended.h.tickets.issue("chat-thread");
+			const id2 = ended.h.open("wss://tunnel.example", ticket);
+			const call = ended.h.call(id2, "chat", "send_message", SEND);
+			await vi.waitFor(() => expect(ended.asked).toHaveLength(1));
+			ended.h.release(ticket);
+			expect(textOf(await call)).toMatch(/not approved/);
+			ended.h.endAll();
+		});
+
+		/** The host wired to a core as the service wires it, with a Chat conversation's AI thread and an ordinary one. */
+		async function withCore() {
+			const { core, work } = makeCore([fakeProvider()]);
+			const { h } = host(undefined, {
+				sessionBypassed: (who) => core.writesSkipApproval(who),
+				asksEveryWrite: (who) => core.asksEveryWrite(who),
+				askWrite: (who, call, signal) => core.askWrite(who, call, signal),
+			});
+			const chatThread = await core.create({ provider: "fake", model: "", dir: work, text: "", consent: { sensitive: false, projectSettings: false }, device: "phone", chat: { chatId: 7n, title: "Team", app: "telegram" } });
+			const plain = await core.create({ provider: "fake", model: "", dir: work, text: "", consent: { sensitive: false, projectSettings: false }, device: "phone" });
+			const cards = (threadId: string) => byCase(core.snapshot(threadId), "approval");
+			return { core, h, chatThread, plain, cards };
+		}
+
+		test("as agy in full access runs it (no card of its own): exactly one card on the thread, and the answer decides", async () => {
+			const { core, h, chatThread, cards } = await withCore();
+			const ticket = h.tickets.issue(chatThread.id);
+			const id = h.open("wss://tunnel.example", ticket);
+			for (const [decision, sends] of [[Decision.ALLOW, 1], [Decision.DENY, 0]] as const) {
+				const before = sentCount();
+				const call = h.call(id, "chat", "send_message", SEND);
+				await vi.waitFor(() => expect(cards(chatThread.id).filter((c) => c.body.value.state === PromptState.PENDING)).toHaveLength(1));
+				const card = cards(chatThread.id).find((c) => c.body.value.state === PromptState.PENDING);
+				if (!card) throw new Error("no card");
+				expect(card.body.value).toMatchObject({ name: "chat_send_message", summary: "Send to «Team» (12 members): hi", write: { tool: "chat_send_message", chatId: 7n, chatTitle: "Team" } });
+				core.respond(chatThread.id, card.id, card.revision, { decision }, "phone");
+				const result = await call;
+				expect(result.isError === true).toBe(decision === Decision.DENY);
+				expect(sentCount() - before).toBe(sends);
+			}
+			expect(cards(chatThread.id)).toHaveLength(2);
+			h.endAll();
+			await core.stop();
+		});
+
+		test("as Claude asks first (its card approved the call): no second card from the service", async () => {
+			const { core, h, chatThread, cards } = await withCore();
+			const ticket = h.tickets.issue(chatThread.id);
+			const id = h.open("wss://tunnel.example", ticket);
+			h.approve(ticket, "chat_send_message", SEND);
+			expect((await h.call(id, "chat", "send_message", SEND)).isError).toBeUndefined();
+			expect(cards(chatThread.id)).toHaveLength(0);
+			h.endAll();
+			await core.stop();
+		});
+
+		test("an ordinary thread's unapproved write is refused without a card", async () => {
+			const { core, h, plain, cards } = await withCore();
+			const id = h.open("wss://tunnel.example", h.tickets.issue(plain.id));
+			expect(textOf(await h.call(id, "chat", "send_message", SEND))).toMatch(/not approved/);
+			expect(cards(plain.id)).toHaveLength(0);
+			h.endAll();
+			await core.stop();
+		});
 	});
 
 	test("a session's ticket names it in the log; an ended ticket is refused", async () => {
@@ -245,10 +407,19 @@ describe("the service's MCP host", () => {
 		expect(textOf(await all.call(id2, "chat", "delete_messages", { chat_id: 7 }))).toMatch(/not a tool tunelo offers/);
 		expect(textOf(await all.call(id2, "tunnel", "kill_everything", {}))).toMatch(/not a tool tunelo offers/);
 		expect(chat.calls.length).toBe(before);
+		// The server's upload tools are the service's own: never listed.
 		expect((await all.remoteTools()).tools.map((t) => t.exposed).sort()).toEqual([
 			"chat_get_chat",
 			"chat_list_chats",
+			"chat_send_media",
 			"chat_send_message",
+			"kb_get_document",
+			"kb_list_spaces",
+			"kb_recent",
+			"kb_save_note",
+			"kb_search",
+			"localman_create_collection_node",
+			"localman_get_collection",
 			"localman_get_history_entry",
 			"localman_list_collections",
 			"localman_send_request",

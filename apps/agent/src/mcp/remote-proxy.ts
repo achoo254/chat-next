@@ -88,6 +88,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** What an agent should read when a call fails before the tool ran. */
+/** What the user calls each app, for the one message a person is told to act on. */
+const PRODUCT: Readonly<Record<AppName, string>> = { tunnel: "Tunelo", chat: "the Chat app", localman: "Localman", kb: "Knowledge Base" };
+
+/**
+ * The machine's sign-in does not hold the app's resource (signed in before
+ * the app joined it): its tools say so, and no request is made.
+ */
+export class AppNotGrantedError extends Error {
+	constructor(readonly app: AppName) {
+		const name = PRODUCT[app];
+		super(
+			`This machine's sign-in does not cover ${name} yet: run \`tunelo login\` on the machine, then try again. ` +
+				`Máy này chưa được cấp quyền ${name}: chạy \`tunelo login\` trên máy rồi thử lại.`,
+		);
+		this.name = "AppNotGrantedError";
+	}
+}
+
 function explain(app: AppName, err: unknown): string {
 	// The app's id, not its product name (that one belongs to the brand package).
 	const server = `the ${app} MCP server`;
@@ -137,6 +155,7 @@ export class RemoteProxy {
 	}
 
 	private failed(app: AppName, err: unknown): Error {
+		if (notGranted(err)) return new AppNotGrantedError(app);
 		return new Error(redactMessage(explain(app, err), this.sent.keys()));
 	}
 
@@ -167,15 +186,28 @@ export class RemoteProxy {
 	/** Runs `tool` of `group` on its server; a failure comes back as a tool error. */
 	async call(group: ToolGroup, tool: string, args: Record<string, unknown>): Promise<CallToolResult> {
 		if (!group.allowedTools.includes(tool)) return failure(new Error(`${tool} is not a tool tunelo offers`));
+		return this.run(group, tool, args, (text) => this.redact(text));
+	}
+
+	/**
+	 * Runs one of the group's internal tools (ToolGroup.internalTools) for the
+	 * service itself. Its answer is not redacted (an upload's signed URLs
+	 * carry their token): it must never reach an agent or a log.
+	 */
+	async callInternal(group: ToolGroup, tool: string, args: Record<string, unknown>): Promise<CallToolResult> {
+		if (!group.internalTools?.includes(tool)) return failure(new Error(`${tool} is not an internal tool of ${group.name}`));
+		return this.run(group, tool, args, (text) => text);
+	}
+
+	/** Calls `tool` on the group's server: its text answers through `clean`, a failure as a tool error. */
+	private async run(group: ToolGroup, tool: string, args: Record<string, unknown>, clean: (text: string) => string): Promise<CallToolResult> {
 		try {
 			const result = await this.withClient(group.app, this.callTimeoutMs, (client) =>
 				client.callTool({ name: tool, arguments: args }, { timeout: this.callTimeoutMs }),
 			);
 			const content = Array.isArray(result.content) ? result.content : [];
 			const texts = content.flatMap((item) =>
-				isRecord(item) && item.type === "text" && typeof item.text === "string"
-					? [{ type: "text" as const, text: this.redact(item.text) }]
-					: [],
+				isRecord(item) && item.type === "text" && typeof item.text === "string" ? [{ type: "text" as const, text: clean(item.text) }] : [],
 			);
 			return { content: texts, ...(result.isError === true ? { isError: true } : {}) };
 		} catch (err) {
@@ -265,6 +297,14 @@ export class RemoteProxy {
 		await client.connect(transport, { timeout: timeoutMs });
 		return { client };
 	}
+}
+
+/** A ResourceNotGrantedError, as thrown or as the cause the MCP client wrapped it in. */
+function notGranted(err: unknown): boolean {
+	for (let e: unknown = err, depth = 0; e instanceof Error && depth < 5; e = e.cause, depth++) {
+		if (e instanceof ResourceNotGrantedError) return true;
+	}
+	return false;
 }
 
 function pickAnnotations(a: Record<string, unknown>): ToolAnnotations {

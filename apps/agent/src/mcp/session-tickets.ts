@@ -8,6 +8,7 @@
  * with the session.
  */
 import { randomBytes } from "node:crypto";
+import type { WriteCard } from "../providers/types.ts";
 import type { SessionSecretHooks } from "../sign-in-secrets/secret-env.ts";
 
 /** What a session needs to start tunelo's MCP, and to have its writes approved. */
@@ -22,8 +23,8 @@ export interface SessionMcp {
 	url?: string;
 	/** The user approved this call of a write tool on the device: the service lets it run once. */
 	approveWrite(exposed: string, input: Record<string, unknown>): void;
-	/** One line for a write's approval card (recipient, URL); undefined to keep the default. */
-	describeWrite(exposed: string, input: Record<string, unknown>): Promise<string | undefined>;
+	/** What a write's approval card shows (recipient, URL); undefined for a call that is no write of tunelo's MCP. */
+	describeWrite(exposed: string, input: Record<string, unknown>): Promise<WriteCard | undefined>;
 	/** The session's sign-in secrets in its commands; absent when the machine keeps none. */
 	secrets?: SessionSecretHooks;
 	/** What happened in the tunelo browser that the AI hears with its next tool result, taken once. */

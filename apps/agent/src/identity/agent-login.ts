@@ -1,9 +1,9 @@
 /**
  * The device sign-in of `tunelo login` as the client `tunelo-agent`: one
- * approval for the tunnel, Chat and Localman (RFC 8628, RFC 8707).
+ * approval for the tunnel, Chat, Localman and the Knowledge Base (RFC 8628, RFC 8707).
  *
  * Every request to the token endpoint carries `resource`, every poll
- * included: the grant holds three resources, so the IdP cannot pick one and
+ * included: the grant holds several resources, so the IdP cannot pick one and
  * answers `invalid_target`, which burns the approved device code. The IdP
  * shows no link with the code filled in for this client: the person types
  * the code.

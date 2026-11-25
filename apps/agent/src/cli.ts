@@ -19,7 +19,7 @@ import { importLegacySignIns } from "./identity/legacy-import.ts";
 import { Machine } from "./machine.ts";
 import { logFile, tailLog } from "./log-tail.ts";
 import { registerMcpCommand } from "./mcp/cli-mcp-command.js";
-import { McpHost } from "./mcp/mcp-host.js";
+import { McpHost, type McpHostOptions } from "./mcp/mcp-host.js";
 import { serveSessionMcp } from "./mcp/session-mcp-http.ts";
 import { goOnline } from "./online.ts";
 import { startService, stopService } from "./service.ts";
@@ -75,6 +75,12 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   let advisor: () => AdvisorHooks | undefined = () => undefined;
   // Until the machine exists no session runs; fail closed meanwhile all the same.
   let isAdvisorThread: (threadId: string) => boolean = () => true;
+  // A Chat conversation's AI thread: a write its AI ran without asking is asked about on the device by the service.
+  let asksEveryWrite: (threadId: string) => boolean = () => false;
+  let askWrite: NonNullable<McpHostOptions["askWrite"]> = async () => false;
+  // chat_send_file: the folder of a session's thread, and what it may never send (everything until the machine exists).
+  let sessionDir: (threadId: string) => string | undefined = () => undefined;
+  let isSensitive: (path: string) => boolean = () => true;
   const mcp = new McpHost(dir, {
     log,
     enabledGroups: () => config.get().mcpGroups,
@@ -83,6 +89,10 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
     browser: () => browser(),
     advisor: () => advisor(),
     isAdvisorThread: (threadId) => isAdvisorThread(threadId),
+    asksEveryWrite: (threadId) => asksEveryWrite(threadId),
+    askWrite: (threadId, call, signal) => askWrite(threadId, call, signal),
+    sessionDir: (threadId) => sessionDir(threadId),
+    isSensitive: (path) => isSensitive(path),
   });
   // tunelo's MCP for the sessions this service opens, served here: no `tunelo mcp` process per session.
   // Without it (the port could not be opened) the sessions fall back to `tunelo mcp` over stdio.
@@ -106,6 +116,10 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   advisor = () => advisorHooks;
   isAdvisorThread = (threadId) => machine.core.isAdvisorThread(threadId);
   sessionBypassed = (threadId) => machine.core.writesSkipApproval(threadId);
+  asksEveryWrite = (threadId) => machine.core.asksEveryWrite(threadId);
+  askWrite = (threadId, call, signal) => machine.core.askWrite(threadId, call, signal);
+  sessionDir = (threadId) => machine.core.sessionDir(threadId);
+  isSensitive = (path) => machine.isSensitive(path);
   const portIndex = args.indexOf("--port");
   const portArg = portIndex >= 0 ? args[portIndex + 1] : undefined;
   const port = await machine.start(portArg ? Number(portArg) : undefined);

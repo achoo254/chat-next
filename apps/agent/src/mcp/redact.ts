@@ -124,6 +124,11 @@ export function redactMessage(text: string, known: Iterable<string> = []): strin
 
 const SENSITIVE_HEADER = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|apikey|x-auth-token|x-access-token|x-csrf-token|x-xsrf-token)$/i;
 
+/** A header whose value is a credential: the known ones, and any name with token, secret, key or password in it. */
+export function isCredentialHeader(name: string): boolean {
+	return SENSITIVE_HEADER.test(name) || /token|secret|key|passw(?:or)?d/i.test(name);
+}
+
 /**
  * JSON text with the values of sensitive HTTP headers hidden, wherever they
  * appear: `{ name, value }` pairs and `{ "<header>": value }` maps. Text

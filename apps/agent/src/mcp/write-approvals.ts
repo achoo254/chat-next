@@ -22,7 +22,7 @@ function canonical(value: unknown): string {
 }
 
 /** What one approval is for: session, group, tool and arguments. */
-function approvalKey(ticket: string, group: string, tool: string, args: unknown): string {
+export function approvalKey(ticket: string, group: string, tool: string, args: unknown): string {
 	const digest = createHash("sha256").update(canonical(args ?? {})).digest("base64url");
 	return `${ticket}\n${group}\n${tool}\n${digest}`;
 }

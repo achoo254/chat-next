@@ -23,6 +23,9 @@
  */
 import { randomUUID } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/server";
+import type { WriteCard } from "../providers/types.ts";
+import { type ChatFileSession, type FileStamp, describeFiles } from "./chat-file-tools.js";
+import { bodyExcerpt, cardHeaders, reachesLocal } from "./localman-cards.js";
 import {
 	GROUP_NAMES,
 	type GroupName,
@@ -30,8 +33,11 @@ import {
 	TOOL_GROUPS,
 	type ToolGroup,
 	ToolTable,
+	WRITE_APPROVAL_REASON,
 	actsForUser,
 	exposedToolName,
+	hasAppServer,
+	runsInService,
 	sessionTool,
 	toolGroup,
 	toolTables,
@@ -40,11 +46,11 @@ import { type LocalTunnel, LocalTunnels } from "./local-tunnels.js";
 import { createMcpContext } from "./mcp-context.js";
 import { LOCAL_WRITES_OFF, LocalWritesSetting } from "./local-writes.js";
 import { failure } from "./mcp-result.js";
-import { RemoteProxy, type RemoteTool, identityAccess } from "./remote-proxy.js";
+import { AppNotGrantedError, RemoteProxy, type RemoteTool, identityAccess } from "./remote-proxy.js";
 import { hideSensitiveHeaders, redact, redactMessage } from "./redact.js";
 import { SessionTickets } from "./session-tickets.js";
 import type { ToolMode } from "./session-tool-registry.ts";
-import { WriteApprovals } from "./write-approvals.js";
+import { WriteApprovals, approvalKey } from "./write-approvals.js";
 import { SECRETS_GROUP, SECRET_TOOLS, registerSecretTools } from "../sign-in-secrets/secret-tools.ts";
 import type { SecretService } from "../sign-in-secrets/secret-service.ts";
 import { BROWSER_GROUP, BROWSER_TOOLS, registerBrowserTools } from "../remote-browser/browser-tools.ts";
@@ -75,6 +81,8 @@ const ADVISOR_ONLY = "Advisor's session only has advisor_weigh, advisor_git and 
 const WEIGH_ONLY = "In a terminal, tunelo's MCP only has advisor_weigh.";
 const NOT_APPROVED =
 	"This was not approved on the device: tunelo runs it only after the user approves this exact call.";
+/** How long a card the service puts up for a write waits for the user's answer. */
+export const WRITE_ASK_MS = 10 * 60_000;
 /** How long a card waits for the name of the chat a message goes to. */
 const DESCRIBE_WAIT_MS = 3_000;
 const PREVIEW_CHARS = 300;
@@ -97,7 +105,34 @@ export interface McpHostOptions {
 	advisor?: () => AdvisorHooks | undefined;
 	/** The thread is one of Advisor's own (the core's word): its session gets Advisor's tools only. */
 	isAdvisorThread?: (threadId: string) => boolean;
+	/**
+	 * A session (by the label of its ticket) whose every write the user
+	 * approves (a Chat conversation's AI thread): a write that comes without
+	 * an approval (its AI never asked, as agy in full access) is asked about
+	 * on the device here instead of refused.
+	 */
+	asksEveryWrite?: (owner: string) => boolean;
+	/**
+	 * Puts the approval card of such a write on the owner's thread; resolves
+	 * true once the user allows it, false when declined, cancelled, the
+	 * session ended or `signal` aborted.
+	 */
+	askWrite?: (owner: string, call: WriteAsk, signal: AbortSignal) => Promise<boolean>;
+	/** How long that card waits; WRITE_ASK_MS when unset (tests). */
+	writeAskMs?: number;
+	/** The working folder of a session's thread (by the label of its ticket): chat_send_file sends files of it only. */
+	sessionDir?: (owner: string) => string | undefined;
+	/** Paths a session may never send from (tunelo's own folders, the user's secrets). */
+	isSensitive?: (path: string) => boolean;
 	log?: (line: string) => void;
+}
+
+/** A write the service asks the user about itself: the tool as tunelo's MCP serves it, its arguments, and its card. */
+export interface WriteAsk {
+	name: string;
+	input: Record<string, unknown>;
+	reason: string;
+	card?: WriteCard;
 }
 
 /** A tool of an app's MCP server as `tunelo mcp` offers it. */
@@ -115,6 +150,15 @@ export class McpHost {
 	private readonly localWrites: () => boolean;
 	private readonly log: (line: string) => void;
 	private readonly releaseListeners = new Set<(ticket: string) => void>();
+	/** The cards the service put up for writes and waits on, by ticket: they end with it. */
+	private readonly asking = new Map<string, Set<AbortController>>();
+	/**
+	 * The files each chat_send_file card showed (by approvalKey), until its
+	 * call is approved; then those the approved call must still match, until
+	 * it runs. Both end with their session.
+	 */
+	private readonly shownFiles = new Map<string, FileStamp[]>();
+	private readonly approvedFiles = new Map<string, FileStamp[][]>();
 	/**
 	 * Where the service serves tunelo's MCP over HTTP to the sessions it opens
 	 * (session-mcp-http.ts); undefined until it listens, and on a machine where
@@ -156,9 +200,31 @@ export class McpHost {
 		if (ticket !== undefined && !this.tickets.owner(ticket)) throw new Error(TICKET_ENDED);
 		const id = randomUUID();
 		const context = createMcpContext(serverUrl, this.dir);
-		const session: McpSession = { context, tunnels: new LocalTunnels(context) };
+		const session: McpSession = { context, tunnels: new LocalTunnels(context), ...(ticket ? { ticketed: true, chatFiles: this.chatFiles(ticket) } : {}) };
 		this.sessions.set(id, { session, tables: toolTables(session), ...(ticket ? { ticket, ticketTools: this.ticketTools(ticket) } : {}) });
 		return id;
+	}
+
+	/** What chat_send_file needs of the session with `ticket`: its thread's folder, and Chat's server. */
+	private chatFiles(ticket: string): ChatFileSession {
+		const chat = toolGroup("chat");
+		const unavailable = async () => failure(new Error("The chat tools are not available"));
+		return {
+			dir: () => {
+				const owner = this.tickets.owner(ticket);
+				return owner === undefined ? undefined : this.options.sessionDir?.(owner);
+			},
+			isSensitive: (path) => this.options.isSensitive?.(path) ?? true,
+			callApp: (tool, args) => (chat ? this.remote.call(chat, tool, args) : unavailable()),
+			callInternal: (tool, args) => (chat ? this.remote.callInternal(chat, tool, args) : unavailable()),
+			approvedFiles: (args) => {
+				const key = approvalKey(ticket, "chat", "send_file", args);
+				const waiting = this.approvedFiles.get(key);
+				const stamps = waiting?.shift();
+				if (waiting && waiting.length === 0) this.approvedFiles.delete(key);
+				return stamps;
+			},
+		};
 	}
 
 	private ticketTools(ticket: string): Map<string, ToolTable> {
@@ -232,13 +298,17 @@ export class McpHost {
 		if (!group.allowedTools.includes(tool)) {
 			return failure(new Error(`${tool} is not a tool tunelo offers`));
 		}
-		const refusal = this.writeRefusal(entry.ticket, who, group, tool, args);
+		const refusal = await this.writeRefusal(entry.ticket, who, group, tool, args);
 		if (refusal) {
 			this.log(redactMessage(`mcp ${who}: ${group.name} ${tool} refused (not approved)`));
 			return failure(new Error(refusal));
 		}
 		const table = entry.tables.get(group.name);
-		const result = table ? await table.call(tool, args) : await this.remote.call(group, tool, args);
+		const result = !runsInService(group, tool)
+			? await this.remote.call(group, tool, args)
+			: table
+				? await table.call(tool, args)
+				: failure(new Error(`${exposedToolName(group.name, tool)} works only in a session tunelo opened`));
 		this.log(redactMessage(`mcp ${who}: ${group.name} ${tool} ${result.isError ? "failed" : "ok"}`));
 		return this.clean(group, tool, result);
 	}
@@ -262,11 +332,53 @@ export class McpHost {
 	}
 
 	/** Why a write may not run now; undefined when it may (or is no write). */
-	private writeRefusal(ticket: string | undefined, who: string, group: ToolGroup, tool: string, args: Record<string, unknown>): string | undefined {
+	private async writeRefusal(ticket: string | undefined, who: string, group: ToolGroup, tool: string, args: Record<string, unknown>): Promise<string | undefined> {
 		if (!actsForUser(group, tool, args)) return undefined;
 		if (!ticket) return this.localWrites() ? undefined : LOCAL_WRITES_OFF;
 		if (this.options.sessionBypassed?.(who) === true) return undefined;
-		return this.approvals.consume(ticket, group.name, tool, args) ? undefined : NOT_APPROVED;
+		// Approved already: the AI asked the device for this exact call (exactly one card).
+		const approved =
+			this.approvals.consume(ticket, group.name, tool, args) ||
+			(this.options.asksEveryWrite?.(who) === true && (await this.askOnDevice(ticket, who, group, tool, args)));
+		if (!approved) return NOT_APPROVED;
+		return this.holdShownFiles(ticket, group, tool, args);
+	}
+
+	/**
+	 * An approved chat_send_file runs only on the files its card showed: they
+	 * are kept for the run to compare. Refused when no card listed them.
+	 */
+	private holdShownFiles(ticket: string, group: ToolGroup, tool: string, args: Record<string, unknown>): string | undefined {
+		if (group.name !== "chat" || tool !== "send_file") return undefined;
+		const key = approvalKey(ticket, group.name, tool, args);
+		const shown = this.shownFiles.get(key);
+		if (!shown) return "The approval card did not list these files, so nothing was sent: call chat_send_file again.";
+		this.shownFiles.delete(key);
+		this.approvedFiles.set(key, [...(this.approvedFiles.get(key) ?? []), shown]);
+		return undefined;
+	}
+
+	/** The card of a write its AI ran without asking, put up by the service; true once the user allows it in time. */
+	private async askOnDevice(ticket: string, who: string, group: ToolGroup, tool: string, args: Record<string, unknown>): Promise<boolean> {
+		const ask = this.options.askWrite;
+		if (!ask) return false;
+		const exposed = exposedToolName(group.name, tool);
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), this.options.writeAskMs ?? WRITE_ASK_MS);
+		const waiting = this.asking.get(ticket) ?? new Set<AbortController>();
+		waiting.add(controller);
+		this.asking.set(ticket, waiting);
+		try {
+			const card = await this.describeWrite(exposed, args, ticket).catch(() => undefined);
+			if (controller.signal.aborted) return false;
+			return await ask(who, { name: exposed, input: args, reason: WRITE_APPROVAL_REASON, ...(card ? { card } : {}) }, controller.signal);
+		} catch {
+			return false;
+		} finally {
+			clearTimeout(timer);
+			waiting.delete(controller);
+			if (waiting.size === 0 && this.asking.get(ticket) === waiting) this.asking.delete(ticket);
+		}
 	}
 
 	/** A result as it may leave the service. */
@@ -308,6 +420,11 @@ export class McpHost {
 	/** Ends a session's ticket and its approvals not spent. */
 	release(ticket: string): void {
 		this.tickets.revoke(ticket);
+		for (const controller of this.asking.get(ticket) ?? []) controller.abort();
+		this.asking.delete(ticket);
+		for (const files of [this.shownFiles, this.approvedFiles]) {
+			for (const key of [...files.keys()]) if (key.startsWith(`${ticket}\n`)) files.delete(key);
+		}
 		for (const listener of this.releaseListeners) listener(ticket);
 		this.approvals.forget(ticket);
 		this.options.secrets?.()?.endSession(ticket);
@@ -315,49 +432,117 @@ export class McpHost {
 	}
 
 	/**
-	 * One line telling the user what a write does, for its approval card:
-	 * the chat a message goes to (by name when Chat answers in time) and
-	 * the start of the text, or the method and URL of a request.
+	 * What a write's approval card shows: the chat a message goes to (by
+	 * name when Chat answers in time) and the start of the text, or the
+	 * method and URL of a request, the files of the machine sent (of the
+	 * session with `ticket`); devices word it from `write`, `summary` is the
+	 * English line for those that cannot ("" to keep their default).
+	 * Undefined for a call that is no write of tunelo's MCP.
 	 */
-	async describeWrite(exposed: string, input: Record<string, unknown>): Promise<string | undefined> {
+	async describeWrite(exposed: string, input: Record<string, unknown>, ticket?: string): Promise<WriteCard | undefined> {
 		const found = sessionTool(exposed);
-		if (!found) return undefined;
+		if (!found || !found.group.writeTools.includes(found.tool)) return undefined;
 		const text = (v: unknown) => (typeof v === "string" ? v : "");
-		if (found.group.name === "chat" && found.tool === "send_message") {
+		if (found.group.name === "chat" && (found.tool === "send_message" || found.tool === "send_file")) {
 			const chatId = typeof input.chat_id === "number" ? input.chat_id : Number(input.chat_id);
-			const to = (await this.chatName(found.group, chatId)) ?? `chat ${String(input.chat_id)}`;
-			const body = text(input.text);
-			const preview = body.length > PREVIEW_CHARS ? `${body.slice(0, PREVIEW_CHARS)}… (${body.length} characters)` : body;
-			return redact(`Send to ${to}: ${preview}`);
+			const chat = await this.chatName(found.group, chatId);
+			const members = chat?.members ? ` (${chat.members} members)` : "";
+			const to = chat ? `«${chat.title}»${members}` : `chat ${String(input.chat_id)}`;
+			const body = text(found.tool === "send_file" ? input.caption : input.text);
+			const cut = redact(body.slice(0, PREVIEW_CHARS));
+			const preview = body.length > PREVIEW_CHARS ? `${cut}… (${body.length} characters)` : cut;
+			const write = {
+				tool: exposed,
+				chatId: Number.isSafeInteger(chatId) ? BigInt(chatId) : 0n,
+				chatTitle: redact(chat?.title ?? ""),
+				chatMembers: chat?.members ?? 0,
+				text: cut,
+				textLength: body.length,
+			};
+			if (found.tool === "send_message") return { summary: redact(`Send to ${to}: ${preview}`), write };
+			const owner = ticket === undefined ? undefined : this.tickets.owner(ticket);
+			const dir = owner === undefined ? undefined : this.options.sessionDir?.(owner);
+			const paths = Array.isArray(input.paths) ? input.paths.filter((p): p is string => typeof p === "string") : [];
+			const { files, stamps } = await describeFiles(dir, paths, (p) => this.options.isSensitive?.(p) ?? true);
+			// What the approved call must still find: kept with the session's ticket.
+			if (ticket !== undefined) this.shownFiles.set(approvalKey(ticket, "chat", "send_file", input), stamps);
+			const listed = files.map((f) => (f.problem ? `${f.name} (cannot be sent: ${f.problem})` : `${f.name} (${f.size} bytes)`)).join(", ");
+			return { summary: redact(`Send ${files.length === 1 ? "1 file" : `${files.length} files`} to ${to}: ${listed}${preview ? ` — ${preview}` : ""}`), write: { ...write, files } };
+		}
+		if (found.group.name === "kb" && found.tool === "save_note") {
+			const title = redact(text(input.title));
+			const space = text(input.space);
+			const body = text(input.markdown);
+			const cut = redact(body.slice(0, PREVIEW_CHARS));
+			const preview = body.length > PREVIEW_CHARS ? `${cut}… (${body.length} characters)` : cut;
+			// kb saves a note private, always (save-note-tool.ts in kb-next).
+			return {
+				summary: redact(`Save a private note «${title}» to ${space ? `the Space ${space}` : "your private Space"}: ${preview}`),
+				write: { tool: exposed, title, space, visibility: "private", text: cut, textLength: body.length },
+			};
 		}
 		if (found.group.name === "localman" && found.tool === "send_request") {
-			return redact(`${text(input.method).toUpperCase() || "GET"} ${text(input.url)}`);
+			const method = text(input.method).toUpperCase() || "GET";
+			const url = redact(text(input.url));
+			const body = text(input.body);
+			const headers = cardHeaders(headerList(input.headers, "name"));
+			const local = reachesLocal(text(input.url));
+			return {
+				summary: redact(`${method} ${url}${local ? " (through your machine)" : ""}`),
+				write: { tool: exposed, method, url, headers, text: bodyExcerpt(body), textLength: body.length, reachesLocal: local },
+			};
 		}
-		return undefined;
+		if (found.group.name === "localman" && found.tool === "create_collection_node") {
+			const collectionId = text(input.collectionId);
+			const collectionName = (await this.collectionName(found.group, collectionId)) ?? "";
+			const draft = (typeof input.draft === "object" && input.draft !== null ? input.draft : {}) as Record<string, unknown>;
+			const title = redact(text(input.name));
+			const kind = text(input.kind) || "request";
+			const method = text(draft.method).toUpperCase();
+			const url = redact(text(draft.url));
+			const enabled = Array.isArray(draft.headers) ? draft.headers.filter((h) => (h as { enabled?: unknown } | null)?.enabled !== false) : [];
+			const into = collectionName ? `«${collectionName}»` : `collection ${collectionId}`;
+			return {
+				summary: redact(`Save the ${kind} «${title}» to ${into}${method || url ? `: ${method} ${url}`.trimEnd() : ""}`),
+				write: { tool: exposed, title, method, url, headers: cardHeaders(headerList(enabled, "key")), collectionId, collectionName: redact(collectionName) },
+			};
+		}
+		return { summary: "", write: { tool: exposed } };
 	}
 
-	/** «Title» (N members), or the peer's name, of a chat; undefined when Chat does not say in time. */
-	private async chatName(group: ToolGroup, chatId: number): Promise<string | undefined> {
+	/** The title (with its members) or the peer's name of a chat; undefined when Chat does not say in time. */
+	private async chatName(group: ToolGroup, chatId: number): Promise<{ title: string; members: number } | undefined> {
 		if (!Number.isFinite(chatId)) return undefined;
+		const answer = (await this.readForCard(group, "get_chat", { chat_id: chatId })) as
+			| { chat?: { title?: string; member_count?: number; peer_user_id?: number | string }; users?: { id?: number | string; name?: string; username?: string }[] }
+			| undefined;
+		// A one-to-one chat has no title: it is named after the other person (peer_user_id), never after the caller.
+		const peerId = answer?.chat?.peer_user_id;
+		const peer = peerId === undefined ? undefined : answer?.users?.find((u) => String(u.id) === String(peerId));
+		const name = answer?.chat?.title || peer?.name || (peer?.username ? `@${peer.username}` : "");
+		if (!name) return undefined;
+		const count = answer?.chat?.member_count;
+		return { title: name, members: answer?.chat?.title && typeof count === "number" ? count : 0 };
+	}
+
+	/** The name of a Localman collection; undefined when Localman does not say in time. */
+	private async collectionName(group: ToolGroup, collectionId: string): Promise<string | undefined> {
+		if (collectionId === "") return undefined;
+		const answer = (await this.readForCard(group, "get_collection", { collectionId })) as { name?: unknown } | undefined;
+		return typeof answer?.name === "string" && answer.name !== "" ? answer.name : undefined;
+	}
+
+	/** A read tool's JSON answer for a card, if it comes within DESCRIBE_WAIT_MS; undefined otherwise. */
+	private async readForCard(group: ToolGroup, tool: string, args: Record<string, unknown>): Promise<unknown> {
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		const late = new Promise<undefined>((resolve) => {
 			timer = setTimeout(() => resolve(undefined), DESCRIBE_WAIT_MS);
 		});
 		try {
-			const result = await Promise.race([this.remote.call(group, "get_chat", { chat_id: chatId }), late]);
+			const result = await Promise.race([this.remote.call(group, tool, args), late]);
 			const first = result?.content[0];
 			if (!result || result.isError || first?.type !== "text") return undefined;
-			const answer = JSON.parse(first.text) as {
-				chat?: { title?: string; member_count?: number; peer_user_id?: number | string };
-				users?: { id?: number | string; name?: string; username?: string }[];
-			};
-			// A one-to-one chat has no title: it is named after the other person (peer_user_id), never after the caller.
-			const peerId = answer.chat?.peer_user_id;
-			const peer = peerId === undefined ? undefined : answer.users?.find((u) => String(u.id) === String(peerId));
-			const name = answer.chat?.title || peer?.name || (peer?.username ? `@${peer.username}` : "");
-			if (!name) return undefined;
-			const members = answer.chat?.title && answer.chat.member_count ? ` (${answer.chat.member_count} members)` : "";
-			return `«${name}»${members}`;
+			return JSON.parse(first.text) as unknown;
 		} catch {
 			return undefined;
 		} finally {
@@ -368,11 +553,14 @@ export class McpHost {
 	/**
 	 * The tools of the app servers' groups that are on, for `tunelo mcp` to
 	 * list; a group whose server cannot be reached now is left out, with why.
+	 * A group the machine's sign-in does not cover yet (the Knowledge Base on
+	 * a machine signed in before it) is listed all the same: each of its tools
+	 * answers what to do, which the AI can tell the user.
 	 */
 	async remoteTools(ticket?: string): Promise<{ tools: OfferedTool[]; unavailable: { group: GroupName; reason: string }[]; writes: boolean }> {
 		if (ticket !== undefined && this.tickets.scope(ticket) === "advisor-weigh") return { tools: [], unavailable: [], writes: false };
 		const writes = this.maySeeWrites(ticket);
-		const groups = TOOL_GROUPS.filter((g) => !g.register && this.enabled(g.name));
+		const groups = TOOL_GROUPS.filter((g) => hasAppServer(g) && this.enabled(g.name));
 		const settled = await Promise.allSettled(groups.map((g) => this.remote.tools(g)));
 		const tools: OfferedTool[] = [];
 		const unavailable: { group: GroupName; reason: string }[] = [];
@@ -383,6 +571,17 @@ export class McpHost {
 				for (const tool of outcome.value) {
 					if (!writes && group.writeTools.includes(tool.name)) continue;
 					tools.push({ ...tool, group: group.name, exposed: exposedToolName(group.name, tool.name) });
+				}
+			} else if (outcome.reason instanceof AppNotGrantedError) {
+				for (const name of group.allowedTools) {
+					if (runsInService(group, name) || (!writes && group.writeTools.includes(name))) continue;
+					tools.push({
+						name,
+						description: `Not available on this machine yet. ${outcome.reason.message}`,
+						inputSchema: { type: "object" },
+						group: group.name,
+						exposed: exposedToolName(group.name, name),
+					});
 				}
 			} else {
 				const reason = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
@@ -424,4 +623,14 @@ export class McpHost {
 		}
 		return false;
 	}
+}
+
+/** `{name, value}` pairs from a request's headers, the name under `nameKey` (`name` for a send, `key` for a saved request's rows). */
+function headerList(value: unknown, nameKey: "name" | "key"): { name: string; value: string }[] {
+	if (!Array.isArray(value)) return [];
+	return value.flatMap((entry) => {
+		const row = typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>) : {};
+		const name = row[nameKey];
+		return typeof name === "string" && name !== "" ? [{ name, value: typeof row.value === "string" ? row.value : "" }] : [];
+	});
 }

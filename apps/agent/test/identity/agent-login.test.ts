@@ -1,4 +1,4 @@
-// The one sign-in of tunelo-agent asks for the three resources, and every
+// The one sign-in of tunelo-agent asks for every resource, and every
 // request to the token endpoint names one: without it the IdP answers
 // invalid_target and burns the approved device code.
 import { discover } from "@tunelo/client";
@@ -16,7 +16,7 @@ afterEach(() => idp.close());
 const noWait = { sleep: async () => undefined };
 
 describe("tunelo-agent device sign-in", () => {
-  test("asks for the three apps at once and names the resource on every poll", async () => {
+  test("asks for every app at once, the Knowledge Base included, and names the resource on every poll", async () => {
     idp.tokenReplies.push(
       { status: 400, body: { error: "authorization_pending" } },
       { status: 400, body: { error: "slow_down" } },
@@ -31,7 +31,8 @@ describe("tunelo-agent device sign-in", () => {
     const start = idp.requests.find((r) => r.path === "/device/auth");
     expect(start?.form.get("client_id")).toBe(AGENT_CLIENT_ID);
     expect(start?.form.get("scope")).toBe(AGENT_SCOPE);
-    expect(start?.form.getAll("resource")).toEqual([resources.tunnel, resources.chat, resources.localman]);
+    expect(start?.form.getAll("resource")).toEqual([resources.tunnel, resources.chat, resources.localman, resources.kb]);
+    expect(start?.form.get("scope")?.split(" ")).toEqual(expect.arrayContaining(["kb:read", "kb:write"]));
 
     const polls = idp.requests.filter((r) => r.path === "/token");
     expect(polls).toHaveLength(3);

@@ -377,7 +377,94 @@ message Frame {
     // A → B (tunelo 3.17.0+): see "macOS folder access" below.
     MacFolderAccessAsk mac_folder_access_ask = 177;
     MacFolderAccessRevoke mac_folder_access_revoke = 179;
+
+    // Chats whose new messages the machine pushes into their AI session
+    // (tunelo 3.28.0+); see "chat inbox" below. An older tunelo answers
+    // these with ERROR_REASON_UNSUPPORTED_REQUEST.
+    // A → B, answered with ChatInboxState
+    ChatInboxList chat_inbox_list = 199;
+    ChatInboxSet chat_inbox_set = 200;
+    ChatInboxRemove chat_inbox_remove = 201;
+    // B → A: the answer, and unasked to every connected device when a
+    // subscription, its state or its counters change.
+    ChatInboxState chat_inbox_state = 202;
   }
+}
+
+// --- chat inbox (tunelo 3.28.0+) ----------------------------------------------
+//
+// The user subscribes chats (a person's one-to-one chats, or a group) so that
+// their incoming messages become a new user turn of the chat's AI session
+// (the thread of ThreadCreate.chat). Subscriptions live only on the machine.
+// No subscription: nothing is read or pushed. The machine reads new messages
+// with its own sign-in to Chat (list_chats every 5 s while one is on, then
+// get_messages of the chats that moved); messages the user sent are skipped,
+// messages of one chat arriving within 5 s of each other (at most 30 s) make
+// one turn, and a subscription delivers at most `per_hour_limit` turns an
+// hour. A chat hidden from AI is never read; its subscription waits.
+
+// Every subscription of the machine.
+message ChatInboxList {}
+
+// Subscribes a chat, or changes its subscription; answered with every item.
+message ChatInboxSet {
+  // The chat (positive).
+  int64 chat_id = 1;
+  // Its title, or the other person's name for a one-to-one chat: names the
+  // chat in the turns and in the session's title.
+  string title = 2;
+  // "telegram", "zalo", or "" for Chat itself.
+  string app = 3;
+  // Pushing on (true) or paused (false). A chat subscribed for the first
+  // time starts after its newest message: nothing older is pushed.
+  bool enabled = 4;
+  // Turns an hour at most, 1 to 120; 0 keeps the current value (20 for a new
+  // subscription).
+  uint32 per_hour_limit = 5;
+}
+
+// Removes a chat's subscription (nothing when there is none); answered with
+// every item. Its session stays.
+message ChatInboxRemove {
+  int64 chat_id = 1;
+}
+
+message ChatInboxState {
+  repeated ChatInboxItem items = 1;
+}
+
+enum ChatInboxItemState {
+  CHAT_INBOX_ITEM_STATE_UNSPECIFIED = 0;
+  // Pushing (or paused: see `enabled`).
+  CHAT_INBOX_ITEM_STATE_ACTIVE = 1;
+  // The user hid the chat from AI: nothing is read or pushed until they show
+  // it again, then it goes on from its newest message.
+  CHAT_INBOX_ITEM_STATE_HIDDEN = 2;
+  // `per_hour_limit` turns went in within the last hour: new messages are
+  // counted in `missed`, not pushed, until the hour frees a turn.
+  CHAT_INBOX_ITEM_STATE_LIMITED = 3;
+  // Chat could not be read or the turn could not be delivered (no signed-in
+  // AI, the session refused it); tried again on the next tick.
+  CHAT_INBOX_ITEM_STATE_ERROR = 4;
+  // The machine is not signed in to Chat (`tunelo login`).
+  CHAT_INBOX_ITEM_STATE_SIGNED_OUT = 5;
+}
+
+message ChatInboxItem {
+  int64 chat_id = 1;
+  string title = 2;
+  string app = 3;
+  bool enabled = 4;
+  uint32 per_hour_limit = 5;
+  ChatInboxItemState state = 6;
+  // Turns pushed in the last hour.
+  uint32 delivered_last_hour = 7;
+  // Messages not pushed since the service started: over the limit, or come
+  // while the service was off (counted, never pushed late). Counters are not
+  // kept across restarts.
+  uint32 missed = 8;
+  // When the last turn went in (Unix ms); 0 for none since the service started.
+  int64 last_delivery_at = 9;
 }
 
 // --- requests (A → B) ------------------------------------------------------
@@ -2029,6 +2116,84 @@ message ApprovalItem {
   // to the AI, which goes on, when macOS refuses or nobody answers in time.
   // Never offered "allow for the session".
   string mac_folder = 12;
+  // tunelo 3.28.0+: the call is a write of tunelo's own MCP (it acts as the
+  // user in Chat, Localman or on the internet). Devices word the card in
+  // their own language from it; `summary` and `reason` stay in English for
+  // devices that do not know it. Unset for any other call.
+  ApprovalWrite write = 13;
+}
+
+// A write of tunelo's MCP, as an approval card shows it.
+message ApprovalWrite {
+  // The tool as tunelo's MCP serves it: "chat_send_message",
+  // "localman_send_request", "open_http_tunnel", ...
+  string tool = 1;
+  // chat_send_message: the chat the message goes to.
+  int64 chat_id = 2;
+  // Its title, or the other person's name in a one-to-one chat; "" when Chat
+  // did not say in time.
+  string chat_title = 3;
+  // Members of a chat with a title; 0 for a one-to-one chat or unknown.
+  uint32 chat_members = 4;
+  // The start of the message (secret-shaped values hidden), and its full
+  // length in characters.
+  string text = 5;
+  uint32 text_length = 6;
+  // localman_send_request: the request's method (upper case) and URL.
+  string method = 7;
+  string url = 8;
+  // chat_send_file: the files of the machine that go to the chat, in order
+  // (`text` is then the caption). Nothing is uploaded before the user allows
+  // the card.
+  repeated ApprovalFile files = 9;
+  // kb_save_note (the call that saves, with its confirm_token): the note's
+  // title, the slug of the Space it goes to ("" for the user's own private
+  // Space), and who may read it ("private": only the user). `text` and
+  // `text_length` are the start of its Markdown and its full length.
+  string title = 10;
+  string space = 11;
+  string visibility = 12;
+  // localman_send_request: the headers sent, in order; `text` and
+  // `text_length` are then the start of the body (first 400 characters,
+  // credentials of known shapes hidden) and its full length.
+  // localman_create_collection_node: the saved request's enabled headers.
+  repeated ApprovalHeader headers = 13;
+  // localman_send_request: the URL is on the user's own machine or network
+  // (localhost, a private or link-local address): Localman sends it through
+  // the user's machine or tunnel.
+  bool reaches_local = 14;
+  // localman_create_collection_node: the collection the request is saved
+  // to, its name when Localman said in time ("" otherwise: show the id).
+  // `title` is the new request's name, `method` and `url` its own.
+  string collection_id = 15;
+  string collection_name = 16;
+}
+
+// A header of a request on an approval card.
+message ApprovalHeader {
+  string name = 1;
+  // "" when masked; otherwise at most 120 characters.
+  string value = 2;
+  // A credential header (Authorization, Cookie, Set-Cookie, or a name with
+  // token, secret, key or password in it): its value is not shown.
+  bool masked = 3;
+}
+
+// A file of the machine a write sends.
+message ApprovalFile {
+  // Its name (no folder).
+  string name = 1;
+  // Its size in bytes; 0 with `problem` set when it cannot be read.
+  int64 size = 2;
+  // Its type, from its first bytes or its name ("application/octet-stream"
+  // when unknown).
+  string mime = 3;
+  // The whole image, for a photo of at most 256 KB; empty otherwise.
+  bytes preview = 4;
+  // Why the file will not be sent (outside the session's folder, not a
+  // regular file, not found, in a sensitive folder), in English; "" when it
+  // will. The call then fails before anything is uploaded.
+  string problem = 5;
 }
 
 message ApprovalSecret {

@@ -162,6 +162,7 @@ async function run(
     writesSkipApproval,
     cards: approvals.length,
     summaries: approvals.map((a) => a.body.value.summary),
+    writes: approvals.map((a) => a.body.value.write),
     reasons: approvals.map((a) => a.body.value.reason),
     macFolders: approvals.map((a) => a.body.value.macFolder),
     ran: claude.ran,
@@ -235,7 +236,10 @@ describe("write tools in a session", () => {
         ticket: "ticket-1",
         configDir: "/tmp/tunelo",
         approveWrite: (name, input) => approved.push([name, input]),
-        describeWrite: async (name) => (name.endsWith("chat_send_message") ? "Send to «Team» (12 members): test" : undefined),
+        describeWrite: async (name) =>
+          name.endsWith("chat_send_message")
+            ? { summary: "Send to «Team» (12 members): test", write: { tool: name, chatId: 7n, chatTitle: "Team", chatMembers: 12, text: "test", textLength: 4 } }
+            : undefined,
         release: () => undefined,
       });
       return { approved, sessionMcp };
@@ -245,6 +249,7 @@ describe("write tools in a session", () => {
       const { approved, sessionMcp } = lease();
       const r = await run("auto", ["mcp__tunelo__*"], [SEND], Decision.ALLOW, sessionMcp);
       expect(r.summaries).toEqual(["Send to «Team» (12 members): test"]);
+      expect(r.writes).toMatchObject([{ tool: "chat_send_message", chatId: 7n, chatTitle: "Team", chatMembers: 12, text: "test", textLength: 4 }]);
       // The adapter hands tunelo the tool's name as tunelo's MCP serves it.
       expect(approved).toEqual([["chat_send_message", SEND[1]]]);
     });

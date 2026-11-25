@@ -134,8 +134,8 @@ describe("tunelo login --server", () => {
 	test("a new server's session replaces the old one once signed in, sealed", async () => {
 		await login("--server", "tunnel.acme.test");
 		expect(identitySession(dir).info()).toEqual({ issuer: "https://auth.acme.test", sub: "new-account", clientId: AGENT_CLIENT_ID });
-		// One approval for the three apps; the device code is redeemed for the tunnel's resource.
-		expect(state.resources).toEqual(["https://tunnel.acme.test", "https://chat.acme.test/mcp", "https://localman.acme.test/mcp"]);
+		// One approval for the four apps; the device code is redeemed for the tunnel's resource.
+		expect(state.resources).toEqual(["https://tunnel.acme.test", "https://chat.acme.test/mcp", "https://localman.acme.test/mcp", "https://kb.acme.test/mcp"]);
 		expect(state.polledFor).toEqual(["tunnel"]);
 		expect(identitySession(dir).covers("chat")).toBe(true);
 		expect(state.revoked).toEqual(["old-refresh"]);

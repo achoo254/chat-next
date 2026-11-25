@@ -57,6 +57,8 @@ import { type WorkspaceFrame, WorkspaceLink, gitFileBody } from "./workspace-lin
 import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
 import { LedgerUnreadable } from "../usage/ledger.ts";
 import type { ObservatoryEventSink, ObservatoryHub } from "../observatory/hub/observatory-hub.ts";
+import type { ChatInbox } from "../chat-inbox/chat-inbox.ts";
+import { chatInboxStateBody } from "../chat-inbox/inbox-wire.ts";
 import { CLAUDE_PROVIDER_ID } from "../providers/claude/accounts/paths.ts";
 import { ReportRangeError } from "../usage/report.ts";
 
@@ -113,6 +115,8 @@ export type LinkContext = {
   advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
   /** The Claude Code sessions Observatory stored (ObservatoryWatch and the requests beside it); absent where the machine has none (tests). */
   observatory?: Pick<ObservatoryHub, "listSessions" | "watch" | "unwatch" | "forget" | "earlier" | "content" | "station">;
+  /** Chats whose new messages go into their AI session (ChatInboxList and the requests beside it); absent where the machine has none (tests). */
+  chatInbox?: Pick<ChatInbox, "list" | "set" | "remove">;
 };
 
 /** The class and reason of each refusal of Advisor's key store. */
@@ -978,6 +982,19 @@ export class Connection {
         case "observatoryContent":
         case "observatoryStation":
           return this.observatoryFrame(id, b);
+        case "chatInboxList":
+        case "chatInboxSet":
+        case "chatInboxRemove": {
+          const inbox = this.ctx.chatInbox;
+          if (!inbox) return this.send(id, { case: "error", value: refusal("this machine pushes no chat into sessions", ErrorReason.UNSUPPORTED_REQUEST) });
+          const items =
+            b.case === "chatInboxSet"
+              ? inbox.set({ chatId: b.value.chatId, title: b.value.title, app: b.value.app, enabled: b.value.enabled, perHourLimit: b.value.perHourLimit })
+              : b.case === "chatInboxRemove"
+                ? inbox.remove(b.value.chatId)
+                : inbox.list();
+          return this.send(id, { case: "chatInboxState", value: chatInboxStateBody(items) });
+        }
         case "projectConfigGet": {
           const dir = b.value.dir;
           if (!dir) return this.send(id, { case: "error", value: refusal("a folder is needed", ErrorReason.FOLDER_NOT_FOUND) });

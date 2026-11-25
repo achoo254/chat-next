@@ -176,7 +176,57 @@ export type ApprovalRequest = {
    * allowing also asks macOS for it (macFolderBeforeCall). Never "allow for the session".
    */
   macFolder?: string;
+  /** A write of tunelo's MCP: what devices word the card from, in their own language. */
+  write?: WriteDetails;
 };
+
+/**
+ * A write of tunelo's MCP as its approval card shows it (ApprovalWrite in the
+ * protocol): the tool as tunelo's MCP serves it, and what it acts on.
+ */
+export type WriteDetails = {
+  tool: string;
+  /** chat_send_message: the chat, its title (or the other person's name) when Chat said in time, its members when it has a title. */
+  chatId?: bigint;
+  chatTitle?: string;
+  chatMembers?: number;
+  /** The start of the message, and its full length in characters. */
+  text?: string;
+  textLength?: number;
+  /** localman_send_request: the method (upper case) and URL. */
+  method?: string;
+  url?: string;
+  /** chat_send_file: the files, in order (`text` is the caption). */
+  files?: WriteFile[];
+  /** kb_save_note: the note's title, its Space's slug ("" for the user's own), who may read it ("private"); `text` is the start of its Markdown. */
+  title?: string;
+  space?: string;
+  visibility?: string;
+  /** localman_send_request: the headers sent (`text` is the start of the body); localman_create_collection_node: the saved request's. */
+  headers?: WriteHeader[];
+  /** localman_send_request: the URL is on the user's own machine or network. */
+  reachesLocal?: boolean;
+  /** localman_create_collection_node: the collection, its name when Localman said in time (`title` is the request's name). */
+  collectionId?: string;
+  collectionName?: string;
+};
+
+/** A header on an approval card (ApprovalHeader in the protocol): a credential's value is not shown. */
+export type WriteHeader = { name: string; value: string; masked: boolean };
+
+/** A file of the machine a write sends (ApprovalFile in the protocol). */
+export type WriteFile = {
+  name: string;
+  size: bigint;
+  mime: string;
+  /** The whole image, for a small photo. */
+  preview?: Uint8Array;
+  /** Why it will not be sent (English); unset when it will. */
+  problem?: string;
+};
+
+/** A write's approval card: an English line for devices that cannot word it themselves, and its details. */
+export type WriteCard = { summary: string; write: WriteDetails };
 
 export type Question = {
   question: string;

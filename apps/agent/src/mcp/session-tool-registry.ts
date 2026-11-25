@@ -76,7 +76,8 @@ export function registerSessionTools(server: McpServer, opts: SessionToolOptions
 		for (const group of TOOL_GROUPS) {
 			if (!group.register) continue;
 			const table = new ToolTable();
-			group.register(table, { context, tunnels: new LocalTunnels(context) });
+			// A session tunelo opened also lists the tools on its thread's folder (chat_send_file).
+			group.register(table, { context, tunnels: new LocalTunnels(context), ...(mode === "session" ? { ticketed: true } : {}) });
 			registerTable(server, group.name, table, forward, (name) => !offered.writes && group.writeTools.includes(name), false);
 		}
 	}

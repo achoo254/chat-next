@@ -58,6 +58,7 @@ import type {
   SessionHistory,
   SessionPage,
   SessionQuery,
+  WriteCard,
   ToolKind as Kind,
   TerminalLaunch,
   TerminalRunner,
@@ -202,6 +203,9 @@ export type ConsentGiven = { sensitive: boolean; projectSettings: boolean; trust
 
 /** The conversation of the Chat app a thread opens for (ChatLink in the protocol); app is "telegram", "zalo", or "" for Chat itself. */
 export type ChatLinkInput = { chatId: bigint; title: string; app: string };
+
+/** How much of a call's input an approval card the core puts up itself shows. */
+const APPROVAL_INPUT_CHARS = 4_000;
 
 /** Where the AI sessions of Chat conversations opened without a folder work: one folder per chat under tunelo's data. */
 export function chatSessionsDir(dataDir: string): string {
@@ -2364,6 +2368,46 @@ export class AgentCore {
     return this.threads.get(threadId)?.meta.chatId === undefined && this.bypassed(threadId);
   }
 
+  /** The working folder of the thread's session (what chat_send_file may send from); undefined for an Advisor thread or one gone. */
+  sessionDir(threadId: string): string | undefined {
+    const t = this.threads.get(threadId);
+    return t && !t.deleted && t.meta.kind !== "advisor" ? t.meta.dir : undefined;
+  }
+
+  /** Every write of tunelo's MCP from the thread's session needs the user's approval, whoever asks for it: a Chat conversation's AI thread. */
+  asksEveryWrite(threadId: string): boolean {
+    const t = this.threads.get(threadId);
+    return t !== undefined && !t.deleted && t.meta.chatId !== undefined;
+  }
+
+  /**
+   * The approval card of a write of tunelo's MCP that the thread's AI ran
+   * without asking (agy in full access): the service asks the user itself.
+   * True once the user allows it; false when declined, or cancelled with the
+   * session or by `signal`.
+   */
+  async askWrite(threadId: string, call: { name: string; input: Record<string, unknown>; reason: string; card?: WriteCard }, signal: AbortSignal): Promise<boolean> {
+    const t = this.threads.get(threadId);
+    if (!t || t.deleted || signal.aborted) return false;
+    const full = JSON.stringify(call.input);
+    const answer = await this.ask(
+      t,
+      {
+        kind: "approval",
+        toolId: `mcp-${randomUUID()}`,
+        toolKind: "mcp",
+        name: call.name,
+        summary: call.card?.summary || call.name,
+        input: full.slice(0, APPROVAL_INPUT_CHARS),
+        sensitive: false,
+        reason: call.reason,
+        ...(call.card ? { write: call.card.write } : {}),
+      },
+      signal,
+    );
+    return "decision" in answer && answer.decision !== "deny";
+  }
+
   async setPermissionMode(threadId: string, mode: string, device: string): Promise<void> {
     const t = this.thread(threadId);
     // An Advisor thread's session reads only, whatever mode its AI would offer.
@@ -3006,6 +3050,7 @@ export class AgentCore {
           state: PromptState.PENDING,
           secrets: req.secrets ?? [],
           macFolder: req.macFolder ?? "",
+          ...(req.write ? { write: req.write } : {}),
         },
       });
     } else {

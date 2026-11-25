@@ -118,7 +118,8 @@ export async function answerPermission(p: AcpPermissionParams, ctx: PermissionCo
   const macFolder = ctx.macFolders?.ungrantedIn(`${JSON.stringify(call.rawInput ?? {})} ${toolPaths(call, ctx.dir).join(" ")}`, ctx.dir);
   if (!sensitive && macFolder === undefined && !ownWrite && ctx.rules.has(rule)) return { outcome: { outcome: "selected", optionId: allow } };
   const shown = describe(call, ctx.dir);
-  const summary = (write && (await write.describeWrite(own, args).catch(() => undefined))) || shown.summary;
+  const card = write ? await write.describeWrite(own, args).catch(() => undefined) : undefined;
+  const summary = card?.summary || shown.summary;
   const cut = shown.input.length > CARD_INPUT_CHARS ? `The input shown is cut: ${shown.input.length} characters in all.` : "";
   const answer = await ctx.askUser(
     {
@@ -131,6 +132,7 @@ export async function answerPermission(p: AcpPermissionParams, ctx: PermissionCo
       sensitive,
       ...(cut ? { reason: cut } : {}),
       ...(macFolder !== undefined ? { macFolder } : {}),
+      ...(card ? { write: card.write } : {}),
     },
     signal,
   );

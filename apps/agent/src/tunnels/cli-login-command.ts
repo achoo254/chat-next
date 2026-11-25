@@ -82,7 +82,7 @@ async function deviceLogin(issuer: string): Promise<string> {
 	// The IdP fills the code in only for a browser at the same address as this
 	// machine; elsewhere the page asks for the code shown here.
 	console.log();
-	console.log("  Approve this machine in the browser (Tunelo, Chat and Localman):");
+	console.log("  Approve this machine in the browser (Tunelo, Chat, Localman and Knowledge Base):");
 	console.log(`  ${authorization.verificationUriComplete ?? authorization.verificationUri}`);
 	console.log(`  Code: ${authorization.userCode} (type it if the page asks; open ${authorization.verificationUri} on another device)`);
 	console.log();

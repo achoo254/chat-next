@@ -7,7 +7,7 @@ import { type Session, generateKeyPair, startHandshake } from "@achoo254/chat-re
 import type { ConfigStore } from "../../src/config.ts";
 import type { AgentCore } from "../../src/core/agent-core.ts";
 import { DeviceTrust } from "../../src/device-trust.ts";
-import { Connection } from "../../src/link/connection.ts";
+import { Connection, type LinkContext } from "../../src/link/connection.ts";
 import type { AgentProvider } from "../../src/providers/types.ts";
 import { trustDevice } from "./trusted-devices.ts";
 import type { AuditLog } from "../../src/safety/audit-log.ts";
@@ -46,6 +46,7 @@ export async function pairedDevice(ctx: {
   onAdvisorKey?: () => void;
   advisorAuto?: { available: () => boolean; set: (on: boolean, device: string) => void };
   machineInfo?: () => Promise<MachineInfo>;
+  chatInbox?: LinkContext["chatInbox"];
 }): Promise<DeviceLink> {
   const machineKey = await generateKeyPair(true);
   const device = await generateKeyPair();
@@ -74,6 +75,7 @@ export async function pairedDevice(ctx: {
       ...(ctx.advisorKeys ? { advisorKeys: ctx.advisorKeys } : {}),
       ...(ctx.onAdvisorKey ? { onAdvisorKey: ctx.onAdvisorKey } : {}),
       ...(ctx.advisorAuto ? { advisorAuto: ctx.advisorAuto } : {}),
+      ...(ctx.chatInbox ? { chatInbox: ctx.chatInbox } : {}),
       machineKey: () => machineKey,
       trust: new DeviceTrust({ config: ctx.config }),
       machineInfo:

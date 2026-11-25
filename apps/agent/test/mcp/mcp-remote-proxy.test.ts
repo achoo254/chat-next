@@ -4,6 +4,7 @@ import { SessionExpiredError } from "../../src/identity/session.ts";
 import { type ToolGroup, toolGroup } from "../../src/mcp/groups.ts";
 import { RemoteProxy, type RemoteAccess } from "../../src/mcp/remote-proxy.ts";
 import { type FakeMcpApp, startFakeMcpApp } from "../support/fake-mcp-app.ts";
+import { textOf } from "../support/mcp-harness.ts";
 
 const JWT = /eyJ[\w-]+\.[\w-]+\.[\w-]*/;
 const jwt = (n: string) => `eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ${n}.c2ln${n}`;
@@ -60,7 +61,8 @@ describe("remote MCP proxy", () => {
   test("lists only the group's allowed tools, cached ten minutes", async () => {
     const p = proxy();
     const tools = await p.tools(chat);
-    expect(tools.map((t) => t.name).sort()).toEqual(["get_chat", "list_chats", "send_message"]);
+    // Not the upload tools the server also lists: those are the service's own (callInternal).
+    expect(tools.map((t) => t.name).sort()).toEqual(["get_chat", "list_chats", "send_media", "send_message"]);
     expect(tools.find((t) => t.name === "send_message")?.inputSchema).toMatchObject({ properties: { chat_id: {}, text: {} } });
     const requests = apps.chat.seen.length;
     await p.tools(chat);
@@ -68,6 +70,16 @@ describe("remote MCP proxy", () => {
     now += 10 * 60_000 + 1;
     await p.tools(chat);
     expect(apps.chat.seen.length).toBeGreaterThan(requests);
+    await p.close();
+  });
+
+  test("an internal tool runs for the service only, its answer not redacted; an agent's call to it is refused", async () => {
+    const p = proxy();
+    const started = await p.callInternal(chat, "start_media_upload", { kind: "document", file_name: "a.txt", size: 3, file_hash: "x" });
+    expect(started.isError).toBeUndefined();
+    expect(JSON.stringify(started.content)).toContain("sig=signed-");
+    expect(textOf(await p.call(chat, "start_media_upload", {}))).toMatch(/not a tool tunelo offers/);
+    expect(textOf(await p.callInternal(chat, "send_message", { chat_id: 7, text: "x" }))).toMatch(/not an internal tool/);
     await p.close();
   });
 
@@ -165,7 +177,7 @@ describe("remote MCP proxy", () => {
     expect(apps.chat.seen.length).toBe(requests);
     delete apps.chat.failWith;
     now += 30_001;
-    expect((await p.tools(chat)).length).toBe(3);
+    expect((await p.tools(chat)).length).toBe(4);
     await p.close();
   });
 

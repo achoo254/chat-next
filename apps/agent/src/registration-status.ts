@@ -14,11 +14,15 @@
 import type { KeyPair } from "@achoo254/chat-remote-protocol";
 import type { ConfigStore } from "./config.ts";
 import { MachineApiError } from "./machine-api.ts";
-import { APPS, type AppName, ResourceNotGrantedError, SessionExpiredError, type SessionInfo } from "./identity/session.ts";
+import { type AppName, ResourceNotGrantedError, SessionExpiredError, type SessionInfo } from "./identity/session.ts";
+
+/** The apps `tunelo status` reports on: those the machine registers with (the Knowledge Base has nothing to register). */
+export const STATUS_APPS = ["tunnel", "chat", "localman"] as const;
+export type StatusApp = (typeof STATUS_APPS)[number];
 
 export type AppStatus = "ok" | "waiting" | "sign-in" | "error" | "off";
 export type AppState = { status: AppStatus; detail: string; retryAt?: number };
-export type AppsReport = Record<AppName, AppState>;
+export type AppsReport = Record<StatusApp, AppState>;
 
 export const RETRY_FIRST_MS = 60_000;
 export const RETRY_MAX_MS = 60 * 60_000;
@@ -84,7 +88,7 @@ export function storedReport(config: ConfigStore, session: AppSession): AppsRepo
 
 /** Lines of `tunelo status`, one per app, labelled with its capitalised name. */
 export function describeApps(report: AppsReport, now = Date.now()): string[] {
-  return APPS.map((app) => {
+  return STATUS_APPS.map((app) => {
     const s = report[app];
     const label = app.charAt(0).toUpperCase() + app.slice(1);
     const retry = s.retryAt !== undefined ? ` (next try in ${Math.max(1, Math.round((s.retryAt - now) / 60_000))} min)` : "";

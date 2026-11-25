@@ -23,7 +23,7 @@ import {
   type Settings,
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
-import { SESSION_MCP_SERVER, isWriteTool, needsApproval } from "../../mcp/groups.ts";
+import { SESSION_MCP_SERVER, WRITE_APPROVAL_REASON, isWriteTool, needsApproval } from "../../mcp/groups.ts";
 import { TERMINAL_ADVISOR_MCP_SERVER } from "../../mcp/session-mcp-server.ts";
 import type { SessionMcp } from "../../mcp/session-tickets.ts";
 import { loopbackNoProxy, sessionMcpHttp, sessionMcpLaunch } from "../../mcp/session-mcp-launch.ts";
@@ -480,7 +480,6 @@ export function withoutTuneloMcp(servers: Record<string, unknown>): NonNullable<
   return Object.fromEntries(Object.entries(servers).filter(([, config]) => !runsTunelo(config))) as NonNullable<Options["mcpServers"]>;
 }
 
-const WRITE_APPROVAL_REASON = "It acts as you in Chat, Localman or on the internet: tunelo asks you every time.";
 
 /**
  * PreToolUse: a write tool of tunelo's MCP always goes to the device for
@@ -811,7 +810,8 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
     // A write of tunelo's MCP: the card names what it does, and the service runs it only once approved here.
     const ownTool = tuneloTool(toolName);
     const write = policy.sessionMcp && needsApproval(ownTool, input) ? policy.sessionMcp : undefined;
-    const summary = (write && (await write.describeWrite(ownTool, input).catch(() => undefined))) || toolSummary(toolName, input, policy.dir);
+    const card = write ? await write.describeWrite(ownTool, input).catch(() => undefined) : undefined;
+    const summary = card?.summary || toolSummary(toolName, input, policy.dir);
     const full = JSON.stringify(input);
     const cut = full.length > CARD_INPUT_CHARS ? `The input shown is cut: ${full.length} characters in all.` : "";
     // A command reading a sign-in secret: the device words why it asks (from $TUNELO_SECRET_* in the input).
@@ -829,6 +829,7 @@ function startSession(queryFn: QueryFn, bin: string, policy: SessionPolicy, askU
       // Named with their sites, so the card shows where each one belongs.
       ...(usesSecret ? { secrets: secrets ? secrets.sitesIn(command) : envNamesIn(command).map((name) => ({ name, origin: "" })) } : {}),
       ...(macFolder !== undefined ? { macFolder } : {}),
+      ...(card ? { write: card.write } : {}),
     };
     const answer = await askUser(req, opts.signal);
     if (answer.decision === "deny") {

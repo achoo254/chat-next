@@ -39,7 +39,10 @@ function context(decision: ApprovalAnswer["decision"]) {
     onRule: () => undefined,
     sessionMcp: {
       approveWrite: (exposed, input) => approved.push({ exposed, input }),
-      describeWrite: async (exposed, input) => (exposed === "chat_send_message" ? `Send to chat ${String(input.chat_id)}: ${String(input.text)}` : undefined),
+      describeWrite: async (exposed, input) =>
+        exposed === "chat_send_message"
+          ? { summary: `Send to chat ${String(input.chat_id)}: ${String(input.text)}`, write: { tool: exposed, chatId: BigInt(String(input.chat_id)), text: String(input.text) } }
+          : undefined,
     },
   };
   return { ctx, cards, approved, rules };
@@ -71,6 +74,7 @@ describe("a write of tunelo's MCP in an Antigravity session", () => {
     const out = await answerPermission(call("mcp_tunelo_chat_send_message", { chat_id: 7, text: "hi", toolSummary: "Send a message" }), ctx, new AbortController().signal);
     expect(out).toEqual({ outcome: { outcome: "selected", optionId: "allow" } });
     expect(cards.map((c) => c.summary)).toEqual(["Send to chat 7: hi"]);
+    expect(cards.map((c) => c.write)).toEqual([{ tool: "chat_send_message", chatId: 7n, text: "hi" }]);
     expect(approved).toEqual([{ exposed: "chat_send_message", input: { chat_id: 7, text: "hi" } }]);
   });
 
