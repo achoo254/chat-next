@@ -28,8 +28,16 @@ export function chatContext(chat: Pick<Chat, "id" | "externalApp">, title: strin
 		`Ứng dụng: ${chat.externalApp ?? brand.appName}`,
 		`chat_id: ${chat.id}`,
 		"Dùng các tool chat của tunelo (get_messages, search_messages, get_chat…) để đọc hội thoại này. Gợi ý trả lời chỉ là bản nháp. Chỉ gửi tin khi người dùng yêu cầu rõ ràng, và luôn qua tool gửi có thẻ duyệt.",
+		"Tệp trong thư mục của phiên này gửi được vào hội thoại bằng chat_send_file, sau khi người dùng duyệt thẻ.",
+		// Zalo takes only what the user types or attaches in the composer: no tool can post there.
+		...(chat.externalApp === "zalo"
+			? ["Hội thoại này ở Zalo: tool không gửi được tin hay tệp vào đây (Zalo chỉ nhận những gì người dùng tự gõ hoặc đính kèm ở ô soạn tin). Hãy soạn sẵn nội dung và bảo người dùng bấm «Đưa vào ô soạn tin» để tự gửi."]
+			: []),
 	].join("\n");
 }
+
+/** After the context, when a session is opened before any question (AI Agent › Liên hệ): the AI only says it is ready. */
+export const CONTEXT_ONLY = "Chưa có câu hỏi nào: chỉ cần trả lời ngắn rằng bạn đã sẵn sàng.";
 
 /** The chat's session among a machine's threads: the newest one naming the chat, not archived. */
 export function chatThread(threads: readonly ThreadSummary[], chatId: number): ThreadSummary | null {
@@ -42,7 +50,7 @@ function machineKey(selfId: number): string {
 	return `chat:ai-machine:${selfId}`;
 }
 
-function rememberedMachine(selfId: number): string {
+export function rememberedMachine(selfId: number): string {
 	try {
 		return window.localStorage.getItem(machineKey(selfId)) ?? "";
 	} catch {
@@ -50,7 +58,7 @@ function rememberedMachine(selfId: number): string {
 	}
 }
 
-function rememberMachine(selfId: number, ref: string): void {
+export function rememberMachine(selfId: number, ref: string): void {
 	try {
 		window.localStorage.setItem(machineKey(selfId), ref);
 	} catch {
@@ -100,7 +108,7 @@ function statusOf(directoryLoading: boolean, target: MachineView | null): ChatAi
 }
 
 /** Opens the chat's session on `link` with `text` as its first message; null when the machine answered with no session. */
-async function createChatThread(link: MachineLink, state: LinkState, chat: Pick<Chat, "id" | "externalApp">, title: string, text: string): Promise<ThreadSummary | null> {
+export async function createChatThread(link: MachineLink, state: LinkState, chat: Pick<Chat, "id" | "externalApp">, title: string, text: string): Promise<ThreadSummary | null> {
 	const frame = await link.request({
 		case: "threadCreate",
 		value: {

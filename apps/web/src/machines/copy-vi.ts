@@ -319,9 +319,57 @@ export const viMachines = {
 		builtin: (ai: string) => `Lệnh của ${ai}`,
 		skills: "Skill",
 	},
+	/** «Liên hệ»: Chat's people and groups, their sessions and the pushing of their new messages into them. */
+	contacts: {
+		title: "Liên hệ",
+		loading: "Đang tải liên hệ…",
+		search: "Tìm người hoặc nhóm",
+		empty: "Chưa có ai trong danh bạ Chat.",
+		noMatch: "Không thấy ai khớp.",
+		machine: "Máy giữ đăng ký",
+		noMachine: "Chưa có máy nào chạy AI.",
+		manage: "Quản lý máy",
+		offline: (machine: string) => `Máy B đang tắt (${machine}): đẩy tin và mở phiên cần máy đang chạy.`,
+		outdated: "Máy chạy tunelo cũ: cập nhật lên 3.28.0 trở lên để đẩy tin vào phiên.",
+		update: "Xem cách cập nhật",
+		group: "Nhóm",
+		hidden: "Ẩn với AI: không đẩy tin được",
+		push: "Đẩy tin vào phiên",
+		pushFor: (name: string) => `Đẩy tin của ${name} vào phiên`,
+		limit: "Giới hạn lượt mỗi giờ",
+		perHour: (n: number) => `${n} lượt/giờ`,
+		status: {
+			active: (n: number) => `Đang đẩy · ${n} lượt trong giờ qua`,
+			hidden: "Chat đang ẩn với AI",
+			limited: (missed: number) => `Hết lượt trong giờ · bỏ lỡ ${missed} tin`,
+			error: "Không đọc được Chat, sẽ thử lại",
+			signedOut: "Máy chưa đăng nhập Chat: chạy tunelo login",
+			paused: "Đã tạm dừng",
+		},
+		open: "Mở phiên",
+		quick: "Nhắn nhanh",
+		/** What the session's composer starts with for «Nhắn nhanh». */
+		quickPrefix: (name: string) => `Nhắn cho ${name}: `,
+		failed: "Không mở được phiên của chat này trên máy. Thử lại sau.",
+	},
 	transcript: {
 		/** Under each AI reply in the Chat app's AI panel: the text goes into the chat's composer, for the user to send. */
 		useText: "Đưa vào ô soạn tin",
+		/** The Knowledge Base documents a kb tool answered with. */
+		kbSources: "Nguồn từ Knowledge Base",
+		/** A Localman request the AI sent (localman_send_request), as a card. */
+		localman: {
+			label: "Kết quả request Localman",
+			headers: (n: number) => `Header (${n})`,
+			binary: (size: string) => `Body nhị phân, ${size}`,
+			empty: "Không có body",
+			truncated: "Body đã bị cắt bớt",
+			more: "Xem thêm",
+			less: "Thu gọn",
+			open: "Mở trong Localman",
+			/** Puts "METHOD URL → status (ms)" and the first lines of the body into the chat's composer. */
+			copyShort: "Chép kết quả gọn",
+		},
 		/** The same button for a moment once the text went in. */
 		usedText: "Đã đưa vào ô soạn tin",
 		earlier: (n: number) => `Xem ${n} mục trước`,
@@ -389,6 +437,50 @@ export const viMachines = {
 		empty: "Chưa có gì trong phiên này.",
 	},
 	approval: {
+		/** An MCP tool that acts as the user (ApprovalItem.write): worded here, the machine's text stays English for older devices. */
+		write: {
+			reason: "Thao tác này nhân danh bạn trong Chat, Localman hoặc trên internet: tunelo hỏi bạn mỗi lần.",
+			send: (title: string, members: number, text: string): string => (members > 0 ? `Gửi vào «${title}» (${members} thành viên): ${text}` : `Gửi vào «${title}»: ${text}`),
+			sendChat: (chatId: string, text: string): string => `Gửi vào cuộc trò chuyện ${chatId}: ${text}`,
+			/** After the start of a longer message: its whole length. */
+			more: (length: number): string => `… (${length} ký tự)`,
+			/** Where a write goes: the chat by name (with its members), or by id when no name is known. */
+			to: (title: string, members: number): string => (members > 0 ? `«${title}» (${members} thành viên)` : `«${title}»`),
+			toChat: (chatId: string): string => `cuộc trò chuyện ${chatId}`,
+			/** Files of the machine (chat_send_file), with the caption when there is one. */
+			sendFiles: (count: number, to: string, caption: string): string => `Gửi ${count} tệp vào ${to}${caption === "" ? "" : `: ${caption}`}`,
+			/** Photos and files already in Chat (chat_send_media): their count when the call gives it. */
+			sendMedia: (count: number, to: string): string => `Gửi ${count} tệp vào ${to}`,
+			sendMediaAny: (to: string): string => `Gửi ảnh/tệp đã có trong Chat vào ${to}`,
+			forward: (to: string): string => `Chuyển tiếp tin tới ${to}`,
+			startPrivate: (userId: string): string => `Mở chat riêng với người dùng ${userId}`,
+			/** kb_save_note: a note saved to the Knowledge Base. */
+			kbSave: (title: string, space: string, isPrivate: boolean): string => `Lưu ghi chú${isPrivate ? " riêng tư" : ""} «${title}» vào ${space}`,
+			kbOwnSpace: "Space riêng của bạn",
+			kbPrivate: "Riêng tư — chỉ bạn đọc được",
+			kbTitle: "Tiêu đề",
+			kbSpace: "Space",
+			kbVisibility: "Ai đọc được",
+			kbExcerpt: "Nội dung",
+			/** Localman: a request whose address is on the user's own machine or network. */
+			lmLocal: "Chạy qua máy của bạn",
+			lmHeaders: "Header",
+			lmBody: "Body",
+			lmCollection: "Collection",
+			lmName: "Tên request",
+			lmSave: (title: string, collection: string, method: string, url: string): string => `Lưu request «${title}» vào collection «${collection}»: ${method} ${url}`,
+			files: "Tệp sẽ gửi",
+			cannotSend: "không gửi được",
+			/** Why a file will not be sent, from the machine's English. */
+			problems: {
+				"outside the session's folder": "nằm ngoài thư mục của phiên",
+				"a path with .. is not allowed": "không được dùng đường dẫn có ..",
+				"not a regular file": "không phải tệp thường",
+				"not found": "không tìm thấy",
+				"in a sensitive folder": "nằm trong thư mục nhạy cảm",
+				"the session's folder is gone": "thư mục của phiên không còn",
+			} as Readonly<Record<string, string>>,
+		},
 		label: (ai: string) => `${ai} xin quyền`,
 		shell: "Cho phép chạy lệnh này?",
 		edit: "Cho phép sửa file này?",

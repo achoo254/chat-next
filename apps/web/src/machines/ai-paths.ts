@@ -29,6 +29,8 @@ export function observeFocus(search: string): ObserveFocus {
 export const aiPaths = {
 	/** The "Cần bạn" board of every machine. */
 	need: "/ai/need",
+	/** «Liên hệ»: Chat's people and groups, their sessions and the pushing of their new messages. */
+	contacts: "/ai/contacts",
 	/** The machines: list, adding, pairing, details. */
 	manage: "/ai/machines",
 	/** A session in its AI's own CLI, in the machine's terminal. */

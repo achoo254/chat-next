@@ -35,6 +35,7 @@ import { DeleteThreadDialog, ThreadMenuItems, threadActionsSupported } from "./t
 import { MacFolderAccessDialog, TerminalFolderNotice } from "./mac-folder-access.tsx";
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
+import { UseTextContext, type UseText } from "./cards/use-text-context.ts";
 import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
 import { PageHead } from "./page-head.tsx";
 import { ProjectConfigHint } from "./project-config.tsx";
@@ -88,8 +89,7 @@ function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
 }
 
-/** Takes an AI reply's text (the Chat app's AI panel); resolves true once the text went where it goes. */
-export type UseText = (text: string) => Promise<boolean>;
+export type { UseText };
 
 /** How long the reply's button says the text went in. */
 const USED_MS = 2_000;
@@ -432,6 +432,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
+						<UseTextContext value={onUseText ?? null}>
 						<Transcript
 							blocks={blocks}
 							previous={previous}
@@ -452,6 +453,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 							commands={threadInfo?.commands}
 							onUseText={onUseText}
 						/>
+						</UseTextContext>
 					)}
 					{suggestion !== undefined && (
 						<LimitBar

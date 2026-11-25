@@ -29,6 +29,8 @@ import "./machines.css";
 
 /** "Hiệu quả": loaded, with its styles, the first time it opens. */
 const UsageScreen = lazy(() => import("./usage/usage-screen.tsx"));
+/** «Liên hệ»: loaded the first time it opens. */
+const ContactsPage = lazy(() => import("./contacts-page.tsx"));
 const AiAccountsScreen = lazy(() => import("./ai-accounts/ai-accounts-screen.tsx"));
 /** "Quan sát" of a session by its own id: loaded, with the Live Map, the first time it opens. */
 const LiveMapView = lazy(() => import("./observatory/live-map-view.tsx"));
@@ -58,6 +60,13 @@ export default function MachinesScreen({ view }: { view: MachinesView }) {
 			break;
 		case "need":
 			main = <HomeBoard back />;
+			break;
+		case "contacts":
+			main = (
+				<Suspense fallback={<SessionLoading label={t.contacts.loading} />}>
+					<ContactsPage />
+				</Suspense>
+			);
 			break;
 		case "machines":
 			main = <MachinesPage />;

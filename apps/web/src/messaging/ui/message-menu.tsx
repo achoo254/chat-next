@@ -299,7 +299,13 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 			icon: "bulb",
 			run: () =>
 				openAiPanel(ui, chatId, {
-					quote: { seq: message.seq, sender, date: message.date, text: message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]` },
+					quote: {
+						seq: message.seq,
+						sender,
+						date: message.date,
+						text: message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]`,
+						code: message.entities.filter((e) => e.type === "code" || e.type === "pre").map((e) => message.text.slice(e.offset, e.offset + e.length)),
+					},
 				}),
 		});
 		// An album goes on as a whole, as from its quick Forward button.

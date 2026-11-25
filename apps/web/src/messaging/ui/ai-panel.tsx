@@ -22,6 +22,7 @@ import type { Drafts } from "../data/drafts.ts";
 import { useDialog, useServices } from "../data/services.tsx";
 import { DialogHead, Modal, useDomId } from "./parts.tsx";
 import { useUi, type AiPanelRequest, type AiQuote, type Ui } from "./ui-context.tsx";
+import { hasLocalmanRequest } from "./ai-localman-hints.ts";
 import { plainText } from "./ai-plain-text.ts";
 import { useChatAi, type ChatAi } from "./use-chat-ai.ts";
 
@@ -35,8 +36,10 @@ export const AI_MAX = 640;
 const AI_DEFAULT = 400;
 const STEP = 10;
 
-type Chip = "draft" | "summarize" | "translate" | "explain";
+type Chip = "draft" | "summarize" | "translate" | "explain" | "localmanRun" | "localmanSave";
 const CHIPS: readonly Chip[] = ["draft", "summarize", "translate", "explain"];
+/** Only for a message holding a request (a curl command, a URL or JSON). */
+const LOCALMAN_CHIPS: readonly Chip[] = ["localmanRun", "localmanSave"];
 
 let nextFill = 0;
 
@@ -232,8 +235,9 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 
 	// The chat gets plain text: its people (Telegram, Zalo) would see the markdown's marks as typed.
 	// Resolves true once the text is in the composer (the reply's button says so), false when the user kept their own.
-	const offerText = (markdown: string): Promise<boolean> => {
-		const text = plainText(markdown);
+	// `plain`: the text is plain already (a result card's short copy), not the AI's markdown.
+	const offerText = (markdown: string, plain = false): Promise<boolean> => {
+		const text = plain ? markdown : plainText(markdown);
 		// An edit in progress is not in the draft: putting the text in would end it, so the user is asked first too.
 		const editing = ui.intents.cell(chat.id).get()?.mode === "edit";
 		const current = drafts.get(chat.id, topicId);
@@ -363,7 +367,7 @@ function QuoteCard({ quote, locale, copy, disabled, onChip, onRemove }: { quote:
 			</div>
 			<blockquote>{quote.text}</blockquote>
 			<div className="ai-chips" role="group" aria-label={copy.aiPanel.chips}>
-				{CHIPS.map((kind) => (
+				{(hasLocalmanRequest(quote.text, quote.code) ? [...CHIPS, ...LOCALMAN_CHIPS] : CHIPS).map((kind) => (
 					<button key={kind} type="button" className="chip" disabled={disabled} onClick={() => onChip(kind)}>
 						{copy.aiPanel.chip[kind]}
 					</button>

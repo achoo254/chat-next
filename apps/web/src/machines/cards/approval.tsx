@@ -4,10 +4,17 @@
 // composer and answers keys 1, 2, 3 and Esc. The answer names the revision
 // the user saw, so a prompt that changed meanwhile is refused instead of
 // answered blindly. An answered prompt shows in its tool's row
-// (tool-run.tsx); one without a shown tool stays as a short line.
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+// (tool-run.tsx); one without a shown tool stays as a short line. A tool
+// that acts as the user (ApprovalItem.write: a message into a chat, a
+// Localman request, a tunnel) is worded here in the user's language, the
+// chat named as this device knows it; older machines send only English.
+import { useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 import { PlainTextBox, type PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
-import { Decision, PromptState, ToolKind, type ApprovalItem, type ApprovalSecret } from "@achoo254/chat-proto/remote/remote";
+import { Decision, PromptState, ToolKind, type ApprovalFile, type ApprovalHeader, type ApprovalItem, type ApprovalSecret, type ApprovalWrite } from "@achoo254/chat-proto/remote/remote";
+import { Icon } from "../../components/screen-icons.tsx";
+import { useI18n } from "../../i18n/i18n.tsx";
+import { formatBytes } from "../../messaging/media/media-format.ts";
+import { ServicesContext } from "../../messaging/data/services.tsx";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon, type MachineIconName } from "../machine-icons.tsx";
 import { errorText } from "../use-machines.ts";
@@ -47,6 +54,264 @@ function askTitle(t: MachinesCopy, approval: ApprovalItem): string {
 		default:
 			return t.approval.other(approval.name);
 	}
+}
+
+/** The arguments the AI called the tool with (the card's JSON input); empty when unreadable. */
+function inputArgs(input: string): Record<string, unknown> {
+	try {
+		const value: unknown = JSON.parse(input);
+		return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+	} catch {
+		return {};
+	}
+}
+
+/** An id argument as text ("" when absent). */
+function idArg(value: unknown): string {
+	return typeof value === "number" || (typeof value === "string" && /^\d+$/.test(value)) ? String(value) : "";
+}
+
+/** The chat a chat write goes to: `write.chat_id`, or for tools the machine does not describe, the call's own argument. */
+export function writeChatId(write: ApprovalWrite, input: string): number {
+	if (write.chatId !== 0n) return Number(write.chatId);
+	const args = inputArgs(input);
+	const id = idArg(write.tool === "chat_forward_messages" ? args.to_chat_id : args.chat_id);
+	return id === "" ? 0 : Number(id);
+}
+
+/**
+ * The card's words for a tool that acts as the user: `summary` in place of the machine's (null: keep the
+ * machine's), `reason` always. `knownTitle`: the chat's name as this device shows it ("" when unknown);
+ * `input`: the call's JSON arguments, for the tools the machine does not describe.
+ */
+export function writeWords(t: MachinesCopy, write: ApprovalWrite, knownTitle: string, input = ""): { summary: string | null; reason: string } {
+	const w = t.approval.write;
+	const more = write.textLength > [...write.text].length ? w.more(write.textLength) : "";
+	const text = write.text === "" ? "" : `${write.text}${more}`;
+	const title = knownTitle !== "" ? knownTitle : write.chatTitle;
+	const args = inputArgs(input);
+	// A chat this device knows by name, else the machine's name for it, else its id.
+	const to = (): string => {
+		if (title !== "") return w.to(title, write.chatMembers);
+		const id = writeChatId(write, input);
+		return w.toChat(id === 0 ? "?" : String(id));
+	};
+	switch (write.tool) {
+		case "chat_send_message":
+			return { summary: title !== "" ? w.send(title, write.chatMembers, text) : w.sendChat(String(write.chatId), text), reason: w.reason };
+		case "chat_send_file": {
+			// A machine that lists no files (older tunelo) keeps its own line.
+			const count = Array.isArray(write.files) ? write.files.length : 0;
+			return { summary: count > 0 ? w.sendFiles(count, to(), text) : null, reason: w.reason };
+		}
+		case "chat_send_media": {
+			const media = Array.isArray(args.media_ids) ? args.media_ids.length : 0;
+			return { summary: media > 0 ? w.sendMedia(media, to()) : w.sendMediaAny(to()), reason: w.reason };
+		}
+		case "chat_forward_messages":
+			return { summary: w.forward(to()), reason: w.reason };
+		case "chat_start_private_chat":
+			return { summary: w.startPrivate(idArg(args.user_id) || "?"), reason: w.reason };
+		case "localman_send_request":
+			return { summary: `${write.method} ${write.url}`, reason: w.reason };
+		case "localman_create_collection_node": {
+			// A machine before these fields names no collection: its own line stays.
+			const collection = lmCollection(write);
+			const title = typeof write.title === "string" ? write.title : "";
+			return { summary: collection === "" || title === "" ? null : w.lmSave(title, collection, write.method, write.url), reason: w.reason };
+		}
+		case "kb_save_note": {
+			// A machine before these fields sends no title: its own line stays.
+			const note = kbNote(t, write);
+			return { summary: note === null ? null : w.kbSave(note.title, note.space, note.isPrivate), reason: w.reason };
+		}
+		default:
+			return { summary: null, reason: w.reason };
+	}
+}
+
+/** A note kb_save_note saves, as the card shows it; null from a machine that does not describe it. */
+export function kbNote(t: MachinesCopy, write: ApprovalWrite): { title: string; space: string; isPrivate: boolean; excerpt: string } | null {
+	const title = typeof write.title === "string" ? write.title : "";
+	if (write.tool !== "kb_save_note" || title === "") return null;
+	const w = t.approval.write;
+	const space = typeof write.space === "string" && write.space !== "" ? write.space : w.kbOwnSpace;
+	const more = write.textLength > [...write.text].length ? w.more(write.textLength) : "";
+	return { title, space, isPrivate: write.visibility === "private", excerpt: write.text === "" ? "" : `${write.text}${more}` };
+}
+
+/** The collection a saved request goes to: its name, else its id; "" from a machine that does not say. */
+function lmCollection(write: ApprovalWrite): string {
+	const name = typeof write.collectionName === "string" ? write.collectionName : "";
+	const id = typeof write.collectionId === "string" ? write.collectionId : "";
+	return name !== "" ? name : id;
+}
+
+/** A header as the card lists it: a credential's value never shows. */
+export function headerLine(header: Pick<ApprovalHeader, "name" | "value" | "masked">): string {
+	return `${header.name}: ${header.masked ? "••••" : header.value}`;
+}
+
+/** A Localman request the card sends or saves: where it runs, the collection, the headers and the start of its body. */
+function LocalmanDetails({ t, write }: { t: MachinesCopy; write: ApprovalWrite }) {
+	const w = t.approval.write;
+	// Items built by hand (tests, older journals) may lack the lists.
+	const headers: readonly ApprovalHeader[] = Array.isArray(write.headers) ? write.headers : [];
+	const save = write.tool === "localman_create_collection_node";
+	const collection = save ? lmCollection(write) : "";
+	const body = write.tool === "localman_send_request" && write.text !== "" ? `${write.text}${write.textLength > [...write.text].length ? w.more(write.textLength) : ""}` : "";
+	const local = write.tool === "localman_send_request" && write.reachesLocal === true;
+	if (!local && headers.length === 0 && body === "" && collection === "") return null;
+	return (
+		<div className="mx-lm-write">
+			{local && <span className="mx-tag warn mx-lm-local">{w.lmLocal}</span>}
+			<dl className="mx-kb-note">
+				{collection !== "" && (
+					<div>
+						<dt>{w.lmCollection}</dt>
+						<dd>{collection}</dd>
+					</div>
+				)}
+				{save && typeof write.title === "string" && write.title !== "" && (
+					<div>
+						<dt>{w.lmName}</dt>
+						<dd>{write.title}</dd>
+					</div>
+				)}
+				{headers.length > 0 && (
+					<div>
+						<dt>{w.lmHeaders}</dt>
+						<dd>
+							<ul className="mx-lm-write-headers">
+								{headers.map((h, i) => (
+									<li key={`${i}:${h.name}`} className="mono">
+										{headerLine(h)}
+									</li>
+								))}
+							</ul>
+						</dd>
+					</div>
+				)}
+				{body !== "" && (
+					<div>
+						<dt>{w.lmBody}</dt>
+						<dd className="mx-pre">{body}</dd>
+					</div>
+				)}
+			</dl>
+		</div>
+	);
+}
+
+/** The note a kb_save_note card saves: title, Space, who reads it and the start of its text. */
+function KbNoteDetails({ t, write }: { t: MachinesCopy; write: ApprovalWrite }) {
+	const note = kbNote(t, write);
+	if (note === null) return null;
+	const w = t.approval.write;
+	return (
+		<dl className="mx-kb-note">
+			<div>
+				<dt>{w.kbTitle}</dt>
+				<dd>{note.title}</dd>
+			</div>
+			<div>
+				<dt>{w.kbSpace}</dt>
+				<dd>{note.space}</dd>
+			</div>
+			{note.isPrivate && (
+				<div>
+					<dt>{w.kbVisibility}</dt>
+					<dd>{w.kbPrivate}</dd>
+				</div>
+			)}
+			{note.excerpt !== "" && (
+				<div>
+					<dt>{w.kbExcerpt}</dt>
+					<dd className="mx-pre">{note.excerpt}</dd>
+				</div>
+			)}
+		</dl>
+	);
+}
+
+/** The machine's English reason a file will not be sent, in the user's language (an unknown one as it came). */
+export function fileProblem(t: MachinesCopy, problem: string): string {
+	return t.approval.write.problems[problem] ?? problem;
+}
+
+/** A photo's preview as a page address while the row shows (freed after); null for no preview. */
+function usePreviewUrl(file: ApprovalFile): string | null {
+	const { preview, mime } = file;
+	const [url, setUrl] = useState<string | null>(null);
+	useEffect(() => {
+		if (preview.length === 0 || typeof URL.createObjectURL !== "function") return;
+		const made = URL.createObjectURL(new Blob([new Uint8Array(preview)], { type: mime }));
+		// The address is an external resource made for this row: set once made, freed when the row goes.
+		// eslint-disable-next-line react-hooks/set-state-in-effect
+		setUrl(made);
+		return () => {
+			URL.revokeObjectURL(made);
+			setUrl(null);
+		};
+	}, [preview, mime]);
+	return url;
+}
+
+function FileRow({ file, t }: { file: ApprovalFile; t: MachinesCopy }) {
+	const { locale } = useI18n();
+	const url = usePreviewUrl(file);
+	const problem = file.problem === "" ? "" : fileProblem(t, file.problem);
+	return (
+		<li className={problem === "" ? "mx-send-file" : "mx-send-file bad"}>
+			{url !== null ? <img src={url} alt={file.name} /> : <Icon name="file" />}
+			<span className="nm" title={file.name}>
+				{file.name}
+			</span>
+			{problem === "" ? (
+				<span className="muted">{formatBytes(Number(file.size), locale)}</span>
+			) : (
+				<span className="mx-send-problem" role="alert">
+					{t.approval.write.cannotSend}: {problem}
+				</span>
+			)}
+		</li>
+	);
+}
+
+/** The machine's files a chat_send_file card sends, one row each. */
+function SendFiles({ files, t }: { files: readonly ApprovalFile[]; t: MachinesCopy }) {
+	if (files.length === 0) return null;
+	return (
+		<ul className="mx-send-files" aria-label={t.approval.write.files}>
+			{files.map((file, i) => (
+				<FileRow key={`${i}:${file.name}`} file={file} t={t} />
+			))}
+		</ul>
+	);
+}
+
+/** The name of chat `chatId` as the chat list shows it (a group's title, the other person's name); "" when this device does not know it. */
+function useKnownChatTitle(chatId: number): string {
+	// The AI Agent screens live inside the Chat app's services; a card drawn alone (tests) knows no chat.
+	const services = useContext(ServicesContext);
+	const store = services?.store ?? null;
+	const subscribe = useCallback((listener: () => void) => (store === null || chatId === 0 ? () => undefined : store.subscribe(`dialog:${chatId}`, listener)), [store, chatId]);
+	return useSyncExternalStore(subscribe, () => {
+		const view = store === null || chatId === 0 ? undefined : store.dialog(chatId);
+		if (view === undefined || view.chat === null) return "";
+		return view.chat.type === "private" ? (view.peer?.name ?? "") : view.chat.title;
+	});
+}
+
+/** The summary and reason the card shows: the machine's, or for a tool acting as the user, worded here. */
+function useApprovalWords(t: MachinesCopy, approval: ApprovalItem): { summary: string; reason: string } {
+	// Items built by hand (tests, older journals) may lack the field.
+	const write: ApprovalWrite | undefined = approval.write;
+	const input = typeof approval.input === "string" ? approval.input : "";
+	const known = useKnownChatTitle(write === undefined || !write.tool.startsWith("chat_") ? 0 : writeChatId(write, input));
+	if (write === undefined) return { summary: approval.summary, reason: approval.reason };
+	const words = writeWords(t, write, known, input);
+	return { summary: words.summary ?? approval.summary, reason: words.reason };
 }
 
 /** What became of an answered (or expired, cancelled) prompt. */
@@ -130,6 +395,7 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 	const [message, setMessage] = useState("");
 	const field = useRef<PlainTextBoxHandle>(null);
 	const pending = approval.state === PromptState.PENDING;
+	const words = useApprovalWords(t, approval);
 	const sites = secretSites(approval);
 	const secrets = sites.length > 0 ? sites.map((s) => s.name) : secretsInCommand(approval);
 	// Asking macOS for a protected folder is never allowed for the session.
@@ -175,7 +441,7 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 		return (
 			<div className="mx-done-line">
 				<MachineIcon name={toolIcon(approval.kind)} small />
-				<span className="mono">{approval.summary || approval.name}</span>
+				<span className="mono">{words.summary || approval.name}</span>
 				<span className="muted">· {approvalOutcome(t, approval)}</span>
 			</div>
 		);
@@ -193,7 +459,10 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 				<span>{askTitle(t, approval)}</span>
 				{approval.sensitive && <span className="mx-tag danger">{t.approval.sensitive}</span>}
 			</h4>
-			{approval.summary !== "" && <pre className="mx-pre">{approval.summary}</pre>}
+			{words.summary !== "" && <pre className="mx-pre">{words.summary}</pre>}
+			{approval.write?.tool === "chat_send_file" && Array.isArray(approval.write.files) && <SendFiles files={approval.write.files} t={t} />}
+			{approval.write?.tool === "kb_save_note" && <KbNoteDetails t={t} write={approval.write} />}
+			{(approval.write?.tool === "localman_send_request" || approval.write?.tool === "localman_create_collection_node") && <LocalmanDetails t={t} write={approval.write} />}
 			{sites.length > 0 && (
 				<ul className="mx-secret-sites" aria-label={t.approval.secretSites}>
 					{sites.map((s) => (
@@ -213,7 +482,7 @@ export function ApprovalCard({ approval, ai, sessionAllow, onDecide, compact = f
 				// Worded here: tunelo 2.0.8 sent its own English reason for these, which is left out.
 				<p className="muted mx-reason">{t.approval.secretCommand(secrets.join(", "))}</p>
 			) : (
-				!compact && approval.reason !== "" && <p className="muted mx-reason">{approval.reason}</p>
+				!compact && words.reason !== "" && <p className="muted mx-reason">{words.reason}</p>
 			)}
 			{telling ? (
 				<div className="mx-tell">

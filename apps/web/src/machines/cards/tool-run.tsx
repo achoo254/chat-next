@@ -3,7 +3,9 @@
 // to see each call. A row shows the call's command wrapped and clamped to
 // three lines ("Xem thêm" shows the rest), the answered permission prompt
 // as a short status under it, the files a subagent edited, and its output
-// behind "Kết quả".
+// behind "Kết quả". A Localman request the AI sent shows as its own card
+// (localman-result.tsx), and the Knowledge Base documents a kb tool answered
+// with as source chips (kb-sources.tsx).
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Item } from "@achoo254/chat-proto/remote/remote";
 import { useI18n } from "../../i18n/i18n.tsx";
@@ -12,6 +14,8 @@ import { clockText, toolTimeoutMs, useNow } from "../transcript/run-time.ts";
 import type { ToolRun } from "../transcript/tool-fold.ts";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { approvalOutcome, toolIcon } from "./approval.tsx";
+import { isKbDocumentsTool, kbSources, KbSourceChips } from "./kb-sources.tsx";
+import { isLocalmanSend, LocalmanResultCard, parseLocalmanResult } from "./localman-result.tsx";
 
 interface ToolRunCardProps {
 	runs: readonly ToolRun[];
@@ -89,7 +93,11 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, [summary, expanded]);
-	const output = result !== null && (result.output !== "" || result.truncated) ? result : null;
+	const call = run.call;
+	// Read from the output as it came; anything not recognised keeps the generic "Kết quả".
+	const localman = call !== null && result !== null && result.ok && isLocalmanSend(call.name) ? parseLocalmanResult(call.input, result.output) : null;
+	const sources = call !== null && result !== null && result.ok && isKbDocumentsTool(call.name) ? kbSources(result.output) : [];
+	const output = localman === null && result !== null && (result.output !== "" || result.truncated) ? result : null;
 	const showToggle = clamped || expanded;
 	const edited = run.subagentFiles.length;
 	const timeout = run.call === null ? undefined : toolTimeoutMs(run.call.input);
@@ -146,6 +154,8 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 						)}
 					</div>
 				)}
+				{localman !== null && <LocalmanResultCard result={localman} />}
+				<KbSourceChips sources={sources} label={t.transcript.kbSources} />
 			</div>
 			<span className="mx-run-state">
 				{running ? (

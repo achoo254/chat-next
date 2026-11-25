@@ -13,7 +13,8 @@
 // one: project-actions.ts), and each session this device opens counts as seen.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Icon } from "../components/screen-icons.tsx";
-import { type MachinesView } from "../router.tsx";
+import { Link, type MachinesView } from "../router.tsx";
+import { aiPaths } from "./ai-paths.ts";
 import { useAgentProjects } from "./agent-projects-store.ts";
 import { FirstSteps, stepsPending } from "./first-steps.tsx";
 import { isBlocked, isListLoading, type Conn } from "./machine-status.ts";
@@ -251,6 +252,10 @@ export function SessionSidebar({ view }: { view: MachinesView }) {
 				{machines.length > 0 && !(showSteps && progress.projects === 0) && <AddProject machines={machines} />}
 				<HeadMenu machines={machines} refreshProjects={() => store.refresh()} hostNote={hostNote} attention={blocked + outdated} manageCurrent={view.page === "machines" || view.page === "add"} />
 			</header>
+			<Link to={aiPaths.contacts} className="mx-contacts-link" current={view.page === "contacts"}>
+				<Icon name="users" small />
+				<span>{t.contacts.title}</span>
+			</Link>
 			{filter === "archived" && <p className="mx-archived-head">{t.sessions.archivedTitle(archived)}</p>}
 			<div className="mx-groups" ref={groups} onPointerDown={onPointerDown} data-dragging={drag !== null ? "" : undefined} aria-busy={directory.status === "loading" || snapshot.status === "loading"}>
 				{snapshot.status === "loading" && machines.length > 0 && (

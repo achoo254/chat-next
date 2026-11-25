@@ -492,6 +492,26 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-run-approval { overflow-wrap: anywhere; }
 .mx-run-clock { color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 .mx-run-out { min-width: 0; }
+/* A Localman request the AI sent (localman-result.tsx): status colored by class, body folded, secret headers masked. */
+.mx-lm { display: grid; gap: var(--space-1); min-width: 0; margin-top: var(--space-1); padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); font-size: 0.8125rem; color: var(--c-text); }
+.mx-lm-head { display: flex; gap: var(--space-2); min-width: 0; }
+.mx-lm-head .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-lm-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.mx-lm-status { font-weight: 600; }
+.mx-lm-status.ok { color: var(--c-success-text, var(--c-success)); }
+.mx-lm-status.redirect { color: var(--c-info-text); }
+.mx-lm-status.client { color: var(--c-warning-text); }
+.mx-lm-status.server { color: var(--c-error-text); }
+.mx-lm-headers dl { display: grid; gap: 2px; margin: var(--space-1) 0 0; }
+.mx-lm-headers dl > div { display: flex; gap: var(--space-2); min-width: 0; }
+.mx-lm-headers dt { flex: none; font-weight: 600; }
+.mx-lm-headers dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.mx-lm-body { max-height: none; }
+.mx-lm-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+/* Knowledge Base documents a kb tool answered with (kb-sources.tsx). */
+.mx-kb-sources { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-1) 0 0; padding: 0; list-style: none; }
+.mx-kb-sources a { display: inline-flex; max-width: 260px; padding: 2px var(--space-2); overflow: hidden; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-full); background: var(--c-surface-subtle); color: var(--c-text); font-size: 0.75rem; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.mx-kb-sources a:hover { border-color: var(--c-primary); }
 .mx-run-out[open] { flex: 1 1 100%; display: grid; gap: var(--space-1); justify-items: start; }
 .mx-run-out[open] > .mx-pre { justify-self: stretch; }
 .mx-run-out summary { display: inline-flex; align-items: center; gap: 2px; min-height: 28px; cursor: pointer; list-style: none; border-radius: var(--radius-xs); }
@@ -868,6 +888,22 @@ button.mx-mode:disabled { cursor: default; opacity: 0.6; }
 .mx-secret-sites { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
 .mx-secret-sites li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
 .mx-secret-sites strong { font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+/* The machine's files a chat_send_file card sends: a thumbnail for a photo, else a file icon; a file that will not go in red. */
+/* A Localman request a card sends or saves: the badge when it runs through the user's machine, headers one per line. */
+.mx-lm-write { display: grid; gap: var(--space-1); justify-items: start; }
+.mx-lm-write > .mx-kb-note { justify-self: stretch; }
+.mx-lm-write-headers { margin: 0; padding: 0; list-style: none; font-size: 0.8125rem; overflow-wrap: anywhere; }
+/* The note a kb_save_note card saves: label and value on a row each. */
+.mx-kb-note { display: grid; gap: var(--space-1); margin: 0; font-size: 0.875rem; }
+.mx-kb-note > div { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: var(--space-2); }
+.mx-kb-note dt { color: var(--c-text-muted); }
+.mx-kb-note dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.mx-send-files { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.mx-send-file { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: 0.875rem; }
+.mx-send-file img { width: 48px; height: 48px; flex: none; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--c-border-subtle); }
+.mx-send-file .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-send-file.bad { color: var(--c-error-text); }
+.mx-send-problem { overflow-wrap: anywhere; }
 .mx-secret-sites code { font-family: var(--font-mono); font-size: 0.75rem; color: var(--c-text-muted); }
 .mx-first { max-width: 520px; margin-inline: auto; }
 .mx-first .btn-lg { min-height: 48px; padding-inline: var(--space-5); font-size: 1rem; }
@@ -1029,3 +1065,31 @@ dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; m
 
 /* ---------- Quick tooltip for icon buttons in the workspace panel and the composer (use-hover-tips.ts) ---------- */
 .ws-tip { position: fixed; z-index: 60; max-width: 280px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--c-text); color: var(--c-surface); font-size: 0.75rem; line-height: 1.4; box-shadow: var(--shadow-md); pointer-events: none; overflow-wrap: anywhere; }
+
+/* «Liên hệ» (contacts-page.tsx): its link at the top of the AI Agent column, the search, one row per person or group. */
+.mx-contacts-link { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; margin: 0 var(--space-2) var(--space-1); padding: 0 var(--space-3); border-radius: var(--radius-sm); color: var(--c-text); text-decoration: none; font-size: 0.875rem; }
+.mx-contacts-link:hover { background: var(--c-hover); }
+.mx-contacts-link[aria-current="page"] { background: var(--c-selected); font-weight: 600; }
+.mx-contacts-machine { width: auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-contacts-search { display: flex; align-items: center; gap: var(--space-2); }
+.mx-contacts-search .input { flex: 1; min-width: 0; }
+.mx-contact-rows { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.mx-contact { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); }
+.mx-contact-main { display: grid; gap: 2px; min-width: 0; }
+.mx-contact-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
+.mx-contact-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-contact-apps { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.mx-contact-hidden, .mx-contact-status { color: var(--c-text-muted); font-size: 0.75rem; }
+.mx-contact-status.limited, .mx-contact-status.hidden { color: var(--c-warning-text); }
+.mx-contact-status.error, .mx-contact-status.signedOut { color: var(--c-error-text); }
+.mx-contact-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.mx-contact-push { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; }
+.mx-contact-limit { width: auto; }
+/* A narrow column (the panel beside the sessions, phones): the actions go under the name. */
+@container (max-width: 560px) {
+	.mx-contact { grid-template-columns: auto minmax(0, 1fr); }
+	.mx-contact-acts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (pointer: coarse) {
+	.mx-contacts-link, .mx-contact-acts .btn, .mx-contact-limit { min-height: 44px; }
+}

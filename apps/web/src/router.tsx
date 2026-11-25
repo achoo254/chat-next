@@ -28,6 +28,8 @@ export type MachinesView =
 	| { readonly page: "list" }
 	/** The "Cần bạn" board of every machine (what phones open from the list). */
 	| { readonly page: "need" }
+	/** «Liên hệ»: the people and groups of Chat, each with its session and whether its new messages go into it. */
+	| { readonly page: "contacts" }
 	/** Managing the machines: the list and the account's devices, adding, details. */
 	| { readonly page: "machines" }
 	| { readonly page: "add" }
@@ -241,6 +243,7 @@ function matchMachines(parts: readonly string[]): Route | null {
 	if (parts.length === 0) return route({ page: "list" });
 	if (parts.length === 1 && parts[0] === "add") return route({ page: "add" });
 	if (parts.length === 1 && parts[0] === "need") return route({ page: "need" });
+	if (parts.length === 1 && parts[0] === "contacts") return route({ page: "contacts" });
 	if (parts.length === 1 && parts[0] === "machines") return route({ page: "machines" });
 	const head = parts[0] ?? "";
 	// The development machine exists only in development builds.

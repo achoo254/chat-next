@@ -22,6 +22,7 @@ import {
 	FrameSchema,
 	HandshakeErrorCode,
 	type BrowserTakeover,
+	type ChatInboxItem,
 	type Frame,
 	type Item,
 	type MachineInfo,
@@ -119,6 +120,11 @@ export interface LinkState {
 	readonly machineAccounts: MachineAccounts | null;
 	/** The machine's projects as it last sent them (tunelo 2.0.7+); null until it does. */
 	readonly projects: ProjectListResult | null;
+	/**
+	 * The chats whose new messages go into their sessions (tunelo 3.28.0+), as the machine last sent them: in
+	 * answer to ChatInboxList/Set/Remove and unasked whenever one changes; null until it does.
+	 */
+	readonly chatInbox: readonly ChatInboxItem[] | null;
 	/** Clones this device started, by clone id, as their progress last said. */
 	readonly clones: ReadonlyMap<string, ProjectCloneProgress>;
 	/** The newest step of an update of tunelo the machine reported (tunelo 2.3.0+); null before any. */
@@ -236,6 +242,7 @@ const INITIAL: LinkState = {
 	threadInfo: new Map(),
 	machineAccounts: null,
 	projects: null,
+	chatInbox: null,
 	clones: new Map(),
 	agentUpdate: null,
 	secretPrompts: new Map(),
@@ -850,6 +857,9 @@ export class MachineLink {
 				break;
 			case "projectListResult":
 				this.set({ projects: b.value });
+				break;
+			case "chatInboxState":
+				this.set({ chatInbox: b.value.items });
 				break;
 			case "projectCloneProgress": {
 				const clones = new Map(this.current.clones);

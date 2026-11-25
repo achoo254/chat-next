@@ -4,6 +4,6 @@
 import "../../machines/machines.css";
 import { SessionChat } from "../../machines/session-chat.tsx";
 
-export default function AiPanelSession({ machine, threadId, onUseText }: { machine: string; threadId: string; onUseText: (text: string) => Promise<boolean> }) {
+export default function AiPanelSession({ machine, threadId, onUseText }: { machine: string; threadId: string; onUseText: (text: string, plain?: boolean) => Promise<boolean> }) {
 	return <SessionChat machine={machine} threadId={threadId} mode="chat" onUseText={onUseText} />;
 }

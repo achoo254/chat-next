@@ -13,6 +13,8 @@ export const brand = {
 	domain,
 	/** Host of the web app, e.g. chat.<domain>. */
 	webHost: brandConfig.hostTemplates.web.replace("{domain}", domain),
+	/** The Knowledge Base of the same account domain, kb.<domain>: AI answers link its documents. */
+	kbOrigin: `https://kb.${domain}`,
 	/** Host of the IdP sign-in page, e.g. auth.<domain>. */
 	idpHost: idp.host,
 	/** IdP account page: sign-in methods, app grants, devices. */

@@ -137,6 +137,8 @@ export interface AiQuote {
 	/** Unix seconds. */
 	readonly date: number;
 	readonly text: string;
+	/** Its code and pre spans (entities), for the quick actions that need a request in it. */
+	readonly code?: readonly string[];
 }
 
 /**

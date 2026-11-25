@@ -52,6 +52,12 @@ export const AGENT_MAC_FOLDER_REVOKE = [3, 22, 0] as const;
  */
 export const AGENT_CHAT_THREADS = [3, 27, 0] as const;
 
+/**
+ * The first tunelo that pushes new messages of subscribed chats into their sessions (ChatInboxList, ChatInboxSet,
+ * ChatInboxRemove, ChatInboxState); older ones answer ERROR_REASON_UNSUPPORTED_REQUEST.
+ */
+export const AGENT_CHAT_INBOX = [3, 28, 0] as const;
+
 /** The first tunelo that refuses ThreadClose while anything goes on in the session, so a device may offer "close session". */
 export const AGENT_SAFE_CLOSE = [3, 3, 5] as const;
 

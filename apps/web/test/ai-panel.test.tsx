@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app.tsx";
 import { aiQuestion } from "../src/messaging/ui/composer.tsx";
 import { placeName } from "../src/machines/use-machines.ts";
+import { hasLocalmanRequest } from "../src/messaging/ui/ai-localman-hints.ts";
 import { plainText } from "../src/messaging/ui/ai-plain-text.ts";
 import { chatContext, chatThread, pickTarget } from "../src/messaging/ui/use-chat-ai.ts";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
@@ -346,6 +347,24 @@ describe("the chat's session on the machine", () => {
 		expect(within(shown).queryByRole("region", { name: "Tin đang hỏi" })).toBeNull();
 	});
 
+	it("offers Localman's quick actions on a message with a request, and asks the session to run it", async () => {
+		const { fixture, chatId, lan } = lanChat();
+		fixture.send(lan, chatId, 'Gọi thử body này: {"user": "lan", "age": 3}');
+		const { machines, created } = await withMachine();
+		renderWith(fixture, machines, `/c/${chatId}`);
+		await openMenuOf('Gọi thử body này: {"user": "lan", "age": 3}');
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Hỏi AI" }, LONG));
+		const shown = await panel();
+		const chips = within(within(shown).getByRole("region", { name: "Tin đang hỏi" })).getByRole("group", { name: "Hỏi nhanh" });
+		expect(within(chips).getAllByRole("button").map((b) => b.textContent)).toEqual(["Soạn trả lời", "Tóm tắt", "Dịch", "Giải thích", "Chạy bằng Localman", "Lưu vào collection"]);
+		const runIt = within(chips).getByRole("button", { name: "Chạy bằng Localman" });
+		await waitFor(() => expect((runIt as HTMLButtonElement).disabled).toBe(false), LONG);
+		await userEvent.click(runIt);
+		await waitFor(() => expect(created).toHaveLength(1), LONG);
+		expect(created[0]?.text).toContain("Dùng tool localman_send_request để gọi request trong tin này");
+		expect(created[0]?.text).toContain('{"user": "lan", "age": 3}');
+	});
+
 	it("asks nothing about a chat hidden from AI until it is shown again", async () => {
 		const { fixture, chatId } = lanChat();
 		fixture.server.hideDialogFromAi(fixture.selfId, chatId, true);
@@ -404,6 +423,22 @@ describe("helpers", () => {
 		expect(placeName("/Users/me/chat-sessions/notes")).toBe("notes");
 	});
 
+	it("finds a request Localman could run in a message: curl, a URL or JSON, not prose", () => {
+		expect(hasLocalmanRequest("chạy thử: curl -s https://x.example/health")).toBe(true);
+		expect(hasLocalmanRequest("$ curl localhost:3000/api")).toBe(true);
+		expect(hasLocalmanRequest("API mới ở https://api.example.com/v2 nhé")).toBe(true);
+		expect(hasLocalmanRequest('{"user": "lan", "age": 3}')).toBe(true);
+		expect(hasLocalmanRequest('Body nè: [{"id": 1}] gửi thử')).toBe(true);
+		expect(hasLocalmanRequest("Payload:\n```json\n{\n  \"ok\": true\n}\n```")).toBe(true);
+		expect(hasLocalmanRequest("đây `{\"k\": 1}` nhé")).toBe(true);
+		// Telegram code entities count like fenced blocks.
+		expect(hasLocalmanRequest("xem đoạn code", ['{"k": 1}'])).toBe(true);
+		expect(hasLocalmanRequest("mai họp lúc mấy giờ? {đã chốt} [ghi chú]")).toBe(false);
+		expect(hasLocalmanRequest("mình curl tóc rồi")).toBe(false);
+		expect(hasLocalmanRequest("{} và []")).toBe(false);
+		expect(hasLocalmanRequest("```\nchỉ là chữ\n```")).toBe(false);
+	});
+
 	it("turns the AI's markdown into plain text for a chat message", () => {
 		expect(plainText("Mai họp **9 giờ**, _phòng_ `2` ~~cũ~~.")).toBe("Mai họp 9 giờ, phòng 2 cũ.");
 		expect(plainText("Xem [lịch](https://lich.example/a) hoặc https://x.example")).toBe("Xem lịch (https://lich.example/a) hoặc https://x.example");
@@ -430,6 +465,12 @@ describe("helpers", () => {
 		expect(pickTarget([view("1", "offline"), view("2", "on")], "1")).toBe("1");
 		expect(pickTarget([view("1", "offline")], "9")).toBe("1");
 		expect(pickTarget([], "")).toBe("");
-		expect(chatContext({ id: 42, externalApp: "telegram" }, "Lan")).toContain("Ứng dụng: telegram\nchat_id: 42");
+		const telegram = chatContext({ id: 42, externalApp: "telegram" }, "Lan");
+		expect(telegram).toContain("Ứng dụng: telegram\nchat_id: 42");
+		expect(telegram).toContain("chat_send_file");
+		expect(telegram).not.toContain("Zalo");
+		const zalo = chatContext({ id: 43, externalApp: "zalo" }, "Bình");
+		expect(zalo).toContain("Hội thoại này ở Zalo: tool không gửi được tin hay tệp vào đây");
+		expect(zalo).toContain("bảo người dùng bấm «Đưa vào ô soạn tin»");
 	});
 });
