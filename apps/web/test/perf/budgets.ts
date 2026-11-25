@@ -51,9 +51,11 @@ export const BUNDLE_BUDGET = {
 	 * bundler's runtime helpers without importing the react vendor chunk, so
 	 * rolldown keeps the helpers in a startup chunk of their own (0.3 KB, the
 	 * split's overhead; the bundler has no setting for where its runtime
-	 * goes). The budget is 154 KB.
+	 * goes). 154.1 KB once the composer of a synced chat names the app in its
+	 * placeholder (in place of a lazy note line) and a chat row leaves off the
+	 * logo of the app whose folder is open (about 0.1 KB). The budget is 155 KB.
 	 */
-	startupJsGzip: 154 * 1024,
+	startupJsGzip: 155 * 1024,
 	/** Derived: startup CSS was 13.7 KB gzip when the gate started. */
 	startupCssGzip: 20 * 1024,
 } as const;
