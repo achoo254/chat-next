@@ -1,7 +1,6 @@
 // Reactions on a chat synced with another app: the app takes only some emoji, so
 // the pickers offer only those and a refusal says so instead of "did not work".
 // The Telegram list is the one the server checks (server/internal/bridge/feature/reactions.go).
-import { Code, ConnectError } from "@connectrpc/connect";
 
 const TELEGRAM = [
 	"❤", "👍", "👎", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉", "🤩", "🤮", "💩", "🙏", "👌", "🕊",
@@ -37,10 +36,4 @@ export function quickReactions(app: string | undefined, emojis: readonly string[
 		if (pick !== "" && reactionTaken(app, pick) && !out.includes(pick)) out.push(pick);
 	}
 	return out;
-}
-
-/** True when the server refused a reaction because the synced app does not take the emoji. */
-export function isReactionRefused(err: unknown): boolean {
-	const error = ConnectError.from(err);
-	return error.code === Code.InvalidArgument && error.rawMessage.startsWith("reaction_not_accepted");
 }

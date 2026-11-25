@@ -5,7 +5,8 @@
 import type { StoredMessage } from "@achoo254/chat-core";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useChat, useServices } from "../data/services.tsx";
-import { isReactionRefused, quickReactions } from "./bridge-reactions.ts";
+import { quickReactions } from "./bridge-reactions.ts";
+import { isReactionRefused } from "./reaction-refused.ts";
 import "./reaction-bar.css";
 
 export default function ReactionBar({ chatId, seq, reactions }: { chatId: number; seq: number; reactions: StoredMessage["reactions"] }) {

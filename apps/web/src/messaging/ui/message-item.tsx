@@ -15,7 +15,7 @@ import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
-import { isReactionRefused } from "./bridge-reactions.ts";
+import { isReactionRefused } from "./reaction-refused.ts";
 import { clock, integrationTone, isSavedChat, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";

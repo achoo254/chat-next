@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { isReactionRefused, quickReactions, reactionTaken } from "../../src/messaging/ui/bridge-reactions.ts";
+import { quickReactions, reactionTaken } from "../../src/messaging/ui/bridge-reactions.ts";
+import { isReactionRefused } from "../../src/messaging/ui/reaction-refused.ts";
 
 describe("reactions of a chat synced with another app", () => {
 	it("takes any emoji in a plain chat", () => {
@@ -28,5 +29,7 @@ describe("reactions of a chat synced with another app", () => {
 		expect(isReactionRefused(new ConnectError("reaction_not_accepted: telegram does not take this emoji", Code.InvalidArgument))).toBe(true);
 		expect(isReactionRefused(new ConnectError("reaction must be one emoji", Code.InvalidArgument))).toBe(false);
 		expect(isReactionRefused(new Error("network"))).toBe(false);
+		// The check reads the code by value (no Connect import on the startup path): another code is not a refusal.
+		expect(isReactionRefused(new ConnectError("reaction_not_accepted: x", Code.FailedPrecondition))).toBe(false);
 	});
 });
