@@ -101,7 +101,6 @@ func TestMapMessageUnsupportedKindsStayLabels(t *testing.T) {
 	cases := map[string]string{
 		mediaEvent("chat.voice", `{"href":"`+testFileURL+`"}`):   labelVoice,
 		mediaEvent("chat.gif", `{"href":"`+testPhotoURL+`"}`):    labelGIF,
-		mediaEvent("chat.sticker", `{"id":1}`):                   labelSticker,
 		mediaEvent("chat.doodle", `{"href":"`+testPhotoURL+`"}`): labelUnsupported,
 		mediaEvent("chat.location.new", `{"lat":1}`):             labelUnsupported,
 		mediaEvent("chat.recommended", `{"href":"https://a.b"}`): labelUnsupported,
@@ -110,6 +109,33 @@ func TestMapMessageUnsupportedKindsStayLabels(t *testing.T) {
 		m, _, err := mapMessage(mustEvent(t, line), time.Now())
 		if err != nil || m.Text != want || len(m.Media) != 0 {
 			t.Errorf("%.80s: text = %q, media = %+v, err = %v; want %q", line, m.Text, m.Media, err, want)
+		}
+	}
+}
+
+func TestMapMessageStickerBecomesAPictureToCopy(t *testing.T) {
+	ev := mustEvent(t, mediaEvent("chat.sticker", `{"id":21001,"catId":2,"type":7}`))
+	m, _, err := mapMessage(ev, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Text != "" || len(m.Media) != 1 {
+		t.Fatalf("message = %+v", m)
+	}
+	got := m.Media[0]
+	if got.Kind != "sticker" || got.MimeType != "image/png" || got.Ref != mediaRef+stickerURL+"21001" {
+		t.Errorf("media = %+v", got)
+	}
+	if !mediaAllowed(strings.TrimPrefix(got.Ref, mediaRef)) {
+		t.Errorf("the sticker URL %q is not on an allowed host", got.Ref)
+	}
+}
+
+func TestMapMessageStickerWithoutAUsableIDIsALabel(t *testing.T) {
+	for _, content := range []string{`{"catId":2}`, `{"id":"../x?a=b"}`, `{"id":""}`, `"x"`} {
+		m, _, err := mapMessage(mustEvent(t, mediaEvent("chat.sticker", content)), time.Now())
+		if err != nil || m.Text != labelSticker || len(m.Media) != 0 {
+			t.Errorf("%s: message = %+v, err = %v", content, m, err)
 		}
 	}
 }

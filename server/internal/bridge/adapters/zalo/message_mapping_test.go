@@ -68,10 +68,10 @@ func TestMapMessageSelfTakesTheLookedUpPeerName(t *testing.T) {
 
 func TestMapMessageLabels(t *testing.T) {
 	cases := map[string]string{
-		`{"ev":"message","thread":"user","msgType":"chat.sticker","content":{"id":1,"catId":2,"type":7},"msgId":"1","uidFrom":"5","idTo":"6"}`: labelSticker,
-		`{"ev":"message","thread":"user","msgType":"chat.photo","content":{"href":"x"},"msgId":"1","uidFrom":"5","idTo":"6"}`:                  labelPhoto,
-		`{"ev":"message","thread":"user","msgType":"webchat","content":{"title":"link"},"msgId":"1","uidFrom":"5","idTo":"6"}`:                 labelUnsupported,
-		`{"ev":"message","thread":"user","msgType":"webchat","content":"","msgId":"1","uidFrom":"5","idTo":"6"}`:                               labelUnsupported,
+		`{"ev":"message","thread":"user","msgType":"chat.sticker","content":{"catId":2,"type":7},"msgId":"1","uidFrom":"5","idTo":"6"}`: labelSticker,
+		`{"ev":"message","thread":"user","msgType":"chat.photo","content":{"href":"x"},"msgId":"1","uidFrom":"5","idTo":"6"}`:           labelPhoto,
+		`{"ev":"message","thread":"user","msgType":"webchat","content":{"title":"link"},"msgId":"1","uidFrom":"5","idTo":"6"}`:          labelUnsupported,
+		`{"ev":"message","thread":"user","msgType":"webchat","content":"","msgId":"1","uidFrom":"5","idTo":"6"}`:                        labelUnsupported,
 	}
 	for line, want := range cases {
 		m, _, err := mapMessage(mustEvent(t, line), time.Now())

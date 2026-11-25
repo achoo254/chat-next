@@ -3,6 +3,7 @@ package zalo
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -79,7 +80,7 @@ func messageContent(ev wireEvent) (string, []bridge.Media) {
 			return text, nil
 		}
 	case msgTypeSticker:
-		return labelSticker, nil
+		return stickerContent(ev.Content)
 	case msgTypePhoto:
 		return fileContent(ev.Content, "photo", labelPhoto)
 	case msgTypeFile:
@@ -92,6 +93,30 @@ func messageContent(ev wireEvent) (string, []bridge.Media) {
 		return labelGIF, nil
 	}
 	return labelUnsupported, nil
+}
+
+// stickerURL is where Zalo serves the picture of a sticker by its id: a public
+// image on its CDN host, fetched without the session like the other files. Seen
+// answering 200 with a PNG for a real sticker id and 404 for an unknown one.
+const stickerURL = "https://zalo-api.zadn.vn/api/emoticon/sticker/webpc?size=130&eid="
+
+// stickerIDPattern is what a sticker id looks like: digits, as the content gives it.
+var stickerIDPattern = regexp.MustCompile(`^[0-9]{1,18}$`)
+
+// stickerContent turns a sticker message (its content names only the sticker's id
+// and pack) into the picture the engine copies; without a usable id it is the label.
+func stickerContent(content json.RawMessage) (string, []bridge.Media) {
+	var s struct {
+		ID looseString `json:"id"`
+	}
+	if err := json.Unmarshal(content, &s); err != nil || !stickerIDPattern.MatchString(string(s.ID)) {
+		return labelSticker, nil
+	}
+	url := stickerURL + string(s.ID)
+	if !mediaAllowed(url) {
+		return labelSticker, nil
+	}
+	return "", []bridge.Media{{Ref: mediaRef + url, Kind: "sticker", MimeType: "image/png"}}
 }
 
 // fileContent turns an attachment into the file the engine copies. Without a URL

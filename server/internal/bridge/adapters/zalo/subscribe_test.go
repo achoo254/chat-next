@@ -82,7 +82,7 @@ func TestSubscribeDeliversMessagesOnceAndIgnoresGroups(t *testing.T) {
 	if first.Text != "xin chào" || first.Conversation != "500" || first.From.IsSelf || first.From.Name != "Lan" {
 		t.Errorf("first = %+v", first)
 	}
-	if second.Text != labelSticker || second.Conversation != "500" || !second.From.IsSelf || second.From.ID != "999" {
+	if second.Text != "" || len(second.Media) != 1 || second.Media[0].Kind != "sticker" || second.Conversation != "500" || !second.From.IsSelf || second.From.ID != "999" {
 		t.Errorf("second = %+v", second)
 	}
 	convs, _ := a.ListConversations(context.Background(), testAccount)
