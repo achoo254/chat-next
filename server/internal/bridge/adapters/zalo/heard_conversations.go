@@ -100,6 +100,16 @@ func (h *heardAccount) record(conv bridge.Conversation, m bridge.Message) {
 	}
 }
 
+// peer is the other person of a conversation as last heard, nil when unknown.
+func (h *heardAccount) peer(conv string) *bridge.Participant {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if c := h.convs[conv]; c != nil {
+		return c.conv.Peer
+	}
+	return nil
+}
+
 // forget drops a recalled message from what Backfill would still hand over.
 func (h *heardAccount) forget(conv, id string) {
 	h.mu.Lock()

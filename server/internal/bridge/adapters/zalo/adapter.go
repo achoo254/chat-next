@@ -111,9 +111,9 @@ func (a *Adapter) Capabilities() bridge.Capabilities {
 }
 
 // Features implements bridge.Featured: messages come in (with photos, files and
-// videos) and go out (text, photos and files). A recall in Zalo removes the copy in Chat. No edits, topics or pins.
+// videos) and go out (text, photos and files). A recall in Zalo removes the copy in Chat, and reactions come in (not go out). No edits, topics or pins.
 func (a *Adapter) Features() map[feature.Feature]feature.Support {
-	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}}
+	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}, feature.Reactions: {In: true}}
 }
 
 // Close stops every login and subscription sidecar.

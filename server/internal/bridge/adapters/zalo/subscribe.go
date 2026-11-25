@@ -2,6 +2,7 @@ package zalo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -107,10 +108,14 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 				return err
 			}
 		case evOther:
-			if ev.Name != "undo" {
-				continue // typing, reaction, seen...: no feature declared for them
+			var err error
+			switch ev.Name {
+			case "undo":
+				err = a.deliverUndo(ctx, heard, ev, out)
+			case "reaction":
+				err = a.deliverReaction(ctx, heard, st.uid, ev, out)
 			}
-			if err := a.deliverUndo(ctx, heard, ev, out); err != nil {
+			if err != nil {
 				return err
 			}
 		case evAccount:
@@ -145,6 +150,32 @@ func (a *Adapter) deliverUndo(ctx context.Context, heard *heardAccount, ev wireE
 	case out <- bridge.Event{Delete: &bridge.Delete{Conversation: conv, IDs: []string{id}}}:
 		return nil
 	}
+}
+
+// deliverReaction hands the engine the reactions Zalo reports for 1-1 messages.
+func (a *Adapter) deliverReaction(ctx context.Context, heard *heardAccount, ownerUID string, ev wireEvent, out chan<- bridge.Event) error {
+	var probe struct {
+		ThreadID looseString `json:"threadId"`
+	}
+	_ = json.Unmarshal(ev.Payload, &probe)
+	conv := string(probe.ThreadID)
+	peer := bridge.Participant{ID: conv, Name: "Zalo " + conv, NameUnknown: true}
+	if known := heard.peer(conv); known != nil {
+		peer = *known
+	}
+	_, list, err := mapReactions(ev.Payload, peer, bridge.Participant{ID: ownerUID, IsSelf: true})
+	if err != nil {
+		a.logger.Debug("zalo reaction dropped", "reason", err.Error())
+		return nil
+	}
+	for i := range list {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case out <- bridge.Event{Reactions: &list[i]}:
+		}
+	}
+	return nil
 }
 
 // deliver maps a 1-1 message, drops a repeat, keeps it for ListConversations

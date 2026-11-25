@@ -299,3 +299,35 @@ func TestSubscribeRecallRemovesTheMessageAndIgnoresGroups(t *testing.T) {
 		t.Errorf("backfill handed %d messages, want the recalled one forgotten", len(page.Messages))
 	}
 }
+
+func TestSubscribeReactionsOfThePersonAndOfTheOwner(t *testing.T) {
+	lines := []string{
+		accountLine,
+		connectedLine,
+		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"1","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000"}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":":o","rType":3,"rMsg":[{"gMsgID":1001,"cMsgID":1}]}},"threadId":"500","isSelf":false,"isGroup":false}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":"","rMsg":[{"gMsgID":1001}]}},"threadId":"500","isSelf":false,"isGroup":false}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":"/-heart","rMsg":[{"gMsgID":1001}]}},"threadId":"500","isSelf":true,"isGroup":false}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":"","rMsg":[{"gMsgID":1001}]}},"threadId":"500","isSelf":true,"isGroup":false}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":"/-unknown","rMsg":[{"gMsgID":1001}]}},"threadId":"500","isSelf":false,"isGroup":false}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":":o","rMsg":[{"gMsgID":2001}]}},"threadId":"900","isGroup":true}}`,
+		`{"ev":"listener","state":"closed","code":1006}`,
+	}
+	r := &fakeRunner{script: scriptedSession(t, lines, false)}
+	a, _ := newTestAdapter(t, r)
+	got, _ := runSubscribe(t, a, testAccount)
+	if len(got) != 4 {
+		t.Fatalf("events = %d, want the message and three reactions", len(got))
+	}
+	peer, gone, owner := got[1].Reactions, got[2].Reactions, got[3].Reactions
+	if peer == nil || peer.ID != "1001" || peer.Conversation != "500" || !peer.Complete || peer.OwnerKnown ||
+		len(peer.List) != 1 || peer.List[0].Emoji != "😮" || peer.List[0].From.ID != "500" || peer.List[0].From.Name != "Lan" {
+		t.Errorf("peer reaction = %+v", peer)
+	}
+	if gone == nil || !gone.Complete || len(gone.List) != 0 {
+		t.Errorf("taken back = %+v, want a complete empty list", gone)
+	}
+	if owner == nil || owner.Complete || !owner.OwnerKnown || len(owner.List) != 1 || owner.List[0].Emoji != "❤️" || !owner.List[0].From.IsSelf || owner.List[0].From.ID != "999" {
+		t.Errorf("owner reaction = %+v", owner)
+	}
+}
