@@ -304,6 +304,37 @@ describe("the open chat's row clicked again", () => {
 	});
 });
 
+describe("the open topic's row clicked again", () => {
+	afterEach(() => {
+		delete (HTMLElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+	});
+
+	it("scrolls the list to the newest message of that topic", async () => {
+		const fixture = new ChatFixture();
+		const ngan = fixture.addUser("Ngân");
+		const chat = fixture.createChat(ChatType.GROUP, "Diễn đàn", [fixture.selfId, ngan], { forum: true });
+		fixture.topics.set(chat, [
+			{ id: 1, title: "General", iconColor: 0x8e8e93, creatorId: ngan, pinned: false, closed: false, hidden: false, unreadCount: 0 },
+			{ id: 2, title: "Hạ tầng", iconColor: 0x6fb9f0, creatorId: ngan, pinned: false, closed: false, hidden: false, unreadCount: 0 },
+		]);
+		for (let i = 1; i <= 10; i++) fixture.send(ngan, chat, `tin ${i}`, { topicId: 2n });
+		renderMessaging(fixture, `/c/${chat}/t/2`);
+		// The topic column loads lazily: wait for it so the list is not re-laid-out after the scroll.
+		const topics = await screen.findByRole("list", { name: "Chủ đề" }, LONG);
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		await within(log).findByText("tin 10", {}, LONG);
+
+		const layout = layOut(log);
+		layout.scrollTo(0);
+		await screen.findByRole("button", { name: /^Xuống tin mới nhất/ }, LONG);
+		expect(log.scrollTop).toBe(0);
+
+		await userEvent.click(within(topics).getByRole("button", { name: /Hạ tầng/ }));
+		await waitFor(() => expect(log.scrollTop).toBe(500), LONG);
+		await waitFor(() => expect(screen.queryByRole("button", { name: /^Xuống tin mới nhất/ })).toBeNull(), LONG);
+	});
+});
+
 describe("the chat title clicked", () => {
 	afterEach(() => {
 		delete (HTMLElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
