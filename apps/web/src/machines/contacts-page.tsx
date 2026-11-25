@@ -235,7 +235,13 @@ function ContactItem({ row, items, target, abilities, t }: { row: ContactRow; it
 			</div>
 			<div className="mx-contact-acts">
 				<span className="mx-contact-push">
-					<span className="hide-narrow">{c.push}</span>
+					{/* Both words are visible text only; the switch's own name is the full sentence. */}
+					<span className="mx-contact-push-long" aria-hidden="true">
+						{c.push}
+					</span>
+					<span className="mx-contact-push-short" aria-hidden="true">
+						{c.pushShort}
+					</span>
 					<Switch checked={enabled} label={c.pushFor(row.name)} disabled={!abilities.inbox || hidden || busy} onChange={(on) => void setInbox(on, on ? limit : 0)} />
 				</span>
 				{enabled && abilities.inbox && (

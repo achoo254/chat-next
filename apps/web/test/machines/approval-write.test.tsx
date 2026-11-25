@@ -70,7 +70,7 @@ describe("the approval card", () => {
 		};
 		render(
 			<I18nProvider>
-				<ServicesContext value={{ store } as unknown as Services}>
+				<ServicesContext value={{ store, self: { id: 1, name: "Tôi" } } as unknown as Services}>
 					<ApprovalCard approval={approval(send())} ai="Claude" sessionAllow={false} onDecide={async () => undefined} />
 				</ServicesContext>
 			</I18nProvider>,
@@ -196,5 +196,34 @@ describe("files of the machine sent to a chat", () => {
 		// Its own English line stays; the reason is worded here.
 		expect(screen.getByText(SUMMARY)).toBeTruthy();
 		expect(screen.getByText(viMachines.approval.write.reason)).toBeTruthy();
+	});
+});
+
+describe("the user's chat with themselves", () => {
+	const self = { id: 1, name: "Đạt Trịnh Quốc Hoàn" };
+	const toSelf = create(ApprovalWriteSchema, { tool: "chat_send_message", chatId: 99n, chatTitle: self.name, chatMembers: 0, text: "ghi chú", textLength: 7 });
+	const cardWith = (store: unknown) =>
+		render(
+			<I18nProvider>
+				<ServicesContext value={{ store, self } as unknown as Services}>
+					<ApprovalCard approval={approval(toSelf, '{"chat_id":99,"text":"ghi chú"}')} ai="Claude" sessionAllow={false} onDecide={async () => undefined} />
+				</ServicesContext>
+			</I18nProvider>,
+		);
+
+	it("is named as the chat list names it, not after the user", () => {
+		const store = {
+			subscribe: () => () => undefined,
+			dialog: (chatId: number) => (chatId === 99 ? { chat: { type: "private", title: "", memberCount: 1 }, peer: { id: 1, name: self.name, isSelf: true } } : undefined),
+		};
+		cardWith(store);
+		expect(screen.getByText("Gửi vào «Cloud của tôi»: ghi chú")).toBeTruthy();
+		expect(screen.queryByText(/Đạt Trịnh Quốc Hoàn/)).toBeNull();
+	});
+
+	it("is recognised from the machine's name for it when this device does not know the chat", () => {
+		cardWith({ subscribe: () => () => undefined, dialog: () => undefined });
+		expect(screen.getByText("Gửi vào «Cloud của tôi»: ghi chú")).toBeTruthy();
+		expect([viMachines, enMachines, zhCNMachines].map((t) => t.approval.write.savedChat)).toEqual(["Cloud của tôi", "My Cloud", "我的云端"]);
 	});
 });

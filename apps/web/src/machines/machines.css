@@ -1084,11 +1084,16 @@ dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; m
 .mx-contact-status.error, .mx-contact-status.signedOut { color: var(--c-error-text); }
 .mx-contact-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
 .mx-contact-push { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 0.8125rem; }
+.mx-contact-push-short { display: none; }
+/* Advisor's mascot docked on the right floats over the page's right edge: the rows keep clear of it (56px and a gap). */
+:root:has(.adv-mascot[data-side="right"]) .mx-contacts > .mx-body { padding-right: calc(var(--space-5) + 72px); }
 .mx-contact-limit { width: auto; }
 /* A narrow column (the panel beside the sessions, phones): the actions go under the name. */
 @container (max-width: 560px) {
 	.mx-contact { grid-template-columns: auto minmax(0, 1fr); }
 	.mx-contact-acts { grid-column: 1 / -1; justify-content: flex-start; }
+	.mx-contact-push-long { display: none; }
+	.mx-contact-push-short { display: inline; }
 }
 @media (pointer: coarse) {
 	.mx-contacts-link, .mx-contact-acts .btn, .mx-contact-limit { min-height: 44px; }

@@ -325,7 +325,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .entity { display: inline; padding: 0; border: 0; background: none; font: inherit; color: var(--c-primary); text-align: inherit; cursor: pointer; }
 .entity:hover { text-decoration: underline; }
 /* The menu of an e-mail address (email-entity.tsx), at the address and kept inside the window. */
-.entity-menu { position: fixed; z-index: 20; max-width: calc(100vw - 2 * var(--space-2)); }
+.entity-menu { position: fixed; z-index: 50; max-width: calc(100vw - 2 * var(--space-2)); }
 .entity-menu .menu { min-width: 180px; }
 .mention { color: var(--c-primary); font-weight: 500; }
 .mention.me { padding: 0 2px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-primary-solid) 14%, transparent); }
@@ -478,7 +478,7 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .lp-compose .lp-text b { color: var(--c-primary); font-weight: 600; }
 .lp-compose .lp-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }
 /* Attach menu (R3), opening upwards from the paper clip. */
-.menu-anchor .menu.attach-menu { position: absolute; left: 0; top: auto; right: auto; bottom: calc(100% + var(--space-2)); z-index: 10; }
+.menu-anchor .menu.attach-menu { position: absolute; left: 0; top: auto; right: auto; bottom: calc(100% + var(--space-2)); z-index: 50; }
 .attach-menu small { margin-left: auto; padding-left: var(--space-4); font-size: 0.75rem; color: var(--c-text-muted); }
 /* Files dragged over a chat: the drop zone covers the conversation. */
 .drop-zone { position: absolute; inset: var(--space-3); z-index: 5; display: grid; place-items: center; align-content: center; gap: var(--space-2); padding: var(--space-4); text-align: center; border-radius: var(--radius-lg); border: 2px dashed var(--c-primary); background: color-mix(in srgb, var(--c-surface) 92%, var(--c-primary-solid)); color: var(--c-text); pointer-events: none; }
@@ -502,7 +502,7 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 
 /* Message popover: opens at the pointer or the button that asked for it (placed by message-menu.tsx), no dimming. */
 /* Lifted message (phones, Telegram-style): the screen blurs, a copy of the message floats from its place with the reaction row above and the menu below. */
-.ctx-layer { position: fixed; inset: 0; z-index: 30; background: transparent; transition: background var(--dur-base) var(--ease-standard), backdrop-filter var(--dur-base) var(--ease-standard); }
+.ctx-layer { position: fixed; inset: 0; z-index: 50; background: transparent; transition: background var(--dur-base) var(--ease-standard), backdrop-filter var(--dur-base) var(--ease-standard); }
 .ctx-layer[data-phase="open"] { background: color-mix(in srgb, var(--c-backdrop) 62%, transparent); backdrop-filter: blur(14px); }
 .ctx-stack { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-2)); transform: translateY(0); transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
 .ctx-stack.mine { align-items: flex-end; }
@@ -517,7 +517,7 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .ctx-layer[data-phase="open"] .ctx-stack > :is(.react-picker, .menu, .emoji-pop) { opacity: 1; transform: scale(1); }
 .ctx-pop { animation: ctx-pop-in 120ms var(--ease-standard); }
 @keyframes ctx-pop-in { from { opacity: 0; transform: scale(0.96); } }
-.ctx-pop { position: fixed; z-index: 20; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-2)); }
+.ctx-pop { position: fixed; z-index: 50; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); max-width: calc(100vw - 2 * var(--space-2)); }
 .react-picker { position: relative; display: flex; gap: 2px; padding: var(--space-1); border-radius: var(--radius-full); background: var(--c-surface); border: 1px solid var(--c-border-subtle); box-shadow: var(--shadow-md); }
 .react-picker button, .react-picker .emoji-anchor > button { display: grid; place-items: center; width: 40px; min-height: 40px; border: 0; border-radius: var(--radius-full); background: none; font-size: 1.25rem; color: var(--c-icon-muted); }
 .react-picker button:hover { background: var(--c-hover); }
@@ -531,10 +531,10 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .menu .go { display: inline-flex; margin-left: auto; color: var(--c-icon-muted); }
 /* Chat list row menu with its mute submenu, at the pointer. */
 .menu-pair { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-1); }
-.list-menu { position: fixed; z-index: 20; max-width: calc(100vw - 2 * var(--space-2)); }
+.list-menu { position: fixed; z-index: 50; max-width: calc(100vw - 2 * var(--space-2)); }
 .list-menu .menu { min-width: 200px; }
 .menu hr { border: 0; border-top: 1px solid var(--c-border-subtle); margin: var(--space-1) 0; }
-.menu-anchor .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 10; }
+.menu-anchor .menu { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: 50; }
 
 /* ---------- Topics ---------- */
 .topic-ico { display: grid; place-items: center; width: var(--avatar); height: var(--avatar); flex: none; border-radius: var(--radius-md); }
@@ -972,7 +972,7 @@ fieldset.acts { margin: 0; padding: var(--space-1) 0; }
 .qa-ico { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface-subtle); color: var(--c-icon-muted); }
 .quick-acts [aria-pressed="true"] .qa-ico { border-color: transparent; background: var(--c-selected); color: var(--c-primary); }
 .qa-label { overflow-wrap: anywhere; }
-.qa-menu { position: absolute; left: 0; top: calc(100% + var(--space-1)); z-index: 10; min-width: 200px; }
+.qa-menu { position: absolute; left: 0; top: calc(100% + var(--space-1)); z-index: 50; min-width: 200px; }
 .link-row.danger, .link-row.danger > .icon { color: var(--c-error); }
 .info-sec > .link-row { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; text-decoration: none; }
 

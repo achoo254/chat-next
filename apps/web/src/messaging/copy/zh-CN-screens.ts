@@ -698,7 +698,7 @@ export const zhCNScreens: ScreensCopy = {
 			localmanRun:
 				"使用 localman_send_request 工具发送这条消息中的请求（方法、URL、请求头和请求体按消息所写）。缺少信息就问我。运行完后，概括状态码、耗时和响应体的前几行。",
 			localmanSave:
-				"根据这条消息构建请求。调用 localman_list_collections，然后用选择题问我要保存到哪个集合（不要自行选择，没有默认值），之后再用 localman_create_collection_node 保存。",
+				"根据这条消息构建请求。调用 localman_list_workspaces；如果有多个工作区，用选择题问我选哪个工作区。然后为该工作区调用 localman_list_collections，并用选择题问我要保存到哪个集合（不要自行选择，没有默认值）。之后才用 localman_create_collection_node 保存。",
 		},
 		quoted: (sender: string, time: string, seq: number, text: string): string => `关于 ${sender} 在 ${time} 发送的第 ${seq} 条消息：\n${text}`,
 		replaceTitle: "替换正在输入的内容？",

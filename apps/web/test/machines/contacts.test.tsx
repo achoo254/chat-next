@@ -102,6 +102,19 @@ describe("the rows of Liên hệ", () => {
 	});
 });
 
+describe("the layout of Liên hệ", () => {
+	it("labels the switch shortly in a narrow column and keeps the rows clear of the docked mascot", async () => {
+		const { readFileSync } = await import("node:fs");
+		const { resolve } = await import("node:path");
+		const sheet = readFileSync(resolve(process.cwd(), "src/machines/machines.css"), "utf8");
+		expect(sheet).toMatch(/\.mx-contact-push-short \{ display: none; \}/);
+		const narrow = /@container \(max-width: 560px\) \{[^@]*\.mx-contact-push-short \{ display: inline; \}/.exec(sheet);
+		expect(narrow?.[0]).toContain(".mx-contact-push-long { display: none; }");
+		expect(sheet).toContain(':root:has(.adv-mascot[data-side="right"]) .mx-contacts > .mx-body { padding-right: calc(var(--space-5) + 72px); }');
+		expect([viMachines.contacts.pushShort, enMachines.contacts.pushShort]).toEqual(["Đẩy tin", "Push"]);
+	});
+});
+
 describe("Liên hệ against a machine", () => {
 	async function withMachine(version = "3.28.0", threads: ThreadSummary[] = []) {
 		const machine = await FakeMachine.create();
@@ -185,6 +198,9 @@ describe("Liên hệ against a machine", () => {
 		expect(within(lan).getByText("Chat")).toBeTruthy();
 		expect(await rowOf("Nhóm dự án")).toBeTruthy();
 		const toggle = within(lan).getByRole("switch", { name: "Đẩy tin của Lan vào phiên" });
+		// Both labels are drawn (CSS shows one by width); the switch keeps the full name.
+		expect(within(lan).getByText("Đẩy tin vào phiên")).toBeTruthy();
+		expect(within(lan).getByText("Đẩy tin")).toBeTruthy();
 		await waitFor(() => expect((toggle as HTMLButtonElement).disabled).toBe(false), LONG);
 		await userEvent.click(toggle);
 		await waitFor(() => expect(sets).toHaveLength(2), LONG);

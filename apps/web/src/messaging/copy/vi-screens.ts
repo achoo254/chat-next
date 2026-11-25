@@ -703,7 +703,7 @@ export const viScreens = {
 				"Dùng tool localman_send_request để gọi request trong tin này (method, URL, header, body như trong tin). Nếu thiếu thông tin thì hỏi tôi. Sau khi chạy xong, tóm tắt mã trạng thái, thời gian và vài dòng đầu của body.",
 			/** Never a default collection: the user picks one each time. */
 			localmanSave:
-				"Dựng request từ tin này. Gọi localman_list_collections, rồi HỎI TÔI chọn collection nào bằng câu hỏi có lựa chọn (không tự chọn, không có mặc định), rồi mới lưu bằng localman_create_collection_node.",
+				"Dựng request từ tin này. Gọi localman_list_workspaces; nếu có nhiều workspace thì HỎI TÔI chọn workspace nào bằng câu hỏi có lựa chọn. Rồi gọi localman_list_collections cho workspace đó và HỎI TÔI chọn collection nào bằng câu hỏi có lựa chọn (không tự chọn, không có mặc định). Chỉ sau đó mới lưu bằng localman_create_collection_node.",
 		},
 		/** The quoted message as the AI reads it, before the question. */
 		quoted: (sender: string, time: string, seq: number, text: string): string => `Về tin #${seq} của ${sender} lúc ${time}:\n${text}`,

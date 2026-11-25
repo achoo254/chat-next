@@ -423,6 +423,17 @@ describe("helpers", () => {
 		expect(placeName("/Users/me/chat-sessions/notes")).toBe("notes");
 	});
 
+	it("asks for the workspace, then the collection, each by a choice, before saving to Localman", async () => {
+		const [{ enScreens }, { zhCNScreens }, { viScreens }] = await Promise.all([import("../src/messaging/copy/en-screens.ts"), import("../src/messaging/copy/zh-CN-screens.ts"), import("../src/messaging/copy/vi-screens.ts")]);
+		for (const screens of [viScreens, enScreens, zhCNScreens]) {
+			const prompt = screens.aiPanel.prompt.localmanSave;
+			const order = ["localman_list_workspaces", "localman_list_collections", "localman_create_collection_node"].map((tool) => prompt.indexOf(tool));
+			expect(order.every((at) => at >= 0)).toBe(true);
+			expect([...order].sort((a, b) => a - b)).toEqual(order);
+		}
+		expect(viScreens.aiPanel.prompt.localmanSave).toContain("nếu có nhiều workspace thì HỎI TÔI chọn workspace nào bằng câu hỏi có lựa chọn");
+	});
+
 	it("finds a request Localman could run in a message: curl, a URL or JSON, not prose", () => {
 		expect(hasLocalmanRequest("chạy thử: curl -s https://x.example/health")).toBe(true);
 		expect(hasLocalmanRequest("$ curl localhost:3000/api")).toBe(true);

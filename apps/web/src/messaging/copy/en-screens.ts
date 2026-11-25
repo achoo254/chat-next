@@ -699,7 +699,7 @@ export const enScreens: ScreensCopy = {
 			localmanRun:
 				"Use the localman_send_request tool to send the request in this message (method, URL, headers and body as in the message). If something is missing, ask me. When it has run, sum up the status code, the time and the first lines of the body.",
 			localmanSave:
-				"Build a request from this message. Call localman_list_collections, then ASK ME which collection with a multiple-choice question (do not pick one yourself, there is no default), and only then save it with localman_create_collection_node.",
+				"Build a request from this message. Call localman_list_workspaces; if there are several workspaces, ASK ME which one with a multiple-choice question. Then call localman_list_collections for that workspace and ASK ME which collection with a multiple-choice question (do not pick one yourself, there is no default). Only then save it with localman_create_collection_node.",
 		},
 		quoted: (sender: string, time: string, seq: number, text: string): string => `About message #${seq} from ${sender} at ${time}:\n${text}`,
 		replaceTitle: "Replace what you are typing?",

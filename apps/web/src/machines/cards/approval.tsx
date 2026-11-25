@@ -14,6 +14,7 @@ import { Decision, PromptState, ToolKind, type ApprovalFile, type ApprovalHeader
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { formatBytes } from "../../messaging/media/media-format.ts";
+import { isSavedChat } from "../../messaging/data/format.ts";
 import { ServicesContext } from "../../messaging/data/services.tsx";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon, type MachineIconName } from "../machine-icons.tsx";
@@ -290,8 +291,11 @@ function SendFiles({ files, t }: { files: readonly ApprovalFile[]; t: MachinesCo
 	);
 }
 
-/** The name of chat `chatId` as the chat list shows it (a group's title, the other person's name); "" when this device does not know it. */
-function useKnownChatTitle(chatId: number): string {
+/**
+ * The name of chat `chatId` as the chat list shows it (a group's title, the other person's name, `saved` for the
+ * user's chat with themselves); "" when this device does not know it.
+ */
+function useKnownChatTitle(chatId: number, saved: string): string {
 	// The AI Agent screens live inside the Chat app's services; a card drawn alone (tests) knows no chat.
 	const services = useContext(ServicesContext);
 	const store = services?.store ?? null;
@@ -299,8 +303,19 @@ function useKnownChatTitle(chatId: number): string {
 	return useSyncExternalStore(subscribe, () => {
 		const view = store === null || chatId === 0 ? undefined : store.dialog(chatId);
 		if (view === undefined || view.chat === null) return "";
+		if (isSavedChat(view.chat, view.peer)) return saved;
 		return view.chat.type === "private" ? (view.peer?.name ?? "") : view.chat.title;
 	});
+}
+
+/**
+ * The chat's name for the card: as this device knows it, else the machine's. A one-to-one chat the machine names
+ * after the user is the user's chat with themselves (Chat names it after the other person, here the user).
+ */
+function chatTitleFor(t: MachinesCopy, write: ApprovalWrite, known: string, selfName: string): string {
+	if (known !== "") return known;
+	const named = typeof write.chatTitle === "string" ? write.chatTitle : "";
+	return named !== "" && named === selfName && write.chatMembers === 0 ? t.approval.write.savedChat : "";
 }
 
 /** The summary and reason the card shows: the machine's, or for a tool acting as the user, worded here. */
@@ -308,9 +323,12 @@ function useApprovalWords(t: MachinesCopy, approval: ApprovalItem): { summary: s
 	// Items built by hand (tests, older journals) may lack the field.
 	const write: ApprovalWrite | undefined = approval.write;
 	const input = typeof approval.input === "string" ? approval.input : "";
-	const known = useKnownChatTitle(write === undefined || !write.tool.startsWith("chat_") ? 0 : writeChatId(write, input));
+	const known = useKnownChatTitle(write === undefined || !write.tool.startsWith("chat_") ? 0 : writeChatId(write, input), t.approval.write.savedChat);
+	const services = useContext(ServicesContext);
+	// Only a chat tool names the user (their own Saved Messages); other cards, and items built by hand, never read it.
+	const selfName = write !== undefined && write.tool.startsWith("chat_") ? (services?.self.name ?? "") : "";
 	if (write === undefined) return { summary: approval.summary, reason: approval.reason };
-	const words = writeWords(t, write, known, input);
+	const words = writeWords(t, write, chatTitleFor(t, write, known, selfName), input);
 	return { summary: words.summary ?? approval.summary, reason: words.reason };
 }
 

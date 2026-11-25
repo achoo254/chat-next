@@ -5,6 +5,9 @@
    them. --adv-y is its height in the band (0..1, advisor-drag.ts). On a wide
    screen the bubble and its menu are placed beside what opened them by
    advisor-drag.ts (inline left, width, top or bottom, max-height). */
+/* Stacking: the mascot (45), its flash (45), bubble (46) and menu (47) float over the page but under the
+   message menus, popovers and pickers (50, styles/messaging.css), which the user opens on purpose; dialogs are
+   in the top layer above all of them. */
 .adv-mascot {
 	position: fixed; z-index: 45; width: 56px; height: 56px; padding: 0; border: 0; background: none; cursor: grab; touch-action: none;
 	top: clamp(calc(env(safe-area-inset-top) + 72px), calc(72px + var(--adv-y, 0.62) * (100dvh - 136px)), calc(100dvh - env(safe-area-inset-bottom) - 64px));

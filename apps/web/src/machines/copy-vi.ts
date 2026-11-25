@@ -335,6 +335,8 @@ export const viMachines = {
 		group: "Nhóm",
 		hidden: "Ẩn với AI: không đẩy tin được",
 		push: "Đẩy tin vào phiên",
+		/** The same, beside the switch on a narrow column. */
+		pushShort: "Đẩy tin",
 		pushFor: (name: string) => `Đẩy tin của ${name} vào phiên`,
 		limit: "Giới hạn lượt mỗi giờ",
 		perHour: (n: number) => `${n} lượt/giờ`,
@@ -457,6 +459,8 @@ export const viMachines = {
 			/** kb_save_note: a note saved to the Knowledge Base. */
 			kbSave: (title: string, space: string, isPrivate: boolean): string => `Lưu ghi chú${isPrivate ? " riêng tư" : ""} «${title}» vào ${space}`,
 			kbOwnSpace: "Space riêng của bạn",
+			/** The user's own chat with themselves, named as the chat list names it. */
+			savedChat: "Cloud của tôi",
 			kbPrivate: "Riêng tư — chỉ bạn đọc được",
 			kbTitle: "Tiêu đề",
 			kbSpace: "Space",
