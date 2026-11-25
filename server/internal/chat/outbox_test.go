@@ -388,3 +388,44 @@ func TestRemovingTheLinkDropsTheQueue(t *testing.T) {
 		t.Fatalf("queue has %d rows (err %v) after the chat was removed, want none", n, err)
 	}
 }
+
+func TestAReactionTelegramDoesNotTakeIsRefusedAndNothingIsQueued(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	owner := h.user("owner")
+	chatID := h.group(owner)
+	h.linkChat(owner, chatID, DirectionBoth)
+	resp, err := h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "xin chào"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seq := resp.GetMessage().GetSeq()
+	if _, err := h.svc.SetReaction(ctx, owner, chatID, seq, "😮"); codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("a reaction Telegram refuses: %v, want invalid argument", err)
+	}
+	for _, row := range h.outboxRows(chatID, seq) {
+		if strings.HasPrefix(row, "set_reaction") {
+			t.Fatalf("queue = %v, want no reaction row", row)
+		}
+	}
+	if _, err := h.svc.SetReaction(ctx, owner, chatID, seq, "❤️"); err != nil {
+		t.Fatalf("a reaction Telegram takes: %v", err)
+	}
+	if got := h.outboxRows(chatID, seq); !equalStrings(got, []string{"send:pending", "set_reaction:pending"}) {
+		t.Fatalf("queue = %v, want the send and one pending reaction", got)
+	}
+}
+
+func TestAnyReactionStaysAllowedInAChatNotSyncedWithTelegram(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	owner := h.user("owner")
+	chatID := h.group(owner)
+	resp, err := h.svc.SendMessage(ctx, owner, &appv1.SendMessageRequest{ChatId: chatID, Text: "xin chào"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.svc.SetReaction(ctx, owner, chatID, resp.GetMessage().GetSeq(), "😮"); err != nil {
+		t.Fatalf("a reaction in a plain chat: %v", err)
+	}
+}

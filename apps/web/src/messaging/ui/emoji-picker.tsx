@@ -86,11 +86,13 @@ interface EmojiPickerProps {
 	/** "reaction": picking reacts and closes; "insert": picking inserts and keeps the panel open. */
 	mode: "reaction" | "insert";
 	onPick: (emoji: string) => void;
+	/** Offer only the emoji this says are taken (a chat synced with an app that takes some). */
+	taken?: (emoji: string) => boolean;
 	/** Called on Esc and on a click outside; the caller moves focus back. */
 	onClose: () => void;
 }
 
-export function EmojiPicker({ mode, onPick, onClose }: EmojiPickerProps) {
+export function EmojiPicker({ mode, onPick, taken, onClose }: EmojiPickerProps) {
 	const copy = useScreensCopy();
 	const t = copy.emojiPicker;
 	const ref = useRef<HTMLDivElement>(null);
@@ -115,15 +117,16 @@ export function EmojiPicker({ mode, onPick, onClose }: EmojiPickerProps) {
 
 	const needle = fold(query.trim());
 	const sections = useMemo<readonly Section[]>(() => {
+		const keep = (emoji: string) => taken === undefined || taken(emoji);
 		if (needle !== "") {
-			const hits = CATEGORIES.flatMap((category) => EMOJIS[category]).filter(([, name]) => fold(name).includes(needle));
+			const hits = CATEGORIES.flatMap((category) => EMOJIS[category]).filter(([emoji, name]) => keep(emoji) && fold(name).includes(needle));
 			return [{ id: "results", title: t.results(query.trim()), emojis: hits.map(([emoji]) => emoji) }];
 		}
 		return [
-			{ id: "recent", title: t.recent, emojis: recent },
-			...CATEGORIES.map((category) => ({ id: category, title: t[category], emojis: EMOJIS[category].map(([emoji]) => emoji) })),
+			{ id: "recent", title: t.recent, emojis: recent.filter(keep) },
+			...CATEGORIES.map((category) => ({ id: category, title: t[category], emojis: EMOJIS[category].map(([emoji]) => emoji).filter(keep) })),
 		];
-	}, [needle, query, recent, t]);
+	}, [needle, query, recent, t, taken]);
 	const cells = sections.flatMap((section) => section.emojis.map((emoji) => ({ section: section.id, emoji })));
 	const current = Math.min(active, Math.max(0, cells.length - 1));
 	/** Index of each section's first cell in `cells`. */

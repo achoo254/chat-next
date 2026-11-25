@@ -31,6 +31,7 @@ const (
 type outboundLink struct {
 	accountID  int64
 	externalID string
+	app        string // the app of the account ("telegram")
 }
 
 // outboundLink returns the link of chatID if me owns an active external
@@ -42,10 +43,10 @@ func (t *txn) outboundLink(ctx context.Context, chatID, me int64, feat feature.F
 	var messages string
 	var override *string
 	err := t.tx.QueryRow(ctx, `
-		SELECT x.account_id, x.external_chat_id, x.direction, f.direction
+		SELECT x.account_id, x.external_chat_id, x.direction, f.direction, a.source
 		FROM external_chats x JOIN external_accounts a ON a.id = x.account_id
 		LEFT JOIN external_chat_features f ON f.account_id = x.account_id AND f.external_chat_id = x.external_chat_id AND f.feature = $3
-		WHERE x.chat_id = $1 AND a.owner_id = $2 AND a.status <> 'stopped'`, chatID, me, string(feat)).Scan(&l.accountID, &l.externalID, &messages, &override)
+		WHERE x.chat_id = $1 AND a.owner_id = $2 AND a.status <> 'stopped'`, chatID, me, string(feat)).Scan(&l.accountID, &l.externalID, &messages, &override, &l.app)
 	if isNoRows(err) {
 		return nil, nil
 	}

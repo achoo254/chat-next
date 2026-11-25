@@ -15,6 +15,7 @@ import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
+import { isReactionRefused } from "./bridge-reactions.ts";
 import { clock, integrationTone, isSavedChat, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
 import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
@@ -325,7 +326,9 @@ function ReactionChip({ message, reaction, chat }: { message: StoredMessage; rea
 			aria-pressed={chosen}
 			aria-label={label}
 			onClick={() => {
-				remote.setReaction(message.chatId, message.seq, chosen ? "" : emoji).catch(() => toasts.show(copy.common.failed));
+				remote
+					.setReaction(message.chatId, message.seq, chosen ? "" : emoji)
+					.catch((err: unknown) => toasts.show(isReactionRefused(err) ? copy.common.reactionRefused : copy.common.failed));
 			}}
 			{...trigger}
 			// The message under the chip has its own menu: the chip's gestures stop here.

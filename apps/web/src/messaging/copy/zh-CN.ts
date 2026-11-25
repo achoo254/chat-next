@@ -15,6 +15,7 @@ export const zhCN: MessagingCopy = {
 		you: "你",
 		copied: "已复制",
 		failed: "操作未成功，请过几分钟再试。",
+		reactionRefused: "同步的应用不支持此表情，请换一个。",
 		privateRefused: "你目前无法给此人发消息。",
 		privateRefusedInviteHint: "你可以通过邀请链接邀请对方加入群组。",
 		strangerLimit: "你今天已向许多不认识的人发起聊天。请稍后再试，或请对方把你加为联系人。",

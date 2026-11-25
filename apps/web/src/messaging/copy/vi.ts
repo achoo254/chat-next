@@ -16,6 +16,7 @@ export const vi = {
 		you: "Bạn",
 		copied: "Đã sao chép",
 		failed: "Không thực hiện được, thử lại sau ít phút.",
+		reactionRefused: "Ứng dụng đang đồng bộ không nhận emoji này. Hãy chọn emoji khác.",
 		/** A private chat the person's settings refuse; never says which setting (or a block). */
 		privateRefused: "Không thể nhắn tin cho người này lúc này.",
 		privateRefusedInviteHint: "Bạn có thể mời họ vào nhóm bằng link mời.",

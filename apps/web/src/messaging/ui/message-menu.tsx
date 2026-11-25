@@ -21,6 +21,7 @@ import { pinnedLists } from "../data/pinned.ts";
 import type { WindowItem } from "../data/store.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
+import { isReactionRefused, quickReactions, reactionTaken } from "./bridge-reactions.ts";
 import { EmojiPicker } from "./emoji-picker.tsx";
 import { MessageBubble, PendingBubble, type LimitedActions } from "./message-item.tsx";
 import { copyText } from "./parts.tsx";
@@ -364,7 +365,9 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 	const react = (emoji: string) => {
 		if (item.kind !== "message") return;
 		const current = item.message.reactions.find((r) => r.chosen)?.emoji;
-		remote.setReaction(chatId, item.message.seq, current === emoji ? "" : emoji).catch(failure);
+		remote
+			.setReaction(chatId, item.message.seq, current === emoji ? "" : emoji)
+			.catch((err: unknown) => toasts.show(isReactionRefused(err) ? copy.common.reactionRefused : copy.common.failed));
 		close();
 	};
 
@@ -380,7 +383,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 	const reactions =
 		item.kind === "message" && !item.message.recalled && !more ? (
 			<div className="react-picker" role="group" aria-label={copy.menu.react}>
-				{Object.keys(copy.menu.reactionNames).map((emoji) => (
+				{quickReactions(chat?.externalApp, Object.keys(copy.menu.reactionNames)).map((emoji) => (
 					<button key={emoji} type="button" aria-label={copy.menu.reactionNames[emoji] ?? emoji} onClick={() => react(emoji)}>
 						{emoji}
 					</button>
@@ -393,7 +396,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 // A recalled message outside its chat's screen offers nothing at all.
 if (entries.length === 0 && reactions === null && !more) return null;
 const actions = more ? (
-		<EmojiPicker mode="reaction" onPick={react} onClose={close} />
+		<EmojiPicker mode="reaction" onPick={react} taken={(emoji) => reactionTaken(chat?.externalApp, emoji)} onClose={close} />
 	) : (
 		// eslint-disable-next-line jsx-a11y/interactive-supports-focus -- focus sits on the menu items; the menu only receives their arrow keys
 		<div className="menu" role="menu" ref={menu} aria-label={mine ? copy.menu.labelMine : copy.menu.label} onKeyDown={onMenuKey}>

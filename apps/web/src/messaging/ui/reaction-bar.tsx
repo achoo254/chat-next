@@ -4,7 +4,8 @@
 // pointer first reaches an emoji button, so it adds nothing to the start.
 import type { StoredMessage } from "@achoo254/chat-core";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { useServices } from "../data/services.tsx";
+import { useChat, useServices } from "../data/services.tsx";
+import { isReactionRefused, quickReactions } from "./bridge-reactions.ts";
 import "./reaction-bar.css";
 
 export default function ReactionBar({ chatId, seq, reactions }: { chatId: number; seq: number; reactions: StoredMessage["reactions"] }) {
@@ -13,12 +14,15 @@ export default function ReactionBar({ chatId, seq, reactions }: { chatId: number
 	const copy = useScreensCopy();
 	const names = copy.menu.reactionNames;
 	const { remote, toasts } = useServices();
+	const app = useChat(chatId)?.externalApp;
 	const react = (emoji: string) => {
-		remote.setReaction(chatId, seq, chosen === emoji ? "" : emoji).catch(() => toasts.show(copy.common.failed));
+		remote
+			.setReaction(chatId, seq, chosen === emoji ? "" : emoji)
+			.catch((err: unknown) => toasts.show(isReactionRefused(err) ? copy.common.reactionRefused : copy.common.failed));
 	};
 	return (
 		<div className="react-bar" role="group" aria-label={copy.menu.quickReactions}>
-			{Object.keys(names).map((emoji) => (
+			{quickReactions(app, Object.keys(names)).map((emoji) => (
 				<button
 					key={emoji}
 					type="button"

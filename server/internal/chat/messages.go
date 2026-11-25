@@ -1798,6 +1798,15 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 		if blocked {
 			return errDenied("this user does not accept your reactions")
 		}
+		if emoji != "" {
+			out, err := t.outboundLink(ctx, chatID, me, feature.Reactions)
+			if err != nil {
+				return err
+			}
+			if out != nil && !feature.ReactionAllowed(out.app, emoji) {
+				return errInvalid("reaction_not_accepted: %s does not take this emoji", out.app)
+			}
+		}
 		var tag interface{ RowsAffected() int64 }
 		if emoji == "" {
 			tag, err = t.tx.Exec(ctx, `DELETE FROM message_reactions WHERE chat_id = $1 AND seq = $2 AND user_id = $3`, chatID, seq, me)

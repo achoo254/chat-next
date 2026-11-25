@@ -17,6 +17,7 @@ export const en: MessagingCopy = {
 		you: "You",
 		copied: "Copied",
 		failed: "That did not work. Try again in a few minutes.",
+		reactionRefused: "The synced app does not take this emoji. Pick another one.",
 		privateRefused: "You cannot message this person right now.",
 		privateRefusedInviteHint: "You can invite them to a group with an invite link.",
 		strangerLimit: "You have started many chats with people you do not know today. Try again later, or ask them to add you to their contacts.",
