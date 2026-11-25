@@ -532,12 +532,6 @@ export function MessageBubble({
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
-	const seqs = album
-		? albumKeys.flatMap((key) => {
-				const item = store.item(chatId, key);
-				return item?.kind === "message" ? [item.message.seq] : [];
-			})
-		: [message.seq];
 	const read = mine && readOutboxMaxSeq >= message.seq;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 	// A recalled message keeps its place only: nothing to reply to, react to or forward.

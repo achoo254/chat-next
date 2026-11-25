@@ -102,7 +102,7 @@ describe("messages", () => {
 		const { log } = await openChat(`/c/${seedDemo().ids.ops}`, "Dashboard ổn định.");
 		const message = messageOf(log, "Dashboard ổn định.");
 		const actions = within(message).getByRole("toolbar", { name: "Thao tác nhanh với tin của Lan Anh" });
-		expect(within(actions).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Trả lời", "Chuyển tiếp", "Thêm thao tác"]);
+		expect(within(actions).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Trả lời"]);
 		// The reaction button stands apart, under the bubble.
 		expect(within(message).getByRole("button", { name: "Thả cảm xúc" }).closest(".msg-actions")).toBeNull();
 		await userEvent.click(within(actions).getByRole("button", { name: "Trả lời" }));
