@@ -121,7 +121,7 @@ function MoreTopics({ chatId }: { chatId: number }) {
 export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
-	const { backend, toasts } = useServices();
+	const { backend, store, toasts } = useServices();
 	const [menuFor, setMenuFor] = useState(0);
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	// A chat copied from another app has its topics managed there: the server takes the right away, so no menu opens here.
@@ -168,7 +168,11 @@ export function TopicListColumn({ chat, title, topics, currentTopicId }: TopicLi
 								type="button"
 								className={topic.closed ? "chat-row topic-row closed" : "chat-row topic-row"}
 								aria-current={topic.id === currentTopicId ? "true" : undefined}
-								onClick={() => navigate(paths.topic(chat.id, topic.id))}
+								onClick={() => {
+									// The open topic's row clicked again: to its newest message, as the chat list does.
+									if (topic.id === currentTopicId) store.scrollToNewest(chat.id);
+									else navigate(paths.topic(chat.id, topic.id));
+								}}
 								onContextMenu={openMenu(topic)}
 								onKeyDown={openMenu(topic)}
 							>
