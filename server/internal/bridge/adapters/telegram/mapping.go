@@ -95,6 +95,7 @@ func participantUser(u *tg.User, self int64) bridge.Participant {
 	p := bridge.Participant{ID: strconv.FormatInt(u.ID, 10), Name: userName(u), Username: u.Username, IsBot: u.Bot, IsSelf: u.ID == self, NameUnknown: !named}
 	withUserPhoto(&p, u)
 	withUserPhone(&p, u)
+	withUserSeen(&p, u, time.Now())
 	return p
 }
 

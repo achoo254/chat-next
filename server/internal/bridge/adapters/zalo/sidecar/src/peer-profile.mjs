@@ -12,7 +12,7 @@ export const PEER_WAIT_MS = 3000;
 /** The longest phone number passed on; anything longer is not a number. */
 const PHONE_MAX = 32;
 
-const NO_PROFILE = Object.freeze({ name: "", avatar: "", phone: "" });
+const NO_PROFILE = Object.freeze({ name: "", avatar: "", phone: "", seen: 0 });
 
 /**
  * The phone number a full profile (changed_profiles) shows, "" when it shows none. Only a
@@ -45,21 +45,32 @@ export function peerProfile(info, uid) {
 }
 
 /**
- * Makes `lookup(uid)`: the name, photo URL and phone number of a person, each "" when unknown; it never
+ * When a person was last online, in milliseconds since 1970, from a lastOnline answer; 0 when the
+ * answer has no usable time (a person who hides it, or a call that failed).
+ */
+export function lastOnlineMs(answer, now = Date.now()) {
+	const at = answer?.lastOnline;
+	return typeof at === "number" && Number.isFinite(at) && at > 0 && at <= now + 60_000 ? Math.floor(at) : 0;
+}
+
+/**
+ * Makes `lookup(uid)`: the name, photo URL, phone number and last-online time (`seen`, ms, 0 when unknown) of a person, each "" when unknown; it never
  * rejects. One getUserInfo per person every PEER_TTL_MS (PEER_MISS_TTL_MS after an empty or
  * failed answer), shared by the messages that arrive while it runs, so they still go out in
  * order. A message waits at most `waitMs`; the lookup goes on and serves the next message.
  * `log` is told only "ok", "empty" or "failed", never the name, photo, number or id.
  */
-export function createPeerLookup({ getUserInfo, log = () => {}, now = Date.now, waitMs = PEER_WAIT_MS }) {
-	const kept = new Map(); // uid -> { name, avatar, phone, until }
+export function createPeerLookup({ getUserInfo, getLastOnline = async () => null, log = () => {}, now = Date.now, waitMs = PEER_WAIT_MS }) {
+	const kept = new Map(); // uid -> { name, avatar, phone, seen, until }
 	const running = new Map(); // uid -> Promise of the profile
 
 	function start(uid) {
 		const lookup = (async () => {
 			try {
-				const found = peerProfile(await getUserInfo(uid), uid);
-				const empty = found.name === "" && found.avatar === "" && found.phone === "";
+				// The last-online call may fail or be refused without the profile being lost.
+				const [info, online] = await Promise.all([getUserInfo(uid), Promise.resolve(getLastOnline(uid)).catch(() => null)]);
+				const found = { ...peerProfile(info, uid), seen: lastOnlineMs(online, now()) };
+				const empty = found.name === "" && found.avatar === "" && found.phone === "" && found.seen === 0;
 				log(empty ? "empty" : "ok");
 				kept.set(uid, { ...found, until: now() + (empty ? PEER_MISS_TTL_MS : PEER_TTL_MS) });
 				return found;
@@ -77,7 +88,7 @@ export function createPeerLookup({ getUserInfo, log = () => {}, now = Date.now, 
 
 	return async function lookup(uid) {
 		const have = kept.get(uid);
-		if (have !== undefined && now() < have.until) return { name: have.name, avatar: have.avatar, phone: have.phone };
+		if (have !== undefined && now() < have.until) return { name: have.name, avatar: have.avatar, phone: have.phone, seen: have.seen };
 		const pending = running.get(uid) ?? start(uid);
 		let timer;
 		const late = new Promise((resolve) => {

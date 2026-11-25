@@ -23,8 +23,8 @@ test("passes on only an https photo URL", () => {
 });
 
 test("gives nothing for an answer without the person", () => {
-	assert.deepEqual(peerProfile({ changed_profiles: { 7: { displayName: "x" } } }, "42"), { name: "", avatar: "", phone: "" });
-	assert.deepEqual(peerProfile(undefined, "42"), { name: "", avatar: "", phone: "" });
+	assert.deepEqual(peerProfile({ changed_profiles: { 7: { displayName: "x" } } }, "42"), { name: "", avatar: "", phone: "", seen: 0 });
+	assert.deepEqual(peerProfile(undefined, "42"), { name: "", avatar: "", phone: "", seen: 0 });
 });
 
 test("passes on the phone number of a full profile only, and only a plain number", () => {
@@ -60,17 +60,17 @@ test("messages of one person share one lookup and keep their order", async () =>
 	calls[0].resolve(answer("42"));
 	await Promise.all([first, second]);
 	assert.deepEqual(order, [["1", AVATAR], ["2", AVATAR]]);
-	assert.deepEqual(await lookup("42"), { name: "Lan", avatar: AVATAR, phone: "" });
+	assert.deepEqual(await lookup("42"), { name: "Lan", avatar: AVATAR, phone: "", seen: 0 });
 	assert.equal(calls.length, 1, "a kept profile is not asked for again");
 });
 
 test("a slow lookup lets the message go without the profile, and serves the next one", async () => {
 	const { calls, getUserInfo } = slowUserInfo();
 	const lookup = createPeerLookup({ getUserInfo, waitMs: 20 });
-	assert.deepEqual(await lookup("42"), { name: "", avatar: "", phone: "" });
+	assert.deepEqual(await lookup("42"), { name: "", avatar: "", phone: "", seen: 0 });
 	calls[0].resolve(answer("42"));
 	await new Promise((resolve) => setImmediate(resolve));
-	assert.deepEqual(await lookup("42"), { name: "Lan", avatar: AVATAR, phone: "" });
+	assert.deepEqual(await lookup("42"), { name: "Lan", avatar: AVATAR, phone: "", seen: 0 });
 	assert.equal(calls.length, 1);
 });
 
@@ -86,11 +86,23 @@ test("a failed or empty lookup is kept for a while, then asked again", async () 
 		log: (o) => outcomes.push(o),
 		now: () => clock,
 	});
-	assert.deepEqual(await lookup("42"), { name: "", avatar: "", phone: "" });
+	assert.deepEqual(await lookup("42"), { name: "", avatar: "", phone: "", seen: 0 });
 	await lookup("42");
 	assert.equal(calls, 1);
 	clock += PEER_MISS_TTL_MS + 1;
 	await lookup("42");
 	assert.equal(calls, 2);
 	assert.deepEqual(outcomes, ["failed", "failed"]);
+});
+
+test("the last-online time comes with the profile, and a failed or hidden one is 0", async () => {
+	const NOW = 1_800_000_000_000;
+	const getUserInfo = async (uid) => answer(uid);
+	const seenOf = async (getLastOnline) => (await createPeerLookup({ getUserInfo, getLastOnline, now: () => NOW })("42")).seen;
+	assert.equal(await seenOf(async () => ({ settings: { show_online_status: true }, lastOnline: NOW - 5000 })), NOW - 5000);
+	assert.equal(await seenOf(async () => ({ settings: { show_online_status: false }, lastOnline: 0 })), 0);
+	assert.equal(await seenOf(async () => ({ lastOnline: NOW + 3_600_000 })), 0, "a time in the future is not believed");
+	assert.equal(await seenOf(async () => { throw new Error("refused"); }), 0);
+	const lookup = createPeerLookup({ getUserInfo, getLastOnline: async () => { throw new Error("x"); }, now: () => NOW });
+	assert.equal((await lookup("42")).name, "Lan", "the profile survives a failed last-online call");
 });

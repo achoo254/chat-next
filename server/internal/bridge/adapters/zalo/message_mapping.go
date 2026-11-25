@@ -58,13 +58,14 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 	}
 	withAvatar(&peer, ev.PeerAvatar)
 	withPhone(&peer, ev.PeerPhone)
+	withSeen(&peer, ev.PeerSeen)
 	if !ev.Self {
 		sender = peer
 	}
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
 	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now)}
 	m.Text, m.Media = messageContent(ev)
-	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.PhoneKnown) {
+	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.PhoneKnown || peer.SeenKnown) {
 		m.Peer = &peer
 	}
 	return m, conv, nil
@@ -105,6 +106,15 @@ func withPhone(p *bridge.Participant, raw string) {
 		return
 	}
 	p.PhoneKnown, p.Phone = true, raw
+}
+
+// withSeen gives a participant the time Zalo says they were last online (milliseconds
+// since 1970). 0 means unknown or hidden, which leaves the recorded time as it is.
+func withSeen(p *bridge.Participant, ms int64) {
+	if ms <= 0 {
+		return
+	}
+	p.SeenKnown, p.Seen = true, time.UnixMilli(ms)
 }
 
 // textContent is the text of a text message's content, false when it has none.

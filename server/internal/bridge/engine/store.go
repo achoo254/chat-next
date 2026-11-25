@@ -347,6 +347,9 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 			if err := d.setPhone(ctx, a.ID, p); err != nil {
 				return 0, err
 			}
+			if err := d.setSeen(ctx, a.ID, p); err != nil {
+				return 0, err
+			}
 			return id, nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -375,9 +378,13 @@ func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participa
 		if id, err = store.NextUserID(ctx, tx); err != nil {
 			return err
 		}
+		var seen *time.Time
+		if at, ok := seenOf(p, time.Now()); ok {
+			seen = &at
+		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO users (id, tenant_id, idp_sub, username, name, external_source)
-			VALUES ($1, $2, NULL, $3, $4, $5)`, id, d.tenantID, fmt.Sprintf("ext_%d", id), name, a.Source); err != nil {
+			INSERT INTO users (id, tenant_id, idp_sub, username, name, external_source, last_seen_at)
+			VALUES ($1, $2, NULL, $3, $4, $5, $6)`, id, d.tenantID, fmt.Sprintf("ext_%d", id), name, a.Source, seen); err != nil {
 			return fmt.Errorf("bridge: create puppet: %w", err)
 		}
 		_, err = tx.Exec(ctx, `

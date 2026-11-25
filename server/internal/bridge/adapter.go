@@ -158,6 +158,12 @@ type Participant struct {
 	// never log it.
 	PhoneKnown bool
 	Phone      string
+	// SeenKnown says the app stated when the person was last online, so the engine
+	// records Seen as the puppet's last-seen time. An app that shows only a band
+	// ("recently", "within a week") gives a time inside that band. When false the
+	// recorded time is left as it is; a person the app says is online now is Seen = now.
+	SeenKnown bool
+	Seen      time.Time
 }
 
 // Entity is a normalised text span. Kinds the engine does not know are

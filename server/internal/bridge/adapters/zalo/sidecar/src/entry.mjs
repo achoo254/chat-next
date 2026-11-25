@@ -79,7 +79,8 @@ import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from
 // 8: file_chunk and send_media send one photo or file to one person.
 // 9: react sets or takes back the owner's reaction to a message; a history message carries its client id (cliMsgId).
 // 10: undo recalls a message the owner sent.
-const PROTOCOL = 10;
+// 11: a 1-1 message carries when the other person was last online (peerSeen, ms; 0 when unknown).
+const PROTOCOL = 11;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -148,6 +149,7 @@ function listen(loggedIn) {
 	useApi(loggedIn);
 	lookupPeer = createPeerLookup({
 		getUserInfo: (uid) => loggedIn.getUserInfo(uid),
+		getLastOnline: (uid) => loggedIn.lastOnline(uid),
 		log: (outcome) => process.stderr.write(`lookup ${outcome}\n`),
 	});
 	api.listener.on("message", async (message) => {
@@ -155,7 +157,7 @@ function listen(loggedIn) {
 		const isGroup = message.type === ThreadType.Group;
 		const self = Boolean(message.isSelf);
 		const peerUid = String(self ? (data.idTo ?? "") : (data.uidFrom ?? ""));
-		const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", phone: "" };
+		const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", phone: "", seen: 0 };
 		emit({
 			ev: "message",
 			thread: isGroup ? "group" : "user",
@@ -163,6 +165,7 @@ function listen(loggedIn) {
 			peerName: self ? peer.name : "",
 			peerAvatar: peer.avatar,
 			peerPhone: peer.phone,
+			peerSeen: peer.seen,
 			msgType: data.msgType,
 			content: data.content,
 			msgId: data.msgId,

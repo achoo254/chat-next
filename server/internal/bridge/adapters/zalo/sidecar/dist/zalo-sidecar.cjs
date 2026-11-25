@@ -29212,7 +29212,7 @@ var PEER_TTL_MS = 6 * 60 * 60 * 1e3;
 var PEER_MISS_TTL_MS = 10 * 60 * 1e3;
 var PEER_WAIT_MS = 3e3;
 var PHONE_MAX = 32;
-var NO_PROFILE = Object.freeze({ name: "", avatar: "", phone: "" });
+var NO_PROFILE = Object.freeze({ name: "", avatar: "", phone: "", seen: 0 });
 function profilePhone(profile, full) {
   const raw = full ? profile.phoneNumber : void 0;
   return typeof raw === "string" && raw.length <= PHONE_MAX && /^\+?[0-9 ]*$/.test(raw) ? raw.trim() : "";
@@ -29231,15 +29231,20 @@ function peerProfile(info, uid) {
   }
   return NO_PROFILE;
 }
-function createPeerLookup({ getUserInfo: getUserInfo2, log = () => {
+function lastOnlineMs(answer, now = Date.now()) {
+  const at = answer?.lastOnline;
+  return typeof at === "number" && Number.isFinite(at) && at > 0 && at <= now + 6e4 ? Math.floor(at) : 0;
+}
+function createPeerLookup({ getUserInfo: getUserInfo2, getLastOnline = async () => null, log = () => {
 }, now = Date.now, waitMs = PEER_WAIT_MS }) {
   const kept = /* @__PURE__ */ new Map();
   const running = /* @__PURE__ */ new Map();
   function start(uid) {
     const lookup = (async () => {
       try {
-        const found = peerProfile(await getUserInfo2(uid), uid);
-        const empty = found.name === "" && found.avatar === "" && found.phone === "";
+        const [info, online] = await Promise.all([getUserInfo2(uid), Promise.resolve(getLastOnline(uid)).catch(() => null)]);
+        const found = { ...peerProfile(info, uid), seen: lastOnlineMs(online, now()) };
+        const empty = found.name === "" && found.avatar === "" && found.phone === "" && found.seen === 0;
         log(empty ? "empty" : "ok");
         kept.set(uid, { ...found, until: now() + (empty ? PEER_MISS_TTL_MS : PEER_TTL_MS) });
         return found;
@@ -29256,7 +29261,7 @@ function createPeerLookup({ getUserInfo: getUserInfo2, log = () => {
   }
   return async function lookup(uid) {
     const have = kept.get(uid);
-    if (have !== void 0 && now() < have.until) return { name: have.name, avatar: have.avatar, phone: have.phone };
+    if (have !== void 0 && now() < have.until) return { name: have.name, avatar: have.avatar, phone: have.phone, seen: have.seen };
     const pending = running.get(uid) ?? start(uid);
     let timer;
     const late = new Promise((resolve) => {
@@ -29503,7 +29508,7 @@ function sendMediaFailure(error) {
 }
 
 // src/entry.mjs
-var PROTOCOL = 10;
+var PROTOCOL = 11;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
@@ -29551,6 +29556,7 @@ function listen(loggedIn) {
   useApi(loggedIn);
   lookupPeer = createPeerLookup({
     getUserInfo: (uid) => loggedIn.getUserInfo(uid),
+    getLastOnline: (uid) => loggedIn.lastOnline(uid),
     log: (outcome) => process.stderr.write(`lookup ${outcome}
 `)
   });
@@ -29559,7 +29565,7 @@ function listen(loggedIn) {
     const isGroup = message.type === ThreadType.Group;
     const self2 = Boolean(message.isSelf);
     const peerUid = String(self2 ? data.idTo ?? "" : data.uidFrom ?? "");
-    const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", phone: "" };
+    const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", phone: "", seen: 0 };
     emit({
       ev: "message",
       thread: isGroup ? "group" : "user",
@@ -29567,6 +29573,7 @@ function listen(loggedIn) {
       peerName: self2 ? peer.name : "",
       peerAvatar: peer.avatar,
       peerPhone: peer.phone,
+      peerSeen: peer.seen,
       msgType: data.msgType,
       content: data.content,
       msgId: data.msgId,
