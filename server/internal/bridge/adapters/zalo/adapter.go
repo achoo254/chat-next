@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -172,9 +173,13 @@ func (a *Adapter) Backfill(_ context.Context, acct bridge.Account, conv string, 
 	return bridge.Page{Messages: a.heardFor(acct.ID).takeRecent(conv, limit), Done: true}, nil
 }
 
-// FetchMedia implements bridge.Adapter. No message carries media yet (stickers
-// and files come in as a text label), so any ref is refused for good.
-func (a *Adapter) FetchMedia(context.Context, bridge.Account, string) (bridge.MediaStream, error) {
+// FetchMedia implements bridge.Adapter. Only a person's photo is fetched (from
+// Zalo's image CDN, not through the sidecar); no message carries media yet
+// (stickers and files come in as a text label), so any other ref is refused for good.
+func (a *Adapter) FetchMedia(ctx context.Context, _ bridge.Account, ref string) (bridge.MediaStream, error) {
+	if raw, ok := strings.CutPrefix(ref, avatarRef); ok {
+		return fetchAvatar(ctx, raw)
+	}
 	return nil, fmt.Errorf("%w: zalo media download is not supported yet", bridge.ErrNotAllowed)
 }
 

@@ -63,6 +63,8 @@ type Fake struct {
 	photoBytes                                 map[string][]byte
 	photoCalls                                 []string
 	photoFetches                               int
+	personPhotos                               map[string][]byte
+	personPhotoReadErrs                        map[string]error
 	forwards                                   []string
 	refuse                                     map[string]bool
 	inviteReads                                map[string]int
@@ -326,6 +328,22 @@ func (f *Fake) Subscribe(ctx context.Context, acct bridge.Account, out chan<- br
 
 // FetchMedia implements bridge.Adapter: the fake has no media.
 func (f *Fake) FetchMedia(_ context.Context, _ bridge.Account, ref string) (bridge.MediaStream, error) {
+	f.mu.Lock()
+	person, isPerson := f.personPhotos[ref]
+	readErr := f.personPhotoReadErrs[ref]
+	if isPerson || readErr != nil {
+		f.photoFetches++
+	}
+	f.mu.Unlock()
+	if readErr != nil {
+		return &failingStream{err: readErr}, nil
+	}
+	if isPerson {
+		if person == nil {
+			return nil, fmt.Errorf("fake adapter: this photo cannot be read")
+		}
+		return &fakeStream{Reader: bytes.NewReader(person), size: int64(len(person))}, nil
+	}
 	if conv, ok := strings.CutPrefix(ref, fakePhotoRef); ok {
 		f.mu.Lock()
 		data := f.photoBytes[conv]

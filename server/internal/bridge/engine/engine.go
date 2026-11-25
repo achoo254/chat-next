@@ -187,6 +187,8 @@ type runner struct {
 	floodUntil time.Time
 	// windows are the history windows half read when the other app asked to wait, by link id.
 	windows map[int64]windowProgress
+	// photoHeld are the profile photos whose copy failed, by external_users.id (see pollPeoplePhotos).
+	photoHeld map[int64]heldPhoto
 }
 
 // run connects the account and syncs until ctx ends or something fails.

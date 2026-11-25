@@ -21,6 +21,9 @@ func (a *Adapter) FetchMedia(ctx context.Context, acct bridge.Account, ref strin
 	if conv, ok := strings.CutPrefix(ref, groupPhotoRef); ok {
 		return a.fetchGroupPhoto(ctx, acct, conv)
 	}
+	if rest, ok := strings.CutPrefix(ref, userPhotoRef); ok {
+		return a.fetchUserPhoto(ctx, acct, rest)
+	}
 	conv, rawID, ok := strings.Cut(ref, "/")
 	id, err := strconv.Atoi(rawID)
 	if !ok || err != nil {

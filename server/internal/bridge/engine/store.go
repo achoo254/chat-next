@@ -325,13 +325,21 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 	for range 2 {
 		var id int64
 		var current string
+		var photoWant *string
+		var photoRef string
 		err := d.pool.QueryRow(ctx, `
-			SELECT u.id, u.name FROM external_users x JOIN users u ON u.id = x.user_id
-			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current)
+			SELECT u.id, u.name, x.photo_want, coalesce(x.photo_ref, '') FROM external_users x JOIN users u ON u.id = x.user_id
+			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current, &photoWant, &photoRef)
 		if err == nil {
 			if current != name && !p.NameUnknown {
 				if _, err := d.pool.Exec(ctx, `UPDATE users SET name = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, id, name); err != nil {
 					return 0, fmt.Errorf("bridge: rename puppet: %w", err)
+				}
+			}
+			// A new ref for the same photo is kept too: the one stored may no longer work.
+			if p.PhotoKnown && (photoWant == nil || *photoWant != p.PhotoID || photoRef != p.PhotoRef) {
+				if err := d.wantPhoto(ctx, a.ID, p); err != nil {
+					return 0, err
 				}
 			}
 			return id, nil
@@ -367,7 +375,9 @@ func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participa
 			VALUES ($1, $2, NULL, $3, $4, $5)`, id, d.tenantID, fmt.Sprintf("ext_%d", id), name, a.Source); err != nil {
 			return fmt.Errorf("bridge: create puppet: %w", err)
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO external_users (account_id, external_user_id, user_id) VALUES ($1, $2, $3)`, a.ID, p.ID, id)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref) VALUES ($1, $2, $3, $4, $5)`,
+			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef)
 		if err != nil {
 			return fmt.Errorf("bridge: link puppet: %w", err)
 		}

@@ -53,15 +53,16 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 		if ev.PeerName != "" {
 			peer.Name, peer.NameUnknown = ev.PeerName, false
 		}
-	} else {
-		if ev.DName != "" {
-			peer.Name, peer.NameUnknown = ev.DName, false
-		}
+	} else if ev.DName != "" {
+		peer.Name, peer.NameUnknown = ev.DName, false
+	}
+	withAvatar(&peer, ev.PeerAvatar)
+	if !ev.Self {
 		sender = peer
 	}
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
 	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now), Text: messageText(ev)}
-	if ev.Self && !peer.NameUnknown {
+	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown) {
 		m.Peer = &peer
 	}
 	return m, conv, nil

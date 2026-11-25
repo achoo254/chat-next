@@ -92,7 +92,9 @@ func userName(u *tg.User) string {
 // participantUser is a Telegram user as a bridge participant.
 func participantUser(u *tg.User, self int64) bridge.Participant {
 	named := strings.TrimSpace(u.FirstName+" "+u.LastName) != "" || u.Username != ""
-	return bridge.Participant{ID: strconv.FormatInt(u.ID, 10), Name: userName(u), Username: u.Username, IsBot: u.Bot, IsSelf: u.ID == self, NameUnknown: !named}
+	p := bridge.Participant{ID: strconv.FormatInt(u.ID, 10), Name: userName(u), Username: u.Username, IsBot: u.Bot, IsSelf: u.ID == self, NameUnknown: !named}
+	withUserPhoto(&p, u)
+	return p
 }
 
 // participantOf finds who a peer is. A user Telegram did not send along is

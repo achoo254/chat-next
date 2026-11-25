@@ -15,8 +15,9 @@ import (
 // pair them wrong. Version 3 lets a QR login skip the listener and names the
 // reason of a failed login; version 4 sends a text to one person and reads
 // the newest page of 1-1 messages (send, history); version 5 gives a history
-// message the hash of its text instead of the text.
-const protocolVersion = 5
+// message the hash of its text instead of the text; version 6 gives a 1-1
+// message the photo URL of the other person.
+const protocolVersion = 6
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -94,8 +95,10 @@ type wireEvent struct {
 	DName    string          `json:"dName"`
 	// PeerName is the other person's name looked up by the sidecar for a message
 	// the owner sent (there dName is the owner's own name).
-	PeerName string      `json:"peerName"`
-	TS       looseString `json:"ts"`
+	PeerName string `json:"peerName"`
+	// PeerAvatar is the https URL of the other person's photo, "" when unknown.
+	PeerAvatar string      `json:"peerAvatar"`
+	TS         looseString `json:"ts"`
 	// event, listener, error
 	Name    string          `json:"name"`
 	Payload json.RawMessage `json:"payload"`

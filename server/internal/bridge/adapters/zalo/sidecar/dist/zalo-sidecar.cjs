@@ -17582,7 +17582,7 @@ process.env.WS_NO_UTF_8_VALIDATE = "1";
 
 // src/entry.mjs
 var import_node_readline = __toESM(require("node:readline"), 1);
-var import_node_timers = require("node:timers");
+var import_node_timers2 = require("node:timers");
 
 // node_modules/.pnpm/zca-js@2.3.0/node_modules/zca-js/dist/Errors/ZaloApiError.js
 var ZaloApiError = class extends Error {
@@ -29173,6 +29173,61 @@ function pageFor(messages2, peer) {
   return { count: messages2.length, oldestTs, messages: own.slice(-MAX_HISTORY_MESSAGES) };
 }
 
+// src/peer-profile.mjs
+var import_node_timers = require("node:timers");
+var PEER_TTL_MS = 6 * 60 * 60 * 1e3;
+var PEER_MISS_TTL_MS = 10 * 60 * 1e3;
+var PEER_WAIT_MS = 3e3;
+var NO_PROFILE = Object.freeze({ name: "", avatar: "" });
+function peerProfile(info, uid) {
+  for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
+    const profile = group?.[uid] ?? group?.[`${uid}_0`];
+    if (profile === void 0 || profile === null) continue;
+    const name = String(profile.displayName || profile.zaloName || "");
+    const avatar = typeof profile.avatar === "string" && profile.avatar.startsWith("https://") ? profile.avatar : "";
+    if (name !== "" || avatar !== "") return { name, avatar };
+  }
+  return NO_PROFILE;
+}
+function createPeerLookup({ getUserInfo: getUserInfo2, log = () => {
+}, now = Date.now, waitMs = PEER_WAIT_MS }) {
+  const kept = /* @__PURE__ */ new Map();
+  const running = /* @__PURE__ */ new Map();
+  function start(uid) {
+    const lookup = (async () => {
+      try {
+        const found = peerProfile(await getUserInfo2(uid), uid);
+        const empty = found.name === "" && found.avatar === "";
+        log(empty ? "empty" : "ok");
+        kept.set(uid, { ...found, until: now() + (empty ? PEER_MISS_TTL_MS : PEER_TTL_MS) });
+        return found;
+      } catch {
+        log("failed");
+        kept.set(uid, { ...NO_PROFILE, until: now() + PEER_MISS_TTL_MS });
+        return NO_PROFILE;
+      } finally {
+        running.delete(uid);
+      }
+    })();
+    running.set(uid, lookup);
+    return lookup;
+  }
+  return async function lookup(uid) {
+    const have = kept.get(uid);
+    if (have !== void 0 && now() < have.until) return { name: have.name, avatar: have.avatar };
+    const pending = running.get(uid) ?? start(uid);
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = (0, import_node_timers.setTimeout)(() => resolve(NO_PROFILE), waitMs);
+    });
+    try {
+      return await Promise.race([pending, late]);
+    } finally {
+      (0, import_node_timers.clearTimeout)(timer);
+    }
+  };
+}
+
 // src/login-failure.mjs
 var SESSION_REJECTED = "session_rejected";
 var ZALO_UNAVAILABLE = "zalo_unavailable";
@@ -29258,7 +29313,7 @@ function sendFailure(error) {
 }
 
 // src/entry.mjs
-var PROTOCOL = 5;
+var PROTOCOL = 6;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
@@ -29296,41 +29351,26 @@ function announce(loggedIn) {
   emit({ ev: "account", uid: text });
   return true;
 }
-var peerNames = /* @__PURE__ */ new Map();
-async function lookupPeerName(loggedIn, uid) {
-  if (peerNames.has(uid)) return peerNames.get(uid);
-  try {
-    const name = profileName(await loggedIn.getUserInfo(uid), uid);
-    process.stderr.write(`lookup ${name === "" ? "empty" : "ok"}
-`);
-    if (name !== "") peerNames.set(uid, name);
-    return name;
-  } catch {
-    process.stderr.write("lookup failed\n");
-    return "";
-  }
-}
-function profileName(info, uid) {
-  for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
-    const profile = group?.[uid] ?? group?.[`${uid}_0`];
-    const name = String(profile?.displayName || profile?.zaloName || "");
-    if (name !== "") return name;
-  }
-  return "";
-}
+var lookupPeer = null;
 function listen(loggedIn) {
   api = loggedIn;
+  lookupPeer = createPeerLookup({
+    getUserInfo: (uid) => loggedIn.getUserInfo(uid),
+    log: (outcome) => process.stderr.write(`lookup ${outcome}
+`)
+  });
   api.listener.on("message", async (message) => {
     const data = message.data ?? {};
     const isGroup = message.type === ThreadType.Group;
     const self2 = Boolean(message.isSelf);
     const peerUid = String(self2 ? data.idTo ?? "" : data.uidFrom ?? "");
-    const peerName = !isGroup && self2 && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeerName(loggedIn, peerUid) : "";
+    const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "" };
     emit({
       ev: "message",
       thread: isGroup ? "group" : "user",
       self: self2,
-      peerName,
+      peerName: self2 ? peer.name : "",
+      peerAvatar: peer.avatar,
       msgType: data.msgType,
       content: data.content,
       msgId: data.msgId,
@@ -29433,7 +29473,7 @@ async function handle(line) {
         return command.cmd === "send" ? await send(command) : await readHistory(command);
       case "stop":
         api?.listener.stop();
-        return (0, import_node_timers.setTimeout)(() => process.exit(0), 200);
+        return (0, import_node_timers2.setTimeout)(() => process.exit(0), 200);
       default:
         return fail("unknown_command", new Error("unknown"));
     }
@@ -29446,7 +29486,7 @@ var lines = import_node_readline.default.createInterface({ input: process.stdin 
 lines.on("line", (line) => void handle(line));
 lines.on("close", () => {
   api?.listener.stop();
-  (0, import_node_timers.setTimeout)(() => process.exit(0), 200);
+  (0, import_node_timers2.setTimeout)(() => process.exit(0), 200);
 });
 process.on("uncaughtException", (error) => {
   fail("uncaught", error);

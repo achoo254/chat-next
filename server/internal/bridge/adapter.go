@@ -137,8 +137,15 @@ type Participant struct {
 	IsBot    bool
 	// IsSelf marks the account owner, whose messages are attributed to the
 	// real Chat user.
-	IsSelf   bool
-	PhotoRef string
+	IsSelf bool
+	// PhotoKnown says the adapter read the person's profile photo, so the
+	// puppet's photo follows it: PhotoID names the current photo ("" when
+	// they have none or hide it) and changes whenever the photo does, and
+	// PhotoRef is the FetchMedia ref of its bytes. When false the puppet's
+	// photo is left as it is.
+	PhotoKnown bool
+	PhotoID    string
+	PhotoRef   string
 	// NameUnknown marks a Name that is only a stand-in (the app named the
 	// person by id alone). The engine uses it to create a missing puppet but
 	// never to rename one that already has a real name.

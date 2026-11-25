@@ -11,12 +11,14 @@
 //                                            messages, cut down to that person; `history` or `history_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
-//   {"ev":"ready","protocol":5}
+//   {"ev":"ready","protocol":6}
 //   {"ev":"qr","image":"<base64 png>"} | {"ev":"qr_scanned"} | {"ev":"qr_expired"} | {"ev":"qr_declined"}
 //   {"ev":"logged_in","session":{cookie,imei,userAgent}}   the engine keeps it (encrypted), never this process
 //   {"ev":"account","uid":"<digits>"}                the signed-in account, once logged in (both ways);
 //                                                    an id that is not 1-20 digits is error no_account
-//   {"ev":"message","thread":"user"|"group","self":bool,"msgType":..,"content":..,"msgId":..,"cliMsgId":..,"uidFrom":..,"idTo":..,"dName":..,"ts":..,"ttl":..}
+//   {"ev":"message","thread":"user"|"group","self":bool,"msgType":..,"content":..,"msgId":..,"cliMsgId":..,"uidFrom":..,"idTo":..,"dName":..,"ts":..,"ttl":..,
+//    "peerName":..,"peerAvatar":..}   1-1 only: peerName is the other person's name for a message the owner
+//                                     sent; peerAvatar (protocol 6) the https URL of their photo; "" when unknown
 //   {"ev":"event","name":"typing"|"reaction"|"undo"|"seen"|"delivered"|..,"payload":..}
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
 //   {"ev":"sent","id":..,"msgId":"<digits>","ts":<ms>}    ts is this process's clock when Zalo answered
@@ -45,6 +47,7 @@ import { setTimeout } from "node:timers";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 import { installEgressGuard } from "./egress-guard.mjs";
 import { createHistory, HistoryError } from "./history.mjs";
+import { createPeerLookup } from "./peer-profile.mjs";
 import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
 import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendText } from "./send.mjs";
 
@@ -52,7 +55,8 @@ import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendTex
 // 3: login_qr can skip the listener; login failures carry a reason code; the uid is checked.
 // 4: send (text, 1-1) and history; old_messages is no longer forwarded as an event (history reads it).
 // 5: a history message carries the hash of its text (textHash), not the text.
-const PROTOCOL = 5;
+// 6: a 1-1 message carries the other person's photo URL (peerAvatar); the profile is looked up for every 1-1 message.
+const PROTOCOL = 6;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -105,53 +109,28 @@ function announce(loggedIn) {
 	return true;
 }
 
-/** Names already looked up, by Zalo id: one lookup per person for the life of the process. */
-const peerNames = new Map();
-
-/**
- * The display name of the other person of a 1-1 message. For a message the owner sent, `dName` is
- * the owner's own name, so the other side's name has to be asked for; "" when Zalo gives none
- * (the engine then keeps its stand-in title). A failed lookup is not cached, so the next
- * message tries again.
- */
-async function lookupPeerName(loggedIn, uid) {
-	if (peerNames.has(uid)) return peerNames.get(uid);
-	try {
-		const name = profileName(await loggedIn.getUserInfo(uid), uid);
-		// Operational only: whether the lookup found a name, never the name or the id.
-		process.stderr.write(`lookup ${name === "" ? "empty" : "ok"}\n`);
-		if (name !== "") peerNames.set(uid, name);
-		return name;
-	} catch {
-		process.stderr.write("lookup failed\n");
-		return "";
-	}
-}
-
-/** The display name in a getUserInfo answer, which keeps a profile under its id with or without the `_0` suffix. */
-function profileName(info, uid) {
-	for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
-		const profile = group?.[uid] ?? group?.[`${uid}_0`];
-		const name = String(profile?.displayName || profile?.zaloName || "");
-		if (name !== "") return name;
-	}
-	return "";
-}
+/** Lookups of the other person of a 1-1 message (src/peer-profile.mjs); stderr says only how each ended. */
+let lookupPeer = null;
 
 /** Starts the websocket listener of a logged-in API and forwards what it hears. */
 function listen(loggedIn) {
 	api = loggedIn;
+	lookupPeer = createPeerLookup({
+		getUserInfo: (uid) => loggedIn.getUserInfo(uid),
+		log: (outcome) => process.stderr.write(`lookup ${outcome}\n`),
+	});
 	api.listener.on("message", async (message) => {
 		const data = message.data ?? {};
 		const isGroup = message.type === ThreadType.Group;
 		const self = Boolean(message.isSelf);
 		const peerUid = String(self ? (data.idTo ?? "") : (data.uidFrom ?? ""));
-		const peerName = !isGroup && self && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeerName(loggedIn, peerUid) : "";
+		const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "" };
 		emit({
 			ev: "message",
 			thread: isGroup ? "group" : "user",
 			self,
-			peerName,
+			peerName: self ? peer.name : "",
+			peerAvatar: peer.avatar,
 			msgType: data.msgType,
 			content: data.content,
 			msgId: data.msgId,

@@ -186,7 +186,8 @@ func (r *runner) doDialogState(ctx context.Context, h *outboxRow) error {
 	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
 }
 
-// pollAll runs the poll of every feature that has one.
+// pollAll runs the poll of every feature that has one, then copies the profile photos
+// of people that changed.
 func (r *runner) pollAll(ctx context.Context) error {
 	for i := range handlers {
 		h := &handlers[i]
@@ -200,5 +201,6 @@ func (r *runner) pollAll(ctx context.Context) error {
 			}
 		}
 	}
-	return nil
+	// Not a feature of a chat: a person's photo is the same in every chat they are in.
+	return r.pollPeoplePhotos(ctx)
 }

@@ -86,3 +86,33 @@ func (f *Fake) SetGroupPhoto(_ context.Context, _ bridge.Account, conv string, p
 }
 
 var _ bridge.PhotoWriter = (*Fake)(nil)
+
+// SetPersonPhoto stores the bytes FetchMedia gives for a person's photo ref (a
+// Participant's PhotoRef); nil data makes the fetch fail.
+func (f *Fake) SetPersonPhoto(ref string, data []byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.personPhotos == nil {
+		f.personPhotos = map[string][]byte{}
+	}
+	f.personPhotos[ref] = data
+}
+
+// SetPersonPhotoReadError makes the stream of a person's photo ref fail with err once it
+// is read, as a download that streams does (the call itself succeeds).
+func (f *Fake) SetPersonPhotoReadError(ref string, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.personPhotoReadErrs == nil {
+		f.personPhotoReadErrs = map[string]error{}
+	}
+	f.personPhotoReadErrs[ref] = err
+}
+
+// failingStream is a download that fails when read.
+type failingStream struct{ err error }
+
+func (s *failingStream) Read([]byte) (int, error) { return 0, s.err }
+func (s *failingStream) Close() error             { return nil }
+func (s *failingStream) MimeType() string         { return "image/jpeg" }
+func (s *failingStream) Size() int64              { return 0 }
