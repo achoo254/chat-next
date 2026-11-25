@@ -254,7 +254,7 @@ func (c caller) session(tenantID string, approved bool) (store.Session, error) {
 	}
 	s := store.Session{
 		TenantID: tenantID, UserID: c.user.ID, IdPClientID: c.token.ClientID,
-		AccountLocked: c.user.DeletionRequestedAt != nil, Platform: store.PlatformWeb,
+		AccountLocked: c.user.DeletionRequestedAt != nil, Platform: store.PlatformWeb, ViaAI: true,
 	}
 	if approved {
 		s.AuthTime = time.Now()

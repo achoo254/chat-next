@@ -16,7 +16,7 @@ import { Conversation, EmptyConversation } from "./conversation.tsx";
 import { DialogHost } from "./dialog-host.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { SurfaceContext, type Surface } from "./surface.ts";
-import { Cell, ComposerIntents, UiContext, type DialogRequest, type ListMenuTarget, type MenuTarget, type OpenMiniApp, type Ui } from "./ui-context.tsx";
+import { Cell, ComposerIntents, UiContext, useUi, type DialogRequest, type ListMenuTarget, type MenuTarget, type OpenMiniApp, type Ui } from "./ui-context.tsx";
 
 /** Unread chats the strip shows; the rest are one click away in the page. */
 const MAX_STRIP_CHATS = 8;
@@ -36,6 +36,8 @@ export function CompactWindow({ chatId, topicId }: CompactWindowProps) {
 
 function CompactContent({ pip, chatId, topicId }: CompactWindowProps & { pip: Window }) {
 	const surface = useMemo<Surface>(() => ({ document: pip.document, compact: true }), [pip]);
+	// The AI panel shows in the main window: "/ai …" and «Đưa vào ô soạn tin» go through its cells.
+	const main = useUi();
 	const ui = useMemo<Ui>(
 		() => ({
 			dialog: new Cell<DialogRequest | null>(null),
@@ -43,11 +45,13 @@ function CompactContent({ pip, chatId, topicId }: CompactWindowProps & { pip: Wi
 			listMenu: new Cell<ListMenuTarget | null>(null),
 			miniApp: new Cell<OpenMiniApp | null>(null),
 			intents: new ComposerIntents(),
+			ai: main.ai,
+			composerFill: main.composerFill,
 			// The compact window has no chat list or info column.
 			focusSearch: () => undefined,
 			toggleInfo: () => undefined,
 		}),
-		[],
+		[main],
 	);
 	return createPortal(
 		<SurfaceContext value={surface}>

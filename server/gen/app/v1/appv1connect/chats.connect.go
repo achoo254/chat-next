@@ -108,6 +108,9 @@ const (
 	// ChatsServiceSetDialogMuteProcedure is the fully-qualified name of the ChatsService's
 	// SetDialogMute RPC.
 	ChatsServiceSetDialogMuteProcedure = "/app.v1.ChatsService/SetDialogMute"
+	// ChatsServiceSetDialogHiddenFromAIProcedure is the fully-qualified name of the ChatsService's
+	// SetDialogHiddenFromAI RPC.
+	ChatsServiceSetDialogHiddenFromAIProcedure = "/app.v1.ChatsService/SetDialogHiddenFromAI"
 	// ChatsServiceSetDialogPinnedProcedure is the fully-qualified name of the ChatsService's
 	// SetDialogPinned RPC.
 	ChatsServiceSetDialogPinnedProcedure = "/app.v1.ChatsService/SetDialogPinned"
@@ -192,6 +195,10 @@ type ChatsServiceClient interface {
 	// Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
 	// The caller's other sessions get dialog_mute.
 	SetDialogMute(context.Context, *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error)
+	// Hides a chat from the caller's AI tools or shows it again
+	// (Dialog.hidden_from_ai). The caller's other sessions get
+	// dialog_hidden_from_ai.
+	SetDialogHiddenFromAI(context.Context, *connect.Request[v1.SetDialogHiddenFromAIRequest]) (*connect.Response[v1.SetDialogHiddenFromAIResponse], error)
 	// Pins a chat on top of the caller's list or unpins it, at most 5 chats;
 	// one more fails with failed_precondition
 	// (message prefix "pinned_dialogs_limit"). The caller's sessions get
@@ -398,6 +405,12 @@ func NewChatsServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(chatsServiceMethods.ByName("SetDialogMute")),
 			connect.WithClientOptions(opts...),
 		),
+		setDialogHiddenFromAI: connect.NewClient[v1.SetDialogHiddenFromAIRequest, v1.SetDialogHiddenFromAIResponse](
+			httpClient,
+			baseURL+ChatsServiceSetDialogHiddenFromAIProcedure,
+			connect.WithSchema(chatsServiceMethods.ByName("SetDialogHiddenFromAI")),
+			connect.WithClientOptions(opts...),
+		),
 		setDialogPinned: connect.NewClient[v1.SetDialogPinnedRequest, v1.SetDialogPinnedResponse](
 			httpClient,
 			baseURL+ChatsServiceSetDialogPinnedProcedure,
@@ -478,6 +491,7 @@ type chatsServiceClient struct {
 	closeForumTopic         *connect.Client[v1.CloseForumTopicRequest, v1.CloseForumTopicResponse]
 	hideForumTopic          *connect.Client[v1.HideForumTopicRequest, v1.HideForumTopicResponse]
 	setDialogMute           *connect.Client[v1.SetDialogMuteRequest, v1.SetDialogMuteResponse]
+	setDialogHiddenFromAI   *connect.Client[v1.SetDialogHiddenFromAIRequest, v1.SetDialogHiddenFromAIResponse]
 	setDialogPinned         *connect.Client[v1.SetDialogPinnedRequest, v1.SetDialogPinnedResponse]
 	reorderPinnedDialogs    *connect.Client[v1.ReorderPinnedDialogsRequest, v1.ReorderPinnedDialogsResponse]
 	deleteChat              *connect.Client[v1.DeleteChatRequest, v1.DeleteChatResponse]
@@ -623,6 +637,11 @@ func (c *chatsServiceClient) SetDialogMute(ctx context.Context, req *connect.Req
 	return c.setDialogMute.CallUnary(ctx, req)
 }
 
+// SetDialogHiddenFromAI calls app.v1.ChatsService.SetDialogHiddenFromAI.
+func (c *chatsServiceClient) SetDialogHiddenFromAI(ctx context.Context, req *connect.Request[v1.SetDialogHiddenFromAIRequest]) (*connect.Response[v1.SetDialogHiddenFromAIResponse], error) {
+	return c.setDialogHiddenFromAI.CallUnary(ctx, req)
+}
+
 // SetDialogPinned calls app.v1.ChatsService.SetDialogPinned.
 func (c *chatsServiceClient) SetDialogPinned(ctx context.Context, req *connect.Request[v1.SetDialogPinnedRequest]) (*connect.Response[v1.SetDialogPinnedResponse], error) {
 	return c.setDialogPinned.CallUnary(ctx, req)
@@ -722,6 +741,10 @@ type ChatsServiceHandler interface {
 	// Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
 	// The caller's other sessions get dialog_mute.
 	SetDialogMute(context.Context, *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error)
+	// Hides a chat from the caller's AI tools or shows it again
+	// (Dialog.hidden_from_ai). The caller's other sessions get
+	// dialog_hidden_from_ai.
+	SetDialogHiddenFromAI(context.Context, *connect.Request[v1.SetDialogHiddenFromAIRequest]) (*connect.Response[v1.SetDialogHiddenFromAIResponse], error)
 	// Pins a chat on top of the caller's list or unpins it, at most 5 chats;
 	// one more fails with failed_precondition
 	// (message prefix "pinned_dialogs_limit"). The caller's sessions get
@@ -924,6 +947,12 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(chatsServiceMethods.ByName("SetDialogMute")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatsServiceSetDialogHiddenFromAIHandler := connect.NewUnaryHandler(
+		ChatsServiceSetDialogHiddenFromAIProcedure,
+		svc.SetDialogHiddenFromAI,
+		connect.WithSchema(chatsServiceMethods.ByName("SetDialogHiddenFromAI")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatsServiceSetDialogPinnedHandler := connect.NewUnaryHandler(
 		ChatsServiceSetDialogPinnedProcedure,
 		svc.SetDialogPinned,
@@ -1028,6 +1057,8 @@ func NewChatsServiceHandler(svc ChatsServiceHandler, opts ...connect.HandlerOpti
 			chatsServiceHideForumTopicHandler.ServeHTTP(w, r)
 		case ChatsServiceSetDialogMuteProcedure:
 			chatsServiceSetDialogMuteHandler.ServeHTTP(w, r)
+		case ChatsServiceSetDialogHiddenFromAIProcedure:
+			chatsServiceSetDialogHiddenFromAIHandler.ServeHTTP(w, r)
 		case ChatsServiceSetDialogPinnedProcedure:
 			chatsServiceSetDialogPinnedHandler.ServeHTTP(w, r)
 		case ChatsServiceReorderPinnedDialogsProcedure:
@@ -1159,6 +1190,10 @@ func (UnimplementedChatsServiceHandler) HideForumTopic(context.Context, *connect
 
 func (UnimplementedChatsServiceHandler) SetDialogMute(context.Context, *connect.Request[v1.SetDialogMuteRequest]) (*connect.Response[v1.SetDialogMuteResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.SetDialogMute is not implemented"))
+}
+
+func (UnimplementedChatsServiceHandler) SetDialogHiddenFromAI(context.Context, *connect.Request[v1.SetDialogHiddenFromAIRequest]) (*connect.Response[v1.SetDialogHiddenFromAIResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.ChatsService.SetDialogHiddenFromAI is not implemented"))
 }
 
 func (UnimplementedChatsServiceHandler) SetDialogPinned(context.Context, *connect.Request[v1.SetDialogPinnedRequest]) (*connect.Response[v1.SetDialogPinnedResponse], error) {

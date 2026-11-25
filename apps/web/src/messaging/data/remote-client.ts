@@ -722,6 +722,8 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 				const response = await chats.setDialogMute({ chatId: BigInt(chatId), forever, durationSeconds: forever ? 0 : seconds });
 				return assertSafeId(response.muteUntil);
 			}),
+		setDialogHiddenFromAi: (chatId, hidden) =>
+			call(async () => (await chats.setDialogHiddenFromAI({ chatId: BigInt(chatId), hidden })).hidden),
 		setDialogPinned: (chatId, pinned) =>
 			call(async () => (await chats.setDialogPinned({ chatId: BigInt(chatId), pinned })).pinnedChatIds.map(assertSafeId)),
 		deleteChat: (chatId) =>

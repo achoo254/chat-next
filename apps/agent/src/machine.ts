@@ -14,7 +14,7 @@ import { type KeyPair, PROTOCOL_VERSION, toBase64Url } from "@achoo254/chat-remo
 import { type WebSocket, WebSocketServer } from "ws";
 import { ConfigStore, type TrustedDevice, deviceLabel } from "./config.ts";
 import { DeviceTrust } from "./device-trust.ts";
-import { AgentCore } from "./core/agent-core.ts";
+import { AgentCore, chatSessionsDir } from "./core/agent-core.ts";
 import { machineKey } from "./keystore.ts";
 import { AccountsStore } from "./accounts/store.ts";
 import { accountListBody, readAccounts } from "./link/accounts-link.ts";
@@ -161,7 +161,9 @@ export class Machine {
     this.config = opts.config ?? new ConfigStore();
     this.log = opts.log ?? ((l) => console.log(l));
     const dir = this.config.dir;
-    this.isSensitive = createSensitiveCheck({ configDir: dir });
+    const dataDir = join(dir, "data");
+    // The chats' AI sessions work in folders of tunelo's own data: not sensitive, unlike the rest of it.
+    this.isSensitive = createSensitiveCheck({ configDir: dir, except: [chatSessionsDir(dataDir)] });
     this.macFolders = new MacFolders({
       platform: process.platform,
       home: homedir(),
@@ -278,7 +280,7 @@ export class Machine {
       }),
     });
     this.core = new AgentCore({
-      dataDir: join(dir, "data"),
+      dataDir,
       log: this.log,
       providers: this.providers,
       audit: this.audit,
@@ -355,7 +357,7 @@ export class Machine {
       home: homedir(),
       sessionDirs: async () => {
         const count = new Map<string, number>();
-        for (const t of this.core.list()) if (t.kind !== ThreadKind.ADVISOR) count.set(t.dir, (count.get(t.dir) ?? 0) + 1);
+        for (const t of this.core.list()) if (t.kind !== ThreadKind.ADVISOR && t.chatId === 0n) count.set(t.dir, (count.get(t.dir) ?? 0) + 1);
         for (const p of withHistory(this.providers)) {
           for (const d of (await this.core.localSessions({ provider: p.id, dir: "", query: "", offset: 0, limit: 1 })).dirs) {
             count.set(d.dir, Math.max(count.get(d.dir) ?? 0, d.sessions));

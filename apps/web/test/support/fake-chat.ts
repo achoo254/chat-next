@@ -66,6 +66,7 @@ type MessageExtras = Pick<
 	| "viaBotId"
 	| "date"
 	| "silent"
+	| "sentViaAi"
 >;
 type UserExtras = { isBot?: boolean; username?: string; bio?: string; name?: string; deleted?: boolean; botInlinePlaceholder?: string };
 type ChatExtras = {
@@ -287,6 +288,8 @@ export class ChatFixture {
 	readonly deletedChats: number[] = [];
 	/** SetDialogMute requests. */
 	readonly mutes: { chatId: number; durationSeconds: number; forever: boolean }[] = [];
+	/** SetDialogHiddenFromAI requests, in order. */
+	readonly hiddenFromAiRequests: { chatId: number; hidden: boolean }[] = [];
 	/** GetPinnedMessages requests (chat and topic). */
 	readonly pinnedRequests: { chatId: number; topicId: number }[] = [];
 	/** Chats whose reactions come without the latest reactors (channels, for non-admins). */
@@ -1115,6 +1118,12 @@ export class ChatFixture {
 				const until = req.forever ? 2_147_483_647 : req.durationSeconds > 0 ? Math.floor(Date.now() / 1000) + req.durationSeconds : 0;
 				this.server.muteDialog(this.selfId, chatId, until);
 				return { muteUntil: BigInt(until) };
+			},
+			setDialogHiddenFromAI: (req) => {
+				const chatId = num(req.chatId);
+				this.hiddenFromAiRequests.push({ chatId, hidden: req.hidden });
+				this.server.hideDialogFromAi(this.selfId, chatId, req.hidden);
+				return { hidden: req.hidden };
 			},
 			setDialogPinned: (req) => {
 				const chatId = num(req.chatId);

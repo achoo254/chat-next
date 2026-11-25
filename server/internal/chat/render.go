@@ -138,18 +138,20 @@ type memberRow struct {
 	PinRank   int32
 	// The member marked the chat as unread.
 	UnreadMark bool
+	// The member hid the chat from AI (the MCP endpoint).
+	HiddenFromAI bool
 }
 
 const memberColumns = `m.chat_id, m.user_id, m.role, m.permissions, m.inviter_id, m.joined_at, m.joined_seq,
 	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL, m.left_at, coalesce(m.left_seq, 0),
-	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0), m.unread_mark`
+	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0), m.unread_mark, m.hidden_from_ai`
 
 func scanMember(row pgx.Row) (*memberRow, error) {
 	m := &memberRow{}
 	var perms *int32
 	err := row.Scan(&m.ChatID, &m.UserID, &m.Role, &perms, &m.InviterID, &m.JoinedAt, &m.JoinedSeq,
 		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned, &m.MuteUntil, &m.PinRank,
-		&m.UnreadMark)
+		&m.UnreadMark, &m.HiddenFromAI)
 	if perms != nil {
 		p := uint32(*perms)
 		m.Perms = &p
@@ -452,15 +454,17 @@ type messageRow struct {
 	// ChangedAt: the content last changed after posting (nil when never).
 	ChangedAt *time.Time
 	Deleted   bool
+	// ViaAI: the sender posted it with an MCP tool (shown to the sender only).
+	ViaAI bool
 }
 
 const messageColumns = `m.chat_id, m.seq, m.topic_id, m.from_id, m.random_id, m.date, m.text, m.content, m.reply_to_seq,
-	m.grouped_id, m.edit_version, m.edit_date, m.changed_at, m.deleted_at IS NOT NULL`
+	m.grouped_id, m.edit_version, m.edit_date, m.changed_at, m.deleted_at IS NOT NULL, m.via_ai`
 
 func scanMessage(row pgx.Row) (*messageRow, error) {
 	m := &messageRow{}
 	err := row.Scan(&m.ChatID, &m.Seq, &m.TopicID, &m.FromID, &m.RandomID, &m.Date, &m.Text, &m.Content, &m.ReplyToSeq,
-		&m.GroupedID, &m.EditVersion, &m.EditDate, &m.ChangedAt, &m.Deleted)
+		&m.GroupedID, &m.EditVersion, &m.EditDate, &m.ChangedAt, &m.Deleted, &m.ViaAI)
 	return m, err
 }
 
@@ -707,9 +711,16 @@ func (m *messageRow) render(viewer int64, reactions []*appv1.ReactionCount) (*ap
 	}
 	if viewer == m.FromID {
 		out.RandomId = m.RandomID
+		out.SentViaAi = m.ViaAI
 	}
 	out.Reactions = reactions
 	return out, nil
+}
+
+// ReferencedUsers lists the users a message mentions in any way, its recent
+// reactors included (the users a response carries for it).
+func ReferencedUsers(m *appv1.Message) []int64 {
+	return referencedUsers(m)
 }
 
 // referencedUsers lists the users a message mentions in any way, its recent

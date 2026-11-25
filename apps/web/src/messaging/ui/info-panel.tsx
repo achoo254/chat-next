@@ -6,7 +6,8 @@
 // the "i" button, closed with X; an overlay below 1100px takes focus when it
 // opens (#info-overlay), and below 760px it fills the screen with a back
 // arrow (#narrow). "Ảnh, file, link" lists the kinds of shared media the
-// chat has and opens them in the column, one tab per kind (R3).
+// chat has and opens them in the column, one tab per kind (R3). "Ẩn với AI"
+// keeps the user's AI tools out of the chat.
 import { PINNED_DIALOGS_MAX, type Chat, type User } from "@achoo254/chat-core";
 import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import type { SharedTab } from "../media/shared-media.tsx";
@@ -227,6 +228,42 @@ function PinnedBarRow({ chat }: { chat: Chat }) {
 	);
 }
 
+/** "Ẩn với AI": the user's AI tools (the MCP endpoint) neither read nor post in the chat while it is on. */
+function AiHiddenRow({ chatId }: { chatId: number }) {
+	const copy = useScreensCopy();
+	const { remote, toasts } = useServices();
+	const hidden = useDialog(chatId)?.dialog.hiddenFromAi === true;
+	// The switch follows the tap at once; the server's update confirms it (or the failure puts it back).
+	const [wanted, setWanted] = useState<boolean | null>(null);
+	if (wanted !== null && wanted === hidden) setWanted(null);
+	const checked = wanted ?? hidden;
+	const change = (next: boolean) => {
+		setWanted(next);
+		remote.setDialogHiddenFromAi(chatId, next).then(
+			(now) => {
+				setWanted(now);
+				toasts.show(now ? copy.info.hiddenFromAiOn : copy.info.hiddenFromAiOff);
+			},
+			() => {
+				setWanted(null);
+				toasts.show(copy.common.failed);
+			},
+		);
+	};
+	return (
+		<div className="info-sec">
+			<div className="row">
+				<Icon name="eye-off" />
+				<span className="grow">
+					{copy.info.hiddenFromAi}
+					<small>{copy.info.hiddenFromAiHint}</small>
+				</span>
+				<Switch checked={checked} label={copy.info.hiddenFromAi} onChange={change} />
+			</div>
+		</div>
+	);
+}
+
 function InviteRow({ chat }: { chat: Chat }) {
 	const copy = useScreensCopy();
 	const { locale } = useI18n();
@@ -405,6 +442,7 @@ function GroupInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 			)}
 			{!chat.left && <SharedRows chatId={chat.id} onShared={onShared} />}
 			{!chat.left && <PinnedBarRow chat={chat} />}
+			{!chat.left && <AiHiddenRow chatId={chat.id} />}
 			{chat.externalApp !== undefined && !chat.left && (
 				<Suspense fallback={null}>
 					<BridgeChatTools chatId={chat.id} title={chat.title} />
@@ -469,6 +507,7 @@ function SavedInfo({ chat, onShared }: { chat: Chat; onShared: (tab: SharedTab) 
 			<QuickActions chatId={chat.id} title={name} mute={false} />
 			<SharedRows chatId={chat.id} onShared={onShared} />
 			<PinnedBarRow chat={chat} />
+			<AiHiddenRow chatId={chat.id} />
 			<div className="info-sec">
 				<button type="button" className="row link-row danger" onClick={() => ui.dialog.set({ kind: "deleteChat", chatId: chat.id })}>
 					<Icon name="trash" />
@@ -546,6 +585,7 @@ function UserInfo({ chat, peer, onShared }: { chat: Chat; peer: User | undefined
 				</Suspense>
 			)}
 			<PinnedBarRow chat={chat} />
+			<AiHiddenRow chatId={chat.id} />
 			<div className="info-sec">
 				<button type="button" className="row link-row danger" onClick={toggleBlock}>
 					<Icon name="ban" />

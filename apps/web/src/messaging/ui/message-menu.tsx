@@ -25,7 +25,7 @@ import { isReactionRefused, quickReactions, reactionTaken } from "./bridge-react
 import { EmojiPicker } from "./emoji-picker.tsx";
 import { MessageBubble, PendingBubble, type LimitedActions } from "./message-item.tsx";
 import { copyText } from "./parts.tsx";
-import { useUi, type MenuAnchor } from "./ui-context.tsx";
+import { openAiPanel, useUi, type MenuAnchor } from "./ui-context.tsx";
 
 // The quick reaction row rides in this chunk, so a message loads no extra chunk for it.
 export { default as ReactionBar } from "./reaction-bar.tsx";
@@ -140,7 +140,7 @@ function albumSeqs(items: readonly WindowItem[], message: StoredMessage): number
 export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readOutboxMaxSeq, item: given, limited }: MenuLayerProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
-	const { store, source, remote, backend, toasts } = useServices();
+	const { store, source, remote, backend, toasts, self } = useServices();
 	const pins = pinnedLists(store);
 	const stored = useItem(chatId, itemKey);
 	const item = given ?? stored;
@@ -285,6 +285,23 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 		const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 		const canWrite = !channel || admin;
 		if (canWrite) entries.push({ label: copy.menu.reply, icon: "reply", run: () => ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq }) });
+		// The chat's AI panel opens about this message: who sent it, when, what it says and its seq.
+		const sender =
+			message.integrationLabel !== ""
+				? message.integrationLabel
+				: channel
+					? (chat?.title ?? "")
+					: message.fromId === store.selfId
+						? self.name || copy.common.you
+						: (author?.name ?? copy.message.unknownUser);
+		entries.push({
+			label: copy.menu.askAi,
+			icon: "bulb",
+			run: () =>
+				openAiPanel(ui, chatId, {
+					quote: { seq: message.seq, sender, date: message.date, text: message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]` },
+				}),
+		});
 		// An album goes on as a whole, as from its quick Forward button.
 		const seqs = albumSeqs(store.items(chatId), message);
 		entries.push({ label: copy.menu.forward, icon: "forward", run: () => ui.dialog.set({ kind: "forward", chatId, seq: message.seq, seqs }) });

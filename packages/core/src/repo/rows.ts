@@ -274,6 +274,7 @@ export function rowToMessage(row: SqlRow): Message {
 		linkPreview: parseLinkPreview(optionalStr(row, "link_preview")),
 		recalled: bool(row, "recalled"),
 		silent: bool(row, "silent"),
+		...(bool(row, "sent_via_ai") ? { sentViaAi: true } : {}),
 		...mediaOf(optionalStr(row, "media")),
 		...parseKeyboard(optionalStr(row, "reply_keyboard"), bool(row, "keyboard_hidden")),
 	};
@@ -339,6 +340,7 @@ export function rowToDialog(row: SqlRow): Dialog {
 		pinnedMessageSeq: num(row, "pinned_message_seq"),
 		unreadMark: bool(row, "unread_mark"),
 		sortDate: num(row, "top_date"),
+		hiddenFromAi: bool(row, "hidden_from_ai"),
 	};
 }
 

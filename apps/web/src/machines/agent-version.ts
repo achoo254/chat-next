@@ -45,6 +45,13 @@ export const AGENT_LIVE_MAP = [3, 26, 0] as const;
 /** The first tunelo that takes a folder macOS protects back (MacFolderAccessRevoke), so the machine's folder list offers it. */
 export const AGENT_MAC_FOLDER_REVOKE = [3, 22, 0] as const;
 
+/**
+ * The first tunelo that keeps one session per Chat conversation (ThreadCreate.chat,
+ * ThreadSummary.chat_id). Older ones ignore the chat and would open the session in
+ * their own working folder, so the Chat app's AI panel asks for an update instead.
+ */
+export const AGENT_CHAT_THREADS = [3, 27, 0] as const;
+
 /** The first tunelo that refuses ThreadClose while anything goes on in the session, so a device may offer "close session". */
 export const AGENT_SAFE_CLOSE = [3, 3, 5] as const;
 

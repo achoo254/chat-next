@@ -363,6 +363,17 @@ export const MIGRATIONS: readonly Migration[] = [
 			"DELETE FROM sync_state",
 		],
 	},
+	{
+		version: 18,
+		statements: [
+			// The user hid the chat from their AI tools (Dialog.hidden_from_ai).
+			"ALTER TABLE dialogs ADD COLUMN hidden_from_ai INTEGER NOT NULL DEFAULT 0",
+			// The user posted the message through an AI tool; set only in the sender's own copy.
+			"ALTER TABLE messages ADD COLUMN sent_via_ai INTEGER NOT NULL DEFAULT 0",
+			// Dialogs and messages already stored lack them: the next start takes a fresh snapshot.
+			"DELETE FROM sync_state",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

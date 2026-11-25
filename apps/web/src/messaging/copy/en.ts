@@ -92,6 +92,7 @@ export const en: MessagingCopy = {
 		savedEmpty: "Notes, links and files on every device",
 	},
 	convo: {
+		ai: "Ask AI",
 		pick: "Pick a conversation",
 		pickBody: "Choose a chat on the left, or press + to start a new one.",
 		backToList: "Back to chats",
@@ -140,6 +141,8 @@ export const en: MessagingCopy = {
 		queued: "Waiting to send",
 		sentTick: "Sent",
 		silent: "Sent silently, no notification",
+		viaAi: "via AI",
+		viaAiTitle: "You sent this through AI. Only you see this label.",
 		read: "Seen",
 		failed: "Not sent",
 		notSent: "Not sent",

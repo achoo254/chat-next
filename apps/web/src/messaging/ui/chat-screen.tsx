@@ -28,6 +28,8 @@ import {
 	Cell,
 	ComposerIntents,
 	UiContext,
+	type AiPanelRequest,
+	type ComposerFill,
 	followChatOnScreen,
 	minimizeMiniApp,
 	useCell,
@@ -42,6 +44,8 @@ const WIDE_QUERY = "(min-width: 1101px)";
 
 const TopicListColumn = lazy(() => import("./topic-list.tsx").then((m) => ({ default: m.TopicListColumn })));
 const InfoPanel = lazy(() => import("./info-panel.tsx").then((m) => ({ default: m.InfoPanel })));
+// The chat's AI panel (its AI Agent session on the user's machine), loaded when first opened.
+const AiPanel = lazy(() => import("./ai-panel.tsx"));
 const ChatAdmin = lazy(() => import("./chat-admin.tsx").then((m) => ({ default: m.ChatAdmin })));
 const BannedList = lazy(() => import("./banned-list.tsx").then((m) => ({ default: m.BannedList })));
 const integrationsCode = preloadable(() => import("../integrations/integrations-page.tsx"));
@@ -90,14 +94,23 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 
 	const ui = useMemo<Ui>(() => {
 		const miniApp = new Cell<OpenMiniApp | null>(null);
+		const ai = new Cell<AiPanelRequest | null>(null);
 		return {
 			dialog: new Cell<DialogRequest | null>(null),
 			menu: new Cell<MenuTarget | null>(null),
 			listMenu: new Cell<ListMenuTarget | null>(null),
 			miniApp,
 			intents: new ComposerIntents(),
+			ai,
+			composerFill: new Cell<ComposerFill | null>(null),
 			focusSearch: () => searchRef.current?.focus(),
 			toggleInfo: (open?: boolean) => {
+				// One slot: the chat's info takes the AI panel's place.
+				if (ai.get() !== null && open !== false) {
+					ai.set(null);
+					setInfoOpen(true);
+					return;
+				}
 				// One slot: showing the chat's info minimizes a Mini App docked there.
 				const docked = miniApp.get();
 				if (docked !== null && !docked.minimized && open !== false) {
@@ -174,7 +187,10 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 	const miniApp = useCell(ui.miniApp);
 	useEffect(() => followChatOnScreen(ui.miniApp, chatId), [ui, chatId]);
 	const miniAppDocked = miniApp !== null && !miniApp.minimized;
-	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts && !miniAppDocked;
+	// The AI panel takes the info column's place; a Mini App shown takes it from both.
+	const aiRequest = useCell(ui.ai);
+	const showAi = aiRequest !== null && chat != null && panel === "chat" && !contacts && route.name === "chat" && !miniAppDocked;
+	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts && !miniAppDocked && !showAi;
 
 	const pickFolder = (next: Folder) => {
 		setFolder(next);
@@ -209,7 +225,9 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 
 	const open = chatId !== 0 || (contacts && route.userId !== 0) || route.name === "person";
 	const adminMode = panel !== "chat";
-	const classes = ["app", "folders", showInfo || miniAppDocked ? "" : "no-info", open ? "has-chat" : "", adminMode ? "admin-mode" : ""].filter(Boolean).join(" ");
+	const classes = ["app", "folders", showInfo || miniAppDocked || showAi ? "" : "no-info", showAi ? "ai-open" : "", open ? "has-chat" : "", adminMode ? "admin-mode" : ""]
+		.filter(Boolean)
+		.join(" ");
 
 	return (
 		<UiContext value={ui}>
@@ -248,12 +266,25 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 							</LoaderBoundary>
 						) : (
 							<LoaderScope>
-								<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} />
+								<Conversation chatId={chatId} topicId={topic?.id ?? 0} infoOpen={showInfo} aiOpen={showAi} />
 							</LoaderScope>
 						)}
 						{showInfo && chat != null && (
 							<Suspense fallback={<aside className="info" aria-busy="true" />}>
 								<InfoPanel chat={chat} peer={view?.peer ?? peer} topic={topic} title={title} />
+							</Suspense>
+						)}
+						{showAi && chat != null && aiRequest !== null && (
+							<Suspense fallback={<aside className="ai-panel" aria-busy="true" />}>
+								{/* One panel per chat: another chat opens its own session, without the quote asked about here. */}
+								<AiPanel
+									key={chatId}
+									chat={chat}
+									title={title}
+									topicId={topic?.id ?? 0}
+									request={aiRequest.chatId === chatId ? aiRequest : null}
+									app={appRef}
+								/>
 							</Suspense>
 						)}
 					</>

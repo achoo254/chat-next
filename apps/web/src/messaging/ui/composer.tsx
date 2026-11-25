@@ -14,7 +14,10 @@
 // adds the command menu and the bot's reply keyboard; in a group it adds the
 // command menu of the group's bots. A draft "@bot_username query" is inline
 // mode: the box finds it (bots/inline-token.ts) and the bot's results show as
-// a list attached to the box (bots/inline-results.tsx).
+// a list attached to the box (bots/inline-results.tsx). "/ai question" sent
+// opens the chat's AI panel with the question instead: nothing goes into the
+// chat. Text the AI panel puts in the box («Đưa vào ô soạn tin») replaces
+// the draft.
 import { Suspense, lazy, useCallback, useEffect, useEffectEvent, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { codePointLength } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
@@ -29,7 +32,7 @@ import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
 import { sizeLimitLabel } from "../media/size-limit-label.ts";
-import { useCell, useIntent, useUi } from "./ui-context.tsx";
+import { openAiPanel, useCell, useIntent, useUi } from "./ui-context.tsx";
 
 const AttachMenu = lazy(() => import("./attach-menu.tsx"));
 const EmojiPicker = lazy(() => import("./emoji-picker.tsx").then((m) => ({ default: m.EmojiPicker })));
@@ -78,6 +81,14 @@ function canRecord(): boolean {
 
 const PREVIEW_DELAY_MS = 400;
 const URL_IN_TEXT = /https?:\/\/[^\s<>"]+/i;
+/** "/ai", alone or followed by a question: a question for the chat's AI panel, never a message. */
+const AI_COMMAND = /^\/ai(?:\s+([\s\S]*))?$/;
+
+/** The question of an "/ai …" draft ("" for "/ai" alone); null for any other text. */
+export function aiQuestion(text: string): string | null {
+	const match = AI_COMMAND.exec(text.trim());
+	return match === null ? null : (match[1] ?? "").trim();
+}
 interface ComposerProps {
 	chatId: number;
 	topicId: number;
@@ -223,6 +234,20 @@ export function Composer({
 		if (advisorFill !== undefined && !disabled) takeAdvisorFill(advisorFill);
 	}, [advisorFill, disabled]);
 
+	// The AI panel wrote this chat's draft (and its reply) already: the box shows it and takes the caret.
+	const composerFill = useCell(ui.composerFill);
+	const takeComposerFill = useEffectEvent(() => {
+		ui.composerFill.set(null);
+		setText(drafts.get(chatId, topicId));
+		setError("");
+		area.current?.focus();
+	});
+	useEffect(() => {
+		// The fill cell is an external store: its text is taken into the box once, when it arrives.
+		// eslint-disable-next-line react-hooks/set-state-in-effect
+		if (composerFill !== null && composerFill.chatId === chatId && composerFill.topicId === topicId && !disabled) takeComposerFill();
+	}, [composerFill, chatId, topicId, disabled]);
+
 	const cancelIntent = () => {
 		ui.intents.cell(chatId).set(null);
 	};
@@ -265,6 +290,13 @@ export function Composer({
 		event?.preventDefault();
 		const value = text.trim();
 		if (disabled) return;
+		// "/ai …": the question goes to the chat's AI panel; the box lets go of the command.
+		const question = intent?.mode === "edit" ? null : aiQuestion(value);
+		if (question !== null) {
+			openAiPanel(ui, chatId, { ask: question });
+			update("");
+			return;
+		}
 		if (files.length > 0 && intent?.mode !== "edit") {
 			await sendAttached(value);
 			return;

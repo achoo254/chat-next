@@ -158,6 +158,8 @@ type ThreadMeta = {
   kind?: "advisor";
   /** An Advisor thread's questions not started yet, oldest first: they go on after a restart (without what the machine added). */
   advisorQueue?: SavedQuestion[];
+  /** The conversation of the Chat app this thread is the AI session of (ThreadCreate.chat), as a decimal string; unset for any other thread. */
+  chatId?: string;
   /**
    * The running totals the AI last reported for the session `sessionId`
    * (API time, cost at API prices): a turn's share is what they grew by.
@@ -197,6 +199,14 @@ export type LocalSessionView = LocalSession & { threadId: string; busyElsewhere:
 const FOLDER_COMMANDS_MS = 5 * 60_000;
 
 export type ConsentGiven = { sensitive: boolean; projectSettings: boolean; trustProject?: boolean };
+
+/** The conversation of the Chat app a thread opens for (ChatLink in the protocol); app is "telegram", "zalo", or "" for Chat itself. */
+export type ChatLinkInput = { chatId: bigint; title: string; app: string };
+
+/** Where the AI sessions of Chat conversations opened without a folder work: one folder per chat under tunelo's data. */
+export function chatSessionsDir(dataDir: string): string {
+  return join(dataDir, "chat-sessions");
+}
 
 /** Longest tool output kept from a transcript read back (live output is kept whole). */
 const HISTORY_OUTPUT_MAX = 64 * 1024;
@@ -1197,10 +1207,10 @@ export class AgentCore {
     return item;
   }
 
-  /** The folders of the latest sessions, newest first; Advisor's threads are not sessions of the user's. */
+  /** The folders of the latest sessions, newest first; Advisor's threads and the chats' AI sessions are not sessions of a project of the user's. */
   recentDirs(limit = 10): string[] {
     const seen: string[] = [];
-    for (const s of this.list()) if (s.kind !== ThreadKind.ADVISOR && !seen.includes(s.dir)) seen.push(s.dir);
+    for (const s of this.list()) if (s.kind !== ThreadKind.ADVISOR && s.chatId === 0n && !seen.includes(s.dir)) seen.push(s.dir);
     return seen.slice(0, limit);
   }
 
@@ -1238,9 +1248,18 @@ export class AgentCore {
     permissionMode?: string;
     /** One of the AI's effort levels to start in; "" or unset follows the AI's default. */
     effort?: string;
+    /** The Chat conversation the thread is the AI session of: one thread per chat, in its own folder of tunelo's when `dir` is "". */
+    chat?: ChatLinkInput;
   }): Promise<ThreadSummary> {
     const provider = this.namedProvider(req.provider);
-    const dir = resolve(req.dir);
+    const chat = req.chat;
+    if (chat !== undefined && chat.chatId <= 0n) {
+      throw new AgentError(ErrorCode.INVALID, "chat id must be positive", { reason: ErrorReason.UNSUPPORTED_REQUEST, subject: String(chat.chatId) });
+    }
+    const chatId = chat === undefined ? undefined : String(chat.chatId);
+    const held = chatId === undefined ? undefined : this.chatThread(chatId);
+    if (held) return this.reopenChat(held, req.text);
+    const dir = chatId !== undefined && req.dir.trim() === "" ? this.chatFolder(chatId) : resolve(req.dir);
     this.opts.assertMacFolder?.(dir);
     if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new AgentError(ErrorCode.INVALID, "folder not found", { reason: ErrorReason.FOLDER_NOT_FOUND, subject: dir });
     const mode = req.permissionMode ?? "";
@@ -1252,14 +1271,18 @@ export class AgentCore {
       throw new AgentError(ErrorCode.INVALID, `unknown effort "${effort}"`, { reason: ErrorReason.UNKNOWN_EFFORT, subject: effort });
     }
     await this.admit(provider, dir, req.consent, req.device);
+    // Another create for the same chat may have finished while this one was admitted.
+    const raced = chatId === undefined ? undefined : this.chatThread(chatId);
+    if (raced) return this.reopenChat(raced, req.text);
     const t = this.addThread({
-      title: firstLine(req.text),
+      title: firstLine(req.text) || (chat === undefined ? "" : chatTitle(chat.title)),
       dir,
       provider: provider.id,
       model: req.model,
       projectSettings: req.consent.projectSettings,
     });
-    if (mode !== "" || effort !== "") {
+    if (mode !== "" || effort !== "" || chatId !== undefined) {
+      if (chatId !== undefined) t.meta.chatId = chatId;
       if (mode !== "") t.meta.permissionMode = mode;
       if (effort !== "") {
         t.meta.effort = effort;
@@ -1270,6 +1293,24 @@ export class AgentCore {
     // No first message: the session waits, parked, for the one typed in it.
     if (req.text.trim()) await this.send(t.meta.id, req.text, "");
     return this.summary(t);
+  }
+
+  /** The live (not archived, not deleted) thread of a Chat conversation, if there is one. */
+  private chatThread(chatId: string): Thread | undefined {
+    return [...this.threads.values()].find((t) => !t.deleted && !t.meta.archived && t.meta.chatId === chatId);
+  }
+
+  /** A chat's thread asked for again: a first message given with the request goes on in it rather than being lost. */
+  private async reopenChat(t: Thread, text: string): Promise<ThreadSummary> {
+    if (text.trim()) await this.send(t.meta.id, text, "");
+    return this.summary(t);
+  }
+
+  /** The folder of tunelo's own a chat's AI session works in, made (owner only) when missing. */
+  private chatFolder(chatId: string): string {
+    const dir = join(chatSessionsDir(this.opts.dataDir), chatId);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    return realpathSync(dir);
   }
 
   /**
@@ -3194,6 +3235,7 @@ export class AgentCore {
       projectConfig: this.threadProjectConfig(t),
       gitRoot: gitRoot(t.meta.dir),
       kind: t.meta.kind === "advisor" ? ThreadKind.ADVISOR : ThreadKind.UNSPECIFIED,
+      chatId: chatIdOf(t.meta),
     });
   }
 
@@ -3800,6 +3842,18 @@ function elsewhereKey(s: ThreadSummary): string {
 /** A session's name from a message: its first line, at most 80 characters. */
 function firstLine(text: string): string {
   return text.trim().split("\n")[0]?.slice(0, 80) ?? "";
+}
+
+/** The title of a chat's AI thread opened without a first message. */
+function chatTitle(title: string): string {
+  const name = firstLine(title);
+  return name === "" ? "AI" : firstLine(`AI · ${name}`);
+}
+
+/** The chat id kept in a thread's meta, 0 for none (or one a hand edit broke). */
+function chatIdOf(meta: ThreadMeta): bigint {
+  if (meta.chatId === undefined || !/^\d+$/.test(meta.chatId)) return 0n;
+  return BigInt(meta.chatId);
 }
 
 /** The preview line of a user or AI text item; undefined for anything else (thinking, empty text). */

@@ -1264,6 +1264,7 @@ func (s *Service) dialogs(ctx context.Context, me int64, chatIDs []int64) (*appv
 			PinnedMessageCount:  pins[c.ID].count,
 			PinnedMessageSeq:    pins[c.ID].newest,
 			UnreadMark:          m.UnreadMark,
+			HiddenFromAi:        m.HiddenFromAI,
 			SortDate:            c.LastMessageAt.Unix(),
 		}
 		if top := tops[c.ID]; top != nil {

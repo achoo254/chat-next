@@ -87,7 +87,11 @@ function isPending(block: Block): block is Pending {
 	return (block.kind === "approval" && block.approval.state === PromptState.PENDING) || (block.kind === "question" && block.question.state === PromptState.PENDING);
 }
 
-export function SessionChat({ machine, threadId, mode }: { machine: string; threadId: string; mode: SessionMode }) {
+/**
+ * `onUseText`: each of the AI's text replies offers to put its text somewhere
+ * (the Chat app's AI panel: «Đưa vào ô soạn tin»); absent on the AI Agent screens.
+ */
+export function SessionChat({ machine, threadId, mode, onUseText }: { machine: string; threadId: string; mode: SessionMode; onUseText?: (text: string) => void }) {
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
@@ -404,6 +408,7 @@ export function SessionChat({ machine, threadId, mode }: { machine: string; thre
 							onSend={verdictChipsSend(state.listed, advisorThread) ? (text) => send(text, []) : undefined}
 							sendLocked={!canSend}
 							commands={threadInfo?.commands}
+							onUseText={onUseText}
 						/>
 					)}
 					{suggestion !== undefined && (
@@ -715,6 +720,8 @@ interface TranscriptProps {
 	sendLocked?: boolean;
 	/** The AI's commands and skills, so a sent "/skill" stands out; none while unknown. */
 	commands?: readonly SlashCommand[] | undefined;
+	/** Offers each finished text reply of the AI to the caller (a button under it); none when absent. */
+	onUseText?: ((text: string) => void) | undefined;
 }
 
 /**
@@ -758,7 +765,7 @@ const EARLIER_PX = 600;
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
 const NO_COMMANDS: readonly SlashCommand[] = [];
 
-export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false, commands = NO_COMMANDS }: TranscriptProps) {
+export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false, commands = NO_COMMANDS, onUseText }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -927,6 +934,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 							onSend={onSend}
 							sendLocked={sendLocked}
 							commands={commands}
+							onUseText={onUseText}
 						/>
 					)),
 					previous === null || before < start ? null : (
@@ -986,9 +994,10 @@ interface BlockViewProps {
 	onSend: ((text: string) => Promise<void>) | undefined;
 	sendLocked: boolean;
 	commands: readonly SlashCommand[];
+	onUseText: ((text: string) => void) | undefined;
 }
 
-function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked, commands }: BlockViewProps) {
+function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked, commands, onUseText }: BlockViewProps) {
 	const { locale } = useI18n();
 	switch (block.kind) {
 		case "user": {
@@ -1008,7 +1017,16 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, on
 			);
 		}
 		case "text":
-			return <AgentText text={block.text} streaming={block.partial} />;
+			if (onUseText === undefined || block.partial || block.text.trim() === "") return <AgentText text={block.text} streaming={block.partial} />;
+			return (
+				<div className="mx-reply-use">
+					<AgentText text={block.text} streaming={false} />
+					<button type="button" className="btn btn-sm" onClick={() => onUseText(block.text)}>
+						<Icon name="edit" small />
+						{t.transcript.useText}
+					</button>
+				</div>
+			);
 		case "who":
 			return (
 				<div className="mx-who">

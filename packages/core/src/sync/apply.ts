@@ -9,6 +9,7 @@ import {
 	putAdvisorProfile,
 	putChat,
 	putChatPts,
+	putHiddenFromAi,
 	putMessage,
 	putNewMessage,
 	putMute,
@@ -204,6 +205,9 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			return;
 		case "dialog_mute":
 			putMute(w, body.chatId, body.muteUntil);
+			return;
+		case "dialog_hidden_from_ai":
+			putHiddenFromAi(w, body.chatId, body.hidden);
 			return;
 		case "pinned_dialogs":
 			for (const chatId of body.chatIds) ensureDialog(w, chatId);

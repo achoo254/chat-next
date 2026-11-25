@@ -23,6 +23,7 @@ export interface RemoteApi {
 				Client<typeof ChatsService>,
 				| "getPeerDialogs"
 				| "setDialogMute"
+				| "setDialogHiddenFromAI"
 				| "setDialogPinned"
 				| "reorderPinnedDialogs"
 				| "deleteChat"

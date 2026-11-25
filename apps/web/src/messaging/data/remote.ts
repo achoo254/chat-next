@@ -501,6 +501,8 @@ export interface Remote {
 	readers(chatId: number, seq: number): Promise<Reader[]>;
 	/** Mutes the caller's notifications of a chat; 0 unmutes. Returns the new mute end (Dialog.muteUntil). */
 	setDialogMute(chatId: number, muteFor: MuteFor): Promise<number>;
+	/** Hides the chat from the caller's AI tools or shows it again. Returns the new flag (Dialog.hiddenFromAi). */
+	setDialogHiddenFromAi(chatId: number, hidden: boolean): Promise<boolean>;
 	/** FailedPrecondition "pinned_dialogs_limit…" past PINNED_DIALOGS_MAX. Returns the pinned chats, top first. */
 	setDialogPinned(chatId: number, pinned: boolean): Promise<number[]>;
 	/** Private chats: for the caller only. Groups and channels: the owner deletes it for everyone. */
@@ -581,6 +583,7 @@ const METHODS = [
 	"revokeInvite",
 	"readers",
 	"setDialogMute",
+	"setDialogHiddenFromAi",
 	"setDialogPinned",
 	"deleteChat",
 	"commonChats",

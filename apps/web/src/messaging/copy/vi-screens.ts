@@ -660,7 +660,51 @@ export const viScreens = {
 		restoreTitle: (name: string) => `Khôi phục tầng của ${name}?`,
 		botReviewDone: "Đã cập nhật, đã ghi nhật ký",
 	},
+	aiPanel: {
+		title: "AI",
+		/** The panel's name for screen readers. */
+		label: (chat: string) => `AI của hội thoại ${chat}`,
+		close: "Đóng AI",
+		resize: "Đổi độ rộng khung AI",
+		machine: "Máy chạy AI",
+		loading: "Đang tìm máy…",
+		noMachine: "Chưa có máy",
+		noMachineBody: "Thêm máy tính có AI lập trình ở AI Agent để hỏi AI ngay trong hội thoại.",
+		offline: "Máy B đang tắt",
+		offlineBody: (machine: string) => `${machine} chưa kết nối. Bật máy và chạy tunelo start, rồi thử lại.`,
+		connecting: (machine: string) => `Đang kết nối tới ${machine}…`,
+		noAi: "Máy chưa có AI nào đăng nhập. Đăng nhập một AI trên máy rồi thử lại.",
+		outdated: "Cập nhật tunelo để dùng AI trong hội thoại",
+		openAgent: "Mở AI Agent",
+		hidden: "Chat này đang ẩn với AI: công cụ AI không đọc được tin trong đây.",
+		/** On the panel of a chat hidden from AI: turns that off. */
+		showToAi: "Bỏ ẩn với AI",
+		intro: "AI đọc hội thoại này qua công cụ chat trên máy bạn. Câu trả lời gợi ý chỉ là bản nháp; AI chỉ gửi tin khi bạn bảo rõ, và luôn hỏi bạn duyệt trước.",
+		placeholder: "Hỏi AI về hội thoại này…",
+		send: "Gửi cho AI",
+		sending: "Đang gửi…",
+		failed: "Không gửi được cho AI. Thử lại sau.",
+		quote: "Tin đang hỏi",
+		removeQuote: "Bỏ tin đang hỏi",
+		chips: "Hỏi nhanh",
+		chip: { draft: "Soạn trả lời", summarize: "Tóm tắt", translate: "Dịch", explain: "Giải thích" },
+		/** What each quick chip asks about the quoted message. */
+		prompt: {
+			draft: "Soạn giúp tôi một câu trả lời cho tin này.",
+			summarize: "Tóm tắt tin này cùng bối cảnh quanh nó.",
+			translate: "Dịch tin này sang tiếng Việt.",
+			explain: "Giải thích tin này.",
+		},
+		/** The quoted message as the AI reads it, before the question. */
+		quoted: (sender: string, time: string, seq: number, text: string): string => `Về tin #${seq} của ${sender} lúc ${time}:\n${text}`,
+		replaceTitle: "Thay nội dung đang soạn?",
+		replaceBody: "Ô soạn tin đang có chữ. Thay bằng câu trả lời của AI?",
+		replace: "Thay",
+		filled: "Đã đưa vào ô soạn tin",
+	},
 	menu: {
+		/** Opens the chat's AI panel about this message. */
+		askAi: "Hỏi AI",
 		label: "Thao tác với tin",
 		labelMine: "Thao tác với tin của bạn",
 		react: "Thả cảm xúc",
@@ -780,6 +824,11 @@ export const viScreens = {
 		},
 	},
 	info: {
+		/** The switch keeping the user's AI tools out of this chat (the MCP endpoint neither reads nor posts in it). */
+		hiddenFromAi: "Ẩn với AI",
+		hiddenFromAiHint: "Công cụ AI của bạn không đọc và không gửi tin trong chat này.",
+		hiddenFromAiOn: "Đã ẩn chat này với AI",
+		hiddenFromAiOff: "AI lại đọc được chat này",
 		groupTitle: "Thông tin nhóm",
 		channelTitle: "Thông tin kênh",
 		userTitle: "Thông tin",

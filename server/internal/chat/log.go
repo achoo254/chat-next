@@ -40,6 +40,8 @@ const (
 	kindAdvisorProfile = "advisor_profile"
 	// kindPeopleChanged: the user's people or link suggestions changed.
 	kindPeopleChanged = "people_changed"
+	// kindDialogHiddenFromAI: a member hid a chat from AI or showed it again.
+	kindDialogHiddenFromAI = "dialog_hidden_from_ai"
 	// kindInlineButton: a user pressed a bot's callback button; the row
 	// carries no log entries, the press is in bot_callbacks.
 	kindInlineButton = "inline_button"
@@ -383,6 +385,8 @@ func updateChatID(u *appv1.Update) int64 {
 		return k.ChatDeleted.GetChatId()
 	case *appv1.Update_DialogUnreadMark:
 		return k.DialogUnreadMark.GetChatId()
+	case *appv1.Update_DialogHiddenFromAi:
+		return k.DialogHiddenFromAi.GetChatId()
 	default:
 		return 0
 	}

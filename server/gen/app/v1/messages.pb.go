@@ -1975,7 +1975,10 @@ type Message struct {
 	Recalled bool `protobuf:"varint,21,opt,name=recalled,proto3" json:"recalled,omitempty"`
 	// Posted without a notification (incoming webhooks marked silent);
 	// clients do not notify or play a sound for it and may mark it as silent.
-	Silent        bool `protobuf:"varint,22,opt,name=silent,proto3" json:"silent,omitempty"`
+	Silent bool `protobuf:"varint,22,opt,name=silent,proto3" json:"silent,omitempty"`
+	// The sender posted it through an AI tool (the MCP endpoint). Set only in
+	// the sender's own copy: others, and bridged apps, never see it.
+	SentViaAi     bool `protobuf:"varint,23,opt,name=sent_via_ai,json=sentViaAi,proto3" json:"sent_via_ai,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2160,6 +2163,13 @@ func (x *Message) GetRecalled() bool {
 func (x *Message) GetSilent() bool {
 	if x != nil {
 		return x.Silent
+	}
+	return false
+}
+
+func (x *Message) GetSentViaAi() bool {
+	if x != nil {
+		return x.SentViaAi
 	}
 	return false
 }
@@ -4927,7 +4937,7 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x10joined_by_invite\x18\v \x01(\v2\x1c.app.v1.ActionJoinedByInviteH\x00R\x0ejoinedByInvite\x12W\n" +
 	"\x15incoming_hook_stopped\x18\f \x01(\v2!.app.v1.ActionIncomingHookStoppedH\x00R\x13incomingHookStopped\x12?\n" +
 	"\rmini_app_data\x18\r \x01(\v2\x19.app.v1.ActionMiniAppDataH\x00R\vminiAppDataB\x06\n" +
-	"\x04kind\"\xbe\x06\n" +
+	"\x04kind\"\xde\x06\n" +
 	"\aMessage\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12\x1b\n" +
@@ -4954,7 +4964,8 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\btopic_id\x18\x13 \x01(\x03B\x020\x02R\atopicId\x126\n" +
 	"\flink_preview\x18\x14 \x01(\v2\x13.app.v1.LinkPreviewR\vlinkPreview\x12\x1a\n" +
 	"\brecalled\x18\x15 \x01(\bR\brecalled\x12\x16\n" +
-	"\x06silent\x18\x16 \x01(\bR\x06silent\"\xa8\x01\n" +
+	"\x06silent\x18\x16 \x01(\bR\x06silent\x12\x1e\n" +
+	"\vsent_via_ai\x18\x17 \x01(\bR\tsentViaAi\"\xa8\x01\n" +
 	"\aSyncAck\x12\x14\n" +
 	"\x03pts\x18\x01 \x01(\x03B\x020\x02R\x03pts\x12\x1b\n" +
 	"\tpts_count\x18\x02 \x01(\x05R\bptsCount\x12\x1d\n" +

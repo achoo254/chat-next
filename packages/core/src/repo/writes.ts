@@ -143,8 +143,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 	w.add(
 		`INSERT INTO messages (chat_id, seq, from_id, date, text, entities, media_kind, reply_to_seq, forward,
 			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, buttons, action,
-			search_text, topic_id, link_preview, recalled, silent, media, reply_keyboard, stale)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+			search_text, topic_id, link_preview, recalled, silent, media, reply_keyboard, sent_via_ai, stale)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
 		ON CONFLICT (chat_id, seq) DO UPDATE SET from_id = excluded.from_id, date = excluded.date,
 			text = excluded.text, entities = excluded.entities, media_kind = excluded.media_kind,
 			reply_to_seq = excluded.reply_to_seq, forward = excluded.forward, edit_date = excluded.edit_date,
@@ -154,7 +154,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			integration_label = excluded.integration_label, buttons = excluded.buttons, action = excluded.action,
 			search_text = excluded.search_text, topic_id = excluded.topic_id, link_preview = excluded.link_preview,
 			recalled = excluded.recalled, silent = excluded.silent, media = excluded.media,
-			reply_keyboard = excluded.reply_keyboard, stale = 0
+			reply_keyboard = excluded.reply_keyboard, sent_via_ai = excluded.sent_via_ai, stale = 0
 		WHERE messages.stale = 1 OR (excluded.recalled >= messages.recalled
 			AND (excluded.edit_version >= messages.edit_version OR excluded.recalled > messages.recalled))`,
 		[
@@ -183,6 +183,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			flag(message.silent),
 			message.media === undefined ? null : encodeMediaRef(message.media),
 			message.keyboard === undefined ? null : encodeKeyboard(message.keyboard),
+			flag(message.sentViaAi === true),
 		],
 	);
 	w.emit(EventKeys.history(message.chatId), EventKeys.message(message.chatId, message.seq));
@@ -240,6 +241,11 @@ export function putMute(w: WriteBatch, chatId: number, muteUntil: number): void 
 	w.emit(EventKeys.dialogs, EventKeys.dialog(chatId));
 }
 
+export function putHiddenFromAi(w: WriteBatch, chatId: number, hidden: boolean): void {
+	w.add("UPDATE dialogs SET hidden_from_ai = ? WHERE chat_id = ?", [flag(hidden), chatId]);
+	w.emit(EventKeys.dialogs, EventKeys.dialog(chatId));
+}
+
 /** Makes `chatIds` (top first) the pinned dialogs, unpinning every other. */
 export function putPinnedOrder(w: WriteBatch, chatIds: readonly number[]): void {
 	if (chatIds.length === 0) {
@@ -276,9 +282,9 @@ export function ensureDialog(w: WriteBatch, chatId: number): void {
 export function putDialog(w: WriteBatch, dialog: Dialog, topDate: number, selfId: number): void {
 	w.add(
 		`INSERT INTO dialogs (chat_id, top_seq, top_date, mute_until, pin_rank, unread_mark, pinned_message_count,
-			pinned_message_seq) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+			pinned_message_seq, hidden_from_ai) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
 		ON CONFLICT (chat_id) DO UPDATE SET top_seq = excluded.top_seq, top_date = excluded.top_date,
-			mute_until = excluded.mute_until,
+			mute_until = excluded.mute_until, hidden_from_ai = excluded.hidden_from_ai,
 			pin_rank = CASE WHEN ?5 = 0 THEN 0 WHEN dialogs.pin_rank > 0 THEN dialogs.pin_rank ELSE 1 END,
 			unread_mark = excluded.unread_mark, pinned_message_count = excluded.pinned_message_count,
 			pinned_message_seq = excluded.pinned_message_seq`,
@@ -291,6 +297,7 @@ export function putDialog(w: WriteBatch, dialog: Dialog, topDate: number, selfId
 			flag(dialog.unreadMark),
 			dialog.pinnedMessageCount,
 			dialog.pinnedMessageSeq,
+			flag(dialog.hiddenFromAi),
 		],
 	);
 	putReadState(w, dialog, selfId);

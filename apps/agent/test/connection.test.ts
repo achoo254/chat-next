@@ -305,6 +305,22 @@ describe("connection", () => {
     while ((await c.next()) !== null);
     expect(c.isClosed()).toBe(true);
   });
+
+  it("opens the AI thread of a Chat conversation once: asking again for the chat gives the same thread", async () => {
+    const m = await machine();
+    cores.push(m.core);
+    const phone = await generateKeyPair();
+    trustDevice(m.config, phone.publicKey, "phone");
+    const l = await link(m, phone);
+    const chat = { chatId: 99n, title: "Team", app: "zalo" };
+    const first = await l.request("c1", { case: "threadCreate", value: { provider: "fake", dir: m.work, text: "", chat } });
+    const again = await l.request("c2", { case: "threadCreate", value: { provider: "fake", dir: m.work, text: "", chat } });
+    const a = first?.case === "threadCreated" ? first.value.thread : undefined;
+    const b = again?.case === "threadCreated" ? again.value.thread : undefined;
+    expect(a?.chatId).toBe(99n);
+    expect(a?.title).toBe("AI · Team");
+    expect(b?.id).toBe(a?.id);
+  });
 });
 
 describe("trusted devices from Chat", () => {

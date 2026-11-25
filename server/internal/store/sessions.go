@@ -72,6 +72,10 @@ type Session struct {
 	// ("" for web sessions).
 	DeviceName string
 	AppVersion string
+	// ViaAI: the session acts for the user's AI through the MCP endpoint;
+	// never stored, only the MCP endpoint sets it. Messages it sends record
+	// that they were sent via AI.
+	ViaAI bool
 }
 
 // Native reports a session of the iOS or Android app: it authenticates with

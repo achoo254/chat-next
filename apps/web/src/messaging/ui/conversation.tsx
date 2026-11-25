@@ -5,6 +5,7 @@ import type { Chat } from "@achoo254/chat-core";
 import { compactWindow, isPictureInPictureSupported } from "../../compact/compact-window-store.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { Icon } from "../../components/icon.tsx";
+import { AiMark } from "../../machines/ai-mark.tsx";
 import { readStoredLocale } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
@@ -25,7 +26,7 @@ import { presenceText, usePresence } from "./presence.tsx";
 import { TopicIco } from "./topic-ico.tsx";
 import { useSurface } from "./surface.ts";
 import { BridgeDeliveryContext, bridgeChunk, useBridgeDelivery } from "./bridge-delivery.tsx";
-import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
+import { ChatSearchContext, openAiPanel, useCell, useUi } from "./ui-context.tsx";
 
 const BridgeRefusals = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeRefusals })));
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
@@ -301,9 +302,11 @@ interface ConversationProps {
 	chatId: number;
 	topicId: number;
 	infoOpen: boolean;
+	/** The chat's AI panel shows beside the conversation. */
+	aiOpen?: boolean;
 }
 
-export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
+export function Conversation({ chatId, topicId, infoOpen, aiOpen = false }: ConversationProps) {
 	const copy = useCopy();
 	const ui = useUi();
 	const { compact } = useSurface();
@@ -453,6 +456,19 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					>
 						<Icon name="search" />
 					</button>
+					{!compact && (
+						<button
+							type="button"
+							className="icon-btn"
+							data-ai-toggle
+							aria-pressed={aiOpen}
+							aria-label={copy.convo.ai}
+							title={copy.convo.ai}
+							onClick={() => (aiOpen ? ui.ai.set(null) : openAiPanel(ui, chatId))}
+						>
+							<AiMark name="agent" />
+						</button>
+					)}
 					{!compact && isPictureInPictureSupported() && (
 						<button type="button" className="icon-btn" aria-label={copy.convo.openCompact} onClick={() => void compactWindow.open()}>
 							<Icon name="pip" />

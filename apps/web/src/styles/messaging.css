@@ -1007,6 +1007,35 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 .resolution { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--c-border-subtle); }
 .resolution p { margin: 0; }
 
+/* ---------- AI panel of a conversation (ai-panel.tsx) ---------- */
+/* The column takes the info column's place; its width is dragged (--ai-w, kept on the device). */
+.app.ai-open { grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr) var(--ai-w, 400px); }
+.ai-panel { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.ai-resize { position: absolute; top: 0; bottom: 0; left: -3px; z-index: 2; width: 6px; cursor: col-resize; touch-action: none; }
+.ai-resize:hover, .ai-resize:focus-visible { background: color-mix(in srgb, var(--c-primary) 35%, transparent); outline: none; }
+.ai-head { display: flex; flex: none; align-items: center; gap: var(--space-2); min-height: var(--topbar-h); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.ai-head h2 { flex: 1; margin: 0; font-size: 1rem; font-weight: 600; }
+.ai-head .ai-machine { width: auto; max-width: 50%; }
+.ai-note { flex: none; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ai-note p { margin: 0; flex: 1 1 12rem; }
+.ai-quote { display: grid; flex: none; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--c-border-subtle); }
+.ai-quote-head { display: flex; align-items: center; gap: var(--space-2); }
+.ai-quote-head .muted { flex: 1; font-size: 0.8125rem; }
+.ai-quote blockquote { max-height: 7.5em; margin: 0; padding: var(--space-2) var(--space-3); overflow: auto; border-left: 3px solid var(--c-primary); border-radius: var(--radius-sm); background: var(--c-surface-subtle); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.ai-chips .chip { padding: 0 var(--space-3); }
+.ai-body { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.ai-body > .mx-chat, .ai-loading { flex: 1; }
+.ai-state, .ai-intro { display: grid; justify-items: center; gap: var(--space-2); margin: auto var(--space-4); text-align: center; color: var(--c-text-muted); }
+.ai-state strong { color: var(--c-text); }
+.ai-compose { display: flex; flex: none; align-items: flex-end; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); }
+.ai-compose textarea { flex: 1; resize: none; }
+/* The session's own back link goes to AI Agent: inside the panel, its close button stands for it. */
+.ai-panel .mx-back, .ai-sheet .mx-back { display: none; }
+/* Phone: a sheet near full height, header fixed on top and the composer at the bottom (docs: modal-popup-design). */
+dialog.modal.ai-sheet[open] { display: flex; flex-direction: column; height: 92dvh; padding: 0 0 env(safe-area-inset-bottom); overflow: hidden; }
+.stamp .msg-ai { margin-right: var(--space-1); font-style: italic; }
+
 /* ---------- Responsive ---------- */
 /* Below 1100px the info column overlays the conversation instead of a fourth column. */
 @media (max-width: 1100px) {
@@ -1020,6 +1049,8 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	table.data td.num { text-align: right; }
 	.app, .app.no-info { grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr); }
 	.app aside.info { position: absolute; top: 0; right: 0; bottom: 0; z-index: 6; width: min(var(--info-w), 100%); box-shadow: var(--shadow-lg); }
+	.app.ai-open { grid-template-columns: var(--rail-w) var(--list-w) minmax(0, 1fr); }
+	.app aside.ai-panel { position: absolute; top: 0; right: 0; bottom: 0; z-index: 6; width: min(var(--ai-w, 400px), 100%); box-shadow: var(--shadow-lg); }
 	.detail { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 1024px) {
@@ -1049,7 +1080,7 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 	.n-head.narrow-only { transition: min-height var(--dur-base) var(--ease-standard); }
 	.list.scrolled .n-head.narrow-only { min-height: 48px; padding-block: 0; }
 	.list.scrolled .n-head h2 { font-size: 1rem; }
-	.app, .app.no-info { grid-template-columns: minmax(0, 1fr); }
+	.app, .app.no-info, .app.ai-open { grid-template-columns: minmax(0, 1fr); }
 	.folder-rail { display: none; }
 	.app-frame.folders > .rail { display: flex; }
 	.app .list .folder-tabs { display: flex; overflow-x: auto; }

@@ -139,6 +139,7 @@ func (s *Service) postMedia(ctx context.Context, me int64, p mediaPost) (*appv1.
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
 			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
 			content: &appv1.Message{Entities: p.ents, Media: f.Ref(), ReplyMarkup: p.markup, ViaBotId: p.viaBot},
+			viaAI:   sentViaAI(ctx),
 		})
 		if err != nil {
 			return err
@@ -288,6 +289,7 @@ func (s *Service) SendAlbum(ctx context.Context, me int64, req *appv1.SendAlbumR
 			p, err := t.postMessage(ctx, ev, c, members, newMessage{
 				fromID: me, topicID: topicID, randomID: it.randomID, replyTo: replyTo, groupedID: groupedID, text: it.text,
 				content: &appv1.Message{Entities: it.ents, Media: files[i].Ref()},
+				viaAI:   sentViaAI(ctx),
 			})
 			if err != nil {
 				return err

@@ -334,6 +334,9 @@ message Message {
   // Posted without a notification (incoming webhooks marked silent);
   // clients do not notify or play a sound for it and may mark it as silent.
   bool silent = 22;
+  // The sender posted it through an AI tool (the MCP endpoint). Set only in
+  // the sender's own copy: others, and bridged apps, never see it.
+  bool sent_via_ai = 23;
 }
 
 // Position of the caller's update logs right after a mutation, so the client

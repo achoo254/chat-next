@@ -73,6 +73,10 @@ service ChatsService {
   // Mutes or unmutes the caller's notifications of a chat (Dialog.mute_until).
   // The caller's other sessions get dialog_mute.
   rpc SetDialogMute(SetDialogMuteRequest) returns (SetDialogMuteResponse);
+  // Hides a chat from the caller's AI tools or shows it again
+  // (Dialog.hidden_from_ai). The caller's other sessions get
+  // dialog_hidden_from_ai.
+  rpc SetDialogHiddenFromAI(SetDialogHiddenFromAIRequest) returns (SetDialogHiddenFromAIResponse);
   // Pins a chat on top of the caller's list or unpins it, at most 5 chats;
   // one more fails with failed_precondition
   // (message prefix "pinned_dialogs_limit"). The caller's sessions get
@@ -253,6 +257,9 @@ message Dialog {
   // ("Cloud của tôi"), so the empty chat keeps its place without a top
   // message.
   int64 sort_date = 13 [jstype = JS_NUMBER];
+  // The caller hid the chat from AI tools (SetDialogHiddenFromAI): the MCP
+  // endpoint neither lists, searches, reads nor posts in it.
+  bool hidden_from_ai = 14;
 }
 
 message InviteLink {
@@ -644,6 +651,16 @@ message SetDialogMuteRequest {
 message SetDialogMuteResponse {
   // As Dialog.mute_until.
   int64 mute_until = 1 [jstype = JS_NUMBER];
+  SyncAck ack = 2;
+}
+
+message SetDialogHiddenFromAIRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  bool hidden = 2;
+}
+
+message SetDialogHiddenFromAIResponse {
+  bool hidden = 1;
   SyncAck ack = 2;
 }
 

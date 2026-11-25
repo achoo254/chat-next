@@ -417,6 +417,19 @@ message ThreadCreate {
   // One of the AI's effort_levels to start in (a project's default); empty
   // follows the AI's own default. Machines that predate this field ignore it.
   string effort = 8;
+  // The chat conversation this thread is the AI of (the Chat app's AI panel,
+  // one thread per chat). With dir "", the machine opens it in a folder of
+  // its own for that chat. Machines that predate this field ignore it.
+  ChatLink chat = 9;
+}
+
+// A conversation of the Chat app a thread belongs to.
+message ChatLink {
+  int64 chat_id = 1;
+  // The chat's title and app ("telegram", "zalo", "" for Chat itself), for
+  // the thread's name only.
+  string title = 2;
+  string app = 3;
 }
 
 // What a thread is for.
@@ -1777,6 +1790,8 @@ message ThreadSummary {
   // THREAD_KIND_ADVISOR: Advisor's own thread; only devices that said so
   // (ThreadList.advisor) get it. Such a thread is archived too.
   ThreadKind kind = 19;
+  // The Chat conversation of the thread (ThreadCreate.chat); 0 for none.
+  int64 chat_id = 20;
 }
 
 // What a turn the machine runs is doing right now (tunelo 2.5.0+), for a

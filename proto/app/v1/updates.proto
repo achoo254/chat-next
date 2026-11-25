@@ -81,6 +81,7 @@ message Update {
     UpdateAgentProjectsChanged agent_projects_changed = 31;
     UpdateAdvisorProfile advisor_profile = 32;
     UpdatePeopleChanged people_changed = 33;
+    UpdateDialogHiddenFromAI dialog_hidden_from_ai = 34;
   }
 }
 
@@ -211,6 +212,13 @@ message UpdateTopicChanged {
 message UpdateDialogMute {
   int64 chat_id = 1 [jstype = JS_NUMBER];
   int64 mute_until = 2 [jstype = JS_NUMBER];
+}
+
+// The user hid a chat from AI tools or showed it again
+// (Dialog.hidden_from_ai).
+message UpdateDialogHiddenFromAI {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  bool hidden = 2;
 }
 
 // The user's pinned chats changed: the complete list, top first.

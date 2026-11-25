@@ -46,6 +46,23 @@ type newMessage struct {
 	// date is the original send time of an imported message; zero means now.
 	// It never lies in the future.
 	date time.Time
+	// viaAI: the sender posted it with an MCP tool (ViaAI).
+	viaAI bool
+}
+
+// viaAIKey marks the context of a send made with an MCP tool.
+type viaAIKey struct{}
+
+// ViaAI marks ctx as a send the user's AI made through the MCP endpoint: the
+// message records it and only its sender sees it (Message.sent_via_ai). It
+// changes nothing that reaches other members or a linked app.
+func ViaAI(ctx context.Context) context.Context {
+	return context.WithValue(ctx, viaAIKey{}, true)
+}
+
+func sentViaAI(ctx context.Context) bool {
+	via, _ := ctx.Value(viaAIKey{}).(bool)
+	return via
 }
 
 // postMessage issues the next seq of a locked chat, stores the message and
@@ -66,7 +83,7 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 		}
 	}
 	m := &messageRow{ChatID: c.ID, TopicID: nm.topicID, FromID: nm.fromID, RandomID: nm.randomID, Text: nm.text,
-		Content: content, ReplyToSeq: nm.replyTo, GroupedID: nm.groupedID}
+		Content: content, ReplyToSeq: nm.replyTo, GroupedID: nm.groupedID, ViaAI: nm.viaAI}
 	// An imported message keeps its original date (never after now()), and a
 	// chat is listed by its newest message, so an old import never moves it up.
 	var sentAt *time.Time
@@ -82,10 +99,10 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 	sf := search.FieldsOf(c.Type, m.Text, nm.content)
 	if _, err := t.tx.Exec(ctx, `
 		INSERT INTO messages (chat_id, seq, id, topic_id, from_id, random_id, date, text, content, reply_to_seq, grouped_id,
-			search_tsv, search_text, media_kind, has_link)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, `+search.TSVector("$12")+`, $13, $14, $15)`,
+			search_tsv, search_text, media_kind, has_link, via_ai)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, `+search.TSVector("$12")+`, $13, $14, $15, $16)`,
 		m.ChatID, m.Seq, id, m.TopicID, m.FromID, m.RandomID, m.Date, m.Text, content, m.ReplyToSeq, m.GroupedID,
-		sf.Lexemes, sf.Text, sf.MediaKind, sf.HasLink); err != nil {
+		sf.Lexemes, sf.Text, sf.MediaKind, sf.HasLink, m.ViaAI); err != nil {
 		return nil, fmt.Errorf("chat: insert message: %w", err)
 	}
 	if c.Forum {
@@ -463,6 +480,7 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
 			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
 			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup, ViaBotId: p.viaBot, Action: p.action},
+			viaAI:   sentViaAI(ctx),
 		})
 		if err != nil {
 			return err
@@ -1162,7 +1180,7 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 			ev := t.event(kindMessageNew, toChat, me)
 			p, err := t.postMessage(ctx, ev, c, members, newMessage{
 				fromID: me, topicID: topicID, randomID: randomID, replyTo: replyTo, text: text, content: content,
-				groupedID: albums[src0.GroupedID],
+				groupedID: albums[src0.GroupedID], viaAI: sentViaAI(ctx),
 			})
 			if err != nil {
 				return err

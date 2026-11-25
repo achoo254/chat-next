@@ -20,9 +20,19 @@ type messagesService struct {
 	logger *slog.Logger
 }
 
+// sentWith marks ctx for the chat core when the caller's session sends through
+// the MCP endpoint (store.Session.ViaAI): the new messages record it.
+func sentWith(ctx context.Context) context.Context {
+	if sess, ok := sessionFrom(ctx); ok && sess.ViaAI {
+		return chat.ViaAI(ctx)
+	}
+	return ctx
+}
+
 // SendMessage over /rpc is what the apps' composers call with the text the user
 // typed; the same handler run by an MCP tool is not (chat.FromComposer).
 func (s *messagesService) SendMessage(ctx context.Context, req *connect.Request[appv1.SendMessageRequest]) (*connect.Response[appv1.SendMessageResponse], error) {
+	ctx = sentWith(ctx)
 	if !calledInProcess(ctx) {
 		ctx = chat.FromComposer(ctx)
 	}
@@ -34,6 +44,7 @@ func (s *messagesService) SendMessage(ctx context.Context, req *connect.Request[
 // SendMedia and SendAlbum over /rpc are what the composers call with the files
 // the user attached; an MCP tool running the same handler is not (chat.FromComposer).
 func (s *messagesService) SendMedia(ctx context.Context, req *connect.Request[appv1.SendMediaRequest]) (*connect.Response[appv1.SendMediaResponse], error) {
+	ctx = sentWith(ctx)
 	if !calledInProcess(ctx) {
 		ctx = chat.FromComposer(ctx)
 	}
@@ -43,6 +54,7 @@ func (s *messagesService) SendMedia(ctx context.Context, req *connect.Request[ap
 }
 
 func (s *messagesService) SendAlbum(ctx context.Context, req *connect.Request[appv1.SendAlbumRequest]) (*connect.Response[appv1.SendAlbumResponse], error) {
+	ctx = sentWith(ctx)
 	if !calledInProcess(ctx) {
 		ctx = chat.FromComposer(ctx)
 	}
@@ -52,12 +64,14 @@ func (s *messagesService) SendAlbum(ctx context.Context, req *connect.Request[ap
 }
 
 func (s *messagesService) ForwardMessages(ctx context.Context, req *connect.Request[appv1.ForwardMessagesRequest]) (*connect.Response[appv1.ForwardMessagesResponse], error) {
+	ctx = sentWith(ctx)
 	return call(ctx, s.logger, req, func(me int64, m *appv1.ForwardMessagesRequest) (*appv1.ForwardMessagesResponse, error) {
 		return s.chat.ForwardMessages(ctx, me, m)
 	})
 }
 
 func (s *messagesService) CopyMessage(ctx context.Context, req *connect.Request[appv1.CopyMessageRequest]) (*connect.Response[appv1.CopyMessageResponse], error) {
+	ctx = sentWith(ctx)
 	return call(ctx, s.logger, req, func(me int64, m *appv1.CopyMessageRequest) (*appv1.CopyMessageResponse, error) {
 		return s.chat.CopyMessage(ctx, me, m)
 	})

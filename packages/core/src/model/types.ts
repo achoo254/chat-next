@@ -144,6 +144,8 @@ export interface Dialog {
 	 * keeps its place; 0 when unknown.
 	 */
 	readonly sortDate: number;
+	/** The user hid the chat from their AI tools: the MCP endpoint neither lists, reads nor posts in it. */
+	readonly hiddenFromAi: boolean;
 }
 
 /** Dialog.muteUntil of a chat muted until unmuted. */
@@ -373,6 +375,8 @@ export interface Message {
 	readonly recalled: boolean;
 	/** Posted without a notification (silent incoming webhooks): no notification, no sound. */
 	readonly silent: boolean;
+	/** The user posted it through an AI tool; only the sender's own copy carries it. */
+	readonly sentViaAi?: boolean;
 }
 
 export type SessionRevokeReason =
@@ -497,6 +501,8 @@ export type UpdateBody =
 	  }
 	/** The user muted or unmuted a chat (another session or this one). */
 	| { readonly kind: "dialog_mute"; readonly chatId: number; readonly muteUntil: number }
+	/** The user hid a chat from their AI tools or showed it again. */
+	| { readonly kind: "dialog_hidden_from_ai"; readonly chatId: number; readonly hidden: boolean }
 	/** The user's pinned chats, top first, after a change. */
 	| { readonly kind: "pinned_dialogs"; readonly chatIds: readonly number[] }
 	/**

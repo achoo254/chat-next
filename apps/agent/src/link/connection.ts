@@ -693,6 +693,7 @@ export class Connection {
               trustProject: Boolean(v.consent?.trustProject),
             },
             device: this.device,
+            ...(v.chat ? { chat: { chatId: v.chat.chatId, title: v.chat.title, app: v.chat.app } } : {}),
           });
           return this.openedThread(id, thread);
         }

@@ -89,6 +89,7 @@ export const zhCN: MessagingCopy = {
 		savedEmpty: "笔记、链接和文件，所有设备同步",
 	},
 	convo: {
+		ai: "问 AI",
 		pick: "选择一个聊天",
 		pickBody: "在左侧选择一个聊天，或点击 + 开始新的聊天。",
 		backToList: "返回聊天列表",
@@ -137,6 +138,8 @@ export const zhCN: MessagingCopy = {
 		queued: "等待发送",
 		sentTick: "已发送",
 		silent: "已静默发送，无通知",
+		viaAi: "经 AI",
+		viaAiTitle: "你通过 AI 发送了这条消息。只有你能看到此标签。",
 		read: "已读",
 		failed: "未发送",
 		notSent: "未发送",

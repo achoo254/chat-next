@@ -95,6 +95,8 @@ export const vi = {
 		savedEmpty: "Ghi chú, link và file trên mọi máy",
 	},
 	convo: {
+		/** The conversation header's button opening the chat's AI panel. */
+		ai: "Hỏi AI",
 		pick: "Chọn một cuộc trò chuyện",
 		pickBody: "Chọn chat ở danh sách bên trái, hoặc bấm + để bắt đầu chat mới.",
 		backToList: "Về danh sách chat",
@@ -144,6 +146,9 @@ export const vi = {
 		sentTick: "Đã gửi",
 		/** Bell-off mark on the time of a silent message (an incoming webhook posting without a notification). */
 		silent: "Gửi im lặng, không thông báo",
+		/** Beside the time of your own message sent through an AI tool; only you see it. */
+		viaAi: "qua AI",
+		viaAiTitle: "Bạn gửi tin này qua AI. Chỉ bạn thấy nhãn này.",
 		read: "Đã xem",
 		failed: "Chưa gửi được",
 		notSent: "Chưa gửi được",

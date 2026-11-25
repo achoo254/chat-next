@@ -127,6 +127,8 @@ interface UserRecord {
 	pins: number[];
 	/** Chats the user marked as unread. */
 	readonly unreadMarks: Set<number>;
+	/** Chats the user hid from their AI tools. */
+	readonly hiddenFromAi: Set<number>;
 	notify: WireNotificationSettings;
 	advisor: WireAdvisorProfile;
 }
@@ -243,6 +245,7 @@ export class FakeServer {
 			mutes: new Map(),
 			pins: [],
 			unreadMarks: new Set(),
+			hiddenFromAi: new Set(),
 			notify: defaultNotify(),
 			advisor: create(AdvisorProfileSchema, { lookId: "owl", tone: AdvisorTone.SHORT }),
 		});
@@ -353,6 +356,8 @@ export class FakeServer {
 		return create(MessageSchema, {
 			...record.message,
 			randomId: big(viewer === record.sender ? record.randomId : 0),
+			// Like the server: only the sender's copy says it went through AI.
+			sentViaAi: record.message.sentViaAi && viewer === record.sender,
 			reactions,
 		});
 	}
@@ -457,6 +462,7 @@ export class FakeServer {
 			pinnedMessageCount: pinned.length,
 			pinnedMessageSeq: pinned[pinned.length - 1]?.message.seq ?? 0n,
 			unreadMark: this.user(viewer).unreadMarks.has(chatId),
+			hiddenFromAi: this.user(viewer).hiddenFromAi.has(chatId),
 			// The newest message, hidden ones too (the server's last_message_at).
 			sortDate: [...chat.messages.values()].reduce((newest, r) => (r.message.date > newest ? r.message.date : newest), 0n),
 		});
@@ -561,6 +567,8 @@ export class FakeServer {
 			readonly entities?: MessageInitShape<typeof MessageEntitySchema>[];
 			/** Bot messages: an inline keyboard, a reply keyboard or its removal. */
 			readonly replyMarkup?: MessageInitShape<typeof ReplyMarkupSchema>;
+			/** Posted through an AI tool (the real server keeps it in the sender's copy only). */
+			readonly sentViaAi?: boolean;
 		} = {},
 	): { seq: number; ack: WireSyncAck } {
 		const chat = this.chat(chatId);
@@ -854,6 +862,14 @@ export class FakeServer {
 		if (until > 0) user.mutes.set(chatId, until);
 		else user.mutes.delete(chatId);
 		this.pushUser(userId, { case: "dialogMute", value: { chatId: big(chatId), muteUntil: big(until) } }, chatId);
+	}
+
+	/** The user hid a chat from their AI tools or showed it again, on another session. */
+	hideDialogFromAi(userId: number, chatId: number, hidden: boolean): void {
+		const user = this.user(userId);
+		if (hidden) user.hiddenFromAi.add(chatId);
+		else user.hiddenFromAi.delete(chatId);
+		this.pushUser(userId, { case: "dialogHiddenFromAi", value: { chatId: big(chatId), hidden } }, chatId);
 	}
 
 	/** The user's pinned chats changed on another session. */

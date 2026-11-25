@@ -279,6 +279,12 @@ func (s *chatsService) GetCommonChats(ctx context.Context, req *connect.Request[
 	})
 }
 
+func (s *chatsService) SetDialogHiddenFromAI(ctx context.Context, req *connect.Request[appv1.SetDialogHiddenFromAIRequest]) (*connect.Response[appv1.SetDialogHiddenFromAIResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SetDialogHiddenFromAIRequest) (*appv1.SetDialogHiddenFromAIResponse, error) {
+		return s.chat.SetDialogHiddenFromAI(ctx, me, m.GetChatId(), m.GetHidden())
+	})
+}
+
 func (s *chatsService) SetDialogUnreadMark(ctx context.Context, req *connect.Request[appv1.SetDialogUnreadMarkRequest]) (*connect.Response[appv1.SetDialogUnreadMarkResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.SetDialogUnreadMarkRequest) (*appv1.SetDialogUnreadMarkResponse, error) {
 		ack, err := s.chat.SetDialogUnreadMark(ctx, me, m.GetChatId(), m.GetUnread())

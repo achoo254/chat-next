@@ -241,13 +241,33 @@ function useRichContext(fromId: number): RichContext {
  * `silent`: the bell-off mark of a message posted without a notification
  * (mockups/integrations.html#alert-grouping), with this accessible name; "" for none.
  * `platform`: the app the message came through, in words (merged timeline); "" for none.
+ * `viaAi`: "qua AI" on your own message sent through an AI tool, with its explanation; null for none.
  */
-function Stamp({ date, edited, silent = "", platform = "", children }: { date: number; edited: string; silent?: string; platform?: string; children?: ReactNode }) {
+function Stamp({
+	date,
+	edited,
+	silent = "",
+	platform = "",
+	viaAi = null,
+	children,
+}: {
+	date: number;
+	edited: string;
+	silent?: string;
+	platform?: string;
+	viaAi?: { readonly label: string; readonly title: string } | null;
+	children?: ReactNode;
+}) {
 	"use no memo";
 	const { locale } = useI18n();
 	return (
 		<span className="stamp">
 			{platform !== "" && <span className="msg-app">{platform}</span>}
+			{viaAi !== null && (
+				<span className="msg-ai" title={viaAi.title}>
+					{viaAi.label}
+				</span>
+			)}
 			{silent !== "" && <LabelledIcon name="bell-off" label={silent} className="silent-mark" />}
 			{edited !== "" ? `${edited} ${clock(date, locale)}` : clock(date, locale)}
 			{children}
@@ -553,6 +573,8 @@ export function MessageBubble({
 			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
 			silent={showSilent ? copy.message.silent : ""}
 			platform={platform}
+			// Only the sender's own copy says it went through AI (the server sets it there alone).
+			viaAi={message.sentViaAi === true && message.fromId === store.selfId && !recalled ? { label: copy.message.viaAi, title: copy.message.viaAiTitle } : null}
 		>
 			{mine && !recalled && !isSavedChat(chat, null) && (
 				onItsWay !== null && delivery !== null ? (

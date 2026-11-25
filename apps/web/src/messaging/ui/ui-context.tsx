@@ -130,6 +130,37 @@ export interface ListMenuTarget {
 	readonly y: number;
 }
 
+/** A message the AI panel was opened about («Hỏi AI»). */
+export interface AiQuote {
+	readonly seq: number;
+	readonly sender: string;
+	/** Unix seconds. */
+	readonly date: number;
+	readonly text: string;
+}
+
+/**
+ * The AI panel of a chat: open while this is set. `id` tells each opening apart
+ * (a new quote or question for the panel already open); `ask` is a question
+ * to send at once ("/ai …" typed in the chat's composer), "" for none.
+ */
+export interface AiPanelRequest {
+	readonly id: number;
+	readonly chatId: number;
+	readonly quote: AiQuote | null;
+	readonly ask: string;
+}
+
+/**
+ * The AI panel wrote the draft (and reply) of this chat and topic («Đưa vào
+ * ô soạn tin»): a composer showing them reads the draft again, once (`id`).
+ */
+export interface ComposerFill {
+	readonly id: number;
+	readonly chatId: number;
+	readonly topicId: number;
+}
+
 /** A value with subscribers, for state several distant components read. */
 export class Cell<T> {
 	private readonly listeners = new Set<() => void>();
@@ -170,6 +201,10 @@ export interface Ui {
 	readonly listMenu: Cell<ListMenuTarget | null>;
 	readonly miniApp: Cell<OpenMiniApp | null>;
 	readonly intents: ComposerIntents;
+	/** The AI panel beside the conversation; null when closed. */
+	readonly ai: Cell<AiPanelRequest | null>;
+	/** Text the AI panel put in a chat's composer, until the composer takes it. */
+	readonly composerFill: Cell<ComposerFill | null>;
 	/** Focuses the search box of the chat list (⌘K, header search button). */
 	readonly focusSearch: () => void;
 	readonly toggleInfo: (open?: boolean) => void;
@@ -183,6 +218,14 @@ export const UiContext = createContext<Ui | null>(null);
  * screens), where hashtags stay plain.
  */
 export const ChatSearchContext = createContext<((query: string) => void) | null>(null);
+
+let nextAiRequest = 0;
+
+/** Opens the AI panel of `chatId`, with a quoted message or a question to send at once. */
+export function openAiPanel(ui: Ui, chatId: number, options: { quote?: AiQuote; ask?: string } = {}): void {
+	nextAiRequest += 1;
+	ui.ai.set({ id: nextAiRequest, chatId, quote: options.quote ?? null, ask: options.ask ?? "" });
+}
 
 export function useUi(): Ui {
 	const ui = useContext(UiContext);

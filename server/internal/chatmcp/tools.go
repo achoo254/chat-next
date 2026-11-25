@@ -20,6 +20,7 @@ import (
 // instructions tell the client how the tools fit together.
 const instructions = `Tools act as the signed-in user of this chat, with exactly the rights the user has in the app.
 Chats are identified by chat_id and messages by (chat_id, seq); users and bots by their user id.
+Chats the user hid from AI are not listed or searched, and tools naming one answer chat_hidden_from_ai; only the user can change that, in the app.
 Start with list_chats or search_messages, read with get_messages, find people with search_users or resolve_username, then send_message (start_private_chat opens a one-to-one chat).
 Messages: forward_messages, copy_message, pin_message, get_pinned_messages, get_message_reactions, get_message_readers.
 Groups and channels: create_group, create_channel, add_members, update_chat_info, export_invite_link, get_forum_topics, create_forum_topic, set_admin; set_dialog_mute, set_dialog_pinned and set_dialog_unread_mark change only the user's own chat list.
@@ -108,7 +109,8 @@ func callSelf(ctx context.Context, t *toolset) (*appv1.GetSelfResponse, error) {
 //
 // The handler checks the tool's scope itself: this is the authoritative
 // check (the HTTP step-up check only lets the client ask for the scope).
-// A tool missing from allTools has no scope and is refused.
+// A tool missing from allTools has no scope and is refused. Chats the user
+// hid from AI are refused and left out here too (hidden_from_ai.go).
 func addTool[In any](s *mcp.Server, t *toolset, tool *mcp.Tool, run func(context.Context, In) (any, error)) {
 	scope, known := t.h.toolScopes[tool.Name]
 	mcp.AddTool(s, tool, func(ctx context.Context, _ *mcp.CallToolRequest, in In) (*mcp.CallToolResult, any, error) {
@@ -116,10 +118,21 @@ func addTool[In any](s *mcp.Server, t *toolset, tool *mcp.Tool, run func(context
 			return t.errorResult(ctx, tool.Name, connect.NewError(connect.CodePermissionDenied,
 				fmt.Errorf("insufficient_scope: tool %s needs the %s scope", tool.Name, scope))), nil, nil
 		}
-		out, err := run(ctx, in)
+		hidden, err := t.hiddenChats(ctx)
+		if err == nil {
+			err = t.refuseHidden(ctx, hidden, in)
+		}
 		if err != nil {
 			return t.errorResult(ctx, tool.Name, err), nil, nil
 		}
+		out, err := run(ctx, in)
+		if err == nil {
+			err = refuseHiddenResult(hidden, out)
+		}
+		if err != nil {
+			return t.errorResult(ctx, tool.Name, err), nil, nil
+		}
+		dropHidden(hidden, t.c.user.ID, out)
 		raw, err := encode(out)
 		if err != nil {
 			return t.errorResult(ctx, tool.Name, err), nil, nil

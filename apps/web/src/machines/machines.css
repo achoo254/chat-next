@@ -448,6 +448,8 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-chat { --mx-col: 800px; }
 .mx-messages > * { flex: none; max-width: var(--mx-col); width: 100%; min-width: 0; margin-inline: auto; }
 /* The user's message: its files, then its bubble, on the right; the bubble no wider than a comfortable line. */
+/* An AI reply the caller can take (the Chat app's AI panel: «Đưa vào ô soạn tin»): the button under the text. */
+.mx-reply-use { display: grid; justify-items: start; gap: var(--space-1); }
 .mx-msg.mine { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
 .mx-msg.mine[aria-busy="true"] { opacity: 0.6; }
 /* Earlier blocks of a long session (they also come in on scrolling up). */

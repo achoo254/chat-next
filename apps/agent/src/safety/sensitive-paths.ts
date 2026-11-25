@@ -5,7 +5,17 @@ import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, parse, resolve, sep } from "node:path";
 
-export type SensitiveOptions = { home?: string; configDir?: string; extra?: string[] };
+export type SensitiveOptions = {
+  home?: string;
+  configDir?: string;
+  extra?: string[];
+  /**
+   * Folders of tunelo's own inside a sensitive one that are not sensitive
+   * themselves (the work folders of the chats' AI sessions). Paths resolve
+   * first, so a link from there into a sensitive folder still counts.
+   */
+  except?: string[];
+};
 
 function real(p: string): string {
   // Resolve symlinks and ".." so a link into ~/.ssh is caught; for a path
@@ -61,12 +71,15 @@ export function createSensitiveCheck(opts: SensitiveOptions = {}) {
   }
   inside.push(...(opts.extra ?? []));
   const dirs = inside.map(norm);
+  const allowed = (opts.except ?? []).map(norm);
+  const within = (p: string, d: string): boolean => p === d || p.startsWith(d.endsWith(sep) ? d : d + sep);
 
   return (path: string): boolean => {
     if (!path) return false;
     const p = norm(path);
     if (exact.includes(p)) return true;
-    return dirs.some((d) => p === d || p.startsWith(d.endsWith(sep) ? d : d + sep));
+    if (allowed.some((d) => within(p, d))) return false;
+    return dirs.some((d) => within(p, d));
   };
 }
 

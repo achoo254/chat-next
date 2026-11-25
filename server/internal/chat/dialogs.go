@@ -70,6 +70,38 @@ func (s *Service) SetDialogMute(ctx context.Context, me, chatID int64, durationS
 	return &appv1.SetDialogMuteResponse{MuteUntil: until, Ack: t.ack(me, chatID)}, nil
 }
 
+// SetDialogHiddenFromAI hides a chat from my AI (the MCP endpoint neither
+// lists, reads nor writes it for me) or shows it again. It is Chat's own
+// setting: nothing goes to a linked app. My sessions get dialog_hidden_from_ai
+// when it changes.
+func (s *Service) SetDialogHiddenFromAI(ctx context.Context, me, chatID int64, hidden bool) (*appv1.SetDialogHiddenFromAIResponse, error) {
+	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
+		return nil, err
+	}
+	t, err := s.inTx(ctx, func(t *txn) error {
+		c, m, err := s.activeChatFor(ctx, t.tx, chatID, me, true)
+		if err != nil {
+			return err
+		}
+		if m.HiddenFromAI == hidden {
+			return nil
+		}
+		if _, err := t.tx.Exec(ctx, `UPDATE chat_members SET hidden_from_ai = $3 WHERE chat_id = $1 AND user_id = $2`,
+			c.ID, me, hidden); err != nil {
+			return fmt.Errorf("chat: set hidden from AI: %w", err)
+		}
+		ev := t.event(kindDialogHiddenFromAI, c.ID, me)
+		t.toUsers(ev, []int64{me}, &appv1.Update{Kind: &appv1.Update_DialogHiddenFromAi{DialogHiddenFromAi: &appv1.UpdateDialogHiddenFromAI{
+			ChatId: c.ID, Hidden: hidden,
+		}}})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &appv1.SetDialogHiddenFromAIResponse{Hidden: hidden, Ack: t.ack(me, chatID)}, nil
+}
+
 // SetDialogUnreadMark marks a chat as unread for me or clears the mark. My
 // sessions get dialog_unread_mark when it changes.
 func (s *Service) SetDialogUnreadMark(ctx context.Context, me, chatID int64, unread bool) (*appv1.SyncAck, error) {

@@ -348,6 +348,7 @@ export function toDialog(dialog: WireDialog): Dialog {
 		pinnedMessageSeq: id(dialog.pinnedMessageSeq),
 		unreadMark: dialog.unreadMark,
 		sortDate: id(dialog.sortDate),
+		hiddenFromAi: dialog.hiddenFromAi,
 	};
 }
 
@@ -533,6 +534,7 @@ export function toMessage(message: WireMessage): Message {
 		linkPreview: toLinkPreview(message.linkPreview),
 		recalled: message.recalled,
 		silent: message.silent,
+		...(message.sentViaAi ? { sentViaAi: true } : {}),
 		...(message.media === undefined ? {} : { media: toMediaRef(message.media) }),
 		...keyboardOf(message.replyMarkup),
 	};
@@ -642,6 +644,8 @@ function toBody(update: WireUpdate): UpdateBody {
 			};
 		case "dialogMute":
 			return { kind: "dialog_mute", chatId: id(kind.value.chatId), muteUntil: id(kind.value.muteUntil) };
+		case "dialogHiddenFromAi":
+			return { kind: "dialog_hidden_from_ai", chatId: id(kind.value.chatId), hidden: kind.value.hidden };
 		case "pinnedDialogs":
 			return { kind: "pinned_dialogs", chatIds: kind.value.chatIds.map(id) };
 		case "chatDeleted":
