@@ -1,6 +1,6 @@
 # Deploy of chat.hoandat.com.
-# Started on demand (`gh workflow run deploy.yml`, usually through the
-# chat-ops-prod skill) rather than on every push: AI sessions push to main many
+# Started on demand (`gh workflow run deploy.yml`, usually through
+# tools/deploy-prod.sh in the hoandat-app workspace) rather than on every push: AI sessions push to main many
 # times a day, and deploying each push kept prod restarting and the session
 # waiting; an evening run catches what no session deployed. The run deploys
 # the tip of main, and only once `ci` of that commit has passed (it waits
@@ -20,11 +20,11 @@ on:
         description: Deploy only when main is ahead of the last successful deploy (what the evening run does)
         type: boolean
         default: false
-  # Every evening at 22:00 Asia/Saigon (15:00 UTC; GitHub may start it some
-  # minutes late) main goes out if it is ahead of the last deploy, so a day's
+  # Every evening at 22:10 Asia/Saigon (15:10 UTC; GitHub may start it some
+  # minutes late; repos on the shared server are 5 minutes apart) main goes out if it is ahead of the last deploy, so a day's
   # work reaches production even when no session deployed it.
   schedule:
-    - cron: "0 15 * * *"
+    - cron: "10 15 * * *"
 
 permissions:
   contents: read
