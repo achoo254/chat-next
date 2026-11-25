@@ -68,9 +68,51 @@ func (a *Adapter) EditMessage(context.Context, bridge.Account, bridge.EditReques
 	return fmt.Errorf("%w: Zalo messages cannot be edited from Chat", bridge.ErrNotAllowed)
 }
 
-// DeleteMessages implements bridge.Sender. Deleting is not offered for Zalo.
-func (a *Adapter) DeleteMessages(context.Context, bridge.Account, bridge.Delete) error {
-	return fmt.Errorf("%w: Zalo messages cannot be deleted from Chat", bridge.ErrNotAllowed)
+// DeleteMessages implements bridge.Sender: it recalls, for everyone, messages the
+// owner sent to one person, through the account's listening sidecar (src/undo.mjs).
+// The engine only asks for messages the owner sent. Recalling a message already
+// recalled is not told apart from a refusal: Zalo's answer decides.
+func (a *Adapter) DeleteMessages(ctx context.Context, acct bridge.Account, d bridge.Delete) error {
+	if !accountUID.MatchString(d.Conversation) || len(d.IDs) == 0 {
+		return fmt.Errorf("%w: not messages of a Zalo 1-1 chat", bridge.ErrNotAllowed)
+	}
+	for _, id := range d.IDs {
+		if !messageID.MatchString(id) {
+			return fmt.Errorf("%w: not a Zalo message id", bridge.ErrNotAllowed)
+		}
+	}
+	st := a.sendStateFor(acct.ID)
+	select {
+	case st.turn <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-st.turn }()
+	side := a.sidecarOf(acct.ID)
+	if side == nil {
+		return errNotListening
+	}
+	for _, id := range d.IDs {
+		cli := a.heardFor(acct.ID).clientID(id)
+		if cli == "" {
+			cli = a.clientIDFromHistory(ctx, side, d.Conversation, id)
+		}
+		ev, err := side.request(ctx, command{Cmd: cmdUndo, ID: a.nextRequestID(), To: d.Conversation, MsgID: id, CliMsgID: cli}, a.timing.sendAnswer)
+		if err != nil {
+			return fmt.Errorf("zalo: whether the message was recalled is not known: %w", err)
+		}
+		if ev.Ev == evUndone {
+			continue
+		}
+		errCode := safeCode(string(ev.Code))
+		if ev.Ev != evSendError {
+			errCode = "unclear"
+		}
+		_, err = sendError(errCode, safeCode(string(ev.ZaloCode)))
+		a.logger.Warn("zalo recall failed", "code", errCode, "zalo_code", safeCode(string(ev.ZaloCode)))
+		return err
+	}
+	return nil
 }
 
 // SendMessage implements bridge.Sender: one text message, or the photos and files

@@ -36,6 +36,8 @@ type zaloSim struct {
 	mediaSends  []command         // send_media commands, in order
 	reacts      []command         // react commands, in order
 	reactFail   string            // the next react is answered with this send_error code
+	undos       []command         // undo commands, in order
+	undoFail    string            // the next undo is answered with this send_error code
 }
 
 type simMessage struct {
@@ -126,6 +128,17 @@ func (z *zaloSim) script(p *fakeProcess) {
 			z.chunk(c)
 		case cmdSendMedia:
 			z.sendMedia(p, c)
+		case cmdUndo:
+			z.mu.Lock()
+			z.undos = append(z.undos, c)
+			fail := z.undoFail
+			z.undoFail = ""
+			z.mu.Unlock()
+			if fail != "" {
+				p.emit(fmt.Sprintf(`{"ev":"send_error","id":%q,"code":%q}`, c.ID, fail))
+			} else {
+				p.emit(fmt.Sprintf(`{"ev":"undone","id":%q}`, c.ID))
+			}
 		case cmdReact:
 			z.mu.Lock()
 			z.reacts = append(z.reacts, c)

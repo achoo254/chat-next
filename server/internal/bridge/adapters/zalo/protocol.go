@@ -19,8 +19,9 @@ import (
 // message the photo URL of the other person; version 7 the phone number their
 // profile shows; version 8 sends a photo or a file to one person (file_chunk,
 // send_media); version 9 sets or takes back the owner's reaction to a message
-// (react) and gives a history message its client id.
-const protocolVersion = 9
+// (react) and gives a history message its client id; version 10 recalls a
+// message the owner sent (undo).
+const protocolVersion = 10
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -37,6 +38,7 @@ const (
 	cmdFileChunk = "file_chunk"
 	cmdSendMedia = "send_media"
 	cmdReact     = "react"
+	cmdUndo      = "undo"
 )
 
 // Events the sidecar writes on stdout.
@@ -56,6 +58,7 @@ const (
 	// the caller by id and never reach the listener's loop.
 	evSent         = "sent"
 	evReacted      = "reacted"
+	evUndone       = "undone"
 	evSendError    = "send_error"
 	evHistory      = "history"
 	evHistoryError = "history_error"
@@ -63,7 +66,7 @@ const (
 
 // isAnswer reports whether an event answers a command with an id.
 func isAnswer(ev string) bool {
-	return ev == evSent || ev == evReacted || ev == evSendError || ev == evHistory || ev == evHistoryError
+	return ev == evSent || ev == evReacted || ev == evUndone || ev == evSendError || ev == evHistory || ev == evHistoryError
 }
 
 // command is one line written to the sidecar.

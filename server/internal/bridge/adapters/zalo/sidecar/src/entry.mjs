@@ -19,6 +19,9 @@
 //                                            (protocol 9) set the owner's reaction to one message of one person
 //                                            to the Zalo reaction code icon, "" taking it back (src/reaction.mjs);
 //                                            answered by `reacted` or `send_error`
+//   {"cmd":"undo","id":"<req id>","to":"<uid digits>","msgId":"<digits>","cliMsgId":"<digits>"}
+//                                            (protocol 10) recall one message the owner sent to one person, for
+//                                            everyone (src/undo.mjs); answered by `undone` or `send_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
 //   {"ev":"ready","protocol":7}
@@ -63,6 +66,7 @@ import { createHistory, HistoryError } from "./history.mjs";
 import { createPeerLookup } from "./peer-profile.mjs";
 import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
 import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendText } from "./send.mjs";
+import { sendUndo } from "./undo.mjs";
 import { isMessageId, isReactionCode, sendReaction } from "./reaction.mjs";
 import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from "./send-media.mjs";
 
@@ -74,7 +78,8 @@ import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from
 // 7: a 1-1 message carries the phone number the other person's profile shows (peerPhone), never written anywhere else.
 // 8: file_chunk and send_media send one photo or file to one person.
 // 9: react sets or takes back the owner's reaction to a message; a history message carries its client id (cliMsgId).
-const PROTOCOL = 9;
+// 10: undo recalls a message the owner sent.
+const PROTOCOL = 10;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -268,6 +273,21 @@ async function react(command) {
 	}
 }
 
+/** Recalls one message the owner sent; the answer never carries more than the request id. */
+async function undo(command) {
+	const id = command.id;
+	if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+	if (!isUserId(command.to) || !isMessageId(command.msgId) || !isMessageId(command.cliMsgId)) {
+		return emit({ ev: "send_error", id, code: BAD_REQUEST });
+	}
+	try {
+		await sendUndo(api, command.to, command.msgId, command.cliMsgId);
+		emit({ ev: "undone", id });
+	} catch (error) {
+		emit({ ev: "send_error", id, ...sendFailure(error) });
+	}
+}
+
 /** Reads the newest page of 1-1 messages for one person. */
 async function readHistory(command) {
 	const id = command.id;
@@ -302,9 +322,11 @@ async function handle(line) {
 			case "history":
 			case "send_media":
 			case "react":
+			case "undo":
 				if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
 				if (command.cmd === "send") return await send(command);
 				if (command.cmd === "react") return await react(command);
+				if (command.cmd === "undo") return await undo(command);
 				return command.cmd === "send_media" ? await sendFile(command) : await readHistory(command);
 			case "stop":
 				api?.listener.stop();

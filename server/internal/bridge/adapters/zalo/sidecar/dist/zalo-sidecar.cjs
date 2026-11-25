@@ -28083,7 +28083,7 @@ var undoFactory = apiFactory()((api2, ctx, utils) => {
     [ThreadType.User]: utils.makeURL(`${api2.zpwServiceMap.chat[0]}/api/message/undo`),
     [ThreadType.Group]: utils.makeURL(`${api2.zpwServiceMap.group[0]}/api/group/undomsg`)
   };
-  return async function undo(payload, threadId, type = ThreadType.User) {
+  return async function undo2(payload, threadId, type = ThreadType.User) {
     const params = {
       msgId: payload.msgId,
       clientId: Date.now(),
@@ -29354,6 +29354,11 @@ function sendFailure(error) {
   return { code: isNetworkError(error) ? NETWORK_ERROR2 : UNCLEAR };
 }
 
+// src/undo.mjs
+async function sendUndo(api2, to, msgId, cliMsgId) {
+  await api2.undo({ msgId, cliMsgId }, to, ThreadType.User);
+}
+
 // src/reaction.mjs
 var CODES2 = new Set(Object.values(Reactions));
 function isReactionCode(value) {
@@ -29498,7 +29503,7 @@ function sendMediaFailure(error) {
 }
 
 // src/entry.mjs
-var PROTOCOL = 9;
+var PROTOCOL = 10;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
@@ -29662,6 +29667,19 @@ async function react(command) {
     emit({ ev: "send_error", id, ...sendFailure(error) });
   }
 }
+async function undo(command) {
+  const id = command.id;
+  if (api === null) return emit({ ev: "send_error", id, code: NOT_LOGGED_IN });
+  if (!isUserId(command.to) || !isMessageId(command.msgId) || !isMessageId(command.cliMsgId)) {
+    return emit({ ev: "send_error", id, code: BAD_REQUEST });
+  }
+  try {
+    await sendUndo(api, command.to, command.msgId, command.cliMsgId);
+    emit({ ev: "undone", id });
+  } catch (error) {
+    emit({ ev: "send_error", id, ...sendFailure(error) });
+  }
+}
 async function readHistory(command) {
   const id = command.id;
   if (history === null) return emit({ ev: "history_error", id, code: "listener_down" });
@@ -29693,9 +29711,11 @@ async function handle(line) {
       case "history":
       case "send_media":
       case "react":
+      case "undo":
         if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
         if (command.cmd === "send") return await send(command);
         if (command.cmd === "react") return await react(command);
+        if (command.cmd === "undo") return await undo(command);
         return command.cmd === "send_media" ? await sendFile(command) : await readHistory(command);
       case "stop":
         api?.listener.stop();
