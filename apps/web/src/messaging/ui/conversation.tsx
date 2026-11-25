@@ -9,7 +9,7 @@ import { readStoredLocale } from "../../i18n/i18n.tsx";
 import { navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import type { MessagingCopy } from "../copy/vi.ts";
-import { chatKind, dialogTitle, isSavedChat } from "../data/format.ts";
+import { appName, chatKind, dialogTitle, isSavedChat } from "../data/format.ts";
 import type { Topic } from "../data/pending-backend.ts";
 import { Permission } from "../data/remote.ts";
 import { useChat, useConnection, useDialog, useListEntry, useMediaLimits, useServices, useTopics, useUser, useWindow } from "../data/services.tsx";
@@ -27,7 +27,7 @@ import { useSurface } from "./surface.ts";
 import { BridgeDeliveryContext, bridgeChunk, useBridgeDelivery } from "./bridge-delivery.tsx";
 import { ChatSearchContext, useCell, useUi } from "./ui-context.tsx";
 
-const BridgeNote = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeNote })));
+const BridgeRefusals = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeRefusals })));
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
 // The composer and its editor load apart from the startup code (fetched when
 // the browser is idle, or with the first chat opened), as Telegram Web loads
@@ -241,13 +241,17 @@ function canSend(chat: Chat): boolean {
 	return true;
 }
 
-/** Says where the message goes (#composer-states): a person, a group (with the @ hint) or a topic. */
-function placeholderFor(chat: Chat, topic: Topic | null, title: string, copy: MessagingCopy, saved: boolean): string {
+/**
+ * Says where the message goes (#composer-states): a person, a group (with the @ hint) or a topic,
+ * and the app it goes on to when the chat is synced with one (Chat Bridge), in place of a note above.
+ */
+function placeholderFor(chat: Chat, topic: Topic | null, title: string, copy: MessagingCopy, saved: boolean, app: string | null): string {
 	if (saved) return copy.composer.placeholderSaved;
 	if (chat.type === "channel") return copy.composer.channelPlaceholder;
-	if (topic !== null) return topic.closed ? copy.topics.closedPlaceholder : copy.composer.placeholderGroup(topic.title);
-	if (chat.type === "group") return copy.composer.placeholderGroup(title);
-	return copy.composer.placeholder(title);
+	if (topic?.closed === true) return copy.topics.closedPlaceholder;
+	const to =
+		topic !== null ? copy.composer.placeholderGroup(topic.title) : chat.type === "group" ? copy.composer.placeholderGroup(title) : copy.composer.placeholder(title);
+	return app === null ? to : copy.composer.via(to, appName(app));
 }
 
 /** Subscribers of a channel get a notifications switch in place of the composer. */
@@ -519,7 +523,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 				<>
 					{delivery !== null && (
 						<Suspense fallback={null}>
-							<BridgeNote app={delivery.app} refused={delivery.refused} />
+							<BridgeRefusals app={delivery.app} refused={delivery.refused} />
 						</Suspense>
 					)}
 				<ChatComposer
@@ -528,7 +532,7 @@ export function Conversation({ chatId, topicId, infoOpen }: ConversationProps) {
 					topicId={effectiveTopic}
 					channel={chat.type === "channel"}
 					label={chat.type === "channel" ? copy.composer.channelLabel : copy.composer.label(topic?.title ?? title)}
-					placeholder={placeholderFor(chat, topic, title, copy, isSavedChat(chat, view?.peer ?? peer ?? null))}
+					placeholder={placeholderFor(chat, topic, title, copy, isSavedChat(chat, view?.peer ?? peer ?? null), delivery?.app ?? null)}
 					media={canSendMedia(chat)}
 					botId={botId}
 					group={chat.type === "group"}

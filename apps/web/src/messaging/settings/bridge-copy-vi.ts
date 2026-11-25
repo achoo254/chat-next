@@ -118,7 +118,6 @@ export const viBridge = {
 	},
 	/** Messages of a chat that sends on to the app: where each is on its way (shown in the conversation). */
 	delivery: {
-		note: (app: string): string => `Tin bạn gõ ở đây cũng được gửi sang ${app}.`,
 		sending: (app: string): string => `Đang gửi sang ${app}`,
 		failed: (app: string): string => `Chưa gửi sang ${app}`,
 		unknown: (app: string): string => `Chưa rõ đã gửi sang ${app} chưa`,

@@ -112,7 +112,6 @@ export const enBridge: BridgeCopy = {
 		reconnect: "Reconnect",
 	},
 	delivery: {
-		note: (app) => `What you type here is also sent to ${app}.`,
 		sending: (app) => `Sending to ${app}`,
 		failed: (app) => `Not sent to ${app}`,
 		unknown: (app) => `Unclear whether it reached ${app}`,

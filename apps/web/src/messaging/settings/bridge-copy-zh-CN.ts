@@ -107,7 +107,6 @@ export const zhCNBridge: BridgeCopy = {
 		reconnect: "重新连接",
 	},
 	delivery: {
-		note: (app) => `你在此处输入的内容也会发送到 ${app}。`,
 		sending: (app) => `正在发送到 ${app}`,
 		failed: (app) => `未发送到 ${app}`,
 		unknown: (app) => `不确定是否已到达 ${app}`,

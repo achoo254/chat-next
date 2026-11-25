@@ -7,6 +7,7 @@ import { BridgeOutboxStatus, type BridgeOutboxItem } from "@achoo254/chat-proto/
 import { ChatType } from "@achoo254/chat-proto/chats";
 import { afterEach, describe, expect, it } from "vitest";
 import { ChatFixture } from "./support/fake-chat.ts";
+import { boxPlaceholder } from "./support/plain-text-box.ts";
 import { renderMessaging } from "./support/render-messaging.tsx";
 
 const LONG = { timeout: 8000 };
@@ -29,6 +30,11 @@ function twoWay(items: (seq: number) => BridgeOutboxItem[]): { fixture: ChatFixt
 	return { fixture, chatId, seq };
 }
 
+/** What the composer's text box says while empty. */
+function composerPlaceholder(): string | null {
+	return boxPlaceholder(screen.getByRole("textbox", { name: /^Tin nhắn tới/ }));
+}
+
 /** The bubble of my message in the open conversation (the same text also shows in the chat list). */
 async function myBubble(): Promise<HTMLElement> {
 	const found = await waitFor(() => {
@@ -40,10 +46,11 @@ async function myBubble(): Promise<HTMLElement> {
 }
 
 describe("a chat that sends on to another app", () => {
-	it("says what you type is also sent, and where a message waiting to go is", async () => {
+	it("names the app in the composer, with no note above it, and where a message waiting to go is", async () => {
 		const { fixture, chatId } = twoWay((seq) => [item(seq, "send", BridgeOutboxStatus.PENDING)]);
 		renderMessaging(fixture, `/c/${chatId}`);
-		expect(await screen.findByText("Tin bạn gõ ở đây cũng được gửi sang Telegram.", {}, LONG)).toBeTruthy();
+		await waitFor(() => expect(composerPlaceholder()).toMatch(/ qua Telegram$/), LONG);
+		expect(screen.queryByRole("note")).toBeNull();
 		const bubble = await myBubble();
 		expect(await within(bubble).findByLabelText("Đang gửi sang Telegram", {}, LONG)).toBeTruthy();
 		expect(within(bubble).queryByRole("button", { name: "Gửi lại" })).toBeNull();
@@ -111,7 +118,7 @@ describe("a chat that sends on to another app", () => {
 		fixture.send(fixture.selfId, chatId, "tin thường");
 		renderMessaging(fixture, `/c/${chatId}`);
 		expect((await screen.findAllByText("tin thường", {}, LONG)).length).toBeGreaterThan(0);
-		expect(screen.queryByText(/cũng được gửi sang/)).toBeNull();
+		expect(composerPlaceholder()).not.toMatch(/ qua /);
 		expect(fixture.bridge.outboxLooks).toBe(0);
 	});
 
@@ -120,7 +127,7 @@ describe("a chat that sends on to another app", () => {
 		fixture.bridge.disabled = true;
 		renderMessaging(fixture, `/c/${chatId}`);
 		expect((await screen.findAllByText("tin của tôi", {}, LONG)).length).toBeGreaterThan(0);
-		expect(screen.queryByText(/cũng được gửi sang/)).toBeNull();
+		expect(composerPlaceholder()).not.toMatch(/ qua /);
 		expect(screen.queryByRole("button", { name: "Gửi lại" })).toBeNull();
 	});
 });

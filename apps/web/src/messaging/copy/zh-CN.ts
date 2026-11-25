@@ -216,6 +216,7 @@ export const zhCN: MessagingCopy = {
 		placeholder: (name: string) => `给 ${name} 发消息`,
 		placeholderSaved: "在我的云端写笔记",
 		placeholderGroup: (name: string) => `输入 @ 提及成员，给 ${name} 发消息`,
+		via: (placeholder: string, app: string) => `${placeholder}（经 ${app}）`,
 		channelLabel: "发布",
 		channelPlaceholder: "发布到频道",
 		dropTitle: "拖放文件以发送",

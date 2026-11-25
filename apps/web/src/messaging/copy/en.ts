@@ -219,6 +219,7 @@ export const en: MessagingCopy = {
 		placeholder: (name: string) => `Message ${name}`,
 		placeholderSaved: "Write a note to My Cloud",
 		placeholderGroup: (name: string) => `Type @ to mention, message ${name}`,
+		via: (placeholder: string, app: string) => `${placeholder} via ${app}`,
 		channelLabel: "Post",
 		channelPlaceholder: "Post to the channel",
 		dropTitle: "Drop files to send",

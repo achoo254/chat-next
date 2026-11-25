@@ -1,6 +1,6 @@
 // What a message of a chat that sends on to another app (Chat Bridge, ADR 0022)
 // says about its way there: the mark on its time line, the row under a failed one,
-// and the note above the composer. Loaded on demand (only a connected chat needs
+// and a notice when the app refuses a pin or a change (the composer's placeholder names the app). Loaded on demand (only a connected chat needs
 // it), with its own copy, so none of it weighs on the startup chunk.
 import { useEffect } from "react";
 import type { BridgeOutboxItem } from "../settings/bridge-api.ts";
@@ -9,7 +9,6 @@ import { useCopy } from "../copy/use-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { bridgeAppName, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
 import { LabelledIcon } from "./chat-row.tsx";
-import { Icon } from "../../components/icon.tsx";
 
 export { watchDelivery } from "./bridge-delivery-watch.ts";
 
@@ -78,8 +77,8 @@ export function BridgeFailedRow({ chatId, seq }: { chatId: number; seq: number }
 	);
 }
 
-/** The line above the composer of a chat that sends on; it also tells, once, a pin the app refused. */
-export function BridgeNote({ app, refused }: { app: string; refused: readonly BridgeOutboxItem[] }) {
+/** Tells, once each, a pin or a change the app refused; it draws nothing. */
+export function BridgeRefusals({ app, refused }: { app: string; refused: readonly BridgeOutboxItem[] }) {
 	"use no memo";
 	const copy = useBridgeCopy();
 	const t = copy.delivery;
@@ -91,10 +90,5 @@ export function BridgeNote({ app, refused }: { app: string; refused: readonly Br
 			else toasts.show(t.changeRefused(app_, copy.features.name[STATE_OP_FEATURE[item.op] ?? ""] ?? STATE_OP_FEATURE[item.op] ?? ""));
 		}
 	}, [refused, toasts, t, copy, app]);
-	return (
-		<p className="bridge-note" role="note">
-			<Icon name="info" small />
-			{t.note(bridgeAppName(app))}
-		</p>
-	);
+	return null;
 }

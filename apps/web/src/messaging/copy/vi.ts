@@ -234,6 +234,8 @@ export const vi = {
 		/** "Cloud của tôi" (mockups/chat.html#first-run). */
 		placeholderSaved: "Ghi chú vào Cloud của tôi",
 		placeholderGroup: (name: string) => `Nhập @ để nhắc tên, tin nhắn tới ${name}`,
+		/** A chat synced with another app (Chat Bridge): what you type goes there too. */
+		via: (placeholder: string, app: string) => `${placeholder} qua ${app}`,
 		channelLabel: "Bài đăng",
 		channelPlaceholder: "Đăng bài lên kênh",
 		dropTitle: "Thả file để gửi",

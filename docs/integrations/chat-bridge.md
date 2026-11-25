@@ -15,7 +15,7 @@ Chat Bridge đồng bộ mọi cuộc trò chuyện của chính bạn ở một
 
 ## Gửi từ Chat sang Telegram
 
-Chat hai chiều hiện ghi chú "Tin bạn gõ ở đây cũng được gửi sang Telegram" trên ô soạn tin. Gửi được: văn bản có định dạng (đậm, nghiêng, mã, liên kết), trả lời, sửa, xoá cho mọi người, ảnh, tệp và album. Xoá chỉ cho tôi chỉ xoá ở Chat. Chuyển tiếp, bot, Bot API và thành viên khác không gửi sang Telegram được.
+Ô soạn tin của chat hai chiều ghi tên app ở chữ mờ, ví dụ "Nhập @ để nhắc tên, tin nhắn tới Nhóm A qua Telegram" (Zalo cũng vậy); không còn dòng ghi chú riêng trên ô soạn tin. Gửi được: văn bản có định dạng (đậm, nghiêng, mã, liên kết), trả lời, sửa, xoá cho mọi người, ảnh, tệp và album. Xoá chỉ cho tôi chỉ xoá ở Chat. Chuyển tiếp, bot, Bot API và thành viên khác không gửi sang Telegram được.
 
 Mỗi tin gửi đi có trạng thái ngay trên tin: đồng hồ là đang gửi (Chat xếp hàng và gửi từng tin, cách nhau chừng 0,7 giây, theo đúng thứ tự). Lỗi hiện thành dòng "Chưa gửi sang Telegram" kèm **Gửi lại** và **Xoá tin** (xoá là cách bỏ tin gửi hỏng). Tạm mất mạng hoặc Telegram bảo chờ thì Chat tự thử lại, không mất tin và không gửi trùng. Nếu server dừng đúng lúc đang gửi và quá 10 phút mới chạy lại, tin hiện "Chưa rõ đã gửi sang Telegram chưa": kiểm trong Telegram rồi chọn **Gửi lại** hoặc **Xoá tin**. Bản sửa không sang được (ví dụ Telegram không cho sửa tin cũ nữa) hiện "Bản sửa chưa sang Telegram" kèm **Gửi lại** và **Bỏ qua**.
 
