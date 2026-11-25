@@ -74,6 +74,11 @@ export interface WorkerConfig {
 	/** Origin of the chat server (checked by createWebChat): /rpc and /ws are reached there. */
 	readonly apiOrigin: string;
 	readonly appVersion: string;
+	/**
+	 * When this build was made (Unix milliseconds), to tell an older build from a newer
+	 * one across tabs; absent or 0 when unknown (development, tests): never compared.
+	 */
+	readonly build?: number;
 	/** User of the previous session in this browser; skips GetSelf on warm start. */
 	readonly userIdHint?: number;
 	readonly foreground: boolean;
@@ -119,7 +124,12 @@ export type HubMessage =
 	| { readonly type: "presence"; readonly tabId: string; readonly foreground: boolean }
 	| { readonly type: "online" }
 	| { readonly type: "ended"; readonly reason: SessionEndReason }
-	| { readonly type: "user"; readonly userId: number };
+	| { readonly type: "user"; readonly userId: number }
+	/**
+	 * A tab says which build it runs (WorkerConfig.build), at start and to each new
+	 * leader: a leader of an older build lets the newer tab lead (TabHub).
+	 */
+	| { readonly type: "build"; readonly tabId: string; readonly build: number };
 
 export function serializeError(err: unknown): SerializedError {
 	if (err instanceof Error) return { name: err.name, message: err.message };

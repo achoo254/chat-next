@@ -11,6 +11,9 @@ import { serverOrigin } from "../../server-origin.ts";
 
 const APP_VERSION = "web-r1";
 
+/** When this build was made (vite.config.ts), so a newer tab takes the core over from an older one; 0 when unset. */
+const BUILD_TIME = Number(import.meta.env.VITE_BUILD_TIME ?? 0) || 0;
+
 /** The compact window shows the app, so the app stays in the foreground while it is open even if this page is hidden. */
 const COMPACT_FOREGROUND: NonNullable<WebChatOptions["alsoForeground"]> = {
 	get: () => compactWindow.get() !== null,
@@ -25,6 +28,7 @@ export function connectWebChat(options: MessagingConnectorOptions, native?: Nati
 		createWorker: () => new ChatWorker(),
 		apiOrigin: serverOrigin(),
 		appVersion: APP_VERSION,
+		build: BUILD_TIME,
 		alsoForeground: COMPACT_FOREGROUND,
 		...native,
 		onSessionEnded: options.onSessionEnded,

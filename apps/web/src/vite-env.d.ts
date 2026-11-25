@@ -15,4 +15,6 @@ interface ImportMetaEnv {
 	readonly VITE_APP_VERSION?: string;
 	/** STUN servers of the terminal's direct path, "host:port,host:port" ("" for none); unset: the relay's host. */
 	readonly VITE_TERMINAL_STUN?: string;
+	/** When the bundle was built, Unix milliseconds as text (vite.config.ts sets it). */
+	readonly VITE_BUILD_TIME?: string;
 }

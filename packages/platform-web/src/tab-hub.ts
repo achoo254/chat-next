@@ -4,6 +4,12 @@
 // them. When the leader goes away, the next hub takes the lock, starts the
 // core on the same database and every follower re-sends its unanswered
 // calls (writes carry idempotency keys, see ChatCore.sendText).
+//
+// A tab left open across a deploy keeps the build it loaded, and as leader it
+// would keep serving every newer tab with its older core and database schema.
+// So each tab says which build it runs (at start and to each new leader); a
+// leader that hears of a newer build closes its core, lets the lock go to the
+// next tab in line and queues again behind it, carrying on as a follower.
 import type { SessionEndReason } from "@achoo254/chat-core";
 import type { Unsubscribe } from "@achoo254/chat-platform";
 import type { LeaderLock } from "./leader.ts";
@@ -34,6 +40,8 @@ export interface LeaderCore {
 
 export interface TabHubOptions {
 	readonly tabId: string;
+	/** When this tab's build was made (WorkerConfig.build); 0 or absent: unknown, never yields for it. */
+	readonly build?: number;
 	readonly channel: ChannelLike;
 	readonly lock: LeaderLock;
 	/** Starts the core once this tab leads; throwing answers every call with that error. */
@@ -78,6 +86,9 @@ export class TabHub {
 	private readonly presence = new Map<string, boolean>();
 	private foreground = true;
 	private closed = false;
+	/** The newest build another tab announced since this tab last led or yielded. */
+	private newestBuild = 0;
+	private yielding = false;
 
 	constructor(private readonly options: TabHubOptions) {}
 
@@ -91,6 +102,7 @@ export class TabHub {
 			if (isHubMessage(event.data)) this.receive(event.data);
 		});
 		this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground });
+		this.announceBuild();
 		this.options.lock
 			.acquire(
 				() => this.becomeLeader(),
@@ -222,6 +234,51 @@ export class TabHub {
 		const waiting = this.waiting;
 		this.waiting = [];
 		for (const call of waiting) void this.answer(call.id, call.method, call.args);
+		this.yieldIfOutdated();
+	}
+
+	private announceBuild(): void {
+		const build = this.options.build ?? 0;
+		if (build > 0) this.options.channel.postMessage({ type: "build", tabId: this.options.tabId, build });
+	}
+
+	/** Leader: lets a tab of a newer build lead. */
+	private yieldIfOutdated(): void {
+		const own = this.options.build ?? 0;
+		if (!this.isLeader || !this.ready || this.yielding || this.closed || own <= 0 || this.newestBuild <= own) return;
+		void this.yieldLead();
+	}
+
+	/**
+	 * Closes the core (the next leader opens the database) and queues for the lock
+	 * again behind the tabs waiting for it. Calls still pending here are sent again
+	 * when the next leader announces itself, as after any change of leader.
+	 */
+	private async yieldLead(): Promise<void> {
+		this.yielding = true;
+		this.role = "follower";
+		this.ready = false;
+		this.options.onRole("follower");
+		// Forgotten: the newer tab announces itself again to whoever leads next.
+		this.newestBuild = 0;
+		this.handled.clear();
+		this.waiting = [];
+		const core = this.core;
+		this.core = null;
+		this.coreError = null;
+		try {
+			await core?.close();
+		} catch (err) {
+			this.options.onError(err, "close core");
+		}
+		this.yielding = false;
+		if (this.closed) return;
+		this.options.lock
+			.requeue(
+				() => this.becomeLeader(),
+				(err) => this.options.onError(err, "start leader"),
+			)
+			.catch((err: unknown) => this.options.onError(err, "leader lock"));
 	}
 
 	private async answer(id: string, method: CoreMethod, args: unknown[]): Promise<void> {
@@ -252,7 +309,12 @@ export class TabHub {
 				// A new leader is up: whatever it did not answer yet, ask again.
 				if (this.isLeader) return;
 				this.options.channel.postMessage({ type: "presence", tabId: this.options.tabId, foreground: this.foreground });
+				this.announceBuild();
 				for (const id of this.pending.keys()) this.dispatch(id);
+				return;
+			case "build":
+				if (message.build > this.newestBuild) this.newestBuild = message.build;
+				this.yieldIfOutdated();
 				return;
 			case "presence":
 				this.presence.set(message.tabId, message.foreground);

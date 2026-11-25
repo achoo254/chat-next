@@ -47,6 +47,11 @@ export interface WebChatOptions {
 	 */
 	readonly apiOrigin: string;
 	readonly appVersion: string;
+	/**
+	 * When this build was made (Unix milliseconds). A tab of a newer build takes the
+	 * core over from a tab of an older one left open (WorkerConfig.build); omit when unknown.
+	 */
+	readonly build?: number;
 	/** Defaults to window.localStorage. */
 	readonly storage?: Storage;
 	readonly onSessionEnded?: (reason: SessionEndReason) => void;
@@ -272,6 +277,7 @@ export function createWebChat(options: WebChatOptions): WebChat {
 		config: {
 			apiOrigin,
 			appVersion: options.appVersion,
+			...(options.build === undefined ? {} : { build: options.build }),
 			foreground: foregroundNow(),
 			...(userId === undefined ? {} : { userIdHint: userId }),
 			...(options.native === undefined ? {} : { native: options.native }),

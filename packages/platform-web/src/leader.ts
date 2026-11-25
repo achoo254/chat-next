@@ -49,6 +49,16 @@ export class LeaderLock {
 		});
 	}
 
+	/**
+	 * Lets the next tab in line lead, and queues again behind it: this tab stays open
+	 * and may lead again once the tabs before it are gone.
+	 */
+	requeue(onLeader: () => Promise<void>, onError: (error: unknown) => void): Promise<void> {
+		this.releaseHeld?.();
+		this.releaseHeld = null;
+		return this.acquire(onLeader, onError);
+	}
+
 	/** Lets the next tab take over (this tab is closing or signing out). */
 	release(): void {
 		this.released = true;

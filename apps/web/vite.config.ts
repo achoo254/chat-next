@@ -12,6 +12,9 @@ const SIDE_EFFECT_FREE = /\/packages\/(core|proto-ts)\/src\//;
 const API_ORIGIN = "http://127.0.0.1:4600";
 
 export default defineConfig({
+	// A tab of a newer build takes the core over from one of an older build left open
+	// (packages/platform-web/src/tab-hub.ts); the build time tells them apart.
+	define: { "import.meta.env.VITE_BUILD_TIME": JSON.stringify(String(Date.now())) },
 	plugins: [...reactPlugins(), brandAssets(), themeBootstrap(), langBootstrap(), serviceWorker(loadChatBrand().pushSenderName)],
 	server: {
 		// brand.config.json devOrigins lists this origin; never fall back to another port.

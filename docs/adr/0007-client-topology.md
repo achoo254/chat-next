@@ -11,7 +11,7 @@ Client dùng chung một lõi TypeScript (`packages/core`, `@achoo254/chat-core`
 ## Quyết định
 
 - Web: một worker sở hữu transport WebSocket, sync engine, SQLite trên OPFS (`opfs-sahpool`) và tìm kiếm local. Main thread chỉ chạy React. Không có thao tác DB hay giải mã protobuf trên main thread.
-- Web nhiều tab: một tab giữ DB qua Web Locks; tab khác gọi qua tab đó. Tab giữ DB đóng thì tab còn lại tiếp quản.
+- Web nhiều tab: một tab giữ DB qua Web Locks; tab khác gọi qua tab đó. Tab giữ DB đóng thì tab còn lại tiếp quản. Mỗi tab báo thời điểm build của mình (`VITE_BUILD_TIME`); tab đang giữ DB mà thấy tab bản mới hơn thì đóng DB, nhường khoá và xếp hàng lại sau, tiếp tục chạy như tab thường. Vì vậy một tab cũ bỏ quên qua lần deploy không giữ schema cũ cho các tab mới ([`tab-hub.ts`](../../packages/platform-web/src/tab-hub.ts)). Tab giữ DB thuộc bản trước thay đổi này không biết nhường: tải lại tab đó một lần.
 - Capacitor và Tauri: sync engine và transport chạy trên main thread. Mọi thao tác nặng (ghi SQL theo lô, giải mã protobuf lô lớn) được đẩy xuống native qua một lời gọi batch cho mỗi lô update.
 - Ở cả hai topology, UI chỉ nhận thay đổi đã gom theo frame, qua event bus theo id (hội thoại, khoá tin nhắn).
 - Điểm nối nền tảng là `startApp(platform)`, nhận các interface `SqlDriver` (batch nguyên tử), `Push`, `Lifecycle`, `Notify`, `Badge`, `Files`, `SecureStore`, `OpenExternal` và `AuthBrowser`. Mỗi nền tảng có một package hiện thực riêng.

@@ -36,6 +36,8 @@ interface Tab {
 	readonly ended: SessionEndReason[];
 	readonly foreground: boolean[];
 	readonly invoked: { method: CoreMethod; args: unknown[] }[];
+	/** How many times this tab's core was closed (when it lets another tab lead). */
+	readonly closes: () => number;
 	emit(keys: readonly string[]): void;
 }
 
@@ -48,7 +50,8 @@ afterEach(() => {
 });
 
 /** A tab whose leader core answers "dialogs" with its own id and can be told to hang. */
-function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = {}): Tab {
+function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod; build?: number } = {}): Tab {
+	let closes = 0;
 	const roles: string[] = [];
 	const events: (readonly string[])[] = [];
 	const ended: SessionEndReason[] = [];
@@ -59,6 +62,7 @@ function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = 
 	channels.push(channel);
 	const hub = new TabHub({
 		tabId: id,
+		...(options.build === undefined ? {} : { build: options.build }),
 		channel,
 		lock: new LeaderLock(locks, "leader"),
 		startLeader: async (): Promise<LeaderCore> => ({
@@ -71,7 +75,9 @@ function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = 
 				listeners.add(listener);
 				return () => listeners.delete(listener);
 			},
-			close: async () => undefined,
+			close: async () => {
+				closes++;
+			},
 		}),
 		onEvents: (keys) => events.push(keys),
 		onEnded: (reason) => ended.push(reason),
@@ -93,6 +99,7 @@ function openTab(id: string, locks: FakeLocks, options: { hang?: CoreMethod } = 
 		ended,
 		foreground,
 		invoked,
+		closes: () => closes,
 		emit: (keys) => {
 			for (const listener of listeners) listener(keys);
 		},
@@ -174,4 +181,50 @@ describe("tab hub: one tab owns the database", () => {
 		first.hub.setForeground(true);
 		expect(first.foreground.at(-1)).toBe(true);
 	});
+
+	it("lets a tab of a newer build lead, and carries on as a follower of it", async () => {
+		const locks = new FakeLocks();
+		const old = openTab("old", locks, { build: 1_000 });
+		await until(() => old.roles.includes("leader"));
+		expect(await old.hub.call("dialogs", [])).toBe("dialogs from old");
+		const fresh = openTab("new", locks, { build: 2_000 });
+		await until(() => fresh.roles.includes("leader"));
+		expect(old.roles).toEqual(["leader", "follower"]);
+		expect(old.closes()).toBe(1);
+		// The old tab's calls now run on the newer core.
+		expect(await old.hub.call("dialogs", [])).toBe("dialogs from new");
+		expect(await fresh.hub.call("search", ["x"])).toBe("search from new");
+	});
+
+	it("keeps the lead for a tab of the same or an older build, or one that does not say", async () => {
+		const locks = new FakeLocks();
+		const leader = openTab("A", locks, { build: 2_000 });
+		await until(() => leader.roles.includes("leader"));
+		const same = openTab("B", locks, { build: 2_000 });
+		const older = openTab("C", locks, { build: 1_000 });
+		const unknown = openTab("D", locks);
+		for (const tab of [same, older, unknown]) expect(await tab.hub.call("dialogs", [])).toBe("dialogs from A");
+		expect(leader.roles).toEqual(["leader"]);
+		expect(leader.closes()).toBe(0);
+	});
+
+	it("passes the lead along a line of older tabs to the newest, then takes it back when that tab closes", async () => {
+		const locks = new FakeLocks();
+		const first = openTab("A", locks, { build: 1_000 });
+		await until(() => first.roles.includes("leader"));
+		const second = openTab("B", locks, { build: 1_000 });
+		await second.hub.call("dialogs", []);
+		const newest = openTab("C", locks, { build: 3_000 });
+		await until(() => newest.roles.includes("leader"));
+		expect(await second.hub.call("dialogs", [])).toBe("dialogs from C");
+		expect(await first.hub.call("dialogs", [])).toBe("dialogs from C");
+		// With the newest tab gone an older one leads again, and stays: nobody newer is left.
+		newest.hub.close();
+		await until(() => first.roles.at(-1) === "leader" || second.roles.at(-1) === "leader");
+		const leading = first.roles.at(-1) === "leader" ? first : second;
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(leading.roles.at(-1)).toBe("leader");
+		expect(await first.hub.call("dialogs", [])).toBe(`dialogs from ${leading.id}`);
+	});
 });
+

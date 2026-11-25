@@ -82,6 +82,7 @@ function startHub(config: WorkerConfig): TabHub {
 	const reportError = (context: string) => (err: unknown) => post({ type: "error", context, message: serializeError(err).message });
 	const hub: TabHub = new TabHub({
 		tabId: crypto.randomUUID(),
+		...(config.build === undefined ? {} : { build: config.build }),
 		channel: new BroadcastChannel(`chat-core:${host}`),
 		lock: new LeaderLock(native === undefined ? navigator.locks : nativeLocks(navigator.locks), `chat-core-leader:${host}`),
 		startLeader: async (): Promise<LeaderCore> => {
