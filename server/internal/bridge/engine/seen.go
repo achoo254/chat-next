@@ -24,14 +24,6 @@ func seenOf(p bridge.Participant, now time.Time) (time.Time, bool) {
 	return p.Seen, true
 }
 
-// seenPtr is seenOf as a nullable column value.
-func seenPtr(p bridge.Participant) *time.Time {
-	if at, ok := seenOf(p, time.Now()); ok {
-		return &at
-	}
-	return nil
-}
-
 // setSeen records when a person of the account was last online as the puppet's last-seen
 // time. It only moves forward: an older time than the one recorded changes nothing.
 func (d *db) setSeen(ctx context.Context, accountID int64, p bridge.Participant) error {
