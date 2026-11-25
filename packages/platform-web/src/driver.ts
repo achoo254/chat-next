@@ -78,6 +78,14 @@ export interface SahpoolOptions {
 	readonly vfsName?: string;
 }
 
+/**
+ * Whether opening the pool failed because another context still holds its files
+ * (sqlite-wasm throws the browser's NoModificationAllowedError for the access handles).
+ */
+export function isStorageHeldElsewhere(err: unknown): boolean {
+	return err instanceof Error && (err.name === "NoModificationAllowedError" || /access handle/i.test(err.message));
+}
+
 /** The part of an opfs-sahpool pool the factory uses (sqlite-wasm's SAHPoolUtil). */
 export interface SahpoolLike {
 	readonly OpfsSAHPoolDb: new (path: string) => Database;

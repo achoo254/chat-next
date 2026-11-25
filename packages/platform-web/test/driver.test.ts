@@ -103,3 +103,15 @@ describe("opfs-sahpool factory", () => {
 		expect(opened).toEqual(["/u1.sqlite3"]);
 	});
 });
+
+describe("isStorageHeldElsewhere", () => {
+	it("tells the browser's refusal to open files another context holds from other failures", async () => {
+		const { isStorageHeldElsewhere } = await import("../src/driver.ts");
+		const refusal = new Error("Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created");
+		refusal.name = "NoModificationAllowedError";
+		expect(isStorageHeldElsewhere(refusal)).toBe(true);
+		expect(isStorageHeldElsewhere(new Error("Access Handles cannot be created if there is another open Access Handle"))).toBe(true);
+		expect(isStorageHeldElsewhere(new Error("no such table"))).toBe(false);
+		expect(isStorageHeldElsewhere("Access Handle")).toBe(false);
+	});
+});

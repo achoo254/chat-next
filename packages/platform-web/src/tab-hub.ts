@@ -10,6 +10,11 @@
 // So each tab says which build it runs (at start and to each new leader); a
 // leader that hears of a newer build closes its core, lets the lock go to the
 // next tab in line and queues again behind it, carrying on as a follower.
+//
+// A tab that leads but finds the database files still held by another context (a tab
+// of an older build that stepped down without letting them go, or one slow to end) asks
+// the other tabs to let go ("release"), waits and tries again; a tab that is not leading
+// then gives back what its worker holds (TabHubOptions.releaseStorage).
 import type { SessionEndReason } from "@achoo254/chat-core";
 import type { Unsubscribe } from "@achoo254/chat-platform";
 import type { LeaderLock } from "./leader.ts";
@@ -46,6 +51,12 @@ export interface TabHubOptions {
 	readonly lock: LeaderLock;
 	/** Starts the core once this tab leads; throwing answers every call with that error. */
 	readonly startLeader: () => Promise<LeaderCore>;
+	/** Whether a start failed because another context holds the database files. */
+	readonly storageBusy?: (error: unknown) => boolean;
+	/** Gives back the database files this worker holds; asked of a tab that is not leading. */
+	readonly releaseStorage?: () => Promise<void>;
+	/** Waits between starts of a leader that found the files held; defaults to a timer. */
+	readonly wait?: (ms: number) => Promise<void>;
 	readonly onEvents: (keys: readonly string[]) => void;
 	readonly onEnded: (reason: SessionEndReason) => void;
 	readonly onRole: (role: "leader" | "follower") => void;
@@ -65,6 +76,10 @@ interface PendingCall {
 }
 
 const HANDLED_LIMIT = 500;
+
+/** How many times a leader asks the other tabs to let go and tries again, and the first wait. */
+const RELEASE_ATTEMPTS = 4;
+const RELEASE_WAIT_MS = 400;
 
 const UNSUPPORTED_METHOD: SerializedError = { name: "Error", message: "unsupported method" };
 
@@ -217,7 +232,12 @@ export class TabHub {
 		this.role = "leader";
 		this.options.onRole("leader");
 		try {
-			const core = await this.options.startLeader();
+			let core: LeaderCore;
+			try {
+				core = await this.options.startLeader();
+			} catch (err) {
+				core = await this.startAgainAskingToRelease(err);
+			}
 			this.core = core;
 			core.subscribe((keys) => {
 				this.options.channel.postMessage({ type: "events", keys });
@@ -235,6 +255,27 @@ export class TabHub {
 		this.waiting = [];
 		for (const call of waiting) void this.answer(call.id, call.method, call.args);
 		this.yieldIfOutdated();
+	}
+
+	/**
+	 * The first start failed with `failure`. While that is the database files being held by
+	 * another context, asks the other tabs to let go and tries again (a few times, waiting
+	 * longer each time); any other failure, or the last one, is thrown.
+	 */
+	private async startAgainAskingToRelease(failure: unknown): Promise<LeaderCore> {
+		const wait = this.options.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+		let error = failure;
+		for (let attempt = 1; attempt < RELEASE_ATTEMPTS; attempt++) {
+			if (this.closed || this.options.storageBusy?.(error) !== true) break;
+			this.options.channel.postMessage({ type: "release", tabId: this.options.tabId });
+			await wait(RELEASE_WAIT_MS * attempt);
+			try {
+				return await this.options.startLeader();
+			} catch (err) {
+				error = err;
+			}
+		}
+		throw error;
 	}
 
 	private announceBuild(): void {
@@ -328,6 +369,11 @@ export class TabHub {
 				return;
 			case "user":
 				this.options.onUser(message.userId);
+				return;
+			case "release":
+				// Only a tab that is not leading holds files it has no use for.
+				if (this.isLeader || message.tabId === this.options.tabId) return;
+				void this.options.releaseStorage?.().catch((err: unknown) => this.options.onError(err, "release storage"));
 				return;
 		}
 	}

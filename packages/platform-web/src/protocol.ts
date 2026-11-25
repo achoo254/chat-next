@@ -129,7 +129,12 @@ export type HubMessage =
 	 * A tab says which build it runs (WorkerConfig.build), at start and to each new
 	 * leader: a leader of an older build lets the newer tab lead (TabHub).
 	 */
-	| { readonly type: "build"; readonly tabId: string; readonly build: number };
+	| { readonly type: "build"; readonly tabId: string; readonly build: number }
+	/**
+	 * The tab that holds the leader lock could not open the local database because another
+	 * context still holds its files: a tab that is not leading lets go of what its worker holds.
+	 */
+	| { readonly type: "release"; readonly tabId: string };
 
 export function serializeError(err: unknown): SerializedError {
 	if (err instanceof Error) return { name: err.name, message: err.message };

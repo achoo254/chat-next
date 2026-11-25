@@ -4,8 +4,8 @@
 // their tab's calls to it (tab-hub.ts).
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { createRemoteApi, realtimeUrlFor, SessionEndedError, startApp, type ChatCore } from "@achoo254/chat-core";
-import { cryptoRandomId, systemTimers, type Platform } from "@achoo254/chat-platform";
-import { openMemoryFactory, openSahpoolFactory } from "./driver.ts";
+import { cryptoRandomId, systemTimers, type Platform, type SqlDriverFactory } from "@achoo254/chat-platform";
+import { isStorageHeldElsewhere, openMemoryFactory, openSahpoolFactory } from "./driver.ts";
 import { LeaderLock } from "./leader.ts";
 import { nativeLocks, openLocalDatabase } from "./local-database.ts";
 import { cacheBlobStores, canvasImageProbe, fetchHttp } from "./media-platform.ts";
@@ -74,6 +74,9 @@ function rpcFetch(native: NativeConnection | undefined): typeof fetch {
 	};
 }
 
+/** The database factory this worker opened as leader; its files stay held until it is released. */
+let heldSql: SqlDriverFactory | undefined;
+
 function startHub(config: WorkerConfig): TabHub {
 	const host = location.host;
 	const native = config.native;
@@ -85,6 +88,10 @@ function startHub(config: WorkerConfig): TabHub {
 		...(config.build === undefined ? {} : { build: config.build }),
 		channel: new BroadcastChannel(`chat-core:${host}`),
 		lock: new LeaderLock(native === undefined ? navigator.locks : nativeLocks(navigator.locks), `chat-core-leader:${host}`),
+		storageBusy: isStorageHeldElsewhere,
+		releaseStorage: async () => {
+			await heldSql?.release?.();
+		},
 		startLeader: async (): Promise<LeaderCore> => {
 			const sql = await openLocalDatabase({
 				native: native !== undefined,
@@ -93,6 +100,7 @@ function startHub(config: WorkerConfig): TabHub {
 				openMemory: openMemoryFactory,
 				report: reportError("local database"),
 			});
+			heldSql = sql;
 			const api = createRemoteApi(
 				createConnectTransport({
 					baseUrl: `${origin}/rpc`,

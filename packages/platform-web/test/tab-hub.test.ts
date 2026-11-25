@@ -228,3 +228,157 @@ describe("tab hub: one tab owns the database", () => {
 	});
 });
 
+
+describe("tab hub: a leader that finds the database files held asks the other tabs to let go", () => {
+	const busy = new Error("Access Handles cannot be created if there is another open Access Handle");
+
+	/** A tab whose start fails with `busy` until `holder.released` is set. */
+	function openHoldingTab(id: string, locks: FakeLocks, holder: { released: boolean }, waits: number[]): Tab {
+		const roles: string[] = [];
+		const channel = new BroadcastChannel("chat-core:test-release");
+		channels.push(channel);
+		const hub = new TabHub({
+			tabId: id,
+			channel,
+			lock: new LeaderLock(locks, "leader"),
+			startLeader: async (): Promise<LeaderCore> => {
+				if (!holder.released) throw busy;
+				return { invoke: async () => `from ${id}`, subscribe: () => () => undefined, close: async () => undefined };
+			},
+			storageBusy: (err) => err === busy,
+			wait: async (ms) => {
+				waits.push(ms);
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			},
+			onEvents: () => undefined,
+			onEnded: () => undefined,
+			onRole: (role) => roles.push(role),
+			onUser: () => undefined,
+			onForeground: () => undefined,
+			onOnline: () => undefined,
+			onError: () => undefined,
+		});
+		hubs.push(hub);
+		hub.start(false);
+		return { hub, id, roles, events: [], ended: [], foreground: [], invoked: [], closes: () => 0, emit: () => undefined };
+	}
+
+	/** A follower tab that holds files and gives them back when asked. */
+	function openHolder(locks: FakeLocks, holder: { released: boolean }, asked: string[]): void {
+		const channel = new BroadcastChannel("chat-core:test-release");
+		channels.push(channel);
+		const hub = new TabHub({
+			tabId: "holder",
+			channel,
+			lock: new LeaderLock(locks, "leader"),
+			startLeader: async () => {
+				throw new Error("never leads in this test");
+			},
+			releaseStorage: async () => {
+				asked.push("holder");
+				holder.released = true;
+			},
+			onEvents: () => undefined,
+			onEnded: () => undefined,
+			onRole: () => undefined,
+			onUser: () => undefined,
+			onForeground: () => undefined,
+			onOnline: () => undefined,
+			onError: () => undefined,
+		});
+		hubs.push(hub);
+		hub.start(false);
+	}
+
+	it("starts after a tab that is not leading gave its files back", async () => {
+		const holder = { released: false };
+		const asked: string[] = [];
+		const waits: number[] = [];
+		const locks = new FakeLocks();
+		// The tab that leads starts first; the tab holding the files only follows it.
+		const tab = openHoldingTab("new", locks, holder, waits);
+		openHolder(locks, holder, asked);
+		await until(() => tab.roles.includes("leader") && holder.released);
+		expect(await tab.hub.call("dialogs", [])).toBe("from new");
+		expect(asked).toEqual(["holder"]);
+		expect(waits.length).toBe(1);
+	});
+
+	it("gives up with the error after a few asks when nobody lets go", async () => {
+		const waits: number[] = [];
+		const errors: unknown[] = [];
+		const channel = new BroadcastChannel("chat-core:test-release-none");
+		channels.push(channel);
+		const hub = new TabHub({
+			tabId: "lonely",
+			channel,
+			lock: new LeaderLock(new FakeLocks(), "leader"),
+			startLeader: async () => {
+				throw busy;
+			},
+			storageBusy: (err) => err === busy,
+			wait: async (ms) => {
+				waits.push(ms);
+			},
+			onEvents: () => undefined,
+			onEnded: () => undefined,
+			onRole: () => undefined,
+			onUser: () => undefined,
+			onForeground: () => undefined,
+			onOnline: () => undefined,
+			onError: (err, context) => errors.push([context, err]),
+		});
+		hubs.push(hub);
+		hub.start(false);
+		await until(() => errors.length > 0);
+		expect(waits).toEqual([400, 800, 1200]);
+		expect(errors).toEqual([["start core", busy]]);
+	});
+
+	it("does not ask for any other failure", async () => {
+		const waits: number[] = [];
+		const other = new Error("migration failed");
+		const errors: unknown[] = [];
+		const channel = new BroadcastChannel("chat-core:test-release-other");
+		channels.push(channel);
+		const hub = new TabHub({
+			tabId: "t",
+			channel,
+			lock: new LeaderLock(new FakeLocks(), "leader"),
+			startLeader: async () => {
+				throw other;
+			},
+			storageBusy: (err) => err === busy,
+			wait: async (ms) => {
+				waits.push(ms);
+			},
+			onEvents: () => undefined,
+			onEnded: () => undefined,
+			onRole: () => undefined,
+			onUser: () => undefined,
+			onForeground: () => undefined,
+			onOnline: () => undefined,
+			onError: (err) => errors.push(err),
+		});
+		hubs.push(hub);
+		hub.start(false);
+		await until(() => errors.length > 0);
+		expect(waits).toEqual([]);
+		expect(errors).toEqual([other]);
+	});
+
+	it("never asks the tab that leads to let go", async () => {
+		const locks = new FakeLocks();
+		const asked: string[] = [];
+		const holder = { released: false };
+		const leader = openTab("A", locks);
+		await until(() => leader.roles.includes("leader"));
+		const channel = new BroadcastChannel("chat-core:test");
+		channels.push(channel);
+		channel.postMessage({ type: "release", tabId: "someone" });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(leader.closes()).toBe(0);
+		expect(asked).toEqual([]);
+		expect(holder.released).toBe(false);
+	});
+});
