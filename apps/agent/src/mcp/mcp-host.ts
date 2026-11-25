@@ -348,13 +348,15 @@ export class McpHost {
 			const first = result?.content[0];
 			if (!result || result.isError || first?.type !== "text") return undefined;
 			const answer = JSON.parse(first.text) as {
-				chat?: { title?: string; member_count?: number };
-				users?: { name?: string; username?: string }[];
+				chat?: { title?: string; member_count?: number; peer_user_id?: number | string };
+				users?: { id?: number | string; name?: string; username?: string }[];
 			};
-			const peer = answer.users?.[0];
+			// A one-to-one chat has no title: it is named after the other person (peer_user_id), never after the caller.
+			const peerId = answer.chat?.peer_user_id;
+			const peer = peerId === undefined ? undefined : answer.users?.find((u) => String(u.id) === String(peerId));
 			const name = answer.chat?.title || peer?.name || (peer?.username ? `@${peer.username}` : "");
 			if (!name) return undefined;
-			const members = answer.chat?.member_count ? ` (${answer.chat.member_count} members)` : "";
+			const members = answer.chat?.title && answer.chat.member_count ? ` (${answer.chat.member_count} members)` : "";
 			return `«${name}»${members}`;
 		} catch {
 			return undefined;

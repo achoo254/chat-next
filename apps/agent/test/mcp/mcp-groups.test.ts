@@ -201,6 +201,7 @@ describe("the service's MCP host", () => {
 	test("a card names the chat a message goes to, or the request sent", async () => {
 		const { h } = host();
 		expect(await h.describeWrite("chat_send_message", SEND)).toBe("Send to «Team» (12 members): hi");
+		expect(await h.describeWrite("chat_send_message", { chat_id: 8, text: "hi" })).toBe("Send to «Lan»: hi");
 		const long = "x".repeat(400);
 		expect(await h.describeWrite("chat_send_message", { chat_id: 7, text: long })).toMatch(/… \(400 characters\)$/);
 		expect(await h.describeWrite("localman_send_request", { method: "post", url: "http://localhost:5173/api" })).toBe("POST http://localhost:5173/api");

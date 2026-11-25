@@ -35,7 +35,12 @@ function buildServer(app: FakeMcpApp, bearer: string): McpServer {
   server.registerTool(
     "get_chat",
     { description: "One chat.", inputSchema: z.object({ chat_id: z.number() }) },
-    run("get_chat", () => ({ chat: { id: 7, title: "Team", member_count: 12 } })),
+    // Chat 8 is one-to-one: no title, and the caller is listed before the other person.
+    run("get_chat", (args) =>
+      args.chat_id === 8
+        ? { chat: { id: 8, title: "", member_count: 2, peer_user_id: 22 }, users: [{ id: 11, name: "Me" }, { id: 22, name: "Lan" }] }
+        : { chat: { id: 7, title: "Team", member_count: 12 } },
+    ),
   );
   server.registerTool(
     "get_history_entry",
