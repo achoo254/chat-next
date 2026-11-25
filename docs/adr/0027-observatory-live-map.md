@@ -1,6 +1,6 @@
 # ADR 0027: Quan sát phiên Claude Code bằng Live Map 2D thay văn phòng 3D
 
-Trạng thái: **đã chấp nhận** (23/11/2026, đại ca duyệt); phần hình ảnh và bố cục cảnh thay bởi [ADR 0029](./0029-observatory-cyber-city.md) (25/11/2026). Thay [ADR 0018](./0018-office-view-babylon-normalized-agent-stream.md),
+Trạng thái: **đã chấp nhận** (23/11/2026, đại ca duyệt); phần hình ảnh và bố cục cảnh thay bởi [ADR 0029](./0029-observatory-cyber-city.md) (25/11/2026) rồi [ADR 0030](./0030-observatory-machine-interior-v6.md) (26/11/2026, cũng bỏ ngăn khoan sâu và thanh tua lại khỏi Live Map). Thay [ADR 0018](./0018-office-view-babylon-normalized-agent-stream.md),
 [ADR 0019](./0019-office-living-floor-and-resident-talks.md) và [ADR 0021](./0021-office-single-plan-and-asset-cache.md). Dữ liệu đọc từ dòng thời
 gian Observatory mà `tunelo` lưu trên máy; khung và cam kết dữ liệu: [`observatory-wire.md`](../observatory-wire.md).
 

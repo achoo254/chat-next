@@ -1,6 +1,6 @@
 # ADR 0029: Live Map là một thành phố số, camera theo việc AI làm
 
-Trạng thái: **đã chấp nhận** (25/11/2026, đại ca duyệt bản mẫu và hướng Cyber City). Thay phần hình ảnh và bố cục của
+Trạng thái: **đã thay** bởi [ADR 0030](./0030-observatory-machine-interior-v6.md) (26/11/2026: thành phố số rối mắt, về đúng bản mẫu v6 vẽ bằng Canvas 2D; camera, thẻ hoạt động, rảnh ≤ 20 khung/giây và theo dõi CI giữ nguyên). Trước đó **đã chấp nhận** (25/11/2026, đại ca duyệt bản mẫu và hướng Cyber City). Thay phần hình ảnh và bố cục của
 [ADR 0027](./0027-observatory-live-map.md); dữ liệu, tua lại, ngăn khoan sâu, điểm nghẽn, riêng tư và CSP của ADR 0027 giữ nguyên.
 
 ## Bối cảnh
