@@ -144,6 +144,8 @@ describe("control socket", () => {
         "POST /mcp/tools",
         // Covered by test/observatory/observatory-control-routes.test.ts.
         "GET /observatory/status",
+        // Covered by test/observatory/observatory-ci-cli.test.ts.
+        "POST /observatory/ci",
         "POST /observatory/content",
         "POST /observatory/delete",
         "POST /observatory/export",

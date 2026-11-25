@@ -27,7 +27,7 @@ import { BoundedMap } from "./bounded-map.ts";
 import { gitHeadBranch } from "./git-head-branch.ts";
 import { IngestJoins } from "./ingest-joins.ts";
 import type { StoredLoads } from "./instruction-load-seq.ts";
-import type { NormalizedRecord } from "./normalized-record.ts";
+import type { NormalizedRecord, PushSeen, PushToWatch } from "./normalized-record.ts";
 import { normalizeHookRecord } from "./normalize-hook-record.ts";
 import { normalizeOtelRecord } from "./normalize-otel-record.ts";
 
@@ -42,6 +42,8 @@ export type ObservatoryIngestOptions = {
   branchOf?: (folder: string) => string | undefined;
   /** The instruction loads already stored, for their numbers to go on after a restart (instruction-load-seq.ts); none when absent. */
   storedLoads?: StoredLoads;
+  /** Hears every push that succeeded, after its writes are pushed (the CI watcher); a throw is counted as a failed record, never rethrown. */
+  onPushed?: (push: PushToWatch) => void;
 };
 
 export type IngestStats = {
@@ -126,6 +128,13 @@ export class ObservatoryIngest implements ObservatorySink {
     // Every hook record writes its session's row first: the ingest cannot know the row is still stored (a wipe, a write the writer dropped).
     if (n.session) this.opts.push({ kind: "session", row: n.session });
     for (const op of [...n.ops, ...this.joined(n, origin)]) this.opts.push(this.joins.preferMeasured(op, record.src === "otel"));
+    if (n.pushed && this.opts.onPushed) this.opts.onPushed(this.pushToWatch(n.pushed));
+  }
+
+  /** A push with the branch of its folder (read from git's files, never by running git), for the CI watcher to match runs with. */
+  private pushToWatch(p: PushSeen): PushToWatch {
+    const branch = p.cwd ? labelValue((this.opts.branchOf ?? gitHeadBranch)(expandHome(p.cwd, this.opts.home))) : undefined;
+    return { sessionId: p.sessionId, at: p.at, projectKey: p.projectKey, branch };
   }
 
   private joined(n: NormalizedRecord, origin: RecordOrigin): WriteOp[] {

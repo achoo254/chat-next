@@ -22,6 +22,8 @@ export const StationFlag = {
   estimated: 32,
   /** A shell call started with `run_in_background`: it may still run when the turn stops. */
   background: 64,
+  /** A shell call that follows CI (`gh run watch`, `gh pr checks`, `glab ci status`). */
+  ci: 128,
 } as const;
 
 export type StationPlace = { station: Station; flags: number };
@@ -52,8 +54,8 @@ export function isMemoryPath(path: string): boolean {
 /** A shell line is read this far for its station: enough for any real command line, bounded for a heredoc of megabytes. */
 const MAX_SHELL_CHARS = 64 * 1024;
 
-const SHELL_FLAGS: Partial<Record<CommandClass, number>> = { commit: StationFlag.commit, push: StationFlag.push, deploy: StationFlag.deploy };
-const GIT_CLASSES: ReadonlySet<CommandClass> = new Set(["commit", "push", "git", "deploy"]);
+const SHELL_FLAGS: Partial<Record<CommandClass, number>> = { commit: StationFlag.commit, push: StationFlag.push, ci: StationFlag.ci, deploy: StationFlag.deploy };
+const GIT_CLASSES: ReadonlySet<CommandClass> = new Set(["commit", "push", "ci", "git", "deploy"]);
 
 /** The station of a shell line from the classes of the commands it chains: GIT (flags of all) when any ships, else TESTING when any checks, else SANDBOX. */
 function shellPlace(command: string): StationPlace {

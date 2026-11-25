@@ -19,6 +19,12 @@ export type InstructionLoad = { sessionId: string; at: number; filePath: string;
 /** A `git commit` whose tool response had no gitOperation: the branch is read from the repository of `cwd` (with `~`). */
 export type UndescribedCommit = { sessionId: string; toolUseId: string; promptId?: string | undefined; at: number; cwd: string };
 
+/** A push that succeeded in a session of `projectKey` (its remote), from folder `cwd` (with `~`): the CI watcher follows the runs it starts. */
+export type PushSeen = { sessionId: string; at: number; projectKey: string; cwd?: string | undefined };
+
+/** A push as the ingest hands it to the CI watcher: the branch checked out in its folder when it could be read. */
+export type PushToWatch = { sessionId: string; at: number; projectKey: string; branch?: string | undefined };
+
 /** A value of a session's main thread seen at a time (its permission mode, its model): a change from the one before is a session event. */
 export type SessionValue = { sessionId: string; at: number; value: string };
 
@@ -48,6 +54,8 @@ export type NormalizedRecord = {
   clearStarted?: ClearHalf;
   instruction?: InstructionLoad;
   undescribedCommit?: UndescribedCommit;
+  /** A push that succeeded (not a write: the ingest tells the CI watcher). */
+  pushed?: PushSeen;
   /** The main thread's permission mode this record shows. */
   permissionMode?: SessionValue;
   /** The model of a main-thread API call this record describes. */

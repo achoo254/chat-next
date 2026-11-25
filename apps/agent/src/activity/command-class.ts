@@ -1,13 +1,14 @@
 // The class of a shell command line, read on the machine only: the command
 // itself never leaves it, only this class does. Test, lint and typecheck
-// runners → check; `git commit` → commit, `git push` → push, any other git or
-// GitHub CLI call → git; deploys and copies to other hosts → deploy;
+// runners → check; `git commit` → commit, `git push` → push; a CI call of the
+// GitHub or GitLab CLI (`gh run watch`, `gh pr checks`, `glab ci status`) → ci;
+// any other git or GitHub CLI call → git; deploys and copies to other hosts → deploy;
 // anything else → shell. What the line really runs (past `cd`, wrappers,
 // `npx`, `pnpm run`, `bash -c`, `python -m`) is command-walk.ts's.
 import { type CommandRules, skipOptions, walkCommand } from "./command-walk.ts";
 import { simpleCommands } from "./shell-words.ts";
 
-export type CommandClass = "check" | "commit" | "push" | "git" | "deploy" | "shell";
+export type CommandClass = "check" | "commit" | "push" | "ci" | "git" | "deploy" | "shell";
 
 /** Programs that check: test runners, linters, type checkers. */
 export const CHECK_COMMANDS: ReadonlySet<string> = new Set(["vitest", "jest", "pytest", "eslint", "tsc", "vue-tsc", "mocha", "playwright"]);
@@ -36,6 +37,10 @@ const DEPLOY_SUBCOMMANDS: Record<string, ReadonlySet<string>> = {
 };
 /** At most this many commands of one line are classed (commandClasses). */
 const MAX_CHAINED_COMMANDS = 16;
+/** `gh run …` subcommands that follow a CI run. */
+const GH_RUN_CI = new Set(["watch", "view", "list", "rerun"]);
+/** `glab` subcommands that are all about CI (`glab ci status`, `glab pipeline list`). */
+const GLAB_CI = new Set(["ci", "pipeline"]);
 /** git's own options that take a value (`git -C dir commit`). */
 const GIT_VALUE_FLAGS = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"]);
 
@@ -55,10 +60,19 @@ function gitClass(rest: readonly string[]): CommandClass {
   return "git";
 }
 
+/** `gh run watch|view|list|rerun` and `gh pr checks` → ci, any other `gh` call → git. */
+function ghClass(rest: readonly string[]): CommandClass {
+  const [group, sub] = rest;
+  if (group === "run" && GH_RUN_CI.has(sub ?? "")) return "ci";
+  if (group === "pr" && sub === "checks") return "ci";
+  return "git";
+}
+
 /** A program's class by its name and the words after it; undefined for a plain shell command. */
 function programClass(name: string, rest: readonly string[]): CommandClass | undefined {
   if (name === "git") return gitClass(rest);
-  if (name === "gh") return "git";
+  if (name === "gh") return ghClass(rest);
+  if (name === "glab" && GLAB_CI.has(rest[0] ?? "")) return "ci";
   if (COPY_COMMANDS.has(name)) return "deploy";
   const ships = DEPLOY_SUBCOMMANDS[name];
   if (ships) return ships.size === 0 || ships.has(rest[0] ?? "") ? "deploy" : "shell";

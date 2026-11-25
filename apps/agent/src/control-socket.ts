@@ -17,6 +17,7 @@ import { type IncomingMessage, type ServerResponse, createServer, request } from
 import { join } from "node:path";
 import { z } from "zod";
 import { OBSERVATORY_CONTROL_ROUTES } from "./commands/observatory-control-routes.ts";
+import { OBSERVATORY_CI_ROUTES } from "./commands/observatory-ci.ts";
 import { OBSERVATORY_THRESHOLD_ROUTES } from "./commands/observatory-thresholds.ts";
 import type { Machine } from "./machine.ts";
 import type { McpHost } from "./mcp/mcp-host.ts";
@@ -223,6 +224,8 @@ export const CONTROL_ROUTES: Readonly<Record<string, Route>> = {
   ...OBSERVATORY_CONTROL_ROUTES,
   /** `tunelo observatory thresholds …`: the bottleneck rules' thresholds and switch. */
   ...OBSERVATORY_THRESHOLD_ROUTES,
+  /** `tunelo observatory ci <on|off>`: the CI watcher's switch. */
+  ...OBSERVATORY_CI_ROUTES,
 };
 
 /** Commands that answer with a stream of JSON lines while the caller stays connected. */

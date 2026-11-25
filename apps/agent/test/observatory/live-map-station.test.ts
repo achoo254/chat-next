@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { commandClass } from "../../src/activity/command-class.ts";
 import { StationFlag, isMemoryPath, stationOf, stationOfTarget } from "../../src/observatory/live-map/station-map.ts";
 
-const { commit, push, deploy, write, memory, estimated } = StationFlag;
+const { commit, push, deploy, write, memory, estimated, ci } = StationFlag;
 
 describe("stationOf", () => {
   it("places every kind of tool", () => {
@@ -30,6 +30,9 @@ describe("stationOf", () => {
       ["Bash", { command: "git push origin main" }, "GIT", push],
       ["Bash", { command: "git status" }, "GIT", 0],
       ["Bash", { command: "gh pr create" }, "GIT", 0],
+      ["Bash", { command: "gh run watch" }, "GIT", ci],
+      ["Bash", { command: "gh pr checks 12" }, "GIT", ci],
+      ["Bash", { command: "glab ci status" }, "GIT", ci],
       ["Bash", { command: "./infra/deploy.sh prod" }, "GIT", deploy],
       ["Bash", { command: "ls -la" }, "SANDBOX", 0],
       ["PowerShell", { command: "Get-ChildItem" }, "SANDBOX", 0],
@@ -47,6 +50,8 @@ describe("stationOf", () => {
       ["Edit", "not an object", "FILES", write],
     ];
     for (const [name, input, station, flags] of cases) expect(stationOf(name, input), `${name} ${JSON.stringify(input)}`).toEqual({ station, flags });
+    // The wire field is a uint32: the CI bit is the next free one.
+    expect(ci).toBe(128);
   });
 
   it("reads the command a line really runs", () => {
@@ -60,6 +65,20 @@ describe("stationOf", () => {
       ["git -C ../repo commit -m x", "commit"],
       ["git push", "push"],
       ["git log --oneline", "git"],
+      ["gh run watch", "ci"],
+      ["gh run view 123 --log-failed", "ci"],
+      ["gh run list --limit 5", "ci"],
+      ["gh run rerun 123 --failed", "ci"],
+      ["gh pr checks 12", "ci"],
+      ["gh pr checks --watch", "ci"],
+      ["gh pr create --fill", "git"],
+      ["gh pr view 12", "git"],
+      ["gh run download 123", "git"],
+      ["gh api repos/x/y", "git"],
+      ["glab ci status", "ci"],
+      ["glab ci view", "ci"],
+      ["glab pipeline list", "ci"],
+      ["glab mr create", "shell"],
       ["rsync -a dist/ host:/srv", "deploy"],
       ["pnpm deploy:web", "deploy"],
       ["make deploy", "deploy"],
@@ -84,6 +103,8 @@ describe("a chained shell line", () => {
   it("keeps the flags of every command it chains", () => {
     expect(stationOf("Bash", { command: "git add -A && git commit -m x" })).toEqual({ station: "GIT", flags: commit });
     expect(stationOf("Bash", { command: "git commit -m x && git push" })).toEqual({ station: "GIT", flags: commit | push });
+    expect(stationOf("Bash", { command: "git push && gh run watch" })).toEqual({ station: "GIT", flags: push | ci });
+    expect(stationOf("Bash", { command: "pnpm test && gh pr checks 12 --watch" })).toEqual({ station: "GIT", flags: ci });
     expect(stationOf("Bash", { command: "npm run build && npm run deploy" })).toEqual({ station: "GIT", flags: deploy });
     expect(stationOf("Bash", { command: "pnpm lint; pnpm test" })).toEqual({ station: "TESTING", flags: 0 });
     expect(stationOf("Bash", { command: "cat a.log | grep error" })).toEqual({ station: "SANDBOX", flags: 0 });

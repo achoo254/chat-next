@@ -59,6 +59,7 @@ export type AuditAction =
   | "advisor_auto_on"
   | "advisor_auto_off"
   | "mac_folder_access"
+  | "observatory_ci"
   | "observatory_content"
   | "observatory_delete"
   | "observatory_install"

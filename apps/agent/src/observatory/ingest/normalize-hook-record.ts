@@ -19,7 +19,10 @@
 // a Read's page. The moments that are not a call, a prompt or an API call
 // (permission asked or denied, compaction, the turn's end or failure,
 // notifications, a todo list's counts) are session events
-// (session-event-write.ts): labels and numbers only, never content.
+// (session-event-write.ts): labels and numbers only, never content. A push
+// that succeeded is handed on as `pushed` (no write): the CI watcher follows
+// the runs it starts.
+import { StationFlag } from "../live-map/station-map.ts";
 import type { FilteredHookRecord, RecordOrigin } from "../privacy/filtered-record.ts";
 import type { SessionSource } from "../store/observatory-rows.ts";
 import type { SessionWrite, ToolCallWrite, WriteOp } from "../store/write-ops.ts";
@@ -170,6 +173,7 @@ export function normalizeHookRecord(record: FilteredHookRecord, origin: RecordOr
       todoCounts(call);
       const gitOp = r.text("git_op");
       const sha = r.text("git_sha");
+      if (projectKey && (((call.stationFlags ?? 0) & StationFlag.push) !== 0 || gitOp === "push")) out.pushed = { sessionId, at, projectKey, cwd };
       if (gitOp || sha) push({ kind: "gitOp", row: { sessionId, promptId, at, sha, branch: r.text("git_branch"), kind: gitOp ?? "commit" } });
       else if (call.toolName && isShellTool(call.toolName) && call.target === "git" && cwd && runsGitCommit(commandOf(c?.tool_input))) {
         out.undescribedCommit = { sessionId, toolUseId: call.toolUseId, promptId, at, cwd };

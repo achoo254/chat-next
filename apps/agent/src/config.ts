@@ -86,6 +86,14 @@ export type ObservatoryConfig = {
   contentOff?: string[];
   /** The bottleneck rules (observatory/bottlenecks/bottleneck-thresholds.ts): their switch and thresholds. */
   thresholds?: ObservatoryThresholdsConfig;
+  /** Following GitHub Actions after a session's push (observatory/ci/ci-watcher.ts). */
+  ci?: ObservatoryCiConfig;
+};
+
+/** The CI watcher's switch. Read as untrusted: anything but `false` is on. */
+export type ObservatoryCiConfig = {
+  /** The watcher runs; unset is on. */
+  enabled?: boolean;
 };
 
 /**

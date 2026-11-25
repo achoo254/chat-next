@@ -127,6 +127,10 @@ export const SESSION_EVENT_KINDS = [
   "todo_counts",
   "api_error",
   "mcp_connection",
+  /** A GitHub Actions run of the session's push seen running (ci/ci-watcher.ts): label the workflow's name. */
+  "ci_started",
+  /** That run done: flag whether it succeeded, number how long it ran (ms). */
+  "ci_finished",
 ] as const;
 
 export type SessionEventKind = (typeof SESSION_EVENT_KINDS)[number];

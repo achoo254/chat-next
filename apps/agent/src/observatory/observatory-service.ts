@@ -32,12 +32,19 @@
 // changes; their findings go back through the writer, so the hub sends them
 // to devices like any other row. They start after the store, stop with the
 // hub, and stop around a wipe (their read connection closed first).
+//
+// The CI watcher (ci/ci-watcher.ts) hears every push the ingest takes and,
+// for a GitHub repository, writes the session's CI runs through the same
+// writer while the service runs and its switch (`observatory.ci`) is on.
 import { homedir } from "node:os";
 import type { ConfigStore } from "../config.ts";
 import { rememberSecret } from "../mcp/redact.ts";
 import { ProblemLog } from "../activity/problem-log.ts";
 import { AgentStoreHost } from "./agent-store-host.ts";
 import { BottleneckRunner } from "./bottlenecks/bottleneck-runner.ts";
+import { ciWatchEnabled } from "./ci/ci-watch-config.ts";
+import { CiWatcher } from "./ci/ci-watcher.ts";
+import type { GhRunner } from "./ci/gh-runner.ts";
 import { contentOffOf, setContentOff } from "./content-settings-config.ts";
 import { STOP_WAIT_MS, settledWithin } from "./ingest/accept-tracker.ts";
 import { DailyRollupScheduler } from "./ingest/daily-rollup-scheduler.ts";
@@ -82,6 +89,8 @@ export type ObservatoryServiceOptions = {
   isSensitive?: (absolutePath: string) => boolean;
   /** Schedules the SDK hook queue's work (sdk-hook-feed.ts); tests pass their own. */
   scheduleSdkFeed?: (work: () => void) => void;
+  /** Runs `gh` for the CI watcher (ci/gh-runner.ts execGh by default); tests pass a fake. */
+  runGh?: GhRunner;
 };
 
 export class ObservatoryService {
@@ -105,6 +114,8 @@ export class ObservatoryService {
   readonly hub: ObservatoryHub;
   /** The bottleneck rules; onFinding() hears every finding opened, raised or closed. */
   readonly bottlenecks: BottleneckRunner;
+  /** Follows GitHub Actions after a session's push. */
+  readonly ci: CiWatcher;
 
   constructor(private readonly opts: ObservatoryServiceOptions) {
     this.now = opts.now ?? Date.now;
@@ -132,6 +143,13 @@ export class ObservatoryService {
       },
     });
     this.onLiveEvent((event) => this.bottlenecks.liveEvent(event));
+    this.ci = new CiWatcher({
+      enabled: () => this.enabled && this.started && ciWatchEnabled(opts.config.get().observatory?.ci),
+      push: (op) => this.store.writer?.push(op),
+      problems,
+      runGh: opts.runGh,
+      now: this.now,
+    });
     // The runner only queues (it scores once the writer's flush returned), so it never throws into the hub's turn.
     const written = (ops: readonly WriteOp[]): void => {
       this.bottlenecks.written(ops);
@@ -201,7 +219,9 @@ export class ObservatoryService {
     this.saltTimer.unref?.();
     await this.store.open();
     // The ingest pushes into whichever writer is current (a wipe makes a new one).
-    const ingest = this.opts.ingest ?? ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key) }));
+    const ingest =
+      this.opts.ingest ??
+      ((push) => new ObservatoryIngest({ push, home: homedir(), log: this.opts.log, storedLoads: (...key) => this.storeNow().instructionLoads(...key), onPushed: (p) => this.ci.pushed(p) }));
     const sink = this.store.writer ? this.guard("ingest-create", () => ingest((op) => this.store.writer?.push(op))) : undefined;
     await this.receiver.start();
     this.sink = sink;
@@ -224,6 +244,7 @@ export class ObservatoryService {
   async stop(): Promise<void> {
     this.hub.stop();
     this.bottlenecks.stop();
+    this.ci.stop();
     clearInterval(this.saltTimer);
     this.saltTimer = undefined;
     await this.receiver.stop();
