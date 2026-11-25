@@ -350,6 +350,36 @@ func (it *ImportTx) Edit(ctx context.Context, seq int64, msg ImportMessage) (boo
 	return true, nil
 }
 
+// Attach gives the message at seq the file in msg and clears its text, without
+// marking it edited: the message is the same one the other app sent, now with
+// the file it could not carry when it was imported. It reports false, changing
+// nothing, when the message is gone.
+func (it *ImportTx) Attach(ctx context.Context, seq int64, msg ImportMessage) (bool, error) {
+	text, content, err := it.content(ctx, msg)
+	if err != nil {
+		return false, err
+	}
+	m, err := it.t.s.liveMessage(ctx, it.t.tx, it.c.ID, seq)
+	if isNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var old appv1.Message
+	if len(m.Content) > 0 {
+		if err := proto.Unmarshal(m.Content, &old); err != nil {
+			return false, fmt.Errorf("chat: decode message: %w", err)
+		}
+	}
+	content.ForwardFrom = old.GetForwardFrom()
+	content.Silent = old.GetSilent()
+	if err := it.t.rewriteMessage(ctx, it.c, 0, m, text, content, false, false); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Delete removes the messages at seqs for everyone (silently skipping the
 // ones already gone).
 func (it *ImportTx) Delete(ctx context.Context, seqs []int64) error {

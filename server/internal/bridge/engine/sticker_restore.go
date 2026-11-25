@@ -37,6 +37,12 @@ func (r *runner) queueStickerRestore(caughtUp []*chatLink) {
 // is left. A sticker Chat cannot show (animated Lottie) or one that failed is
 // tried once per run and keeps its label.
 func (r *runner) restoreStickersNext(ctx context.Context) error {
+	if len(r.stickerQueue) > 0 && !r.stickerMarksCleared {
+		if err := r.clearStickerEditMarks(ctx); err != nil {
+			return err
+		}
+		r.stickerMarksCleared = true
+	}
 	for len(r.stickerQueue) > 0 {
 		l := r.stickerQueue[0]
 		if r.links[l.ExternalChat] != l {
@@ -128,7 +134,25 @@ func (r *runner) restoreSticker(ctx context.Context, l *chatLink, s stickerRow) 
 		return err
 	}
 	return r.withLink(ctx, l, func(it *chat.ImportTx) error {
-		_, err := it.Edit(ctx, s.seq, chat.ImportMessage{Content: &appv1.Message{Media: content.Media}})
+		_, err := it.Attach(ctx, s.seq, chat.ImportMessage{Content: &appv1.Message{Media: content.Media}})
 		return err
 	})
+}
+
+// clearStickerEditMarks takes the "edited" mark off the stickers that were
+// given their picture before Attach existed (they went through Edit). A sticker
+// cannot be edited by anyone, and a restored one is the only message of the
+// account with a file named like a sticker, so the mark on it is never a real one.
+func (r *runner) clearStickerEditMarks(ctx context.Context) error {
+	if _, err := r.e.db.pool.Exec(ctx, `
+		UPDATE messages m SET edit_date = NULL, changed_at = now()
+		WHERE m.edit_date IS NOT NULL AND m.deleted_at IS NULL
+			AND EXISTS (SELECT 1 FROM external_messages em
+				WHERE em.account_id = $1 AND em.chat_id = m.chat_id AND em.seq = m.seq)
+			AND EXISTS (SELECT 1 FROM message_files mf JOIN files f ON f.id = mf.file_id
+				WHERE mf.chat_id = m.chat_id AND mf.seq = m.seq AND f.file_name LIKE 'sticker.%')`,
+		r.account.ID); err != nil {
+		return fmt.Errorf("bridge: clear sticker edit marks: %w", err)
+	}
+	return nil
 }

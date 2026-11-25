@@ -64,4 +64,20 @@ func TestStickersImportedAsALabelGetTheirPictureAtTheNextStart(t *testing.T) {
 			`SELECT count(*) FROM messages WHERE chat_id = $1 AND text = '' AND media_kind <> 0`, chatID).Scan(&withFile)
 		return err == nil && withFile == 1
 	}, func() string { return "the sticker never got its picture: " + strings.Join(e.texts(chatID), "|") })
+	var edited bool
+	if err := e.st.Pool().QueryRow(context.Background(),
+		`SELECT edit_date IS NOT NULL FROM messages WHERE chat_id = $1 AND media_kind <> 0`, chatID).Scan(&edited); err != nil || edited {
+		t.Fatalf("a restored sticker is marked edited: %v, %v", edited, err)
+	}
+
+	// A sticker marked edited by the earlier way of restoring loses the mark at the next start.
+	if _, err := e.st.Pool().Exec(context.Background(), `UPDATE messages SET edit_date = now() WHERE chat_id = $1 AND media_kind <> 0`, chatID); err != nil {
+		t.Fatal(err)
+	}
+	e.start()
+	e.eventually(func() bool {
+		var marked bool
+		err := e.st.Pool().QueryRow(context.Background(), `SELECT edit_date IS NOT NULL FROM messages WHERE chat_id = $1 AND media_kind <> 0`, chatID).Scan(&marked)
+		return err == nil && !marked
+	}, func() string { return "the edit mark of a restored sticker stayed" })
 }

@@ -177,6 +177,8 @@ type runner struct {
 	// (sticker_restore.go); stickerTried are the ones already tried in this run.
 	stickerQueue []*chatLink
 	stickerTried map[string]bool
+	// stickerMarksCleared says the edit marks of stickers restored earlier are taken off in this run.
+	stickerMarksCleared bool
 	// syncNow asks the runner to read the account's switch again and list the conversations.
 	syncNow chan struct{}
 	// conversationsTick counts the looks at the state, to list the conversations once in a while.
