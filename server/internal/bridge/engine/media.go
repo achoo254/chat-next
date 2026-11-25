@@ -20,8 +20,8 @@ import (
 const defaultMediaMax = 25 << 20
 
 // uploadKind maps a media kind of an adapter to a kind of Chat's media
-// service; ok is false for what Chat cannot show (stickers, locations,
-// polls, contacts).
+// service; ok is false for what Chat cannot show (animated Lottie stickers,
+// locations, polls, contacts).
 func uploadKind(m bridge.Media) (appv1.MediaKind, bool) {
 	switch m.Kind {
 	case "photo":
@@ -34,6 +34,16 @@ func uploadKind(m bridge.Media) (appv1.MediaKind, bool) {
 		return appv1.MediaKind_MEDIA_KIND_AUDIO, true
 	case "document", "gif":
 		return appv1.MediaKind_MEDIA_KIND_DOCUMENT, true
+	case "sticker":
+		// A static sticker is an image and a video sticker a clip; the
+		// animated Lottie kind (application/x-tgsticker) needs a player
+		// Chat does not have, so it stays a label.
+		switch m.MimeType {
+		case "image/webp", "image/png":
+			return appv1.MediaKind_MEDIA_KIND_PHOTO, true
+		case "video/webm":
+			return appv1.MediaKind_MEDIA_KIND_VIDEO, true
+		}
 	}
 	return 0, false
 }
