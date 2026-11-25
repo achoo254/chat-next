@@ -326,12 +326,12 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 	name := cleanName(p.Name)
 	for range 2 {
 		var id int64
-		var current string
+		var current, username string
 		var photoWant *string
 		var photoRef string
 		err := d.pool.QueryRow(ctx, `
-			SELECT u.id, u.name, x.photo_want, coalesce(x.photo_ref, '') FROM external_users x JOIN users u ON u.id = x.user_id
-			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current, &photoWant, &photoRef)
+			SELECT u.id, u.name, u.username, x.photo_want, coalesce(x.photo_ref, '') FROM external_users x JOIN users u ON u.id = x.user_id
+			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current, &username, &photoWant, &photoRef)
 		if err == nil {
 			if current != name && !p.NameUnknown {
 				if _, err := d.pool.Exec(ctx, `UPDATE users SET name = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, id, name); err != nil {
@@ -348,6 +348,9 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 				return 0, err
 			}
 			if err := d.setSeen(ctx, a.ID, p); err != nil {
+				return 0, err
+			}
+			if err := d.adoptUsername(ctx, id, username, p, a.Source); err != nil {
 				return 0, err
 			}
 			return id, nil
@@ -378,14 +381,8 @@ func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participa
 		if id, err = store.NextUserID(ctx, tx); err != nil {
 			return err
 		}
-		var seen *time.Time
-		if at, ok := seenOf(p, time.Now()); ok {
-			seen = &at
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO users (id, tenant_id, idp_sub, username, name, external_source, last_seen_at)
-			VALUES ($1, $2, NULL, $3, $4, $5, $6)`, id, d.tenantID, fmt.Sprintf("ext_%d", id), name, a.Source, seen); err != nil {
-			return fmt.Errorf("bridge: create puppet: %w", err)
+		if err := insertPuppetUser(ctx, tx, d.tenantID, id, p, name, a.Source); err != nil {
+			return err
 		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref, phone_hmac) VALUES ($1, $2, $3, $4, $5, $6)`,
