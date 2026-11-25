@@ -118,7 +118,8 @@ describe("Observatory over the link", () => {
     expect(sessions.map((s) => Number(s.startedAt))).toEqual([...sessions.map((s) => Number(s.startedAt))].sort((x, y) => y - x));
     expect(sessions.find((s) => s.sessionId === CLI)?.source).toBe(ObservatorySessionSource.CLI);
     expect(sessions.find((s) => s.sessionId === "sess-0001")?.source).toBe(ObservatorySessionSource.SDK);
-    expect(sessions.find((s) => s.sessionId === CLI)?.cwd).toBe("~/work/example-app");
+    // The home folder becomes `~` and the rest keeps the platform's separators (tildePath), as FAKE_CWD was joined.
+    expect(sessions.find((s) => s.sessionId === CLI)?.cwd).toBe(join("~", "work", "example-app"));
 
     // The CLI session has no thread: it is watched by its session id.
     const snapA = snapshotOf(await ask(a, "wa", { case: "observatoryWatch", value: { sessionId: CLI, on: true } }));
