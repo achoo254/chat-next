@@ -45,6 +45,7 @@ export const viMedia = {
 		photo: "Ảnh",
 		photoOf: (name: string) => `Ảnh của ${name}`,
 		open: "Xem ảnh",
+		sticker: "Nhãn dán động",
 		video: "Video",
 		playVideo: (ms: number) => (ms > 0 ? `Phát video, ${words(ms)}` : "Phát video"),
 		album: (n: number) => `Album ${n} ảnh và video`,

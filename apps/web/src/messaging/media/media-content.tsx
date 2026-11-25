@@ -11,9 +11,10 @@ import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
 import { useConnection, useItem, useServices } from "../data/services.tsx";
+import { AnimatedSticker } from "./animated-sticker.tsx";
 import { boxStyle, isVisual, mediaBox } from "./box.ts";
 import { downloadMedia } from "./download.ts";
-import { fileExt, formatBytes, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
+import { fileExt, formatBytes, isAnimatedSticker, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
 import { MediaIcon } from "./media-icons.tsx";
 import { viewer } from "./media-state.ts";
 import { useMediaFile, useNearViewport, usePendingFileUrl, useUploadProgress } from "./use-media.ts";
@@ -280,8 +281,11 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 		case "voice":
 		case "audio":
 			return <VoicePlayer chatId={message.chatId} seq={message.seq} media={media} />;
-		default:
-			return <FileCard chatId={message.chatId} seq={message.seq} media={media} />;
+		default: {
+			const card = <FileCard chatId={message.chatId} seq={message.seq} media={media} />;
+			if (!isAnimatedSticker(media)) return card;
+			return <AnimatedSticker chatId={message.chatId} seq={message.seq} media={media} fallback={card} />;
+		}
 	}
 }
 

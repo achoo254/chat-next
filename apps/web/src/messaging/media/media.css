@@ -39,6 +39,9 @@ button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, trans
 .album .media-pic.gone { padding: var(--space-1); font-size: 0.75rem; }
 .album .media-pic.gone strong { font-size: 0.75rem; }
 .file-stack { display: grid; gap: var(--space-1); }
+/* Animated sticker (.tgs): a square the animation fits into, no card around it. */
+.animated-sticker { width: min(180px, 100%); aspect-ratio: 1; }
+.animated-sticker canvas { display: block; width: 100%; height: 100%; }
 
 /* ---------- File cards ---------- */
 /* The card fills its bubble, so the download button sits at the bubble's right edge. Its own

@@ -55,6 +55,11 @@ export function fileExt(name: string): string {
 	return ext.length <= 4 && /^[a-z0-9]+$/i.test(ext) ? ext.toUpperCase() : "FILE";
 }
 
+/** A Telegram animated sticker: a gzipped Lottie file, kept as a document named *.tgs. */
+export function isAnimatedSticker(media: { readonly kind: string; readonly fileName: string }): boolean {
+	return media.kind === "document" && media.fileName.toLowerCase().endsWith(".tgs");
+}
+
 /** Raster images the browser shows and the server accepts as photos. */
 const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);

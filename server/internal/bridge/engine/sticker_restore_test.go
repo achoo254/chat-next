@@ -34,7 +34,7 @@ func (s *pngStream) Close() error     { return nil }
 func (s *pngStream) MimeType() string { return "image/png" }
 func (s *pngStream) Size() int64      { return s.size }
 
-// A sticker imported as a label (a kind Chat could not show then) gets its
+// A sticker imported as a label (its type was not known then) gets its
 // picture when the engine starts again, and the label goes.
 func TestStickersImportedAsALabelGetTheirPictureAtTheNextStart(t *testing.T) {
 	e := newEnvWithMedia(t, true)
@@ -51,7 +51,7 @@ func TestStickersImportedAsALabelGetTheirPictureAtTheNextStart(t *testing.T) {
 	e.adapter = &pngSticker{Fake: e.fake, data: buf.Bytes()}
 	conv := e.group("g1")
 	sticker := e.msg("1", lan, "", 0)
-	sticker.Media = []bridge.Media{{Kind: "sticker", Ref: "g1/1", MimeType: "application/x-tgsticker"}}
+	sticker.Media = []bridge.Media{{Kind: "sticker", Ref: "g1/1", MimeType: ""}}
 	e.fake.AddHistory("g1", sticker)
 	chatID := e.enable(conv, 100)
 	e.waitTexts(chatID, []string{"[Nhãn dán]"})

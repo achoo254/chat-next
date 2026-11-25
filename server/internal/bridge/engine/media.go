@@ -19,6 +19,9 @@ import (
 // ones stay in the other app and the message says so.
 const defaultMediaMax = 25 << 20
 
+// tgsMime is the type of Telegram's animated stickers: gzipped Lottie JSON.
+const tgsMime = "application/x-tgsticker"
+
 // uploadKind maps a media kind of an adapter to a kind of Chat's media
 // service; ok is false for what Chat cannot show (animated Lottie stickers,
 // locations, polls, contacts).
@@ -35,14 +38,16 @@ func uploadKind(m bridge.Media) (appv1.MediaKind, bool) {
 	case "document", "gif":
 		return appv1.MediaKind_MEDIA_KIND_DOCUMENT, true
 	case "sticker":
-		// A static sticker is an image and a video sticker a clip; the
-		// animated Lottie kind (application/x-tgsticker) needs a player
-		// Chat does not have, so it stays a label.
+		// A static sticker is an image and a video sticker a clip. The
+		// animated Lottie kind (application/x-tgsticker) is kept as the
+		// gzipped file (a document named *.tgs) that the apps play.
 		switch m.MimeType {
 		case "image/webp", "image/png":
 			return appv1.MediaKind_MEDIA_KIND_PHOTO, true
 		case "video/webm":
 			return appv1.MediaKind_MEDIA_KIND_VIDEO, true
+		case tgsMime:
+			return appv1.MediaKind_MEDIA_KIND_DOCUMENT, true
 		}
 	}
 	return 0, false
@@ -169,6 +174,10 @@ func (r *runner) uploadPaced(ctx context.Context, in media.StreamUpload) (*media
 
 // fileNameOf is the name given to the stored file.
 func fileNameOf(m bridge.Media) string {
+	if m.MimeType == tgsMime {
+		// The apps tell an animated sticker by this extension, whatever name Telegram gave.
+		return "sticker.tgs"
+	}
 	if m.Name != "" {
 		return m.Name
 	}
