@@ -3,8 +3,6 @@ package zalo
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -28,15 +26,7 @@ const avatarTimeout = 10 * time.Second
 // avatarAllowed reports whether a photo URL may be stored and fetched: https on the
 // default port, a host under avatarHostSuffix, no credentials.
 func avatarAllowed(raw string) bool {
-	if raw == "" || len(raw) > avatarURLMax {
-		return false
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" {
-		return false
-	}
-	host := strings.ToLower(u.Hostname())
-	return strings.HasSuffix(host, avatarHostSuffix) && len(host) > len(avatarHostSuffix)
+	return cdnURLAllowed(raw, avatarURLMax, []string{avatarHostSuffix})
 }
 
 // withAvatar gives a participant the photo the sidecar found; an empty or unexpected
@@ -48,45 +38,16 @@ func withAvatar(p *bridge.Participant, raw string) {
 	p.PhotoKnown, p.PhotoID, p.PhotoRef = true, raw, avatarRef+raw
 }
 
-// avatarClient downloads photos. It follows no redirect: one could lead off the CDN.
-var avatarClient = &http.Client{
-	Timeout:       avatarTimeout,
-	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-}
-
-// fetchAvatar streams a person's photo from Zalo's CDN.
-func fetchAvatar(ctx context.Context, raw string) (bridge.MediaStream, error) {
-	if !avatarAllowed(raw) {
-		return nil, fmt.Errorf("%w: zalo photo URL is not on the image CDN", bridge.ErrNotAllowed)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
+// fetchAvatar streams a person's photo from Zalo's CDN (cdnClient: no redirect off
+// the image CDN, public addresses only, size cap) and refuses what is not an image.
+func fetchAvatar(ctx context.Context, cdn *cdnClient, raw string) (bridge.MediaStream, error) {
+	stream, err := cdn.get(ctx, raw, avatarAllowed, avatarTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("zalo: photo request: %w", err)
+		return nil, err
 	}
-	resp, err := avatarClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("zalo: photo download failed") // the error names the URL; it is not logged
+	if mime := stream.MimeType(); !strings.HasPrefix(mime, "image/") {
+		_ = stream.Close()
+		return nil, fmt.Errorf("zalo: photo download answered %q", safeCode(strings.ReplaceAll(mime, "/", "_")))
 	}
-	mime := resp.Header.Get("Content-Type")
-	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(mime, "image/") {
-		_ = resp.Body.Close()
-		return nil, fmt.Errorf("zalo: photo download answered %d %q", resp.StatusCode, safeCode(strings.ReplaceAll(mime, "/", "_")))
-	}
-	return &avatarStream{resp: resp, mime: mime}, nil
-}
-
-// avatarStream is a photo being downloaded.
-type avatarStream struct {
-	resp *http.Response
-	mime string
-}
-
-func (s *avatarStream) Read(p []byte) (int, error) { return s.resp.Body.Read(p) }
-func (s *avatarStream) Close() error               { return s.resp.Body.Close() }
-func (s *avatarStream) MimeType() string           { return s.mime }
-func (s *avatarStream) Size() int64 {
-	if s.resp.ContentLength < 0 {
-		return 0
-	}
-	return s.resp.ContentLength
+	return stream, nil
 }

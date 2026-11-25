@@ -9,8 +9,8 @@ import (
 	"app.local/server/internal/bridge"
 )
 
-// Message types seen on a real account (21/11/2026). Images, files, voice and
-// the rest were not observed yet: they come in as the unsupported label.
+// Message types seen on a real account (21/11/2026); those of files are in
+// message_media.go.
 const (
 	msgTypeText    = "webchat"
 	msgTypeSticker = "chat.sticker"
@@ -62,7 +62,8 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 		sender = peer
 	}
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
-	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now), Text: messageText(ev)}
+	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now)}
+	m.Text, m.Media = messageContent(ev)
 	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.PhoneKnown) {
 		m.Peer = &peer
 	}
@@ -78,19 +79,6 @@ func withPhone(p *bridge.Participant, raw string) {
 		return
 	}
 	p.PhoneKnown, p.Phone = true, raw
-}
-
-// messageText is the text of a message, or the label of content not copied.
-func messageText(ev wireEvent) string {
-	switch string(ev.MsgType) {
-	case msgTypeText:
-		if text, ok := textContent(ev.Content); ok {
-			return text
-		}
-	case msgTypeSticker:
-		return labelSticker
-	}
-	return labelUnsupported
 }
 
 // textContent is the text of a text message's content, false when it has none.

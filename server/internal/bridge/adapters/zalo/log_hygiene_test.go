@@ -7,13 +7,17 @@ import (
 )
 
 // Nothing the sidecar says about a person or a session reaches the log: not
-// message text, names, ids, cookies, the imei, nor what stderr carries besides
-// a host name.
+// message text, names, ids, cookies, the imei, file names or file URLs, nor what
+// stderr carries besides a host name.
 func TestNoSidecarContentReachesTheLog(t *testing.T) {
-	secrets := []string{"bí mật riêng", "Nguyễn Văn Bí", "5550001", "8880002", "84900000009", "secret-cookie", "imei-1", "10.9.8.7", "evil-text"}
+	secrets := []string{"bí mật riêng", "Nguyễn Văn Bí", "5550001", "8880002", "84900000009", "secret-cookie", "imei-1", "10.9.8.7", "evil-text",
+		"tok-secret", "dlfl.vn", "zdn.vn", "Hợp đồng bí mật"}
 	lines := []string{
 		`{"ev":"listener","state":"connected"}`,
 		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"bí mật riêng","msgId":"8880002","uidFrom":"5550001","idTo":"0","dName":"Nguyễn Văn Bí","peerPhone":"84900000009","ts":"1763700000000"}`,
+		`{"ev":"message","thread":"user","self":false,"msgType":"share.file","content":{"title":"Hợp đồng bí mật.pdf","href":"https://dl.dlfl.vn/f?sig=tok-secret","params":"{\"fileSize\":\"10\"}"},"msgId":"8880004","uidFrom":"5550001","idTo":"0"}`,
+		`{"ev":"message","thread":"user","self":false,"msgType":"chat.photo","content":{"href":"https://evil.example/p?tok-secret"},"msgId":"8880005","uidFrom":"5550001","idTo":"0"}`,
+		`{"ev":"message","thread":"user","self":false,"msgType":"chat.photo","content":{"href":"https://f1.zdn.vn/p?tok-secret"},"msgId":"8880006","uidFrom":"5550001","idTo":"0"}`,
 		`{"ev":"message","thread":"group","self":false,"msgType":"webchat","content":"bí mật riêng","msgId":"8880003","uidFrom":"5550001","idTo":"77","dName":"Nguyễn Văn Bí"}`,
 		`{"ev":"message","thread":"user","msgType":"webchat","content":"bí mật riêng","uidFrom":"5550001"}`,
 		`{"ev":"event","name":"reaction","payload":{"text":"bí mật riêng","uid":"5550001"}}`,

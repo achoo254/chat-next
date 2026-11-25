@@ -3,10 +3,11 @@
 // (sidecar/dist/zalo-sidecar.cjs) over its stdio protocol, one process per
 // login and one per subscribed account.
 //
-// It receives live 1-1 text and sticker messages after a QR login and lists
-// the conversations heard since the process started; it sends text to one
-// person the account talks with (send.go). Groups are ignored, media is a
-// label, and there is no history beyond what this process heard (see Backfill).
+// It receives live 1-1 messages after a QR login (text, and photos, files and
+// videos copied from Zalo's CDN, see message_media.go) and lists the
+// conversations heard since the process started; it sends text to one person
+// the account talks with (send.go). Groups are ignored, stickers and voice are
+// a label, and there is no history beyond what this process heard (see Backfill).
 package zalo
 
 import (
@@ -64,6 +65,7 @@ type Adapter struct {
 	timing   timing
 	now      func() time.Time
 	refusals *refusalTracker
+	cdn      *cdnClient    // downloads photos and files from Zalo's CDN; nil is defaultCDN
 	requests atomic.Uint64 // ids of commands the sidecar answers
 
 	mu            sync.Mutex
@@ -92,7 +94,7 @@ func New(cfg Config) *Adapter {
 }
 
 func newAdapter(runner Runner, logger *slog.Logger, now func() time.Time) *Adapter {
-	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, refusals: newRefusalTracker(now),
+	return &Adapter{runner: runner, logger: logger, timing: defaultTiming, now: now, refusals: newRefusalTracker(now), cdn: defaultCDN,
 		logins: map[string]*qrLogin{}, loginFailedAt: map[string]time.Time{}, subs: map[string]*subscription{},
 		heard: map[string]*heardAccount{}, sending: map[string]*sendState{}, mismatched: map[string]string{}}
 }
@@ -100,13 +102,14 @@ func newAdapter(runner Runner, logger *slog.Logger, now func() time.Time) *Adapt
 // Name implements bridge.Adapter.
 func (a *Adapter) Name() string { return Name }
 
-// Capabilities implements bridge.Adapter: live messages, and text sent out.
+// Capabilities implements bridge.Adapter: live messages with the files they
+// carry (received only), and text sent out.
 func (a *Adapter) Capabilities() bridge.Capabilities {
-	return bridge.Capabilities{bridge.CapLive: true, bridge.CapSend: true}
+	return bridge.Capabilities{bridge.CapLive: true, bridge.CapMedia: true, bridge.CapSend: true}
 }
 
-// Features implements bridge.Featured: messages come in and go out (text
-// only). No edits, deletes, topics, pins or media.
+// Features implements bridge.Featured: messages come in (with photos, files and
+// videos) and go out (text only). No edits, deletes, topics or pins.
 func (a *Adapter) Features() map[feature.Feature]feature.Support {
 	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}}
 }
@@ -173,14 +176,21 @@ func (a *Adapter) Backfill(_ context.Context, acct bridge.Account, conv string, 
 	return bridge.Page{Messages: a.heardFor(acct.ID).takeRecent(conv, limit), Done: true}, nil
 }
 
-// FetchMedia implements bridge.Adapter. Only a person's photo is fetched (from
-// Zalo's image CDN, not through the sidecar); no message carries media yet
-// (stickers and files come in as a text label), so any other ref is refused for good.
+// FetchMedia implements bridge.Adapter: a person's photo or the file of a message,
+// downloaded from Zalo's CDN by this process, not through the sidecar, and without
+// the session (cdn_fetch.go). Any other ref is refused for good.
 func (a *Adapter) FetchMedia(ctx context.Context, _ bridge.Account, ref string) (bridge.MediaStream, error) {
-	if raw, ok := strings.CutPrefix(ref, avatarRef); ok {
-		return fetchAvatar(ctx, raw)
+	cdn := a.cdn
+	if cdn == nil {
+		cdn = defaultCDN
 	}
-	return nil, fmt.Errorf("%w: zalo media download is not supported yet", bridge.ErrNotAllowed)
+	if raw, ok := strings.CutPrefix(ref, avatarRef); ok {
+		return fetchAvatar(ctx, cdn, raw)
+	}
+	if raw, ok := strings.CutPrefix(ref, mediaRef); ok {
+		return fetchMessageFile(ctx, cdn, raw)
+	}
+	return nil, fmt.Errorf("%w: not a zalo media ref", bridge.ErrNotAllowed)
 }
 
 // heardFor returns the account's heard conversations, creating them.

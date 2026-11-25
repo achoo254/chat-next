@@ -488,3 +488,69 @@ func TestAWaitForAFileKeepsWhatCameBeforeItAndAnEditMadeMeanwhileReachesIt(t *te
 		t.Fatalf("file reads = %d, want 3", calls)
 	}
 }
+
+// filesByRef serves each file by its ref and records the refs asked for.
+type filesByRef struct {
+	*contracttest.Fake
+	mu    sync.Mutex
+	files map[string][]byte
+	asked []string
+}
+
+func (a *filesByRef) FetchMedia(_ context.Context, _ bridge.Account, ref string) (bridge.MediaStream, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.asked = append(a.asked, ref)
+	data, ok := a.files[ref]
+	if !ok {
+		return nil, fmt.Errorf("%w: no such file", bridge.ErrNotAllowed)
+	}
+	return &bytesStream{Reader: bytes.NewReader(data), size: int64(len(data))}, nil
+}
+
+// A photo and a named file with no text, the way the Zalo adapter maps them, are
+// stored as files of the owner under the file's own name; one the app refuses to
+// serve keeps its label.
+func TestFilesWithoutTextAreStoredUnderTheirName(t *testing.T) {
+	e := newEnvWithMedia(t, true)
+	const photoRef, docRef, goneRef = "media:https://f1.zdn.vn/p.jpg", "media:https://dl.dlfl.vn/f.pdf", "media:https://dl.dlfl.vn/gone.pdf"
+	app := &filesByRef{Fake: e.fake, files: map[string][]byte{photoRef: jpegOf(t, color.RGBA{G: 200, A: 255}), docRef: []byte("%PDF-1.7 hợp đồng")}}
+	e.adapter = app
+	ctx := context.Background()
+	conv := e.group("g1")
+	photo := e.msg("1", lan, "", 0)
+	photo.Media = []bridge.Media{{Kind: "photo", Ref: photoRef}}
+	doc := e.msg("2", lan, "", 1)
+	doc.Media = []bridge.Media{{Kind: "document", Ref: docRef, Name: "hợp đồng.pdf", Size: 20}}
+	gone := e.msg("3", lan, "", 2)
+	gone.Media = []bridge.Media{{Kind: "document", Ref: goneRef, Name: "cũ.pdf"}}
+	e.fake.AddHistory("g1", photo, doc, gone)
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"[Tệp: cũ.pdf]"})
+	var names []string
+	rows, err := e.st.Pool().Query(ctx, `SELECT f.file_name FROM files f WHERE f.owner_id = $1 ORDER BY f.file_name`, e.owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, n)
+	}
+	if fmt.Sprint(names) != "[hợp đồng.pdf photo.jpg]" {
+		t.Fatalf("stored files = %q", names)
+	}
+	var withFile int
+	if err := e.st.Pool().QueryRow(ctx, `SELECT count(*) FROM messages WHERE chat_id = $1 AND text = ''`, chatID).Scan(&withFile); err != nil {
+		t.Fatal(err)
+	}
+	app.mu.Lock()
+	asked := fmt.Sprint(app.asked)
+	app.mu.Unlock()
+	if withFile != 2 || !strings.Contains(asked, photoRef) || !strings.Contains(asked, docRef) {
+		t.Fatalf("messages with a file %d, refs asked %s", withFile, asked)
+	}
+}
