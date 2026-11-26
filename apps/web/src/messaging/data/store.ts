@@ -897,6 +897,9 @@ export class ChatStore {
 	 */
 	openWindow(chatId: number, focusSeq = 0): void {
 		const existing = this.windows.get(chatId);
+		// A jump focuses its message once. Opening the chat again without one has nothing to focus: the list
+		// restores where the reader left it, and does not return to that message or flash it again.
+		if (existing !== undefined && focusSeq === 0 && existing.window.focusSeq !== 0) existing.window = { ...existing.window, focusSeq: 0 };
 		// Where the reader left the chat scrolled up (rememberPosition): it opens there again, as Telegram does.
 		const keptSeq = focusSeq === 0 ? (this.positions.get(positionKey(chatId, 0))?.seq ?? 0) : 0;
 		if (existing !== undefined && keptSeq !== 0 && this.holds(existing, keptSeq)) {
