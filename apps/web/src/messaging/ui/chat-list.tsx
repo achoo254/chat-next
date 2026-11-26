@@ -4,7 +4,6 @@
 // positioned, and only the rows in view (plus a margin) are mounted. The
 // "Chưa đọc" filter keeps a chat you just read until you change filters, so
 // the list does not jump (#list-states). Alt+↑/↓ opens the chat above/below.
-// In "Tất cả" the chats of a linked person are one row (people/person-rows.ts).
 
 // The React Compiler leaves this file alone: its memoization only grew the startup bundle (about 1.7 KB gzip
 // for this file) and changed no timing in test/perf.
@@ -14,22 +13,19 @@ import type { SelfUser } from "../../api/adapters.ts";
 import { brand } from "../../brand.ts";
 import { EcosystemAppSwitcher } from "../../components/ecosystem-app-switcher.tsx";
 import { Icon } from "../../components/icon.tsx";
-import { Link, navigate, paths, usePathname } from "../../router.tsx";
+import { Link, navigate, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { inFolder, type Folder } from "../data/format.ts";
 import { useBackendValue, useListEntries, useListStatus } from "../data/services.tsx";
-import { personIdFrom, personPath } from "../people/person-path.ts";
-import type { ListItem } from "../people/person-rows.ts";
 import { AccountMenuSlot } from "./account-menu-slot.tsx";
 import { ChatRow, ROW_HEIGHT, TWO_LINE_ROW_HEIGHT } from "./chat-row.tsx";
-import { FolderTabs, useListPeople } from "./folder-rail.tsx";
+import { FolderTabs } from "./folder-rail.tsx";
 import { ContactsGlyph } from "./contacts-glyph.tsx";
 import { useUi } from "./ui-context.tsx";
 
 const OVERSCAN_PX = 320;
 
 const SearchResults = lazy(() => import("./search-results.tsx"));
-const PersonRow = lazy(() => import("./person-row.tsx"));
 
 /** Chats kept in the "Chưa đọc" filter after they were read, until the filter changes. */
 interface Kept {
@@ -173,8 +169,6 @@ function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: Dialo
 	const copy = useCopy();
 	const entries = useListEntries();
 	const status = useListStatus();
-	const people = useListPeople();
-	const currentPerson = personIdFrom(usePathname());
 	const scroller = useRef<HTMLDivElement>(null);
 	const [scrollTop, setScrollTop] = useState(0);
 	const [viewport, setViewport] = useState(640);
@@ -195,38 +189,34 @@ function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: Dialo
 
 	const rows = useMemo(() => {
 		const tall = new Set(twoLine === "" ? [] : twoLine.split(",").map(Number));
-		const shown = entries.filter((entry) => {
-			const unread = entry.unread || (kept.folder === folder && kept.ids.has(entry.chatId)) || (folder === "unread" && entry.chatId === currentChatId);
-			return inFolder(entry.kind, folder, unread) && (app === null || entry.app === app);
-		});
-		const ids = shown.map((entry) => entry.chatId);
-		const items: readonly ListItem[] = folder === "all" && app === null && people !== null ? people.rows.withPersonRows(shown, people.people) : ids;
+		const ids: number[] = [];
 		const offsets: number[] = [];
 		let total = 0;
-		for (const item of items) {
+		for (const entry of entries) {
+			const unread = entry.unread || (kept.folder === folder && kept.ids.has(entry.chatId)) || (folder === "unread" && entry.chatId === currentChatId);
+			if (!inFolder(entry.kind, folder, unread) || (app !== null && entry.app !== app)) continue;
+			ids.push(entry.chatId);
 			offsets.push(total);
-			total += typeof item === "number" && tall.has(item) ? TWO_LINE_ROW_HEIGHT : ROW_HEIGHT;
+			total += tall.has(entry.chatId) ? TWO_LINE_ROW_HEIGHT : ROW_HEIGHT;
 		}
-		return { ids, items, offsets, total };
-	}, [entries, folder, app, kept, currentChatId, twoLine, people]);
+		return { ids, offsets, total };
+	}, [entries, folder, app, kept, currentChatId, twoLine]);
 
 	// Remember what the "Chưa đọc" filter showed, so reading a chat does not drop it.
 	if (folder === "unread" && kept.folder === folder && rows.ids.some((id) => !kept.ids.has(id))) {
 		setKept({ folder, ids: new Set([...kept.ids, ...rows.ids]) });
 	}
 
-	// Alt+↑/↓: the row above or below the open chat or person (a person's row stands for its chats).
+	// Alt+↑/↓: the chat above or below the open one in this list.
 	useEffect(() => {
 		const onKey = (event: globalThis.KeyboardEvent) => {
 			if (!event.altKey || event.metaKey || event.ctrlKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
-			const index = rows.items.findIndex((item) =>
-				typeof item === "number" ? item === currentChatId : item.person.id === currentPerson || item.chatIds.includes(currentChatId),
-			);
+			const index = rows.ids.indexOf(currentChatId);
 			const position = index === -1 ? 0 : index + (event.key === "ArrowUp" ? -1 : 1);
-			const next = rows.items[position];
+			const next = rows.ids[position];
 			if (next === undefined) return;
 			event.preventDefault();
-			navigate(typeof next === "number" ? paths.chat(next) : personPath(next.person.id));
+			navigate(paths.chat(next));
 			const element = scroller.current;
 			const top = rows.offsets[position] ?? 0;
 			if (element !== null && (top < element.scrollTop || top + ROW_HEIGHT > element.scrollTop + element.clientHeight)) {
@@ -235,7 +225,7 @@ function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: Dialo
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [rows, currentChatId, currentPerson]);
+	}, [rows, currentChatId]);
 
 	useLayoutEffect(() => {
 		const element = scroller.current;
@@ -248,9 +238,9 @@ function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: Dialo
 	}, [status]);
 
 	const first = Math.max(0, upperBound(rows.offsets, scrollTop - OVERSCAN_PX) - 1);
-	const last = Math.min(rows.items.length, upperBound(rows.offsets, scrollTop + viewport + OVERSCAN_PX));
-	const visible = rows.items.slice(first, last);
-	const visibleKey = visible.flatMap((item) => (typeof item === "number" ? [item] : item.chatIds)).join(",");
+	const last = Math.min(rows.ids.length, upperBound(rows.offsets, scrollTop + viewport + OVERSCAN_PX));
+	const visible = rows.ids.slice(first, last);
+	const visibleKey = visible.join(",");
 
 	useEffect(() => {
 		onVisibleChats(visibleKey === "" ? [] : visibleKey.split(",").map(Number));
@@ -281,18 +271,21 @@ function Dialogs({ folder, app, onFolder, currentChatId, onVisibleChats }: Dialo
 			}}
 		>
 			<ul className="chat-rows" aria-label={copy.list.label} style={{ height: rows.total }}>
-				{visible.map((item, index) => {
+				{visible.map((chatId, index) => {
 					const position = first + index;
-					const style = {
-						transform: `translateY(${rows.offsets[position] ?? 0}px)`,
-						height: (rows.offsets[position + 1] ?? rows.total) - (rows.offsets[position] ?? 0),
-					};
-					return typeof item === "number" ? (
-						<ChatRow key={item} chatId={item} current={item === currentChatId} position={position + 1} total={rows.items.length} style={style} appFolder={app} />
-					) : (
-						<Suspense key={`p${item.person.id}`} fallback={null}>
-							<PersonRow item={item} current={item.person.id === currentPerson} position={position + 1} total={rows.items.length} style={style} />
-						</Suspense>
+					return (
+						<ChatRow
+							key={chatId}
+							chatId={chatId}
+							current={chatId === currentChatId}
+							position={position + 1}
+							total={rows.ids.length}
+							style={{
+								transform: `translateY(${rows.offsets[position] ?? 0}px)`,
+								height: (rows.offsets[position + 1] ?? rows.total) - (rows.offsets[position] ?? 0),
+							}}
+							appFolder={app}
+						/>
 					);
 				})}
 			</ul>

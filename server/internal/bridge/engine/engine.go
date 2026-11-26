@@ -203,8 +203,6 @@ type runner struct {
 	botsAnnounced bool
 	// ownPhoneDone: the owner's own number was read for this connection, or need not be (see recordOwnPhone).
 	ownPhoneDone bool
-	// phoneBookDone: the account's contacts were read for phone numbers, or need not be (see readPhoneBook).
-	phoneBookDone bool
 }
 
 // run connects the account and syncs until ctx ends or something fails.

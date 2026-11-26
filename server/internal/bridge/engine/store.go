@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"app.local/server/internal/bridge"
+	"app.local/server/internal/phone"
 	"app.local/server/internal/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -77,8 +78,8 @@ type importedMessage struct {
 type db struct {
 	pool     *pgxpool.Pool
 	tenantID string
-	// phones hashes phone numbers; nil when no key is configured.
-	phones *phoneHasher
+	// phones hashes the owner's own phone number; nil when no key is configured.
+	phones *phone.Hasher
 }
 
 func (d *db) loadAccount(ctx context.Context, id int64) (*accountRow, error) {
@@ -350,9 +351,6 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 					return 0, err
 				}
 			}
-			if err := d.setPhone(ctx, a.ID, p); err != nil {
-				return 0, err
-			}
 			if err := d.setSeen(ctx, a.ID, p); err != nil {
 				return 0, err
 			}
@@ -395,8 +393,8 @@ func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participa
 			return fmt.Errorf("bridge: create puppet: %w", err)
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref, phone_hmac, is_bot) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef, d.phones.update(p).value, p.IsBot)
+			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref, is_bot) VALUES ($1, $2, $3, $4, $5, $6)`,
+			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef, p.IsBot)
 		if err != nil {
 			return fmt.Errorf("bridge: link puppet: %w", err)
 		}

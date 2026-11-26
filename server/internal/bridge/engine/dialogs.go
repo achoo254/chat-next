@@ -211,8 +211,5 @@ func (r *runner) pollAll(ctx context.Context) error {
 	if err := r.pollBotInfos(ctx); err != nil {
 		return err
 	}
-	if err := r.readPhoneBook(ctx); err != nil {
-		return err
-	}
 	return r.recordOwnPhone(ctx)
 }

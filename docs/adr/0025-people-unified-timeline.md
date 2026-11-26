@@ -1,6 +1,6 @@
 # ADR 0025: Người và dòng thời gian gộp
 
-Trạng thái: **đã chấp nhận** (20/11/2026, đại ca duyệt), cài đặt theo [plan](../../../plans/dattqh/261120-1119-unified-inbox/plan.md). Mở rộng [ADR 0022](./0022-chat-bridge.md): mô hình bridge giữ nguyên, thêm một lớp «người» ở trên.
+Trạng thái: **đã bỏ** (26/11/2026, đại ca quyết định gỡ cả tính năng vì chưa có cặp người thật để dùng và Zalo chưa xong; mã, RPC và giao diện đã gỡ, các bảng `people*` còn nằm yên tới một bản phát hành «contract» sau). Nội dung dưới đây giữ làm lịch sử. Trước đó: **đã chấp nhận** (20/11/2026, đại ca duyệt), cài đặt theo [plan](../../../plans/dattqh/261120-1119-unified-inbox/plan.md). Mở rộng [ADR 0022](./0022-chat-bridge.md): mô hình bridge giữ nguyên, thêm một lớp «người» ở trên.
 
 ## Bối cảnh
 

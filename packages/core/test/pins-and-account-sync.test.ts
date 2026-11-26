@@ -48,9 +48,6 @@ describe("protocol mapping", () => {
 		// The AI Agent's projects changed on another device: a content-free hint the screens list again on.
 		expect(toUpdate(create(UpdateSchema, { kind: { case: "agentProjectsChanged", value: {} } })).body).toEqual({ kind: "agent_projects_changed" });
 		expect(EventKeys.agentProjects).toBe("agent_projects");
-		// The user's people or link suggestions changed on another device: the same kind of hint.
-		expect(toUpdate(create(UpdateSchema, { kind: { case: "peopleChanged", value: {} } })).body).toEqual({ kind: "people_changed" });
-		expect(EventKeys.people).toBe("people");
 	});
 
 	it("reads stored settings defensively", () => {

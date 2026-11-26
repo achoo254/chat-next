@@ -516,8 +516,6 @@ export type UpdateBody =
 	| { readonly kind: "notification_settings"; readonly settings: NotificationSettings }
 	/** The user's AI Agent projects changed (content-free: list them again). */
 	| { readonly kind: "agent_projects_changed" }
-	/** The user's people (links between users that are the same person) or link suggestions changed (content-free: list them again). */
-	| { readonly kind: "people_changed" }
 	/** The user's Advisor profile after a change. */
 	| { readonly kind: "advisor_profile"; readonly profile: AdvisorProfile }
 	/** A kind added to the protocol after this client was built. */

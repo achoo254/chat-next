@@ -1,10 +1,8 @@
-// «Liên hệ» of AI Agent as data: the rows (a person linked across apps is
-// one row over all of their one-to-one chats; any other one-to-one chat and
-// each group is a row of its own), what the machine says of each row's
-// pushing (ChatInboxItem), and the requests a row's controls send.
+// «Liên hệ» of AI Agent as data: the rows (each one-to-one chat and each
+// group is a row of its own), what the machine says of each row's pushing
+// (ChatInboxItem), and the requests a row's controls send.
 import { ChatInboxItemState, type ChatInboxItem } from "@achoo254/chat-proto/remote/remote";
 import type { DialogView } from "@achoo254/chat-core";
-import type { LinkedPerson } from "../messaging/people/people-api.ts";
 
 /** One chat of a row: where its messages come from. */
 export interface ContactChat {
@@ -17,11 +15,11 @@ export interface ContactChat {
 }
 
 export interface ContactRow {
-	/** "p<person id>", "c<chat id>". */
+	/** "c<chat id>". */
 	readonly key: string;
 	readonly name: string;
 	readonly group: boolean;
-	/** Newest first, as the chat list has them; a person's chats on every app. */
+	/** The chats the row's controls act on. */
 	readonly chats: readonly ContactChat[];
 }
 
@@ -31,31 +29,16 @@ export const DEFAULT_LIMIT = 20;
 
 /**
  * The rows of «Liên hệ» from the chat list (`order`, newest first, and its
- * views) and the linked people. The user's own saved chat, bots, channels
- * and chats the user left are not contacts.
+ * views). The user's own saved chat, bots, channels and chats the user
+ * left are not contacts.
  */
-export function contactRows(order: readonly number[], viewOf: (chatId: number) => DialogView | undefined, people: readonly LinkedPerson[], selfId: number): ContactRow[] {
-	const rank = new Map(order.map((id, i) => [id, i]));
-	const personOfChat = new Map<number, LinkedPerson>();
-	for (const person of people) for (const m of person.members) if (m.chatId > 0) personOfChat.set(m.chatId, person);
+export function contactRows(order: readonly number[], viewOf: (chatId: number) => DialogView | undefined, selfId: number): ContactRow[] {
 	const rows: ContactRow[] = [];
-	const seenPeople = new Set<number>();
 	const hidden = (chatId: number) => viewOf(chatId)?.dialog.hiddenFromAi === true;
 	for (const chatId of order) {
 		const view = viewOf(chatId);
 		const chat = view?.chat ?? null;
 		if (view === undefined || chat === null || chat.left) continue;
-		const person = personOfChat.get(chatId);
-		if (person !== undefined) {
-			if (seenPeople.has(person.id)) continue;
-			seenPeople.add(person.id);
-			const chats = person.members
-				.filter((m) => m.chatId > 0)
-				.sort((a, b) => (rank.get(a.chatId) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.chatId) ?? Number.MAX_SAFE_INTEGER))
-				.map((m) => ({ chatId: m.chatId, app: m.app, title: m.name || person.name, hiddenFromAi: hidden(m.chatId) }));
-			rows.push({ key: `p${person.id}`, name: person.name, group: false, chats });
-			continue;
-		}
 		if (chat.type === "group") {
 			rows.push({ key: `c${chatId}`, name: chat.title, group: true, chats: [{ chatId, app: chat.externalApp ?? "", title: chat.title, hiddenFromAi: hidden(chatId) }] });
 			continue;

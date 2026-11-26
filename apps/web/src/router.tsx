@@ -1,6 +1,5 @@
 // Minimal history-based routing: a handful of screens do not justify a router library.
 import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
-import { personIdFrom } from "./messaging/people/person-path.ts";
 
 export type SettingsTab = "profile" | "privacy" | "blocked" | "notifications" | "appearance" | "shortcuts" | "app" | "account" | "mcp" | "advisor" | "bridge" | "feedback";
 
@@ -66,8 +65,6 @@ export type Route =
 	| { name: "invite"; token: string }
 	/** userId 0: the list without a profile open. */
 	| { name: "contacts"; userId: number }
-	/** The merged timeline of a linked person (ADR 0025). */
-	| { name: "person"; personId: number }
 	| { name: "moderation"; reportId: string | null; actions: boolean }
 	/** The feedback users sent the assistant bot, in the moderation screen. */
 	| { name: "feedback" }
@@ -200,10 +197,6 @@ function matchMessaging(path: string): Route | null {
 			return { name: "chat", chatId, topicId, panel: "chat" };
 		}
 		return null;
-	}
-	if (parts[0] === "p") {
-		const personId = personIdFrom(path);
-		return personId === null ? null : { name: "person", personId };
 	}
 	if (parts[0] === "b" && parts.length === 2) {
 		const username = parts[1] ?? "";

@@ -21,8 +21,6 @@ export const EventKeys = {
 	notificationSettings: "notification_settings",
 	/** The user's AI Agent projects changed on the server (list them again). */
 	agentProjects: "agent_projects",
-	/** The user's people or link suggestions changed on the server (list them again). */
-	people: "people",
 	/** The user's Advisor profile changed. */
 	advisorProfile: "advisor_profile",
 	outbox: "outbox",

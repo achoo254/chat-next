@@ -110,11 +110,6 @@ func dropHidden(hidden map[int64]bool, me int64, out any) {
 		r.Chats = slices.DeleteFunc(r.Chats, func(c *appv1.Chat) bool { return hidden[c.GetId()] })
 		// count covers every page; only this page's hidden chats are known here.
 		r.Count = max(0, r.Count-int32(before-len(r.Chats)))
-	case *appv1.ListPeopleResponse:
-		for _, p := range r.People {
-			p.Members = slices.DeleteFunc(p.Members, func(m *appv1.PersonMember) bool { return hidden[m.GetChatId()] })
-		}
-		r.People = slices.DeleteFunc(r.People, func(p *appv1.Person) bool { return len(p.Members) == 0 })
 	case *appv1.ListBotDeadLettersResponse:
 		before := len(r.DeadLetters)
 		r.DeadLetters = slices.DeleteFunc(r.DeadLetters, func(d *appv1.BotDeadLetter) bool { return hidden[d.GetChatId()] })

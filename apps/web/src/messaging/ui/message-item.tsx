@@ -27,7 +27,7 @@ import { bridgeChunk, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
 import { useMemberRank } from "./member-ranks.ts";
 import { jumboCount } from "./emoji-text.tsx";
 import { useSelection } from "./selection.ts";
-import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor, type Ui } from "./ui-context.tsx";
+import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
 // Photos, files, voice and uploads render with the media chunk, loaded the
@@ -57,25 +57,6 @@ const ViaLine = viaLine.Component;
 export const messageExtrasPreloads: readonly (() => Promise<void>)[] = [systemLine.preload, forwardLine.preload, viaLine.preload];
 
 const RESERVED = { visibility: "hidden" } as const;
-
-/**
- * A message shown outside its own chat's screen (a person's merged timeline,
- * ADR 0025): no forward and no delete there; reply and edit only through
- * these, each in the message's own chat (absent: the action is not offered).
- */
-export interface LimitedActions {
-	readonly reply?: (chatId: number, seq: number) => void;
-	readonly edit?: (chatId: number, seq: number) => void;
-	/** Show the message a reply quotes: on this screen when it is there, else in its own chat. */
-	readonly jump?: (chatId: number, seq: number) => void;
-}
-
-/** What replying to a message does: the chat's composer intent, or the limited screen's own reply; null when not offered. */
-function replyAction(ui: Ui, chatId: number, seq: number, limited: LimitedActions | undefined): (() => void) | null {
-	if (limited === undefined) return () => ui.intents.cell(chatId).set({ mode: "reply", seq });
-	const reply = limited.reply;
-	return reply === undefined ? null : () => reply(chatId, seq);
-}
 
 /** An empty line of the given class in place of one whose code is still loading. */
 function LineReserve({ className, seq }: { className: string; seq?: number }) {
@@ -243,21 +224,18 @@ function useRichContext(fromId: number): RichContext {
  * `edited`: "đã sửa" or "đã cập nhật" before the time; "" for none.
  * `silent`: the bell-off mark of a message posted without a notification
  * (mockups/integrations.html#alert-grouping), with this accessible name; "" for none.
- * `platform`: the app the message came through, in words (merged timeline); "" for none.
  * `viaAi`: "qua AI" on your own message sent through an AI tool, with its explanation; null for none.
  */
 function Stamp({
 	date,
 	edited,
 	silent = "",
-	platform = "",
 	viaAi = null,
 	children,
 }: {
 	date: number;
 	edited: string;
 	silent?: string;
-	platform?: string;
 	viaAi?: { readonly label: string; readonly title: string } | null;
 	children?: ReactNode;
 }) {
@@ -265,7 +243,6 @@ function Stamp({
 	const { locale } = useI18n();
 	return (
 		<span className="stamp">
-			{platform !== "" && <span className="msg-app">{platform}</span>}
 			{viaAi !== null && (
 				<span className="msg-ai" title={viaAi.title}>
 					{viaAi.label}
@@ -278,7 +255,7 @@ function Stamp({
 	);
 }
 
-function ReplyQuote({ chatId, seq, onJump }: { chatId: number; seq: number; onJump?: ((chatId: number, seq: number) => void) | undefined }) {
+function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 	"use no memo";
 	const copy = useCopy();
 	const { store } = useServices();
@@ -294,7 +271,7 @@ function ReplyQuote({ chatId, seq, onJump }: { chatId: number; seq: number; onJu
 		<button
 			type="button"
 			className={`reply s-${toneOf(target.fromId)}`}
-			onClick={() => (onJump ?? ((chat, at) => store.openWindow(chat, at)))(chatId, seq)}
+			onClick={() => store.openWindow(chatId, seq)}
 		>
 			<b>{name}</b>
 			<span className="q">{messagePreview(target, nameOf, copy, channel)}</span>
@@ -485,10 +462,6 @@ interface BubbleProps {
 	inert?: boolean;
 	runPrev?: boolean;
 	runNext?: boolean;
-	/** The app the message came through, shown in words by the time (merged timeline); "" for none. */
-	platform?: string;
-	/** Shown outside its chat's screen: the limited actions; undefined on the chat's own screen. */
-	limited?: LimitedActions;
 }
 
 /** The media of a message or album, in its reserved box until the media chunk is there. */
@@ -528,13 +501,11 @@ export function MessageBubble({
 	inert = false,
 	runPrev = false,
 	runNext = false,
-	platform = "",
-	limited,
 }: BubbleProps) {
 	const copy = useCopy();
 	const { store, self, backend, toasts } = useServices();
 	const ui = useUi();
-	const selection = useSelection(inert || limited !== undefined ? 0 : chatId);
+	const selection = useSelection(inert ? 0 : chatId);
 	const ctx = useRichContext(message.fromId);
 	const intent = useIntent(chatId);
 	// A chat that sends on to another app (Chat Bridge): where this message is on its way.
@@ -576,7 +547,7 @@ export function MessageBubble({
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 	// A recalled message keeps its place only: nothing to reply to, react to or forward.
 	const canReply = (!channel || admin) && !message.recalled;
-	const reply = canReply ? replyAction(ui, chatId, message.seq, limited) : null;
+	const reply = canReply ? () => ui.intents.cell(chatId).set({ mode: "reply", seq: message.seq }) : null;
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
 	// Selecting: a click anywhere on the message takes it in or out (an album as a whole),
@@ -629,7 +600,6 @@ export function MessageBubble({
 			date={edited ? message.editDate : message.date}
 			edited={edited ? (integration ? copy.message.updated : copy.message.edited) : ""}
 			silent={showSilent ? copy.message.silent : ""}
-			platform={platform}
 			// Only the sender's own copy says it went through AI (the server sets it there alone).
 			viaAi={message.sentViaAi === true && message.fromId === store.selfId && !recalled ? { label: copy.message.viaAi, title: copy.message.viaAiTitle } : null}
 		>
@@ -750,7 +720,7 @@ export function MessageBubble({
 							<ViaLine botId={message.viaBotId} />
 						</Suspense>
 					)}
-					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} onJump={limited?.jump} />}
+					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
 					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
 					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} />}
 					{alert === null ? (
@@ -818,8 +788,6 @@ interface PendingProps {
 	inert?: boolean;
 	runPrev?: boolean;
 	runNext?: boolean;
-	/** The app the message goes through, shown in words by the time (merged timeline); "" for none. */
-	platform?: string;
 }
 
 function PendingMediaSlot({ chatId, pending, albumKeys }: { chatId: number; pending: PendingMessage; albumKeys: readonly string[] }) {
@@ -857,7 +825,6 @@ export function PendingBubble({
 	inert = false,
 	runPrev = false,
 	runNext = false,
-	platform = "",
 }: PendingProps) {
 	const copy = useCopy();
 	const { source, toasts, self } = useServices();
@@ -873,7 +840,7 @@ export function PendingBubble({
 	const icon = failed ? "alert" : "clock";
 	const label = failed ? copy.message.failed : waiting ? copy.message.queued : copy.message.sending;
 	const stamp = (
-		<Stamp date={pending.date} edited="" platform={platform}>
+		<Stamp date={pending.date} edited="">
 			<LabelledIcon name={icon} label={label} className={failed ? "fail" : undefined} />
 		</Stamp>
 	);

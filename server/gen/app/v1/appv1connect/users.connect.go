@@ -72,18 +72,6 @@ const (
 	UsersServiceGetBlockedUsersProcedure = "/app.v1.UsersService/GetBlockedUsers"
 	// UsersServiceSetLocaleProcedure is the fully-qualified name of the UsersService's SetLocale RPC.
 	UsersServiceSetLocaleProcedure = "/app.v1.UsersService/SetLocale"
-	// UsersServiceListPeopleProcedure is the fully-qualified name of the UsersService's ListPeople RPC.
-	UsersServiceListPeopleProcedure = "/app.v1.UsersService/ListPeople"
-	// UsersServiceLinkUsersProcedure is the fully-qualified name of the UsersService's LinkUsers RPC.
-	UsersServiceLinkUsersProcedure = "/app.v1.UsersService/LinkUsers"
-	// UsersServiceUnlinkUserProcedure is the fully-qualified name of the UsersService's UnlinkUser RPC.
-	UsersServiceUnlinkUserProcedure = "/app.v1.UsersService/UnlinkUser"
-	// UsersServiceListLinkSuggestionsProcedure is the fully-qualified name of the UsersService's
-	// ListLinkSuggestions RPC.
-	UsersServiceListLinkSuggestionsProcedure = "/app.v1.UsersService/ListLinkSuggestions"
-	// UsersServiceRejectLinkSuggestionProcedure is the fully-qualified name of the UsersService's
-	// RejectLinkSuggestion RPC.
-	UsersServiceRejectLinkSuggestionProcedure = "/app.v1.UsersService/RejectLinkSuggestion"
 )
 
 // UsersServiceClient is a client for the app.v1.UsersService service.
@@ -113,23 +101,6 @@ type UsersServiceClient interface {
 	// The language the caller's app shows; the assistant bot writes to the
 	// caller in it. Apps send it at every start and when the user changes it.
 	SetLocale(context.Context, *connect.Request[v1.SetLocaleRequest]) (*connect.Response[v1.SetLocaleResponse], error)
-	// People (ADR 0025): the caller's own grouping of users that are the same
-	// person on several apps (a Chat account and the contacts of other apps
-	// synced with the bridge). Everything is scoped to the caller; a user the
-	// caller has no private chat with is NotFound, the same as an unknown one.
-	// The caller's people and the users in each.
-	ListPeople(context.Context, *connect.Request[v1.ListPeopleRequest]) (*connect.Response[v1.ListPeopleResponse], error)
-	// Joins two or more users into one person; users already in different
-	// people merge those people into one.
-	LinkUsers(context.Context, *connect.Request[v1.LinkUsersRequest]) (*connect.Response[v1.LinkUsersResponse], error)
-	// Takes a user out of their person; a person left with one user is removed.
-	UnlinkUser(context.Context, *connect.Request[v1.UnlinkUserRequest]) (*connect.Response[v1.UnlinkUserResponse], error)
-	// Pairs that may be the same person, computed when asked and never linked
-	// automatically.
-	ListLinkSuggestions(context.Context, *connect.Request[v1.ListLinkSuggestionsRequest]) (*connect.Response[v1.ListLinkSuggestionsResponse], error)
-	// The caller says two users are not the same person; the pair is not
-	// suggested again.
-	RejectLinkSuggestion(context.Context, *connect.Request[v1.RejectLinkSuggestionRequest]) (*connect.Response[v1.RejectLinkSuggestionResponse], error)
 }
 
 // NewUsersServiceClient constructs a client for the app.v1.UsersService service. By default, it
@@ -239,62 +210,27 @@ func NewUsersServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(usersServiceMethods.ByName("SetLocale")),
 			connect.WithClientOptions(opts...),
 		),
-		listPeople: connect.NewClient[v1.ListPeopleRequest, v1.ListPeopleResponse](
-			httpClient,
-			baseURL+UsersServiceListPeopleProcedure,
-			connect.WithSchema(usersServiceMethods.ByName("ListPeople")),
-			connect.WithClientOptions(opts...),
-		),
-		linkUsers: connect.NewClient[v1.LinkUsersRequest, v1.LinkUsersResponse](
-			httpClient,
-			baseURL+UsersServiceLinkUsersProcedure,
-			connect.WithSchema(usersServiceMethods.ByName("LinkUsers")),
-			connect.WithClientOptions(opts...),
-		),
-		unlinkUser: connect.NewClient[v1.UnlinkUserRequest, v1.UnlinkUserResponse](
-			httpClient,
-			baseURL+UsersServiceUnlinkUserProcedure,
-			connect.WithSchema(usersServiceMethods.ByName("UnlinkUser")),
-			connect.WithClientOptions(opts...),
-		),
-		listLinkSuggestions: connect.NewClient[v1.ListLinkSuggestionsRequest, v1.ListLinkSuggestionsResponse](
-			httpClient,
-			baseURL+UsersServiceListLinkSuggestionsProcedure,
-			connect.WithSchema(usersServiceMethods.ByName("ListLinkSuggestions")),
-			connect.WithClientOptions(opts...),
-		),
-		rejectLinkSuggestion: connect.NewClient[v1.RejectLinkSuggestionRequest, v1.RejectLinkSuggestionResponse](
-			httpClient,
-			baseURL+UsersServiceRejectLinkSuggestionProcedure,
-			connect.WithSchema(usersServiceMethods.ByName("RejectLinkSuggestion")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // usersServiceClient implements UsersServiceClient.
 type usersServiceClient struct {
-	getSelf              *connect.Client[v1.GetSelfRequest, v1.GetSelfResponse]
-	getUsers             *connect.Client[v1.GetUsersRequest, v1.GetUsersResponse]
-	updateProfile        *connect.Client[v1.UpdateProfileRequest, v1.UpdateProfileResponse]
-	setUsername          *connect.Client[v1.SetUsernameRequest, v1.SetUsernameResponse]
-	resolveUsername      *connect.Client[v1.ResolveUsernameRequest, v1.ResolveUsernameResponse]
-	searchUsers          *connect.Client[v1.SearchUsersRequest, v1.SearchUsersResponse]
-	block                *connect.Client[v1.BlockRequest, v1.BlockResponse]
-	unblock              *connect.Client[v1.UnblockRequest, v1.UnblockResponse]
-	getPrivacy           *connect.Client[v1.GetPrivacyRequest, v1.GetPrivacyResponse]
-	setPrivacy           *connect.Client[v1.SetPrivacyRequest, v1.SetPrivacyResponse]
-	report               *connect.Client[v1.ReportRequest, v1.ReportResponse]
-	addContact           *connect.Client[v1.AddContactRequest, v1.AddContactResponse]
-	deleteContact        *connect.Client[v1.DeleteContactRequest, v1.DeleteContactResponse]
-	getContacts          *connect.Client[v1.GetContactsRequest, v1.GetContactsResponse]
-	getBlockedUsers      *connect.Client[v1.GetBlockedUsersRequest, v1.GetBlockedUsersResponse]
-	setLocale            *connect.Client[v1.SetLocaleRequest, v1.SetLocaleResponse]
-	listPeople           *connect.Client[v1.ListPeopleRequest, v1.ListPeopleResponse]
-	linkUsers            *connect.Client[v1.LinkUsersRequest, v1.LinkUsersResponse]
-	unlinkUser           *connect.Client[v1.UnlinkUserRequest, v1.UnlinkUserResponse]
-	listLinkSuggestions  *connect.Client[v1.ListLinkSuggestionsRequest, v1.ListLinkSuggestionsResponse]
-	rejectLinkSuggestion *connect.Client[v1.RejectLinkSuggestionRequest, v1.RejectLinkSuggestionResponse]
+	getSelf         *connect.Client[v1.GetSelfRequest, v1.GetSelfResponse]
+	getUsers        *connect.Client[v1.GetUsersRequest, v1.GetUsersResponse]
+	updateProfile   *connect.Client[v1.UpdateProfileRequest, v1.UpdateProfileResponse]
+	setUsername     *connect.Client[v1.SetUsernameRequest, v1.SetUsernameResponse]
+	resolveUsername *connect.Client[v1.ResolveUsernameRequest, v1.ResolveUsernameResponse]
+	searchUsers     *connect.Client[v1.SearchUsersRequest, v1.SearchUsersResponse]
+	block           *connect.Client[v1.BlockRequest, v1.BlockResponse]
+	unblock         *connect.Client[v1.UnblockRequest, v1.UnblockResponse]
+	getPrivacy      *connect.Client[v1.GetPrivacyRequest, v1.GetPrivacyResponse]
+	setPrivacy      *connect.Client[v1.SetPrivacyRequest, v1.SetPrivacyResponse]
+	report          *connect.Client[v1.ReportRequest, v1.ReportResponse]
+	addContact      *connect.Client[v1.AddContactRequest, v1.AddContactResponse]
+	deleteContact   *connect.Client[v1.DeleteContactRequest, v1.DeleteContactResponse]
+	getContacts     *connect.Client[v1.GetContactsRequest, v1.GetContactsResponse]
+	getBlockedUsers *connect.Client[v1.GetBlockedUsersRequest, v1.GetBlockedUsersResponse]
+	setLocale       *connect.Client[v1.SetLocaleRequest, v1.SetLocaleResponse]
 }
 
 // GetSelf calls app.v1.UsersService.GetSelf.
@@ -377,31 +313,6 @@ func (c *usersServiceClient) SetLocale(ctx context.Context, req *connect.Request
 	return c.setLocale.CallUnary(ctx, req)
 }
 
-// ListPeople calls app.v1.UsersService.ListPeople.
-func (c *usersServiceClient) ListPeople(ctx context.Context, req *connect.Request[v1.ListPeopleRequest]) (*connect.Response[v1.ListPeopleResponse], error) {
-	return c.listPeople.CallUnary(ctx, req)
-}
-
-// LinkUsers calls app.v1.UsersService.LinkUsers.
-func (c *usersServiceClient) LinkUsers(ctx context.Context, req *connect.Request[v1.LinkUsersRequest]) (*connect.Response[v1.LinkUsersResponse], error) {
-	return c.linkUsers.CallUnary(ctx, req)
-}
-
-// UnlinkUser calls app.v1.UsersService.UnlinkUser.
-func (c *usersServiceClient) UnlinkUser(ctx context.Context, req *connect.Request[v1.UnlinkUserRequest]) (*connect.Response[v1.UnlinkUserResponse], error) {
-	return c.unlinkUser.CallUnary(ctx, req)
-}
-
-// ListLinkSuggestions calls app.v1.UsersService.ListLinkSuggestions.
-func (c *usersServiceClient) ListLinkSuggestions(ctx context.Context, req *connect.Request[v1.ListLinkSuggestionsRequest]) (*connect.Response[v1.ListLinkSuggestionsResponse], error) {
-	return c.listLinkSuggestions.CallUnary(ctx, req)
-}
-
-// RejectLinkSuggestion calls app.v1.UsersService.RejectLinkSuggestion.
-func (c *usersServiceClient) RejectLinkSuggestion(ctx context.Context, req *connect.Request[v1.RejectLinkSuggestionRequest]) (*connect.Response[v1.RejectLinkSuggestionResponse], error) {
-	return c.rejectLinkSuggestion.CallUnary(ctx, req)
-}
-
 // UsersServiceHandler is an implementation of the app.v1.UsersService service.
 type UsersServiceHandler interface {
 	// The caller's own user (profile, email from the IdP).
@@ -429,23 +340,6 @@ type UsersServiceHandler interface {
 	// The language the caller's app shows; the assistant bot writes to the
 	// caller in it. Apps send it at every start and when the user changes it.
 	SetLocale(context.Context, *connect.Request[v1.SetLocaleRequest]) (*connect.Response[v1.SetLocaleResponse], error)
-	// People (ADR 0025): the caller's own grouping of users that are the same
-	// person on several apps (a Chat account and the contacts of other apps
-	// synced with the bridge). Everything is scoped to the caller; a user the
-	// caller has no private chat with is NotFound, the same as an unknown one.
-	// The caller's people and the users in each.
-	ListPeople(context.Context, *connect.Request[v1.ListPeopleRequest]) (*connect.Response[v1.ListPeopleResponse], error)
-	// Joins two or more users into one person; users already in different
-	// people merge those people into one.
-	LinkUsers(context.Context, *connect.Request[v1.LinkUsersRequest]) (*connect.Response[v1.LinkUsersResponse], error)
-	// Takes a user out of their person; a person left with one user is removed.
-	UnlinkUser(context.Context, *connect.Request[v1.UnlinkUserRequest]) (*connect.Response[v1.UnlinkUserResponse], error)
-	// Pairs that may be the same person, computed when asked and never linked
-	// automatically.
-	ListLinkSuggestions(context.Context, *connect.Request[v1.ListLinkSuggestionsRequest]) (*connect.Response[v1.ListLinkSuggestionsResponse], error)
-	// The caller says two users are not the same person; the pair is not
-	// suggested again.
-	RejectLinkSuggestion(context.Context, *connect.Request[v1.RejectLinkSuggestionRequest]) (*connect.Response[v1.RejectLinkSuggestionResponse], error)
 }
 
 // NewUsersServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -551,36 +445,6 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(usersServiceMethods.ByName("SetLocale")),
 		connect.WithHandlerOptions(opts...),
 	)
-	usersServiceListPeopleHandler := connect.NewUnaryHandler(
-		UsersServiceListPeopleProcedure,
-		svc.ListPeople,
-		connect.WithSchema(usersServiceMethods.ByName("ListPeople")),
-		connect.WithHandlerOptions(opts...),
-	)
-	usersServiceLinkUsersHandler := connect.NewUnaryHandler(
-		UsersServiceLinkUsersProcedure,
-		svc.LinkUsers,
-		connect.WithSchema(usersServiceMethods.ByName("LinkUsers")),
-		connect.WithHandlerOptions(opts...),
-	)
-	usersServiceUnlinkUserHandler := connect.NewUnaryHandler(
-		UsersServiceUnlinkUserProcedure,
-		svc.UnlinkUser,
-		connect.WithSchema(usersServiceMethods.ByName("UnlinkUser")),
-		connect.WithHandlerOptions(opts...),
-	)
-	usersServiceListLinkSuggestionsHandler := connect.NewUnaryHandler(
-		UsersServiceListLinkSuggestionsProcedure,
-		svc.ListLinkSuggestions,
-		connect.WithSchema(usersServiceMethods.ByName("ListLinkSuggestions")),
-		connect.WithHandlerOptions(opts...),
-	)
-	usersServiceRejectLinkSuggestionHandler := connect.NewUnaryHandler(
-		UsersServiceRejectLinkSuggestionProcedure,
-		svc.RejectLinkSuggestion,
-		connect.WithSchema(usersServiceMethods.ByName("RejectLinkSuggestion")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/app.v1.UsersService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UsersServiceGetSelfProcedure:
@@ -615,16 +479,6 @@ func NewUsersServiceHandler(svc UsersServiceHandler, opts ...connect.HandlerOpti
 			usersServiceGetBlockedUsersHandler.ServeHTTP(w, r)
 		case UsersServiceSetLocaleProcedure:
 			usersServiceSetLocaleHandler.ServeHTTP(w, r)
-		case UsersServiceListPeopleProcedure:
-			usersServiceListPeopleHandler.ServeHTTP(w, r)
-		case UsersServiceLinkUsersProcedure:
-			usersServiceLinkUsersHandler.ServeHTTP(w, r)
-		case UsersServiceUnlinkUserProcedure:
-			usersServiceUnlinkUserHandler.ServeHTTP(w, r)
-		case UsersServiceListLinkSuggestionsProcedure:
-			usersServiceListLinkSuggestionsHandler.ServeHTTP(w, r)
-		case UsersServiceRejectLinkSuggestionProcedure:
-			usersServiceRejectLinkSuggestionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -696,24 +550,4 @@ func (UnimplementedUsersServiceHandler) GetBlockedUsers(context.Context, *connec
 
 func (UnimplementedUsersServiceHandler) SetLocale(context.Context, *connect.Request[v1.SetLocaleRequest]) (*connect.Response[v1.SetLocaleResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.SetLocale is not implemented"))
-}
-
-func (UnimplementedUsersServiceHandler) ListPeople(context.Context, *connect.Request[v1.ListPeopleRequest]) (*connect.Response[v1.ListPeopleResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.ListPeople is not implemented"))
-}
-
-func (UnimplementedUsersServiceHandler) LinkUsers(context.Context, *connect.Request[v1.LinkUsersRequest]) (*connect.Response[v1.LinkUsersResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.LinkUsers is not implemented"))
-}
-
-func (UnimplementedUsersServiceHandler) UnlinkUser(context.Context, *connect.Request[v1.UnlinkUserRequest]) (*connect.Response[v1.UnlinkUserResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.UnlinkUser is not implemented"))
-}
-
-func (UnimplementedUsersServiceHandler) ListLinkSuggestions(context.Context, *connect.Request[v1.ListLinkSuggestionsRequest]) (*connect.Response[v1.ListLinkSuggestionsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.ListLinkSuggestions is not implemented"))
-}
-
-func (UnimplementedUsersServiceHandler) RejectLinkSuggestion(context.Context, *connect.Request[v1.RejectLinkSuggestionRequest]) (*connect.Response[v1.RejectLinkSuggestionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.UsersService.RejectLinkSuggestion is not implemented"))
 }

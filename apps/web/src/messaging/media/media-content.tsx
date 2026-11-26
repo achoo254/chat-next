@@ -6,7 +6,7 @@
 // progress, cancel, retry) and the photo of a link preview. A message that
 // is no longer available keeps its box and says so.
 import type { MediaRef, MediaRequest, MediaSizeType, PendingMedia, PendingMessage, StoredMessage } from "@achoo254/chat-core";
-import { createContext, useContext, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
@@ -289,27 +289,19 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 	}
 }
 
-/** An album's messages by key, for an album whose messages are not in the store (a person's merged timeline). */
-export const AlbumMessagesContext = createContext<ReadonlyMap<string, StoredMessage> | null>(null);
-
 function AlbumCell({ chatId, itemKey, index }: { chatId: number; itemKey: string; index: number }) {
 	const copy = useMediaCopy();
 	const item = useItem(chatId, itemKey);
-	const handed = useContext(AlbumMessagesContext);
-	const shown = handed?.get(itemKey) ?? (item?.kind === "message" ? item.message : undefined);
-	if (shown === undefined) return null;
-	const media = shown.media;
+	if (item?.kind !== "message") return null;
+	const media = item.message.media;
 	if (media === undefined) return null;
-	if (!isVisual(media)) return <MessageMedia message={shown} />;
-	return <PictureView chatId={chatId} seq={shown.seq} media={media} cell label={copy.media.albumItem(index + 1, media.kind === "video")} />;
+	if (!isVisual(media)) return <MessageMedia message={item.message} />;
+	return <PictureView chatId={chatId} seq={item.message.seq} media={media} cell label={copy.media.albumItem(index + 1, media.kind === "video")} />;
 }
 
 /** Messages sent together (same grouped_id): photos and videos in a grid, files and audio stacked. */
 export function AlbumMedia({ chatId, keys, visual }: { chatId: number; keys: readonly string[]; visual: boolean }) {
 	const copy = useMediaCopy();
-	const handed = useContext(AlbumMessagesContext);
-	// Messages handed over say themselves whether they are all pictures (the store has nothing to ask).
-	if (handed !== null) visual = [...handed.values()].every((message) => message.media === undefined || isVisual(message.media));
 	const cells = keys.map((key, index) => <AlbumCell key={key} chatId={chatId} itemKey={key} index={index} />);
 	if (!visual) return <div className="file-stack">{cells}</div>;
 	return (

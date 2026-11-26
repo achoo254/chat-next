@@ -98,10 +98,11 @@ type Config struct {
 	TelegramAPIHash string
 	// BridgePhoneKey (BRIDGE_PHONE_KEY, optional, base64 of at least
 	// SessionKeyMinLen bytes, not SESSION_KEY) keys the HMAC that stands for
-	// the phone number of a person of another app (external_users.phone_hmac),
-	// so the same number on two puppets suggests one person. Unset, no number
-	// is kept and no suggestion is made by number. It is never logged, and
-	// changing it makes every stored hash useless until people are seen again.
+	// the phone number a user's own Telegram or Zalo account was verified with
+	// (users.phone_hmac), so people can find that user by number. Unset, no
+	// number is kept and finding by phone is off. It is never logged, and
+	// changing it makes every stored hash useless until each account connects
+	// again.
 	BridgePhoneKey []byte
 	// ZaloSidecarBundle is the absolute path of the Zalo sidecar bundle
 	// (ZALO_SIDECAR_BUNDLE, server/internal/bridge/adapters/zalo/sidecar/dist/

@@ -18,13 +18,12 @@ import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { isSavedChat } from "../data/format.ts";
 import { pinnedLists } from "../data/pinned.ts";
-import type { WindowItem } from "../data/store.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
 import { quickReactions, reactionTaken } from "./bridge-reactions.ts";
 import { isReactionRefused } from "./reaction-refused.ts";
 import { EmojiPicker } from "./emoji-picker.tsx";
-import { MessageBubble, PendingBubble, type LimitedActions } from "./message-item.tsx";
+import { MessageBubble, PendingBubble } from "./message-item.tsx";
 import { copyText } from "./parts.tsx";
 import { albumSeqs, startSelection } from "./selection-actions.ts";
 import { openAiPanel, useUi, type MenuAnchor } from "./ui-context.tsx";
@@ -68,14 +67,6 @@ interface MenuLayerProps {
 	picker: boolean;
 	anchor: MenuAnchor;
 	readOutboxMaxSeq: number;
-	/** The message itself, for one that is not in the store's windows (a person's merged timeline); else read from the store. */
-	item?: WindowItem;
-	/**
-	 * Outside its chat's screen (a person's merged timeline): only reactions,
-	 * copy, download and these reply and edit actions; no forward, pin,
-	 * report or delete.
-	 */
-	limited?: LimitedActions;
 }
 
 /** Gap kept between the popover and the spot it opened from, and from the edges of the area. */
@@ -138,15 +129,14 @@ function selectedTextIn(itemKey: string): string {
 	return selection.toString().trim();
 }
 
-export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readOutboxMaxSeq, item: given, limited }: MenuLayerProps) {
+export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readOutboxMaxSeq }: MenuLayerProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store, source, remote, backend, toasts, self } = useServices();
 	const pins = pinnedLists(store);
-	const stored = useItem(chatId, itemKey);
+	const item = useItem(chatId, itemKey);
 	// The text selected inside this message when the menu opened (a right click keeps it).
 	const [picked] = useState(() => selectedTextIn(itemKey));
-	const item = given ?? stored;
 	const author = useUser(item?.kind === "message" && item.message.fromId !== store.selfId ? item.message.fromId : 0);
 	const menu = useRef<HTMLDivElement>(null);
 	const pop = useRef<HTMLDivElement>(null);
@@ -235,27 +225,6 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 		},
 	};
 
-	/** "Tải xuống" for a message with media; null without. */
-	function downloadEntry(message: StoredMessage): MenuEntry | null {
-		const media = message.media;
-		if (media === undefined) return null;
-		return {
-			label: copy.menu.download,
-			icon: "arrow-down",
-			run: () => {
-				toasts.show(copy.menu.downloading);
-				void import("../media/download.ts")
-					.then(({ downloadMedia }) => downloadMedia(source, chatId, message.seq, media))
-					.then(
-						(ok) => {
-							if (!ok) toasts.show(copy.menu.mediaGone);
-						},
-						failure,
-					);
-			},
-		};
-	}
-
 	const entries: MenuEntry[] = [];
 	// Part of the message's text selected with the mouse (as Telegram's "Copy Selected Text").
 	if (pickedText !== "") {
@@ -273,22 +242,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 			entries.push({ label: copy.menu.resend, icon: "send", run: () => source.retryOutbox(pending.outboxId).catch(failure) });
 		}
 		entries.push(copyEntry);
-		if (limited === undefined) {
-			entries.push({ label: copy.menu.discard, icon: "trash", danger: true, separated: true, run: () => source.discardOutbox(pending.outboxId).catch(failure) });
-		}
-	} else if (limited !== undefined) {
-		// Outside its chat's screen: reply and edit through that screen, copy and download; nothing that forwards, pins or deletes.
-		const message = item.message;
-		const { reply, edit } = limited;
-		if (!message.recalled) {
-			if (reply !== undefined) entries.push({ label: copy.menu.reply, icon: "reply", run: () => reply(chatId, message.seq) });
-			if (message.text !== "") entries.push(copyEntry);
-			const download = downloadEntry(message);
-			if (download !== null) entries.push(download);
-			if (edit !== undefined && canEdit(message, store.selfId, limits)) {
-				entries.push({ label: copy.menu.edit, icon: "edit", run: () => edit(chatId, message.seq) });
-			}
-		}
+		entries.push({ label: copy.menu.discard, icon: "trash", danger: true, separated: true, run: () => source.discardOutbox(pending.outboxId).catch(failure) });
 	} else if (item.message.recalled) {
 		// A recalled message has nothing left but its place: it can only be hidden on your side.
 		const message = item.message;
@@ -338,8 +292,24 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 			});
 		}
 		if (message.text !== "") entries.push(copyEntry);
-		const download = downloadEntry(message);
-		if (download !== null) entries.push(download);
+		const media = message.media;
+		if (media !== undefined) {
+			entries.push({
+				label: copy.menu.download,
+				icon: "arrow-down",
+				run: () => {
+					toasts.show(copy.menu.downloading);
+					void import("../media/download.ts")
+						.then(({ downloadMedia }) => downloadMedia(source, chatId, message.seq, media))
+						.then(
+							(ok) => {
+								if (!ok) toasts.show(copy.menu.mediaGone);
+							},
+							failure,
+						);
+				},
+			});
+		}
 		if (canEdit(message, store.selfId, limits)) {
 			entries.push({ label: copy.menu.edit, icon: "edit", run: () => ui.intents.cell(chatId).set({ mode: "edit", seq: message.seq }) });
 		}
@@ -432,9 +402,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 				</button>
 			</div>
 		) : null;
-// A recalled message outside its chat's screen offers nothing at all.
-if (entries.length === 0 && reactions === null && !more) return null;
-const actions = more ? (
+	const actions = more ? (
 		<EmojiPicker mode="reaction" onPick={react} taken={(emoji) => reactionTaken(chat?.externalApp, emoji)} onClose={close} />
 	) : (
 		// eslint-disable-next-line jsx-a11y/interactive-supports-focus -- focus sits on the menu items; the menu only receives their arrow keys

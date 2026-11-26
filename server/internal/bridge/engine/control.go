@@ -377,11 +377,7 @@ func (e *Engine) Disconnect(ctx context.Context, owner, accountID int64, deleteC
 // removeAccount deletes the account row and what hangs on it; the contacts
 // imported for it lose their names like those of an erased owner.
 func (e *Engine) removeAccount(ctx context.Context, a *accountRow) error {
-	err := pgx.BeginFunc(ctx, e.db.pool, func(tx pgx.Tx) error {
-		// The puppets leave the owner's people (ADR 0025) in the same transaction.
-		if err := e.chat.DetachBridgeAccount(ctx, tx, a.OwnerID, a.ID); err != nil {
-			return err
-		}
+	return pgx.BeginFunc(ctx, e.db.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `
 			UPDATE users u SET username = 'deleted_' || u.id, name = '', bio = '', photo_file_id = NULL, deleted_at = now(), updated_at = now()
 			FROM external_users eu WHERE eu.account_id = $1 AND u.id = eu.user_id AND u.deleted_at IS NULL`, a.ID); err != nil {
@@ -396,14 +392,6 @@ func (e *Engine) removeAccount(ctx context.Context, a *accountRow) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	if err := e.chat.AnnouncePeopleChanged(ctx, a.OwnerID); err != nil {
-		// The account is gone either way; other sessions list their people on the next start.
-		e.logger.Warn("announcing the people change failed", "owner_id", a.OwnerID, "err", err)
-	}
-	return nil
 }
 
 // canSend reports whether the adapter of source can be written to.

@@ -57,7 +57,6 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 		peer.Name, peer.NameUnknown = ev.DName, false
 	}
 	withAvatar(&peer, ev.PeerAvatar)
-	withPhone(&peer, ev.PeerPhone)
 	withSeen(&peer, ev.PeerSeen)
 	if !ev.Self {
 		sender = peer
@@ -65,7 +64,7 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
 	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now)}
 	m.Text, m.Media = messageContent(ev)
-	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.PhoneKnown || peer.SeenKnown) {
+	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.SeenKnown) {
 		m.Peer = &peer
 	}
 	return m, conv, nil
@@ -95,17 +94,6 @@ func mapUndo(raw json.RawMessage) (conv, id string, err error) {
 		return "", "", errors.New("zalo: recall without valid ids")
 	}
 	return conv, id, nil
-}
-
-// withPhone gives a participant the phone number their profile shows. Zalo's
-// profile of another person usually leaves the number out, and nobody knows
-// whether an empty one means «none» or «not shown to you», so only a number
-// that is there counts: an empty one leaves the recorded number as it is.
-func withPhone(p *bridge.Participant, raw string) {
-	if raw == "" {
-		return
-	}
-	p.PhoneKnown, p.Phone = true, raw
 }
 
 // withSeen gives a participant the time Zalo says they were last online (milliseconds

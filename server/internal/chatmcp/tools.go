@@ -25,7 +25,7 @@ Start with list_chats or search_messages, read with get_messages, find people wi
 Messages: forward_messages, copy_message, pin_message, get_pinned_messages, get_message_reactions, get_message_readers.
 Files: start_media_upload, PUT the bytes to its URLs, complete_media_upload, then send_media with the media ids (one id one message, several one album); send_media also takes file ids of messages the user can see.
 Groups and channels: create_group, create_channel, add_members, update_chat_info, export_invite_link, get_forum_topics, create_forum_topic, set_admin; set_dialog_mute, set_dialog_pinned and set_dialog_unread_mark change only the user's own chat list.
-Contacts: get_contacts, list_people (the same person on several apps, with the private chat of each), add_contact, block_user, get_common_chats. Incoming webhooks of chats the user administers: list_incoming_hooks, get_incoming_hook_stats, list_incoming_hook_dead_letters, get_incoming_hook_audit.
+Contacts: get_contacts, add_contact, block_user, get_common_chats. Incoming webhooks of chats the user administers: list_incoming_hooks, get_incoming_hook_stats, list_incoming_hook_dead_letters, get_incoming_hook_audit.
 Bots: list_bots, get_bot_delivery (webhook and delivery state), list_bot_dead_letters.
 Tools that say "two calls" (bot webhook, token and deletion, which also need bots:admin; incoming webhook creation, secret rotation, take-over and deletion) work like this:
 the first returns a preview and a confirm_token; show the preview to the user, and only after the user agrees call the tool again with the same arguments plus confirm_token.`

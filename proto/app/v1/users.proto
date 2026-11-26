@@ -38,24 +38,6 @@ service UsersService {
   // The language the caller's app shows; the assistant bot writes to the
   // caller in it. Apps send it at every start and when the user changes it.
   rpc SetLocale(SetLocaleRequest) returns (SetLocaleResponse);
-
-  // People (ADR 0025): the caller's own grouping of users that are the same
-  // person on several apps (a Chat account and the contacts of other apps
-  // synced with the bridge). Everything is scoped to the caller; a user the
-  // caller has no private chat with is NotFound, the same as an unknown one.
-  // The caller's people and the users in each.
-  rpc ListPeople(ListPeopleRequest) returns (ListPeopleResponse);
-  // Joins two or more users into one person; users already in different
-  // people merge those people into one.
-  rpc LinkUsers(LinkUsersRequest) returns (LinkUsersResponse);
-  // Takes a user out of their person; a person left with one user is removed.
-  rpc UnlinkUser(UnlinkUserRequest) returns (UnlinkUserResponse);
-  // Pairs that may be the same person, computed when asked and never linked
-  // automatically.
-  rpc ListLinkSuggestions(ListLinkSuggestionsRequest) returns (ListLinkSuggestionsResponse);
-  // The caller says two users are not the same person; the pair is not
-  // suggested again.
-  rpc RejectLinkSuggestion(RejectLinkSuggestionRequest) returns (RejectLinkSuggestionResponse);
 }
 
 // Presence as visible to the caller after privacy rules are applied.
@@ -339,80 +321,3 @@ message SetLocaleRequest {
 }
 
 message SetLocaleResponse {}
-
-// One identity of a person: a user of Chat or of another app, with the
-// private chat the caller has with them.
-message PersonMember {
-  int64 user_id = 1 [jstype = JS_NUMBER];
-  // The user's name now (it can change after the link).
-  string name = 2;
-  // The app the user belongs to: "telegram", ...; empty for a Chat account.
-  string app = 3;
-  // The caller's private chat with this user.
-  int64 chat_id = 4 [jstype = JS_NUMBER];
-}
-
-message Person {
-  int64 id = 1 [jstype = JS_NUMBER];
-  // Fixed when the link is made (the name of the Chat account if one is
-  // linked, else the name of the first user); it does not follow later
-  // renames and cannot be edited.
-  string name = 2;
-  // At least two users, oldest link first.
-  repeated PersonMember members = 3;
-}
-
-message ListPeopleRequest {}
-
-message ListPeopleResponse {
-  repeated Person people = 1;
-}
-
-message LinkUsersRequest {
-  // Two to 20 distinct users, none of them the caller.
-  repeated int64 user_ids = 1 [jstype = JS_NUMBER];
-}
-
-message LinkUsersResponse {
-  Person person = 1;
-}
-
-message UnlinkUserRequest {
-  int64 user_id = 1 [jstype = JS_NUMBER];
-}
-
-message UnlinkUserResponse {}
-
-enum LinkSuggestionReason {
-  LINK_SUGGESTION_REASON_UNSPECIFIED = 0;
-  // The two names are equal after folding case, accents and spaces. Weak:
-  // the app shows it as «same name, not verified».
-  LINK_SUGGESTION_REASON_NAME = 1;
-  // The other apps show the same phone number for both (only a keyed hash of
-  // it is kept on the server, never sent). Strong, yet still only a
-  // suggestion: nothing is linked until the owner confirms. Listed before the
-  // name suggestions; a pair that matches both is suggested once, by phone.
-  LINK_SUGGESTION_REASON_PHONE = 2;
-}
-
-message LinkSuggestion {
-  PersonMember first = 1;
-  PersonMember second = 2;
-  LinkSuggestionReason reason = 3;
-}
-
-message ListLinkSuggestionsRequest {
-  // When set, only the suggestions that involve this user.
-  int64 user_id = 1 [jstype = JS_NUMBER];
-}
-
-message ListLinkSuggestionsResponse {
-  repeated LinkSuggestion suggestions = 1;
-}
-
-message RejectLinkSuggestionRequest {
-  int64 user_a = 1 [jstype = JS_NUMBER];
-  int64 user_b = 2 [jstype = JS_NUMBER];
-}
-
-message RejectLinkSuggestionResponse {}

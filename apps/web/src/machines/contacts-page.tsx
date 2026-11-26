@@ -1,6 +1,5 @@
-// «Liên hệ» of AI Agent: the people and groups of Chat (linked people as one
-// row over all their one-to-one chats, any other one-to-one chat, groups),
-// searchable. Each row opens the chat's own session on the machine (the
+// «Liên hệ» of AI Agent: the people and groups of Chat (each one-to-one
+// chat and each group a row of its own), searchable. Each row opens the chat's own session on the machine (the
 // session of the conversation's AI panel), opens it with the composer ready
 // for a message to that person («Nhắn nhanh»), and turns on whether the
 // chat's new messages go into that session («Đẩy tin vào phiên», tunelo
@@ -14,7 +13,6 @@ import { advisorStore } from "../advisor/advisor-store.ts";
 import { brand } from "../brand.ts";
 import { appName } from "../messaging/data/format.ts";
 import { useDialogOrder, useServices } from "../messaging/data/services.tsx";
-import { usePeople } from "../messaging/people/people-store.ts";
 import { ChatAvatar, Switch } from "../messaging/ui/parts.tsx";
 import { CONTEXT_ONLY, chatContext, chatThread, createChatThread, pickTarget, rememberMachine, rememberedMachine } from "../messaging/ui/use-chat-ai.ts";
 import { Link, navigate, paths } from "../router.tsx";
@@ -57,7 +55,6 @@ export default function ContactsPage() {
 	const c = t.contacts;
 	const { store, self } = useServices();
 	const order = useDialogOrder();
-	const [, people] = usePeople(null);
 	const hub = useHub();
 	const views = useMachineViews(hub, useNow());
 	const [picked, setPicked] = useState(() => rememberedMachine(self.id));
@@ -66,7 +63,7 @@ export default function ContactsPage() {
 	const [query, setQuery] = useState("");
 	const searchId = useId();
 
-	const rows = useMemo(() => contactRows(order, (id) => store.dialog(id), people.people, self.id), [order, store, people.people, self.id]);
+	const rows = useMemo(() => contactRows(order, (id) => store.dialog(id), self.id), [order, store, self.id]);
 	const shown = matchRows(rows, query);
 	const info = target?.state.info ?? null;
 	const online = target !== null && target.conn.kind === "on" && info !== null;
@@ -190,7 +187,7 @@ function ContactItem({ row, items, target, abilities, t }: { row: ContactRow; it
 	};
 
 	/**
-	 * The row's session on the machine, then shown: the session one of its chats has (a person's newest chat first),
+	 * The row's session on the machine, then shown: the session one of its chats has,
 	 * else one opened for its newest chat with that chat's context.
 	 */
 	const openSession = async (quick: boolean) => {

@@ -9,12 +9,19 @@ lint:
 breaking:
   use:
     - FILE
-  # The per-account Zalo send switch is removed on purpose: Zalo is two-way on connect, like Telegram.
-  # Drop these entries once the release that removes it is the baseline.
+  # Removed on purpose: the per-account Zalo send switch (Zalo is two-way on connect, like Telegram) and
+  # People (linking users into one person, ADR 0025). Drop these entries once the release that removes
+  # them is the baseline.
   ignore_only:
     FIELD_NO_DELETE:
       - app/v1/bridge.proto
+      - app/v1/updates.proto
     MESSAGE_NO_DELETE:
       - app/v1/bridge.proto
+      - app/v1/updates.proto
+      - app/v1/users.proto
     RPC_NO_DELETE:
       - app/v1/bridge.proto
+      - app/v1/users.proto
+    ENUM_NO_DELETE:
+      - app/v1/users.proto

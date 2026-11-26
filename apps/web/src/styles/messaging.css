@@ -633,25 +633,6 @@ aside.info { display: flex; flex-direction: column; min-width: 0; overflow-y: au
 .app .contact-main { overflow-y: auto; }
 .contact-main > .empty { margin: auto; }
 
-/* ---------- People: the same person on several apps ---------- */
-.identities-list, .link-suggestions { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
-.identity { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
-.identity-name { font-weight: 500; overflow-wrap: anywhere; }
-.identities { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
-.identity-row .btn, .suggestion-actions .btn { flex: none; }
-/* The suggestion's buttons drop under the names when the column is narrow. */
-.link-suggestion { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) 0; }
-.link-suggestion .grow { flex: 1 1 160px; min-width: 0; }
-.link-suggestion small { display: flex; align-items: center; gap: var(--space-1); margin-top: 2px; color: var(--c-text-muted); font-size: 0.8125rem; }
-.suggestion-actions { display: flex; gap: var(--space-2); margin-left: auto; }
-.people-sec .banner { border-radius: var(--radius-sm); border-bottom: 0; }
-.contacts-suggestions { flex: none; max-height: 40%; overflow-y: auto; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--c-border-subtle); }
-.contacts-suggestions h3 { margin: 0 0 var(--space-1); font-size: 0.8125rem; font-weight: 600; color: var(--c-text-muted); }
-.contacts-suggestions .note { margin: 0; font-size: 0.8125rem; color: var(--c-text-muted); }
-/* Only the candidates scroll; the title, intro and search stay put. */
-.link-picker .pick-list { list-style: none; margin: 0; padding: 0; max-height: min(420px, 50dvh); overflow-y: auto; }
-.pick-row { width: 100%; background: none; color: inherit; text-align: left; font: inherit; }
-.pick-row:hover { background: var(--c-hover); }
 .contact-card { position: relative; width: min(480px, calc(100% - 2 * var(--space-4))); margin: var(--space-6) auto; border-radius: var(--radius-lg); border: 1px solid var(--c-border-subtle); background: var(--c-surface); }
 .contact-card .info-hero { border-bottom: 0; padding-bottom: var(--space-2); }
 .contact-card .profile-actions { padding: 0 var(--space-4) var(--space-4); border-bottom: 1px solid var(--c-border-subtle); }
@@ -1210,10 +1191,3 @@ dialog.modal.ai-sheet[open] { display: flex; flex-direction: column; height: 92d
 /* A settings row that opens another settings screen (privacy › notification preview). */
 a.row.row-link { display: flex; padding: 0 var(--space-4); color: inherit; text-decoration: none; }
 .row-link:hover { background: var(--c-hover); }
-
-/* A person's merged timeline (people/person-screen.tsx): the app each message came through, in words by its time. */
-.stamp .msg-app { margin-right: var(--space-1); font-weight: 600; }
-/* The person's identities under the header: each one opens its own chat. */
-.person-ids { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--c-surface); border-bottom: 1px solid var(--c-border-subtle); }
-.person-ids .person-id { border: 0; cursor: pointer; padding: 2px var(--space-2); font: inherit; font-size: 0.75rem; font-weight: 600; }
-.person-ids .person-id:hover { background: var(--c-hover); color: var(--c-text); }

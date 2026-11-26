@@ -59,7 +59,7 @@ func Normalize(raw string) (string, bool) {
 	return "+" + d, true
 }
 
-// Hasher turns a phone number into what the phone_hmac columns keep: HMAC-SHA256 of its E.164
+// Hasher turns a phone number into what users.phone_hmac keeps: HMAC-SHA256 of its E.164
 // form under a key that is not in the database. A nil Hasher (no key configured) keeps nothing.
 type Hasher struct {
 	key []byte

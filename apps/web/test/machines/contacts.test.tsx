@@ -1,7 +1,6 @@
-// AI Agent › Liên hệ: a person linked across apps is one row over all of
-// their one-to-one chats, groups are rows of their own; «Đẩy tin vào phiên»
-// sends one ChatInboxSet per chat of the row and the row says what the
-// machine reports (also when it pushes a new state); a machine before
+// AI Agent › Liên hệ: each one-to-one chat and each group is a row of its
+// own; «Đẩy tin vào phiên» sends one ChatInboxSet per chat of the row and the
+// row says what the machine reports (also when it pushes a new state); a machine before
 // tunelo 3.28.0 gets a note and no request; «Mở phiên» opens or finds the
 // chat's session, «Nhắn nhanh» opens it with the composer ready.
 import { ChatInboxItemState, LoginState, ThreadState, type ChatInboxItem, type ChatInboxSet, type ThreadCreate, type ThreadSummary } from "@achoo254/chat-proto/remote/remote";
@@ -67,28 +66,33 @@ describe("the rows of Liên hệ", () => {
 		[16, view({ id: 16, type: "channel", title: "Tin tức" })],
 		[17, view({ id: 17, type: "private", app: "zalo", peer: { id: 5, name: "Bình" } })],
 	]);
-	const people = [{ id: 7, name: "Lan", members: [{ userId: 2, name: "Lan", app: "", chatId: 11 }, { userId: 3, name: "Lan Telegram", app: "telegram", chatId: 13 }] }];
 
-	it("folds a person across apps into one row, keeps groups and other one-to-one chats, leaves bots, channels and the user out", () => {
-		const rows = contactRows([13, 12, 11, 14, 15, 16, 17], (id) => views.get(id), people, 1);
+	it("makes each one-to-one chat and each group a row of its own, leaving bots, channels and the user out", () => {
+		const rows = contactRows([13, 12, 11, 14, 15, 16, 17], (id) => views.get(id), 1);
 		expect(rows.map((r) => [r.key, r.name, r.chats.map((c) => [c.chatId, c.app, c.hiddenFromAi])])).toEqual([
-			["p7", "Lan", [[13, "telegram", true], [11, "", false]]],
+			["c13", "Lan Telegram", [[13, "telegram", true]]],
 			["c12", "Nhóm dự án", [[12, "telegram", false]]],
+			["c11", "Lan", [[11, "", false]]],
 			["c17", "Bình", [[17, "zalo", false]]],
 		]);
 		expect(rows[1]?.group).toBe(true);
 	});
 
-	it("turns a person on with one ChatInboxSet per one-to-one chat", () => {
-		const [lan] = contactRows([11, 13], (id) => views.get(id), people, 1);
-		expect(inboxSets(lan as ContactRow, true, 20)).toEqual([
-			{ chatId: 11n, title: "Lan", app: "", enabled: true, perHourLimit: 20 },
-			{ chatId: 13n, title: "Lan Telegram", app: "telegram", enabled: true, perHourLimit: 20 },
-		]);
+	it("turns a one-to-one chat on with one ChatInboxSet", () => {
+		const [lan] = contactRows([11], (id) => views.get(id), 1);
+		expect(inboxSets(lan as ContactRow, true, 20)).toEqual([{ chatId: 11n, title: "Lan", app: "", enabled: true, perHourLimit: 20 }]);
 	});
 
 	it("says what the machine reports, the worst of a row's chats first", () => {
-		const [lan] = contactRows([11, 13], (id) => views.get(id), people, 1) as [ContactRow];
+		const lan: ContactRow = {
+			key: "c11",
+			name: "Lan",
+			group: false,
+			chats: [
+				{ chatId: 11, app: "", title: "Lan", hiddenFromAi: false },
+				{ chatId: 13, app: "telegram", title: "Lan Telegram", hiddenFromAi: false },
+			],
+		};
 		const item = (chatId: bigint, fields: Partial<Omit<ChatInboxItem, "$typeName">>) => create(ChatInboxItemSchema, { chatId, enabled: true, perHourLimit: 20, state: ChatInboxItemState.ACTIVE, ...fields });
 		const text = (items: ChatInboxItem[]) => statusText(viMachines, rowStatus(lan, items));
 		expect(text([])).toBe("");
@@ -182,7 +186,6 @@ describe("Liên hệ against a machine", () => {
 		fixture.send(lan, lanChat, "chào");
 		fixture.send(lanTelegram, lanTelegramChat, "chào từ Telegram");
 		fixture.send(lan, group, "họp nhé");
-		fixture.people.link([lan, lanTelegram]);
 		return { fixture, lanChat, lanTelegramChat, group };
 	}
 
@@ -198,13 +201,14 @@ describe("Liên hệ against a machine", () => {
 
 	const rowOf = async (name: string) => (await screen.findByText(name, { selector: ".mx-contact-name b" }, LONG)).closest("li") as HTMLElement;
 
-	it("lists Lan once with both apps, turns her on with one request per chat, and follows what the machine pushes", async () => {
-		const { fixture, lanChat, lanTelegramChat } = setup();
+	it("lists each chat of Lan as its own row, turns one on with one request, and follows what the machine pushes", async () => {
+		const { fixture, lanChat } = setup();
 		const { machines, sets, push } = await withMachine();
 		renderAt(fixture, machines, "/ai/contacts");
 		const lan = await rowOf("Lan");
-		expect(within(lan).getByText("Telegram")).toBeTruthy();
 		expect(within(lan).getByText("Chat")).toBeTruthy();
+		expect(within(lan).queryByText("Telegram")).toBeNull();
+		expect(within(await rowOf("Lan Telegram")).getByText("Telegram")).toBeTruthy();
 		expect(await rowOf("Nhóm dự án")).toBeTruthy();
 		const toggle = within(lan).getByRole("switch", { name: "Đẩy tin của Lan vào phiên" });
 		// Both labels are drawn (CSS shows one by width); the switch keeps the full name.
@@ -212,15 +216,14 @@ describe("Liên hệ against a machine", () => {
 		expect(within(lan).getByText("Đẩy tin")).toBeTruthy();
 		await waitFor(() => expect((toggle as HTMLButtonElement).disabled).toBe(false), LONG);
 		await userEvent.click(toggle);
-		await waitFor(() => expect(sets).toHaveLength(2), LONG);
-		expect(sets.map((s) => [Number(s.chatId), s.enabled, s.perHourLimit]).sort()).toEqual([[lanChat, true, 20], [lanTelegramChat, true, 20]].sort());
+		await waitFor(() => expect(sets).toHaveLength(1), LONG);
+		expect(sets.map((s) => [Number(s.chatId), s.enabled, s.perHourLimit])).toEqual([[lanChat, true, 20]]);
 		await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"), LONG);
 		expect(within(lan).getByRole("combobox", { name: "Giới hạn lượt mỗi giờ" })).toBeTruthy();
 		expect(await within(lan).findByText("Đang đẩy · 0 lượt trong giờ qua", {}, LONG)).toBeTruthy();
 
 		push([
 			create(ChatInboxItemSchema, { chatId: BigInt(lanChat), enabled: true, perHourLimit: 20, state: ChatInboxItemState.LIMITED, missed: 4 }),
-			create(ChatInboxItemSchema, { chatId: BigInt(lanTelegramChat), enabled: true, perHourLimit: 20, state: ChatInboxItemState.ACTIVE, deliveredLastHour: 20 }),
 		]);
 		expect(await within(lan).findByText("Hết lượt trong giờ · bỏ lỡ 4 tin", {}, LONG)).toBeTruthy();
 	});
