@@ -140,6 +140,7 @@ export function sessionState(row: SessionRow | undefined, totals: SessionTotals,
             mainModel: live.mainModel,
             running: live.running.map((r) => ({ station: r.station, count: u32(r.count) })),
             openBottlenecks: u32(live.openBottlenecks),
+            subagents: live.subagents,
           }),
         }
       : {}),

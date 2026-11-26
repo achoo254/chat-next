@@ -296,6 +296,7 @@ describe("the Live Map state", () => {
 			mainModel: "claude-sonnet-5-5",
 			running: [{ station: "FILES", count: 1 }],
 			openBottlenecks: 0,
+			subagents: [],
 		};
 		const s = fromSnapshot(snapshot([], { info: null, live: liveState }));
 		expect(s.live?.contextWindowAssumed).toBe(true);

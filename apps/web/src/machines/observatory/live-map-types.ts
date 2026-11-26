@@ -55,6 +55,8 @@ export interface LiveMapLiveState {
 	/** Tool calls running now, by station code as sent. */
 	readonly running: readonly { readonly station: string; readonly count: number }[];
 	readonly openBottlenecks: number;
+	/** Subagents started and not stopped in the whole session (tunelo 3.30.0+; empty before), however old their start. */
+	readonly subagents: readonly { readonly agentId: string; readonly agentType: string }[];
 }
 
 /** A bottleneck finding (section 6.4). */
@@ -255,6 +257,7 @@ export function liveStateFromWire(live: ObservatoryLiveState): LiveMapLiveState 
 		mainModel: live.mainModel,
 		running: live.running.map((r) => ({ station: r.station, count: r.count })),
 		openBottlenecks: live.openBottlenecks,
+		subagents: live.subagents.map((s) => ({ agentId: s.agentId, agentType: s.agentType })),
 	};
 }
 

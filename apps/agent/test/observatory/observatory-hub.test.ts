@@ -175,19 +175,26 @@ describe("events", () => {
     if (state?.case !== "session") throw new Error("no session event");
     expect(state.value.totals).toMatchObject({ prompts: 1, toolCalls: 2, toolFailures: 1, subagents: 1, apiRequests: 1, gitOps: 1, hasCost: true, costUsdEstimate: 0.25 });
     expect(state.value.info?.source).toBeGreaterThan(0);
+    expect(state.value.live?.subagents.map((x) => x.agentId)).toEqual(["s-a1"]);
 
     // The same rows again: nothing changed, nothing sent.
     write(sessionOps("s", T));
     await wait(40);
     expect(a.events()).toHaveLength(first.length);
 
-    // The subagent ended: its event again, same id, and the totals do not change.
+    // The subagent ended: its event again, same id, the totals unchanged, and the live state without it.
     write([{ kind: "subagent", row: { sessionId: "s", agentId: "s-a1", startedAt: T + 4, endedAt: T + 50, toolCount: 3 } }]);
     await wait(40);
     const update = a.events().slice(first.length);
-    expect(update.map((e) => [Number(e.seq), e.id])).toEqual([[first.length + 1, "subagent:s-a1"]]);
+    expect(update.map((e) => [Number(e.seq), e.kind.case])).toEqual([
+      [first.length + 1, "subagent"],
+      [first.length + 2, "session"],
+    ]);
+    expect(update[0]?.id).toBe("subagent:s-a1");
     const sub = update[0]?.kind;
     expect(sub?.case === "subagent" ? [sub.value.endedAt, sub.value.toolCount] : undefined).toEqual([BigInt(T + 50), 3]);
+    const after = update[1]?.kind;
+    expect(after?.case === "session" ? [after.value.live?.subagents, after.value.totals?.subagents] : undefined).toEqual([[], 1]);
   });
 
   it("leave a gap a device answers by watching again: the snapshot holds what it missed and the next events follow it", async () => {

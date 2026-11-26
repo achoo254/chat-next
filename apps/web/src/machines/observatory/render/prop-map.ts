@@ -292,7 +292,12 @@ export function lookOf(state: LiveMapState, scene: SceneTable, now?: number, dim
 		if (dimOthers && mode !== "idle" && !involved.has(id) && !active) presence *= 0.45;
 		places[id] = { presence, active, involved: involved.has(id), used, bottleneck: st?.bottleneck ?? "none" };
 	}
-	const subagents = Object.values(state.scene.subagents).filter((s) => s.running);
+	// The scene's running subagents, then those the machine's live state still runs whose start is older than the events held.
+	const seen = state.scene.subagents;
+	const subagents = [
+		...Object.values(seen).filter((s) => s.running),
+		...(state.live?.subagents ?? []).filter((s) => seen[s.agentId] === undefined),
+	];
 	const drones = subagents.map((s, slot): DroneLook => ({ agentId: s.agentId, agentType: s.agentType, slot }));
 	const newest = state.log[state.log.length - 1];
 	return {

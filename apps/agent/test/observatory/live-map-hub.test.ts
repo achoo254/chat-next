@@ -162,6 +162,26 @@ describe("the live state of a session longer than its window", () => {
     expect(json(live)).toBe(json(wholeSession(store, "s")));
   });
 
+  it("still lists a subagent running since before its newest 200 events, though a newer one already stopped", async () => {
+    const { hub, write, store } = await setup();
+    const ops: WriteOp[] = [
+      session("s", T, { mainModel: "claude-opus-5-5" }),
+      { kind: "prompt", row: { promptId: "p1", sessionId: "s", at: T + 1 } },
+      { kind: "subagent", row: { sessionId: "s", agentId: "long", agentType: "fork", startedAt: T + 2 } },
+      // Claude Code's own helpers: only a stop, at once, and no type.
+      { kind: "subagent", row: { sessionId: "s", agentId: "helper", startedAt: T + 3, endedAt: T + 3 } },
+      // The main turn waits for the background agent.
+      { kind: "sessionEvent", row: { dedupeKey: "stop1", sessionId: "s", at: T + 4, kind: "stop", station: "CORE" } },
+    ];
+    // The subagent thinks for long: only its API requests, not the main thread's.
+    for (let i = 0; i < 250; i++) ops.push({ kind: "apiRequest", row: { dedupeKey: `long-r${i}`, sessionId: "s", at: T + 10 + i, agentId: "long", model: "claude-opus-5-5", inputTokens: 900, outputTokens: 10, durationMs: 300 } });
+    write(ops);
+    const live = hub.watch("s", recorder().sink).session?.live;
+    expect(live?.subagents).toEqual([expect.objectContaining({ agentId: "long", agentType: "fork" })]);
+    expect(live?.core).toBe(ObservatoryCoreState.THINKING);
+    expect(json(live)).toBe(json(wholeSession(store, "s")));
+  });
+
   it.each([1, 2, 3, 4, 5])("matches the whole session's on a random long session (seed %i)", async (seed) => {
     const { hub, write, store } = await setup();
     let x = seed * 7_919;

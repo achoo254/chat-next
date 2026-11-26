@@ -4597,6 +4597,16 @@ message ObservatoryLiveState {
   repeated ObservatoryStationCount running = 8;
   // Bottleneck findings open now.
   uint32 open_bottlenecks = 9;
+  // tunelo 3.30.0+: subagents started and not stopped, by id; none once the
+  // session ended. A device draws them even when their start is older than
+  // the events it holds.
+  repeated ObservatoryRunningSubagent subagents = 10;
+}
+
+message ObservatoryRunningSubagent {
+  string agent_id = 1;
+  // As the subagent's start told it; empty when not told.
+  string agent_type = 2;
 }
 
 enum ObservatoryCoreState {

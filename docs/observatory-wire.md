@@ -196,10 +196,12 @@ chụp kế tiếp. Lịch sử tua lại của thiết bị giữ những gì c
 ### 6.3 Trạng thái sống (`ObservatoryLiveState`)
 
 `{core=1, tokens_per_second=2, context_percent=3, context_tokens=4, context_window=5, context_window_assumed=6, main_model=7, running=8
-(ObservatoryStationCount {station, count}), open_bottlenecks=9}`. Agent tính bằng hàm thuần `hub/live-state.ts` trên 200 sự kiện mới nhất (cả sự kiện
+(ObservatoryStationCount {station, count}), open_bottlenecks=9, subagents=10 (ObservatoryRunningSubagent {agent_id, agent_type}, tunelo 3.30.0+)}`. Agent tính bằng hàm thuần `hub/live-state.ts` trên 200 sự kiện mới nhất (cả sự kiện
 tạm), đặt sau các dòng cũ hơn vẫn còn ảnh hưởng tới kết quả (`store/live-map-reads.ts` `readLiveCarry`): dòng mới nhất của mỗi loại đặt trạng thái lõi, lần
-kết thúc lượt mới nhất, các lời gọi tool chưa kết thúc kể từ đó (tối đa 200, mới nhất) cùng sự kiện báo chúng không chạy, và lượt API mới nhất của luồng chính
-(cả lượt mới nhất có tốc độ). Nhờ vậy kết quả bằng kết quả tính trên toàn bộ phiên, kể cả khi một lời gọi dài bắt đầu trước 200 sự kiện gần nhất. Thiết bị tua
+kết thúc lượt mới nhất, các subagent chưa dừng (tối đa 200, mới nhất), các lời gọi tool chưa kết thúc kể từ đó (tối đa 200, mới nhất) cùng sự kiện báo chúng không
+chạy, và lượt API mới nhất của luồng chính (cả lượt mới nhất có tốc độ). Nhờ vậy kết quả bằng kết quả tính trên toàn bộ phiên, kể cả khi một lời gọi dài hay một
+subagent chạy lâu bắt đầu trước 200 sự kiện gần nhất. `subagents` là các subagent đã bắt đầu, chưa dừng (rỗng khi phiên đã kết thúc): Live Map vẽ chúng quanh
+model kể cả khi sự kiện bắt đầu không còn trong các sự kiện thiết bị giữ. Thiết bị tua
 lại áp **cùng quy tắc** lên các sự kiện tới mốc thì ra cùng kết quả. Chỉ `open_bottlenecks` và ngữ cảnh lớn nhất của phiên
 được đọc thêm từ DB (có thể cũ hơn 200 sự kiện); khi tua, thiết bị lấy từ sự kiện `bottleneck` (mở khi `opened_at ≤ mốc` và chưa `closed_at ≤ mốc`).
 

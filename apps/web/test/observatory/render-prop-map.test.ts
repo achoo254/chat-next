@@ -114,6 +114,20 @@ describe("the activity and the look", () => {
 		expect(job?.agentId).toBe("ag");
 	});
 
+	it("keeps the drone of a subagent the machine still runs though its start is older than the events held", () => {
+		const { state } = played([prompt(1, 0), subagent("ag", 5)]);
+		const live = { core: "thinking" as const, tokensPerSecond: null, contextPercent: null, contextTokens: 0, contextWindow: 0, contextWindowAssumed: false, mainModel: "", running: [], openBottlenecks: 0 };
+		const withLive = { ...state, live: { ...live, subagents: [{ agentId: "ag", agentType: "Explore" }, { agentId: "old", agentType: "fork" }] } };
+		// The scene's own subagent once, then the one only the live state knows.
+		expect(lookOf(withLive, scene).drones).toEqual([
+			{ agentId: "ag", agentType: "Explore", slot: 0 },
+			{ agentId: "old", agentType: "fork", slot: 1 },
+		]);
+		// A subagent the scene saw stop stays stopped, whatever an older live state says.
+		const { state: stopped } = played([prompt(1, 0), subagent("ag", 5), subagent("ag", 9, 9)]);
+		expect(lookOf({ ...stopped, live: { ...live, subagents: [{ agentId: "ag", agentType: "Explore" }] } }, scene).drones).toEqual([]);
+	});
+
 	it("names the event the model thinks for, and is the same look for the same state", () => {
 		const { state } = played([prompt(1, 0)]);
 		expect(lookOf(state, scene).thinkingFor).toBe("prompt:p1");

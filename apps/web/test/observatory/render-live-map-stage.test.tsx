@@ -78,6 +78,7 @@ const live = (over: Partial<LiveMapLiveState>): LiveMapLiveState => ({
 	mainModel: "claude-opus-4",
 	running: [],
 	openBottlenecks: 0,
+	subagents: [],
 	...over,
 });
 

@@ -136,7 +136,9 @@ const MAIN_THREAD = "agent_id IS NULL OR agent_id = ''";
  * events its live state is worked out from) that still change that state,
  * oldest first: the newest row of each kind that sets the core's state, the
  * newest turn end (a stop, an idle prompt, a tool call ended
- * `interruptedError`), the tool calls not ended since it (the newest `limit`)
+ * `interruptedError`), the subagents not stopped (the newest `limit`: a
+ * subagent runs for long, and the newest subagent row is often another one
+ * that already stopped), the tool calls not ended since it (the newest `limit`)
  * with the events that say they never ran, and the main thread's newest API
  * request and newest one with a speed. Folded before the newest events
  * (hub/live-state.ts), they give the state the whole session gives: the
@@ -155,7 +157,7 @@ export function readLiveCarry(db: SqliteConnection, sessionId: string, before: T
   const notRun = chunks(ids).flatMap((part) => newestOfKind(db, "sessionEvent", sessionId, before, part.length, { where: `kind IN ('permission_denied', 'hook_block') AND tool_use_id IN (${inList(part.length)})`, params: part }));
   const rows = [
     ...newest("prompt"),
-    ...newest("subagent"),
+    ...newestOfKind(db, "subagent", sessionId, before, limit, { where: "ended_at IS NULL OR ended_at = 0", params: [] }),
     ...newest("toolCall"),
     ...newest("sessionEvent", CORE_EVENTS),
     ...newest("apiRequest", { where: MAIN_THREAD, params: [] }),

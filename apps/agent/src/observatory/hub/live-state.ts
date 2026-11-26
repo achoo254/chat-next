@@ -46,6 +46,8 @@ export type LiveState = {
   /** Tool calls running now, by station, the stations in name order. */
   running: { station: Station | string; count: number }[];
   openBottlenecks: number;
+  /** Subagents started and not stopped, by id; none once the session ended. */
+  subagents: { agentId: string; agentType: string }[];
 };
 
 export type LiveInput = {
@@ -76,8 +78,8 @@ export function liveStateOf(input: LiveInput): LiveState {
   let lastTimed: Extract<TimelineEntry, { kind: "apiRequest" }>["row"] | undefined;
   let largest = input.largestContext;
   let lastAt = 0;
-  /** Subagents that started and have not stopped. */
-  const runningSubagents = new Set<string>();
+  /** Subagents that started and have not stopped: id → type ("" when not told). */
+  const runningSubagents = new Map<string, string>();
   /** Shell calls started in the background and not known to have ended. */
   const backgroundShells = new Set<string>();
 
@@ -100,7 +102,7 @@ export function liveStateOf(input: LiveInput): LiveState {
         break;
       case "subagent":
         active();
-        if (e.row.endedAt === null || e.row.endedAt === 0) runningSubagents.add(e.row.agentId);
+        if (e.row.endedAt === null || e.row.endedAt === 0) runningSubagents.set(e.row.agentId, e.row.agentType ?? "");
         else runningSubagents.delete(e.row.agentId);
         break;
       case "toolCall":
@@ -161,7 +163,8 @@ export function liveStateOf(input: LiveInput): LiveState {
     }
   }
   if (core === "waiting_user" && (runningSubagents.size > 0 || backgroundShells.size > 0)) core = "thinking";
-  if (input.endedAt !== null && input.endedAt >= lastAt) endTurn("idle");
+  const ended = input.endedAt !== null && input.endedAt >= lastAt;
+  if (ended) endTurn("idle");
 
   const mainModel = lastApi?.model ?? input.mainModel ?? "";
   const window = contextWindowOf(mainModel, largest);
@@ -178,6 +181,7 @@ export function liveStateOf(input: LiveInput): LiveState {
     mainModel,
     running: [...byStation].sort(([a], [b]) => (a < b ? -1 : 1)).map(([station, count]) => ({ station, count })),
     openBottlenecks: input.openBottlenecks,
+    subagents: ended ? [] : [...runningSubagents].sort(([a], [b]) => (a < b ? -1 : 1)).map(([agentId, agentType]) => ({ agentId, agentType })),
   };
 }
 
