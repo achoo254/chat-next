@@ -5,6 +5,8 @@
 // reloads once, which loads the current build. A second failure within
 // RELOAD_GUARD_MS does not reload again (the new build itself may be broken
 // or the network down): the splash shows a message and a reload button.
+// Any other error that unmounts the app shows the same notice, without an
+// automatic reload (the app never reloads by itself for anything else).
 
 /** A failure within this time of the last automatic reload shows the notice instead. */
 export const RELOAD_GUARD_MS = 60_000;
@@ -53,16 +55,19 @@ export function reloadForNewBuild(now = Date.now(), storage: Storage | undefined
 	return true;
 }
 
-// The notice is written before React or the copy of the UI language may be
-// available (the app just failed to load), so its few words live here.
-const NOTICE: Record<string, { text: string; reload: string }> = {
-	vi: { text: "Không tải được phần mới của ứng dụng.", reload: "Tải lại" },
-	en: { text: "Couldn't load the new version of the app.", reload: "Reload" },
-	zh: { text: "无法加载应用的新版本。", reload: "重新加载" },
+// The notice is written after React has unmounted the app, when the copy of
+// the UI language may not be loaded, so its few words live here.
+// chunk: a lazy part of the app could not be loaded twice in a row; crash: any
+// other error that reached the top and unmounted the app.
+export type NoticeKind = "chunk" | "crash";
+const NOTICE: Record<string, { chunk: string; crash: string; reload: string }> = {
+	vi: { chunk: "Không tải được phần mới của ứng dụng.", crash: "Ứng dụng gặp lỗi và đã dừng.", reload: "Tải lại" },
+	en: { chunk: "Couldn't load the new version of the app.", crash: "Something went wrong and the app stopped.", reload: "Reload" },
+	zh: { chunk: "无法加载应用的新版本。", crash: "应用出错，已停止运行。", reload: "重新加载" },
 };
 
-/** Turns the page splash into a message with a reload button (the guard stopped an automatic reload). */
-export function showReloadNotice(doc: Document = document): void {
+/** Turns the page splash, which shows again once the app is unmounted, into a message with a reload button. */
+export function showReloadNotice(kind: NoticeKind = "chunk", doc: Document = document): void {
 	const splash = doc.getElementById("splash");
 	if (splash === null) return;
 	const lang = doc.documentElement.lang.slice(0, 2).toLowerCase();
@@ -71,7 +76,7 @@ export function showReloadNotice(doc: Document = document): void {
 	splash.setAttribute("aria-busy", "false");
 	splash.classList.add("reload-notice");
 	const text = splash.querySelector(".brand-loader-text") ?? splash.appendChild(doc.createElement("p"));
-	text.textContent = words?.text ?? "";
+	text.textContent = words?.[kind] ?? "";
 	if (splash.querySelector("button") !== null) return;
 	const button = doc.createElement("button");
 	button.type = "button";
@@ -84,7 +89,7 @@ export function showReloadNotice(doc: Document = document): void {
 /** Handles a chunk failure that reached the top: reload once, else show the notice. Returns whether it was one. */
 export function recoverFromChunkError(error: unknown): boolean {
 	if (!isChunkLoadError(error)) return false;
-	if (!reloading && !reloadForNewBuild()) showReloadNotice();
+	if (!reloading && !reloadForNewBuild()) showReloadNotice("chunk");
 	return true;
 }
 

@@ -59,20 +59,32 @@ describe("the notice on the splash", () => {
 	it("replaces the loading text with a message and a reload button in the page language", () => {
 		document.documentElement.lang = "vi";
 		document.body.innerHTML = '<div id="splash" class="brand-loader page" aria-busy="true" hidden><p class="brand-loader-text">Đang tải…</p></div>';
-		showReloadNotice();
+		showReloadNotice("chunk");
 		const splash = document.getElementById("splash");
 		expect(splash?.hidden).toBe(false);
 		expect(splash?.getAttribute("aria-busy")).toBe("false");
 		expect(splash?.querySelector(".brand-loader-text")?.textContent).toBe("Không tải được phần mới của ứng dụng.");
 		expect(splash?.querySelector("button")?.textContent).toBe("Tải lại");
-		showReloadNotice();
+		showReloadNotice("chunk");
 		expect(splash?.querySelectorAll("button")).toHaveLength(1);
 	});
 
 	it("speaks English on an English page", () => {
 		document.documentElement.lang = "en";
 		document.body.innerHTML = '<div id="splash"><p class="brand-loader-text"></p></div>';
-		showReloadNotice();
+		showReloadNotice("chunk");
 		expect(document.querySelector("#splash button")?.textContent).toBe("Reload");
+	});
+
+	it("says the app stopped after any other error that unmounted it", () => {
+		document.documentElement.lang = "vi";
+		document.body.innerHTML = '<div id="splash" hidden><p class="brand-loader-text">Đang tải…</p></div>';
+		showReloadNotice("crash");
+		expect(document.querySelector("#splash .brand-loader-text")?.textContent).toBe("Ứng dụng gặp lỗi và đã dừng.");
+		expect(document.querySelector("#splash button")?.textContent).toBe("Tải lại");
+		document.documentElement.lang = "zh-CN";
+		document.body.innerHTML = '<div id="splash"><p class="brand-loader-text"></p></div>';
+		showReloadNotice("crash");
+		expect(document.querySelector("#splash .brand-loader-text")?.textContent).toBe("应用出错，已停止运行。");
 	});
 });

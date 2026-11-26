@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
 import { applyStoredAppearance } from "./appearance.ts";
 import { followSharedTheme } from "./shared-theme.ts";
-import { installChunkReload, recoverFromChunkError } from "./chunk-reload.ts";
+import { installChunkReload, recoverFromChunkError, showReloadNotice } from "./chunk-reload.ts";
 import { installErrorReporter, reportClientError } from "./error-reporter.ts";
 import { captureInstallPrompt } from "./install-prompt.ts";
 import { registerServiceWorker } from "./register-service-worker.ts";
@@ -28,8 +28,9 @@ function render(root: HTMLElement, rpcFetch?: RpcFetch): void {
 		onUncaughtError: (error) => {
 			console.error(error);
 			reportClientError("render", error);
-			// A lazy chunk of a build the server no longer serves: load the current build (chunk-reload.ts).
-			recoverFromChunkError(error);
+			// React has unmounted the app: a lazy chunk of a build the server no longer serves loads the
+			// current build; anything else leaves a reload button instead of the splash (chunk-reload.ts).
+			if (!recoverFromChunkError(error)) showReloadNotice("crash");
 		},
 	}).render(
 		<StrictMode>
