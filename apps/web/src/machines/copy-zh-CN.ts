@@ -84,6 +84,7 @@ export const zhCNMachines: MachinesCopy = {
 			sessionsNote: "电脑 90 天内费用最高的 50 个会话，只显示最近 30 天。",
 			session: (id) => `会话 ${id}`,
 			openRepo: (repo) => `只看 ${repo}`,
+			others: (n) => `其他（${n}）`,
 		},
 		habits: {
 			title: "习惯",

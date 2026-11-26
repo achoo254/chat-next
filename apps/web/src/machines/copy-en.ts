@@ -84,6 +84,7 @@ export const enMachines: MachinesCopy = {
 			sessionsNote: "The machine's 50 costliest sessions of 90 days, kept to the last 30.",
 			session: (id) => `Session ${id}`,
 			openRepo: (repo) => `Show only ${repo}`,
+			others: (n) => `Others (${n})`,
 		},
 		habits: {
 			title: "Habits",

@@ -90,6 +90,7 @@ export const viMachines = {
 			sessionsNote: "Tối đa 50 phiên tốn nhất của máy trong 90 ngày, lọc về 30 ngày.",
 			session: (id: string) => `Phiên ${id}`,
 			openRepo: (repo: string) => `Xem riêng ${repo}`,
+			others: (n: string) => `Khác (${n})`,
 		},
 		habits: {
 			title: "Thói quen",

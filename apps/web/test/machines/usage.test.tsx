@@ -20,7 +20,7 @@ import MachinesScreen from "../../src/machines/machines-screen.tsx";
 import { projectUsagePath, usagePath } from "../../src/machines/usage/usage-paths.ts";
 import { dayOf, reportRange, shiftDay, summarize, usageKeyOf } from "../../src/machines/usage/usage-summary.ts";
 import { usd } from "../../src/machines/usage/usage-format.ts";
-import { OTHER, changeOf, fillsAt, insightsOf, seriesOf } from "../../src/machines/usage/usage-insights.ts";
+import { OTHER, TABLE_ROWS, topRows, changeOf, fillsAt, insightsOf, seriesOf } from "../../src/machines/usage/usage-insights.ts";
 import { ServicesContext, type Services } from "../../src/messaging/data/services.tsx";
 import { machinesServices } from "../support/machines-services.ts";
 import { matchRoute, type MachinesView } from "../../src/router.tsx";
@@ -231,6 +231,16 @@ describe("the usage numbers", () => {
 		expect(s.values[28]).toEqual([6, 5, 4, 3, 3]);
 		// Before tunelo 3.30.0: by repository from the day rows.
 		expect(seriesOf(report(), "", today, "repo", "turns").groups).toEqual(["example.com/other/repo", KEY]);
+	});
+
+	it("keeps a table to its first rows and adds the rest up as one", () => {
+		const rows = Array.from({ length: 13 }, (_, i) => ({ key: `r${i}`, turns: 1, context: 10, cost: 2, share: 1 / 13 }));
+		const { rows: shown, others } = topRows(rows);
+		expect(shown).toHaveLength(TABLE_ROWS + 1);
+		expect(others).toBe(3);
+		expect(shown.at(-1)).toMatchObject({ key: OTHER, turns: 3, context: 30, cost: 6 });
+		expect(shown.at(-1)?.share).toBeCloseTo(3 / 13);
+		expect(topRows(rows.slice(0, 4))).toEqual({ rows: rows.slice(0, 4), others: 0 });
 	});
 
 	it("tells when the 5-hour window fills at the pace of the last 3 hours, only before it resets", () => {

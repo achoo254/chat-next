@@ -105,6 +105,18 @@ export interface Insights {
 	readonly monthStart: number;
 }
 
+/** Rows of a breakdown table; the rest become one OTHER row. */
+export const TABLE_ROWS = 10;
+
+/** `rows` cut to TABLE_ROWS, the rest added up as one OTHER row (its count of groups in `others`). */
+export function topRows(rows: readonly Breakdown[]): { rows: readonly Breakdown[]; others: number } {
+	if (rows.length <= TABLE_ROWS) return { rows, others: 0 };
+	const rest = rows.slice(TABLE_ROWS);
+	const sum = (pick: (b: Breakdown) => number) => rest.reduce((s, b) => s + pick(b), 0);
+	const other: Breakdown = { key: OTHER, turns: sum((b) => b.turns), context: sum((b) => b.context), cost: rest[0]?.cost === null ? null : sum((b) => b.cost ?? 0), share: sum((b) => b.share) };
+	return { rows: [...rows.slice(0, TABLE_ROWS), other], others: rest.length };
+}
+
 /** Sessions shorter than this are left out of the "without a commit" share (a question, a look around). */
 export const MIN_OUTCOME_TURNS = 5;
 

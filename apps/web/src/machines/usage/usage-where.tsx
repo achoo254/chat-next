@@ -8,7 +8,7 @@ import { Link, paths } from "../../router.tsx";
 import { useMachinesCopy } from "../use-machines-copy.ts";
 import { Segmented } from "./usage-chart.tsx";
 import { count, percent, tokens, usd } from "./usage-format.ts";
-import type { Breakdown } from "./usage-insights.ts";
+import { OTHER, topRows, type Breakdown } from "./usage-insights.ts";
 import { usagePath } from "./usage-paths.ts";
 import type { SessionName } from "./usage-session-names.ts";
 
@@ -29,6 +29,7 @@ export function UsageWhere({ machine, repos, models, sessions, names, all, rich 
 	const u = useMachinesCopy().usage;
 	const w = u.where;
 	const [tab, setTab] = useState<Tab>("repos");
+	const shown = topRows(tab === "repos" ? repos : models);
 	const tabs: { key: Tab; label: string }[] = [{ key: "repos", label: w.repos }, ...(rich ? [{ key: "models" as const, label: w.models }, { key: "sessions" as const, label: w.sessions }] : [])];
 	const share = (b: Breakdown) => (
 		<>
@@ -83,10 +84,12 @@ export function UsageWhere({ machine, repos, models, sessions, names, all, rich 
 							</tr>
 						</thead>
 						<tbody>
-							{(tab === "repos" ? repos : models).map((b) => (
+							{shown.rows.map((b) => (
 								<tr key={b.key}>
 									<th scope="row">
-										{tab === "repos" && all ? (
+										{b.key === OTHER ? (
+											w.others(count(u, shown.others))
+										) : tab === "repos" && all ? (
 											<Link to={usagePath(machine, b.key)} title={w.openRepo(b.key)}>
 												{b.key}
 											</Link>
