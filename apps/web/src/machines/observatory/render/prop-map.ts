@@ -355,26 +355,3 @@ export function pathPoint(path: readonly Point[], t: number): Point {
 	return path[path.length - 1] ?? first;
 }
 
-/** The part of a path from its start to `t` (0 to 1) of its length. */
-export function subPath(path: readonly Point[], t: number): Point[] {
-	const first = path[0];
-	if (first === undefined) return [];
-	const { legs, total } = lengths(path);
-	const out: Point[] = [first];
-	let left = Math.max(0, Math.min(1, t)) * total;
-	for (let i = 0; i < legs.length; i++) {
-		const len = legs[i] ?? 0;
-		const a = path[i] ?? first;
-		const b = path[i + 1] ?? a;
-		if (left >= len) {
-			out.push(b);
-			left -= len;
-		} else {
-			const f = len === 0 ? 0 : left / len;
-			out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
-			break;
-		}
-	}
-	return out;
-}
-

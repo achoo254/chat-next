@@ -232,6 +232,13 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		element.scrollTop += moved;
 	}, [window_, keys.length, lastKey, typing, store, chatId, topicId]);
 
+	// The reader went to the newest message by a request (the row clicked again, the to-bottom button):
+	// the position kept from an earlier scroll up is out of date, so the chat does not open back there.
+	const forgetPosition = () => {
+		keptRow.current = null;
+		store.rememberPosition(chatId, topicId, null);
+	};
+
 	// The open chat's row clicked again (as Telegram does): to the newest message,
 	// once the window is live. The token seen at mount is not a request.
 	const seenNewest = useRef<number | null>(null);
@@ -248,7 +255,9 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		pinned.current = false;
 		element.scrollTop = element.scrollHeight;
 		setAtBottom(true);
-	}, [window_]);
+		keptRow.current = null;
+		store.rememberPosition(chatId, topicId, null);
+	}, [window_, store, chatId, topicId]);
 
 	// Leaving the chat: remembered where the reader was unless at the newest message (then it opens at the first unread, or at the newest).
 	const live = useRef(false);
@@ -499,6 +508,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 						onClick={() => {
 							stick.current = true;
 							setAtBottom(true);
+							forgetPosition();
 							if (window_.live) {
 								const element = scroller.current;
 								if (element !== null) element.scrollTop = element.scrollHeight;

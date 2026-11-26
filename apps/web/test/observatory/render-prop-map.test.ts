@@ -13,7 +13,6 @@ import {
 	movesOf,
 	pathPoint,
 	sameLook,
-	subPath,
 } from "../../src/machines/observatory/render/prop-map.ts";
 import type { LiveMapEvent } from "../../src/machines/observatory/live-map-types.ts";
 import { api, bottleneck, lifecycle, prompt, subagent, tool } from "../machines/observatory/live-map-fixtures.ts";
@@ -147,9 +146,5 @@ describe("geometry", () => {
 		expect(pathPoint(path, 0.5)).toEqual([100, 0]);
 		expect(pathPoint(path, 0.75)).toEqual([100, 50]);
 		expect(pathPoint([[0, 0], [30, 40]], 0.5)).toEqual([15, 20]);
-		expect(subPath(path, 0.25)).toEqual([
-			[0, 0],
-			[50, 0],
-		]);
 	});
 });
