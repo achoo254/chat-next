@@ -961,6 +961,8 @@ export class InteriorPainter {
 			const x = x0 + idx * (cw + gap);
 			const st = pipe.steps[k];
 			const col = colourOf(st.status);
+			// A release that ran without following CI (deploy does not wait for it): not a failure, not pending.
+			const untracked = k === "ci" && st.status === "idle" && pipe.steps.push.status !== "idle";
 			const started = st.startedAt ?? wall;
 			if (idx > 0) {
 				const before = pipe.steps[STAGES[idx - 1] ?? "commit"];
@@ -983,7 +985,9 @@ export class InteriorPainter {
 			c.fill();
 			c.strokeStyle = col;
 			c.lineWidth = st.status === "idle" ? 1 : 1.6;
+			if (untracked) c.setLineDash([3, 3]);
 			c.stroke();
+			c.setLineDash([]);
 			c.lineWidth = 1;
 			if (st.status === "run") {
 				// No percent is known: an indeterminate sweep.
@@ -999,7 +1003,7 @@ export class InteriorPainter {
 			c.font = `400 ${10 * this.ts}px ${MONO}`;
 			c.fillStyle = col;
 			const value =
-				st.status === "run" ? duration(Math.max(0, wall - started)) : st.status === "ok" ? `✓ ${duration(st.durationMs ?? 0)}` : st.status === "err" ? copy.stepFailed : st.status === "unknown" ? copy.stepUnknown : "–";
+				st.status === "run" ? duration(Math.max(0, wall - started)) : st.status === "ok" ? `✓ ${duration(st.durationMs ?? 0)}` : st.status === "err" ? copy.stepFailed : st.status === "unknown" ? copy.stepUnknown : untracked ? copy.stepUntracked : "–";
 			c.fillText(value, x + cw / 2, y + 21);
 			c.textAlign = "left";
 		});

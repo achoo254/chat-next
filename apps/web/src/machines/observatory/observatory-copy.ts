@@ -112,6 +112,8 @@ export interface ObservatoryCopy {
 		readonly stepFailed: string;
 		/** A CI step whose outcome is not known (the machine stopped following it, or it ran too long without news). */
 		readonly stepUnknown: string;
+		/** The CI step when a release ran without following CI (deploy does not wait for it). */
+		readonly stepUntracked: string;
 		readonly prod: string;
 		/** The caption of the test bed: a run's outcome (no per-test figures are known). */
 		readonly tests: { readonly running: string; readonly passed: string; readonly failed: string; readonly none: string };
@@ -302,6 +304,7 @@ const vi: ObservatoryCopy = {
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		stepFailed: "✗ lỗi",
 		stepUnknown: "? không rõ",
+		stepUntracked: "không chờ",
 		prod: "prod",
 		tests: { running: "đang chạy…", passed: "đạt", failed: "lỗi", none: "chưa chạy" },
 	},
@@ -497,6 +500,7 @@ const en: ObservatoryCopy = {
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		stepFailed: "✗ failed",
 		stepUnknown: "? unknown",
+		stepUntracked: "not awaited",
 		prod: "prod",
 		tests: { running: "running…", passed: "passed", failed: "failed", none: "not run yet" },
 	},
@@ -692,6 +696,7 @@ const zhCN: ObservatoryCopy = {
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		stepFailed: "✗ 失败",
 		stepUnknown: "? 未知",
+		stepUntracked: "不等待",
 		prod: "prod",
 		tests: { running: "运行中…", passed: "通过", failed: "失败", none: "尚未运行" },
 	},
