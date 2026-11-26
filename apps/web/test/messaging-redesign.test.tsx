@@ -146,10 +146,10 @@ describe("messages", () => {
 		const demo = seedDemo();
 		const text = "@ductrung xem giúp phần cấu hình.";
 		const seq = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, text, { entities: [entity(EntityType.MENTION, text, "@ductrung")] });
-		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Tin mới hơn.");
+		const newer = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Tin mới hơn.");
 		// Read past it elsewhere (the other app, another device): the mention is still unseen,
 		// and the chat open at its newest message does not clear it.
-		demo.fixture.unseenMentions(demo.ids.ops, [seq]);
+		demo.fixture.unseenMentions(demo.ids.ops, [seq], newer);
 		const { log } = await openChat(`/c/${demo.ids.ops}`, "Tin mới hơn.", demo);
 		await userEvent.click(await screen.findByRole("button", { name: "Tới tin nhắc bạn, 1 tin" }, LONG));
 		await waitFor(() => expect(demo.fixture.readMentionCalls).toEqual([seq]), LONG);

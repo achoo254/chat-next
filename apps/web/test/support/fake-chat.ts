@@ -523,8 +523,12 @@ export class ChatFixture {
 		this.dialogExtras.set(chatId, { ...this.dialogExtras.get(chatId), unreadMentionsCount: count });
 	}
 
-	/** You read past these messages that mention you without seeing them (another device, the other app). */
-	unseenMentions(chatId: number, seqs: readonly number[]): void {
+	/**
+	 * You read the chat up to `readTo` elsewhere (another device, the other app) and passed
+	 * these messages that mention you without seeing them.
+	 */
+	unseenMentions(chatId: number, seqs: readonly number[], readTo = Math.max(0, ...seqs)): void {
+		this.server.readHistory(this.selfId, chatId, readTo);
 		for (const seq of seqs) this.server.unseeMention(this.selfId, chatId, seq);
 	}
 
