@@ -40,6 +40,10 @@ export default defineConfig({
 	build: {
 		// CSP is default-src 'self': fonts and images must be files, never data: URIs.
 		assetsInlineLimit: 0,
+		// The polyfill only adds the preload hint to browsers without <link rel="modulepreload">
+		// (Safari before 17, Firefox before 115); there the chunks load when imported, as without
+		// the hint. It is startup JS in every other browser too.
+		modulePreload: { polyfill: false },
 		rollupOptions: {
 			// The client core and the generated protocol code run nothing at import
 			// time. Saying so lets the R0 entry import one helper from the core

@@ -60,6 +60,11 @@ export const BUNDLE_BUDGET = {
 	 * the Telegram and Zalo emoji lists entered startup. The check now reads
 	 * the refusal by its shape in its own module (messaging/ui/reaction-refused.ts),
 	 * and the lists stay with the lazy pickers: 154.9 KB. The budget stays 155 KB.
+	 * 155.7 KB on 26/11/2026 with the code that reloads after a lazy chunk fails to load
+	 * following a deploy (+0.75 KB); 155.2 KB once only its listeners stay in the entry
+	 * chunk. Vite's modulepreload polyfill, 0.2 KB of startup JS that only adds a
+	 * hint for old browsers, is off (vite.config.ts): 155.0 KB, with no room left.
+	 * The budget stays 155 KB.
 	 */
 	startupJsGzip: 155 * 1024,
 	/**
