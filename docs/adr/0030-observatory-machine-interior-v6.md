@@ -28,6 +28,7 @@ Bản mẫu v6 (`hoandat-app/plans/dattqh/261125-2211-observatory-machine-interi
   kiểm thử là dải ô đổi màu theo **kết quả của lượt chạy** (Claude Code không báo từng test, nên không có số đạt/lỗi từng ca), Git là đồ thị commit
   (main, HEAD, nhánh phụ từ 5 commit) cạnh đường ống phát hành, cổng MCP là các cổng kết nối có biểu tượng dịch vụ; khối nhỏ có biểu tượng riêng. Ở chế độ camera **Tự do**,
   mọi khối và đường dẫn sáng bình thường (không làm mờ khối ngoài vùng AI đang làm); Tự động và Tập trung vẫn làm mờ.
+  Số ngữ cảnh (% và token) và tốc độ (tok/s) chỉ ghi ở hộp Phiên: bể Context và khung sóng token vẫn vẽ làm hình nhưng không còn dòng số, và dòng lượt API dưới tên model đã bỏ.
 - **Vẽ bằng Canvas 2D trong code**, không PixiJS, không tài sản ảnh: bỏ `pixi.js`, `public/observatory/`, bộ đệm tranh của service worker (cache
   `observatory-assets-v1` bị xoá khi worker kích hoạt) và location `/observatory/` của nginx. Chữ trên cảnh vẽ trên canvas như bản mẫu; mỗi khối vẫn
   là một nút DOM trong suốt để dùng bàn phím và để test bấm.

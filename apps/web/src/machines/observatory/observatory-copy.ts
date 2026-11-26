@@ -96,10 +96,8 @@ export interface ObservatoryCopy {
 		readonly waiting: string;
 		readonly executing: string;
 		readonly idle: string;
-		readonly apiLine: (turn: number, kTokens: number, tps: number) => string;
 		/** The reservoir's line: percent (null: unknown), tokens used and the window. */
 		readonly contextLine: (percent: number | null, tokens: number, window: number) => string;
-		readonly wave: (tps: number) => string;
 		readonly portal: string;
 		readonly subagent: (type: string) => string;
 		/** A subagent whose type is not known. */
@@ -293,9 +291,7 @@ const vi: ObservatoryCopy = {
 		waiting: "CHỜ BẠN",
 		executing: "đã giao việc, chờ kết quả",
 		idle: "rảnh",
-		apiLine: (turn, k, tps) => `lượt API #${turn} · ${k}k ngữ cảnh · ${tps} tok/s`,
 		contextLine: (percent, tokens, window) => `${percent === null ? "–" : `${percent}%`} · ${tokenSize(tokens)} / ${window > 0 ? tokenSize(window) : "?"}`,
-		wave: (tps) => `SÓNG TOKEN · ${tps} tok/s`,
 		portal: "CỔNG INTERNET",
 		subagent: (type) => `subagent · ${type}`,
 		subagentShort: "subagent",
@@ -490,9 +486,7 @@ const en: ObservatoryCopy = {
 		waiting: "WAITING FOR YOU",
 		executing: "work handed out, waiting for results",
 		idle: "idle",
-		apiLine: (turn, k, tps) => `API turn #${turn} · ${k}k context · ${tps} tok/s`,
 		contextLine: (percent, tokens, window) => `${percent === null ? "–" : `${percent}%`} · ${tokenSize(tokens)} / ${window > 0 ? tokenSize(window) : "?"}`,
-		wave: (tps) => `TOKEN WAVE · ${tps} tok/s`,
 		portal: "INTERNET GATE",
 		subagent: (type) => `subagent · ${type}`,
 		subagentShort: "subagent",
@@ -687,9 +681,7 @@ const zhCN: ObservatoryCopy = {
 		waiting: "等你操作",
 		executing: "已分派任务，等待结果",
 		idle: "空闲",
-		apiLine: (turn, k, tps) => `第 ${turn} 次 API 请求 · ${k}k 上下文 · ${tps} tok/s`,
 		contextLine: (percent, tokens, window) => `${percent === null ? "–" : `${percent}%`} · ${tokenSize(tokens)} / ${window > 0 ? tokenSize(window) : "?"}`,
-		wave: (tps) => `TOKEN 波 · ${tps} tok/s`,
 		portal: "互联网门户",
 		subagent: (type) => `子代理 · ${type}`,
 		subagentShort: "子代理",

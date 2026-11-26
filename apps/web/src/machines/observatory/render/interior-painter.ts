@@ -555,7 +555,7 @@ export class InteriorPainter {
 
 	private drawModel(): void {
 		const c = this.c;
-		const { look, state, t, dt, motion, thinking, selected, contentZone, copy } = this.i;
+		const { look, state, t, dt, motion, thinking, selected, copy } = this.i;
 		const [cx, cy] = this.scene.core.centre;
 		// The design's lattice is drawn for a radius of 120; a larger model scales it.
 		const k = this.scene.core.radius / 120;
@@ -680,14 +680,6 @@ export class InteriorPainter {
 		c.font = `600 ${12 * this.ts}px ${MONO}`;
 		c.fillStyle = think ? INK.think : waiting ? INK.warn : INK.muted;
 		c.fillText(think ? copy.thinking : waiting ? copy.waiting : exec ? copy.executing : copy.idle, cx, cy + 124 * k + 18);
-		if (contentZone === "core" || contentZone === "orchestrator") {
-			const board = this.board("core");
-			if (board.kind === "model" && board.apiTurns > 0) {
-				c.font = `400 ${11 * this.ts}px ${MONO}`;
-				c.fillStyle = INK.muted;
-				c.fillText(copy.apiLine(board.apiTurns, Math.round((state.live?.contextTokens ?? 0) / 1000), Math.round(board.tokensPerSecond ?? 0)), cx, cy + 124 * k + 36);
-			}
-		}
 		c.textAlign = "left";
 	}
 
@@ -699,7 +691,7 @@ export class InteriorPainter {
 	/** The context reservoir: four columns that fill with the context used. */
 	private drawReservoir(): void {
 		const c = this.c;
-		const { look, state, selected, copy } = this.i;
+		const { look, selected, copy } = this.i;
 		const p = this.scene.places.monitoring.rect;
 		const percent = look.contextPercent;
 		const fillRatio = clamp01((percent ?? 0) / 100);
@@ -732,15 +724,12 @@ export class InteriorPainter {
 		c.textBaseline = "top";
 		c.textAlign = "left";
 		c.fillText(copy.tags.monitoring, p.x, p.y + p.h + 10);
-		c.font = `400 ${11.5 * this.ts}px ${MONO}`;
-		c.fillStyle = col;
-		c.fillText(copy.contextLine(percent === null ? null : Math.round(percent), state.live?.contextTokens ?? 0, state.live?.contextWindow ?? 0), p.x, p.y + p.h + 10 + 17 * this.ts);
 	}
 
 	/** The token wave: its height and frequency follow the model's output rate. */
 	private drawWave(): void {
 		const c = this.c;
-		const { dt, copy, motion } = this.i;
+		const { dt, motion } = this.i;
 		const p = this.scene.wave;
 		const amp = Math.min(1, this.waveRate / 140);
 		if (motion) this.wavePhase += dt * (this.waveRate / 130) * 0.012;
@@ -760,11 +749,6 @@ export class InteriorPainter {
 		c.lineWidth = 1.5;
 		c.stroke();
 		c.lineWidth = 1;
-		c.font = `400 ${10.5 * this.ts}px ${MONO}`;
-		c.fillStyle = INK.muted;
-		c.textBaseline = "top";
-		c.textAlign = "left";
-		c.fillText(copy.wave(Math.round(this.waveRate)), p.x, p.y + p.h + 6);
 	}
 
 	/** The internet: a space portal whose stars fall in faster while a fetch runs. */
