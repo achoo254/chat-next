@@ -3917,8 +3917,8 @@ message WsGitPrUrlResult {
 // B reads the token counts the AIs' transcripts on the machine record (never
 // a message, a tool's input or its result) into a ledger kept on the machine
 // (docs/privacy/data-inventory.md), every 15 minutes. What reaches a device
-// here are numbers, rule codes, session ids, repository keys and days: never
-// a message, a title or a file's path. A repository key is the canonical
+// here are numbers, rule codes, session ids, repository keys, model ids and
+// days: never a message, a title, a commit or a file's path. A repository key is the canonical
 // remote of the repository a call ran in, `local:<folder name>` for one
 // without a remote, or `scratch` for temporary folders. Machines without it
 // answer ERROR_REASON_UNSUPPORTED_REQUEST.
@@ -3951,6 +3951,63 @@ message UsageReport {
   repeated UsageSuggestion suggestions = 7;
   // Plan usage readings in the range, in time order.
   repeated UsageQuotaPoint quota = 8;
+  // tunelo 3.30.0+: one row per repository key, day and model, by day, key
+  // then model.
+  repeated UsageModelDay model_days = 9;
+  // tunelo 3.30.0+: the sessions that cost most in the range at API prices
+  // (then those with most calls), at most 50, costliest first.
+  repeated UsageSession sessions = 10;
+}
+
+// Costs are at the AI's API prices, in US dollars: an estimate (a
+// subscription plan is not charged them); 0 when the model's price is not
+// known to the machine.
+message UsageModelDay {
+  string repo_key = 1;
+  // YYYY-MM-DD.
+  string day = 2;
+  // The model id as the AI's transcripts record it.
+  string model = 3;
+  uint64 input_tokens = 4;
+  uint64 cache_read_tokens = 5;
+  uint64 cache_write_tokens = 6;
+  uint64 output_tokens = 7;
+  uint32 main_turns = 8;
+  uint32 subagent_turns = 9;
+  double cost_usd = 10;
+  // The model's price is known (cost_usd counts every call of the row).
+  bool priced = 11;
+}
+
+// A session's calls in the report's range.
+message UsageSession {
+  // ProviderInfo.id of the AI.
+  string provider = 1;
+  // The AI's own session id.
+  string session_id = 2;
+  // Of its last main-session call.
+  string repo_key = 3;
+  // Unix milliseconds of its first and last call in the range.
+  int64 first_at = 4;
+  int64 last_at = 5;
+  uint32 main_turns = 6;
+  uint32 subagent_turns = 7;
+  // The largest context of one main-session call.
+  uint64 peak_context = 8;
+  // The model of most of its main-session calls.
+  string model = 9;
+  double cost_usd = 10;
+  // Calls whose model's price is not known, left out of cost_usd.
+  uint32 unpriced_turns = 11;
+  // The machine opened it (a chat thread, its CLI in the machine's terminal).
+  bool app = 12;
+  // What it left in git: the commits made in its folder from its first call
+  // to 10 minutes after its last, matched by time (two sessions at once in
+  // one repository both count a commit), and the files they changed. Only
+  // when outcome_known: the folder is a git repository B could read.
+  bool outcome_known = 13;
+  uint32 commits = 14;
+  uint32 files_changed = 15;
 }
 
 message UsageDay {
@@ -3996,8 +4053,8 @@ enum UsageRule {
   USAGE_RULE_CONTEXT = 1;
   // The main session went past 300 calls.
   USAGE_RULE_TURNS = 2;
-  // Experimental: a strong model (Opus) mostly reading, searching or running
-  // commands while writing little.
+  // Experimental: a strong model (as the AI's model catalog on B ranks it)
+  // mostly reading, searching or running commands while writing little.
   USAGE_RULE_MECHANICAL = 3;
   // Subagents carried more than half of the session's context.
   USAGE_RULE_SUBAGENTS = 4;
@@ -4020,6 +4077,12 @@ message UsageSuggestion {
   // Unix milliseconds the hint went to devices; 0 when it did not (the
   // session was not running, or no device was reached).
   int64 notified_at = 8;
+  // tunelo 3.30.0+: what the habit cost the session at API prices, in US
+  // dollars (an estimate); 0 when unknown. CONTEXT: cache reads of every
+  // main-session call's context above 300K; TURNS: the calls after the 300th;
+  // MECHANICAL: the mechanical calls on a strong model against the AI's
+  // standard model; SUBAGENTS: 0.
+  double excess_usd = 9;
 }
 
 message UsageQuotaPoint {

@@ -9,6 +9,7 @@
 //
 // A hint holds a rule code, numbers, the session's id and its repository
 // key: never a message, a title or a file's path.
+import type { Catalogs } from "./costs.ts";
 import { DAY_MS, type Ledger, monthStart, shiftMonth, localMonth } from "./ledger.ts";
 import { repoOf } from "./report.ts";
 import { type RuleCode, type RuleSwitches, evaluate } from "./rules.ts";
@@ -25,6 +26,8 @@ export type UsageHint = {
   at: number;
   value: number;
   experimental: boolean;
+  /** What the habit cost the session so far at API prices, in dollars; 0 when unknown. */
+  excessUsd: number;
 };
 
 export type UsageNotifierOptions = {
@@ -35,6 +38,8 @@ export type UsageNotifierOptions = {
   deliver: (hints: UsageHint[], sentAt: number) => Promise<boolean>;
   now?: () => number;
   log?: (line: string) => void;
+  /** The AIs' model catalogs, for the rules that need them. */
+  catalogs?: Catalogs;
 };
 
 export class UsageNotifier {
@@ -68,7 +73,7 @@ export class UsageNotifier {
     const from = Math.min(monthStart(shiftMonth(localMonth(now), -1)), now - DAY_MS);
     const turns = await ledger.turns({ from, to: now + 60_000, keep: (t) => running.has(`${t.provider}\u0000${t.sessionId}`), hold: true });
     const index = ledger.snapshot();
-    const due: UsageHint[] = evaluate(turns, rules)
+    const due: UsageHint[] = evaluate(turns, rules, this.opts.catalogs)
       .filter((s) => ledger.notifiedAt(s.provider, s.sessionId, s.rule) === undefined)
       .map((s) => ({
         rule: s.rule,
@@ -79,6 +84,7 @@ export class UsageNotifier {
         at: s.at,
         value: s.value,
         experimental: s.experimental,
+        excessUsd: s.excessUsd,
       }));
     this.pending = due.length > 0;
     if (due.length === 0) return [];

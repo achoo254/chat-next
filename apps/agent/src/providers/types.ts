@@ -528,8 +528,32 @@ export type UsageLineStats = {
 /** `end`: the byte after the last whole line read; a line still being written is left for the next read. */
 export type UsageRead = { turns: UsageTurn[]; end: number; stats: UsageLineStats };
 
+/** US dollars per million tokens of each kind, at the AI's API prices. */
+export type ModelPrice = { input: number; output: number; cacheRead: number; cacheWrite: number };
+
+/** How strong a model is within its AI: what the usage rules compare. */
+export type ModelTier = "strong" | "standard" | "light";
+
+/**
+ * What the usage ledger needs to know about an AI's models: their API prices
+ * (an estimate: a subscription plan is not charged them), how strong each is,
+ * and which of the AI's tools only read, search or run a command.
+ */
+export interface ModelCatalog {
+  /** Undefined for a model whose price is not known. */
+  price(model: string): ModelPrice | undefined;
+  /** Undefined for a model the catalog does not know. */
+  tier(model: string): ModelTier | undefined;
+  /** The price of the AI's standard model of the same generation, for a strong `model`; undefined when none is known. */
+  lighterPrice(model: string): ModelPrice | undefined;
+  /** Tool names (as the transcripts record them) that read, search or run a command. */
+  readonly mechanicalTools: readonly string[];
+}
+
 /** The AI's token usage as its own transcripts on the machine record it. */
 export interface UsageSource {
+  /** The AI's models, for costs and the rules; absent when tunelo knows none of them. */
+  readonly models?: ModelCatalog;
   /** Every transcript file, each once (links are not followed). */
   files(): Promise<UsageFile[]>;
   /**

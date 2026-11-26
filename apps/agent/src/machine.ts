@@ -53,6 +53,7 @@ import { RemoteBrowser } from "./remote-browser/remote-browser.ts";
 import { ScreenShare } from "./screen-share/screen-share.ts";
 import { UsageScheduler } from "./usage/scheduler.ts";
 import { type UsageHint, UsageNotifier } from "./usage/notify.ts";
+import { OutcomeReader } from "./usage/outcomes.ts";
 import { type RuleSwitches, ruleSwitches } from "./usage/rules.ts";
 import { type UsageApi, usageApiOf, usageSuggestionBody } from "./link/usage-link.ts";
 import { ObservatoryService, type ObservatoryServiceOptions } from "./observatory/observatory-service.ts";
@@ -264,11 +265,13 @@ export class Machine {
       isSensitive: this.isSensitive,
     });
     this.sessionObserver = new ObservatorySessionObserver({ service: this.observatory, dataDir: opts.observatory?.dataDir ?? observatoryDataDirFor(dir), selfCommand: () => selfCommand() });
+    const usageCatalogs = (provider: string) => this.providers.find((p) => p.id === provider)?.usage?.models;
     this.usageNotifier = new UsageNotifier({
       ledger: this.usage.ledger,
       rules: () => this.usageRules(),
       deliver: (hints, sentAt) => this.deliverUsageHints(hints, sentAt),
       log: this.log,
+      catalogs: usageCatalogs,
     });
     this.usageApi = usageApiOf({
       ledger: this.usage.ledger,
@@ -277,6 +280,8 @@ export class Machine {
       deleteLedger: () => this.usage.deleteLedger(),
       // Advisor's sessions stay out of the user's statistics, as out of every list.
       hiddenSessions: () => this.core.advisorSessionIds(),
+      catalogs: usageCatalogs,
+      outcomes: new OutcomeReader(),
     });
     const c = this.config.get();
     this.trust = new DeviceTrust({ config: this.config });

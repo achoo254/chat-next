@@ -77,9 +77,9 @@ export async function gitStatus(dir: string, timeoutMs = 3_000): Promise<GitStat
 }
 
 /** Runs a read-only git command in `dir`; its output, or undefined when git fails, is missing or too slow. */
-async function gitRead(dir: string, args: readonly string[], timeoutMs: number): Promise<string | undefined> {
+export async function gitRead(dir: string, args: readonly string[], timeoutMs: number, maxBuffer = 64 * 1024): Promise<string | undefined> {
   try {
-    const { stdout } = await run("git", [...safeGitArgs(), "-C", dir, ...args], { timeout: timeoutMs, env: gitEnv(), maxBuffer: 64 * 1024, windowsHide: true });
+    const { stdout } = await run("git", [...safeGitArgs(), "-C", dir, ...args], { timeout: timeoutMs, env: gitEnv(), maxBuffer, windowsHide: true });
     return stdout;
   } catch {
     return undefined;

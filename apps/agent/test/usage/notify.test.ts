@@ -47,7 +47,7 @@ describe("hints for running sessions", () => {
     const { n, sent } = notifier(ledger);
     expect(await n.check()).toHaveLength(1);
     expect(sent).toEqual([
-      { hints: [{ rule: "context", provider: "claude", sessionId: "s1", repoKey: "example.com/team/app", turn: 2, at: NOW - 5 * min, value: 350_000, experimental: false }], at: NOW },
+      { hints: [{ rule: "context", provider: "claude", sessionId: "s1", repoKey: "example.com/team/app", turn: 2, at: NOW - 5 * min, value: 350_000, experimental: false, excessUsd: 0 }], at: NOW },
     ]);
     // Nothing of a folder, a model or a message in a hint.
     expect(JSON.stringify(sent)).not.toContain("/work/app");

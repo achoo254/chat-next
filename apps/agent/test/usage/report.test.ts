@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { UsageTurn } from "../../src/providers/types.ts";
 import { Ledger, LedgerUnreadable } from "../../src/usage/ledger.ts";
 import { REPORT_MAX_DAYS, ReportRangeError, p90, rangeOf, usageReport } from "../../src/usage/report.ts";
+import { usageReportBody } from "../../src/link/usage-link.ts";
 import { ruleSwitches } from "../../src/usage/rules.ts";
 import { tempDir } from "../harness.ts";
 
@@ -105,7 +106,7 @@ describe("the usage report", () => {
     ]);
     // s1 went over 300K before the range (its first call): only s2's suggestion is in it, sent at D1 + 10 minutes.
     expect(r.suggestions).toEqual([
-      { rule: "context", sessionId: "s2", repoKey: REPO, turn: 1, at: D1 + 4 * 60_000, value: 400_000, experimental: false, notifiedAt: D1 + 10 * 60_000 },
+      { rule: "context", sessionId: "s2", repoKey: REPO, turn: 1, at: D1 + 4 * 60_000, value: 400_000, experimental: false, notifiedAt: D1 + 10 * 60_000, excessUsd: 0 },
     ]);
     expect(r.quota).toEqual([{ profile: "", at: D1 + 10 * 60_000, via: "scheduled", fiveHour: { utilization: 42, resetsAt: D2 } }]);
     expect(r.lastScanAt).toBe(0);
@@ -130,11 +131,13 @@ describe("the usage report", () => {
     expect(off.suggestions).toEqual([]);
   });
 
-  it("holds numbers, rule codes, session ids, repository keys and days only", async () => {
+  it("sends numbers, rule codes, session ids, repository keys, model ids and days only", async () => {
     const ledger = await synthetic();
     const r = await usageReport(ledger, { from: "2026-11-01", to: "2026-11-06" }, ruleSwitches(undefined), at(6, 9));
-    const text = JSON.stringify(r);
-    for (const leak of ["/work/app", "/tmp/try", "claude-test", "/fake/a.jsonl"]) expect(text).not.toContain(leak);
+    // A session keeps its folder on the machine, for what it left in git (outcomes.ts); the wire never carries it.
+    const text = JSON.stringify(usageReportBody(r), (_k, v: unknown) => (typeof v === "bigint" ? Number(v) : v));
+    for (const leak of ["/work/app", "/tmp/try", "/fake/a.jsonl"]) expect(text).not.toContain(leak);
+    expect(text).toContain("claude-test");
   });
 
   it("refuses days that are not days, a reversed range, a range over 92 days and a key with control characters", () => {

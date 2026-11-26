@@ -1,6 +1,7 @@
 // The usage rules at their thresholds: each fires once, at the call where it
 // first held, and only when switched on.
 import { describe, expect, it } from "vitest";
+import { claudeModels } from "../../src/providers/claude/usage-models.ts";
 import type { Turn } from "../../src/usage/ledger.ts";
 import { USAGE_RULES, evaluate, groupSessions, isMechanical, ruleSwitches } from "../../src/usage/rules.ts";
 
@@ -26,7 +27,7 @@ function call(n: number, ctx: number, extra: Partial<Turn> = {}): Turn {
   };
 }
 
-const rules = (turns: Turn[], on = ruleSwitches(undefined)) => evaluate(turns, on);
+const rules = (turns: Turn[], on = ruleSwitches(undefined)) => evaluate(turns, on, () => claudeModels);
 const only = (rule: string, turns: Turn[]) => rules(turns).filter((s) => s.rule === rule);
 
 describe("context over the limit", () => {
@@ -64,12 +65,12 @@ describe("a strong model on mechanical work (experimental)", () => {
   const think = (n: number) => call(n, 50_000, { ...strong, tools: ["Edit"], output: 2000 });
 
   it("knows a mechanical call: tools that only read, search or run, and little output", () => {
-    expect(isMechanical({ tools: ["Read", "Grep", "Glob", "Bash"], output: 500 })).toBe(true);
-    expect(isMechanical({ tools: ["Bash"], output: 501 })).toBe(false);
-    expect(isMechanical({ tools: [], output: 10 })).toBe(false);
-    expect(isMechanical({ tools: ["Read", "Edit"], output: 10 })).toBe(false);
-    expect(isMechanical({ tools: ["mcp__docs__search"], output: 10 })).toBe(false);
-    expect(isMechanical({ tools: ["Skill:example"], output: 10 })).toBe(false);
+    expect(isMechanical({ tools: ["Read", "Grep", "Glob", "Bash"], output: 500 }, claudeModels)).toBe(true);
+    expect(isMechanical({ tools: ["Bash"], output: 501 }, claudeModels)).toBe(false);
+    expect(isMechanical({ tools: [], output: 10 }, claudeModels)).toBe(false);
+    expect(isMechanical({ tools: ["Read", "Edit"], output: 10 }, claudeModels)).toBe(false);
+    expect(isMechanical({ tools: ["mcp__docs__search"], output: 10 }, claudeModels)).toBe(false);
+    expect(isMechanical({ tools: ["Skill:example"], output: 10 }, claudeModels)).toBe(false);
   });
 
   it("needs 30 strong-model calls", () => {
@@ -132,6 +133,6 @@ describe("sessions and switches", () => {
 
   it("gives numbers, a rule code and the session id; the folder only for its repository key", () => {
     const [s] = rules([call(0, 400_000, { tools: ["Bash"] })]);
-    expect(Object.keys(s ?? {}).sort()).toEqual(["at", "cwd", "experimental", "provider", "rule", "sessionId", "turn", "value"]);
+    expect(Object.keys(s ?? {}).sort()).toEqual(["at", "cwd", "excessUsd", "experimental", "provider", "rule", "sessionId", "turn", "value"]);
   });
 });

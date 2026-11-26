@@ -14,6 +14,7 @@ import { type Dirent, lstatSync, realpathSync } from "node:fs";
 import { open, readdir } from "node:fs/promises";
 import { join, sep } from "node:path";
 import type { UsageFile, UsageLineStats, UsageRead, UsageSource, UsageTurn } from "../types.ts";
+import { claudeModels } from "./usage-models.ts";
 import { JsonCursor } from "./usage-json.ts";
 
 /** Longest line taken; longer ones (a giant tool output) are skipped and counted. */
@@ -251,6 +252,7 @@ export async function readLines(
 }
 
 export class ClaudeUsage implements UsageSource {
+  readonly models = claudeModels;
   /** Files of the last listing that are a subagent's. */
   private subagentFiles = new Set<string>();
   /** One read buffer for every file (a scan reads them one after another), not a new 4 MB each. */

@@ -6,8 +6,10 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { type Frame, type FrameSchema, UsageRule } from "@achoo254/chat-proto/remote/remote";
 import type { ConfigStore } from "../config.ts";
 import type { AuditLog } from "../safety/audit-log.ts";
+import type { Catalogs } from "../usage/costs.ts";
 import type { Ledger, QuotaWindow } from "../usage/ledger.ts";
 import type { UsageHint } from "../usage/notify.ts";
+import { OutcomeReader, outcomeKey } from "../usage/outcomes.ts";
 import { type ReportQuery, type UsageReportData, usageReport } from "../usage/report.ts";
 import { RULE_CODES, type RuleCode, type RuleSwitches, USAGE_RULES, ruleSwitches } from "../usage/rules.ts";
 
@@ -32,10 +34,25 @@ export function usageApiOf(o: {
   now?: () => number;
   /** Sessions the report leaves out (lowercased ids): Advisor's own, hidden from the user's statistics. */
   hiddenSessions?: () => ReadonlySet<string>;
+  /** The AIs' model catalogs, for costs and the rules. */
+  catalogs?: Catalogs;
+  /** Reads what the report's sessions left in git; absent: no outcomes. */
+  outcomes?: OutcomeReader;
 }): UsageApi {
   const rules = () => ruleSwitches(o.config.get().usageRules);
   return {
-    report: (q) => usageReport(o.ledger, q, rules(), (o.now ?? Date.now)(), o.hiddenSessions?.()),
+    report: async (q) => {
+      const r = await usageReport(o.ledger, q, rules(), (o.now ?? Date.now)(), o.hiddenSessions?.(), o.catalogs);
+      if (!o.outcomes) return r;
+      const found = await o.outcomes.read(r.sessions);
+      return {
+        ...r,
+        sessions: r.sessions.map((s) => {
+          const outcome = found.get(outcomeKey(s));
+          return outcome ? { ...s, outcome } : s;
+        }),
+      };
+    },
     rules,
     setRules: (changes, device) => {
       const detail = Object.entries(changes)
@@ -85,6 +102,7 @@ export function usageSuggestionBody(s: Omit<UsageHint, "provider"> & { notifiedA
     value: big(s.value),
     experimental: s.experimental,
     notifiedAt: big(s.notifiedAt),
+    excessUsd: s.excessUsd,
   };
 }
 
@@ -115,6 +133,36 @@ export function usageReportBody(r: UsageReportData) {
       meanContext: big(d.meanContext),
       medianContext: big(d.medianContext),
       p90Context: big(d.p90Context),
+    })),
+    modelDays: r.modelDays.map((m) => ({
+      repoKey: m.repoKey,
+      day: m.day,
+      model: m.model,
+      inputTokens: big(m.input),
+      cacheReadTokens: big(m.cacheRead),
+      cacheWriteTokens: big(m.cacheWrite),
+      outputTokens: big(m.output),
+      mainTurns: m.mainTurns,
+      subagentTurns: m.subagentTurns,
+      costUsd: m.costUsd,
+      priced: m.priced,
+    })),
+    sessions: r.sessions.map((s) => ({
+      provider: s.provider,
+      sessionId: s.sessionId,
+      repoKey: s.repoKey,
+      firstAt: big(s.firstAt),
+      lastAt: big(s.lastAt),
+      mainTurns: s.mainTurns,
+      subagentTurns: s.subagentTurns,
+      peakContext: big(s.peakContext),
+      model: s.model,
+      costUsd: s.costUsd,
+      unpricedTurns: s.unpricedTurns,
+      app: s.app,
+      outcomeKnown: s.outcome !== undefined,
+      commits: s.outcome?.commits ?? 0,
+      filesChanged: s.outcome?.filesChanged ?? 0,
     })),
     suggestions: r.suggestions.map(usageSuggestionBody),
     quota: r.quota.map((q) => {
