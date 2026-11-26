@@ -195,6 +195,9 @@ export const vi = {
 		deleted: "Tin nhắn đã thu hồi",
 		quickActions: (name: string) => `Thao tác nhanh với tin của ${name}`,
 		quickActionsMine: "Thao tác nhanh với tin của bạn",
+		/** A message's checkbox while selecting messages. */
+		select: (name: string) => `Chọn tin của ${name}`,
+		selectLimit: (max: number) => `Chọn được tối đa ${max} tin`,
 		react: "Thả cảm xúc",
 		reply: "Trả lời",
 		forward: "Chuyển tiếp",

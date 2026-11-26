@@ -36,6 +36,7 @@ import {
 	type DialogRequest,
 	type ListMenuTarget,
 	type MenuTarget,
+	type MessageSelection,
 	type OpenMiniApp,
 	type Ui,
 } from "./ui-context.tsx";
@@ -97,6 +98,7 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 		const ai = new Cell<AiPanelRequest | null>(null);
 		return {
 			dialog: new Cell<DialogRequest | null>(null),
+			selection: new Cell<MessageSelection | null>(null),
 			menu: new Cell<MenuTarget | null>(null),
 			listMenu: new Cell<ListMenuTarget | null>(null),
 			miniApp,

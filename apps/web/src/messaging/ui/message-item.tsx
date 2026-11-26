@@ -9,7 +9,7 @@
 // starts with one, URL buttons, and "đã cập nhật" when edited in place. Bot
 // messages carry callback buttons too (mockups/bots.html#inline-keyboard):
 // the pressed one waits for the bot's answer while the others stay usable.
-import { Suspense, lazy, memo, useContext, useState, type MouseEvent, type ReactNode } from "react";
+import { Suspense, lazy, memo, useContext, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import type { Chat, MediaKind, PendingMessage, ReactionCount, StoredMessage } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { preloadable } from "../../components/preload.ts";
@@ -25,6 +25,7 @@ import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { bridgeChunk, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
 import { useMemberRank } from "./member-ranks.ts";
+import { useSelection } from "./selection.ts";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor, type Ui } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
@@ -524,8 +525,9 @@ export function MessageBubble({
 	limited,
 }: BubbleProps) {
 	const copy = useCopy();
-	const { store, self, backend } = useServices();
+	const { store, self, backend, toasts } = useServices();
 	const ui = useUi();
+	const selection = useSelection(inert || limited !== undefined ? 0 : chatId);
 	const ctx = useRichContext(message.fromId);
 	const intent = useIntent(chatId);
 	// A chat that sends on to another app (Chat Bridge): where this message is on its way.
@@ -565,7 +567,47 @@ export function MessageBubble({
 	const reply = canReply ? replyAction(ui, chatId, message.seq, limited) : null;
 
 	const editing = !inert && intent?.mode === "edit" && intent.seq === message.seq;
-	const classes = ["msg", mine ? "mine" : "", channel ? "post" : "", atMe ? "at-me" : "", editing ? "editing" : "", runClasses(runPrev, runNext)]
+	// Selecting: a click anywhere on the message takes it in or out (an album as a whole),
+	// Shift+click the run from the last one; nothing in it opens or reacts meanwhile.
+	const selected = selection !== null && selection.seqs.includes(message.seq);
+	const toggleSelected = (range: boolean) => {
+		if (selection === null) return;
+		// Loaded with the selection bar, outside the first chunk.
+		void import("./selection-actions.ts").then(({ albumSeqs, SELECTION_MAX, toggleSelection }) => {
+			const current = ui.selection.get();
+			if (current === null || current.chatId !== chatId) return;
+			const items = store.items(chatId);
+			const { selection: next, capped } = toggleSelection(current, items, albumSeqs(items, message), range);
+			ui.selection.set(next);
+			if (capped) toasts.show(copy.message.selectLimit(SELECTION_MAX));
+		});
+	};
+	// While selecting, the whole message is the checkbox (mouse, touch and Space or Enter).
+	const selectable = {
+		role: "checkbox",
+		"aria-checked": selected,
+		"aria-label": copy.message.select(senderName),
+		onClickCapture: (event: MouseEvent) => {
+			event.preventDefault();
+			event.stopPropagation();
+			toggleSelected(event.shiftKey);
+		},
+		onKeyDown: (event: KeyboardEvent) => {
+			if (event.key !== " " && event.key !== "Enter") return;
+			event.preventDefault();
+			toggleSelected(event.shiftKey);
+		},
+	};
+	const classes = [
+		"msg",
+		mine ? "mine" : "",
+		channel ? "post" : "",
+		atMe ? "at-me" : "",
+		editing ? "editing" : "",
+		selection !== null ? "selecting" : "",
+		selected ? "selected" : "",
+		runClasses(runPrev, runNext),
+	]
 		.filter(Boolean)
 		.join(" ");
 	const edited = message.editDate !== 0 && !recalled;
@@ -601,9 +643,10 @@ export function MessageBubble({
 			data-key={rowKey}
 			data-seq={message.seq}
 			tabIndex={inert ? undefined : tabbable ? 0 : -1}
-			{...(inert ? {} : trigger)}
+			{...(selection === null ? {} : selectable)}
+			{...(inert || selection !== null ? {} : trigger)}
 			onDoubleClick={
-				inert || reply === null
+				inert || reply === null || selection !== null
 					? undefined
 					: (event) => {
 							if ((event.target as Element).closest("a, button, .spoiler") !== null) return;
@@ -612,6 +655,11 @@ export function MessageBubble({
 						}
 			}
 		>
+			{selection !== null && (
+				<span className="select-tick" aria-hidden="true">
+					{selected && <Icon name="check" small />}
+				</span>
+			)}
 			{/* The avatar stands by the last bubble of a run; the others keep its room. */}
 			{group && !mine && runNext && <span className="avatar-gap" aria-hidden="true" />}
 			{group && integration && !runNext && (

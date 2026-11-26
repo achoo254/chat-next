@@ -14,8 +14,11 @@ export type DialogRequest =
 	| { readonly kind: "newChannel" }
 	/** `seqs`: every message of an album (the server keeps their files, nothing is uploaded again). */
 	| { readonly kind: "forward"; readonly chatId: number; readonly seq: number; readonly seqs?: readonly number[] }
-	/** `recall`: your own message, removed for everyone ("Thu hồi"); otherwise hidden for you only. */
-	| { readonly kind: "delete"; readonly chatId: number; readonly seq: number; readonly recall: boolean }
+	/**
+	 * `recall`: your own message, removed for everyone ("Thu hồi"); otherwise hidden for you only.
+	 * `seqs`: several selected messages (every one of them yours for a recall); `seq` is the first.
+	 */
+	| { readonly kind: "delete"; readonly chatId: number; readonly seq: number; readonly recall: boolean; readonly seqs?: readonly number[] }
 	/** Private chat: deleted for you; group or channel: deleted for everyone by its owner. */
 	| { readonly kind: "deleteChat"; readonly chatId: number }
 	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number }
@@ -197,8 +200,17 @@ export class ComposerIntents {
 	}
 }
 
+/** Messages selected in a chat (the selection mode), oldest first; `anchor` is where a Shift-click range starts. */
+export interface MessageSelection {
+	readonly chatId: number;
+	readonly seqs: readonly number[];
+	readonly anchor: number;
+}
+
 export interface Ui {
 	readonly dialog: Cell<DialogRequest | null>;
+	/** The selection mode of the open chat; null when not selecting. */
+	readonly selection: Cell<MessageSelection | null>;
 	readonly menu: Cell<MenuTarget | null>;
 	readonly listMenu: Cell<ListMenuTarget | null>;
 	readonly miniApp: Cell<OpenMiniApp | null>;

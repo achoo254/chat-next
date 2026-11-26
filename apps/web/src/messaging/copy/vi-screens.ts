@@ -55,6 +55,12 @@ export const viScreens = {
 		deleteForMe: "Xoá ở phía tôi",
 		recalled: "Đã thu hồi tin",
 		hidden: "Đã xoá tin ở phía bạn",
+		forMeManyTitle: (count: number) => `Xoá ${count} tin ở phía bạn?`,
+		recallManyTitle: (count: number) => `Thu hồi ${count} tin?`,
+		recallManyNote: (chat: string) => `Các tin bị gỡ khỏi máy của mọi người trong “${chat}”. Không hoàn tác được.`,
+		onlyMeManyNote: "Các tin chỉ bị ẩn trên các thiết bị của bạn. Người khác vẫn thấy.",
+		recalledMany: (count: number) => `Đã thu hồi ${count} tin`,
+		hiddenMany: (count: number) => `Đã xoá ${count} tin ở phía bạn`,
 	},
 	forward: {
 		title: "Chuyển tiếp tới",
@@ -714,6 +720,8 @@ export const viScreens = {
 	menu: {
 		/** Opens the chat's AI panel about this message. */
 		askAi: "Hỏi AI",
+		/** Starts selecting messages, with this one selected. */
+		select: "Chọn",
 		label: "Thao tác với tin",
 		labelMine: "Thao tác với tin của bạn",
 		react: "Thả cảm xúc",
@@ -747,6 +755,18 @@ export const viScreens = {
 			"😮": "Ngạc nhiên",
 			"🙏": "Cảm ơn",
 		} as Record<string, string>,
+	},
+	selection: {
+		/** The bar that stands in for the composer while messages are selected. */
+		label: "Thao tác với các tin đã chọn",
+		count: (count: number) => `Đã chọn ${count} tin`,
+		cancel: "Bỏ chọn",
+		forward: "Chuyển tiếp",
+		saveToCloud: "Lưu vào Cloud",
+		copy: "Sao chép",
+		download: "Tải xuống",
+		delete: "Xoá",
+		copied: (count: number) => `Đã sao chép ${count} tin`,
 	},
 	pinDialog: {
 		title: "Ghim tin này?",

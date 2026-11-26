@@ -27,9 +27,11 @@ import { TopicIco } from "./topic-ico.tsx";
 import { useSurface } from "./surface.ts";
 import { BridgeDeliveryContext, bridgeChunk, useBridgeDelivery } from "./bridge-delivery.tsx";
 import { ChatSearchContext, openAiPanel, useCell, useUi } from "./ui-context.tsx";
+import { useSelection } from "./selection.ts";
 
 const BridgeRefusals = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeRefusals })));
 const MenuLayer = lazy(() => import("./message-menu.tsx"));
+const SelectionBar = lazy(() => import("./selection-bar.tsx"));
 // The composer and its editor load apart from the startup code (fetched when
 // the browser is idle, or with the first chat opened), as Telegram Web loads
 // its message input; until then the chat shows the box waiting. Its words
@@ -319,6 +321,14 @@ export function Conversation({ chatId, topicId, infoOpen, aiOpen = false }: Conv
 	const effectiveTopic = topic?.id ?? 0;
 	const limits = useMediaLimits();
 	const window_ = useWindow(chatId);
+	const selection = useSelection(chatId);
+	// Leaving the chat ends selecting there.
+	useEffect(
+		() => () => {
+			if (ui.selection.get()?.chatId === chatId) ui.selection.set(null);
+		},
+		[ui, chatId],
+	);
 	const [dragging, setDragging] = useState<number | null>(null);
 	const dragDepth = useRef(0);
 	// The search bar in place of the header, for the chat (and topic) it was opened in;
@@ -522,7 +532,12 @@ export function Conversation({ chatId, topicId, infoOpen, aiOpen = false }: Conv
 			</ChatSearchContext>
 			</BridgeDeliveryContext>
 			<MiniAppChipSlot place="bar" />
-			{chat.left ? (
+			{selection !== null ? (
+				// Selecting messages: the bar of what to do with them stands in for the composer.
+				<Suspense fallback={null}>
+					<SelectionBar selection={selection} />
+				</Suspense>
+			) : chat.left ? (
 				<LeftBar chat={chat} />
 			) : topic !== null && topic.closed && !admin ? (
 				<div className="closed-bar" role="status">

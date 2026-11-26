@@ -49,9 +49,12 @@ export function Quote({ chatId, seq, className = "quote" }: { chatId: number; se
  * "Thu hồi" removes your message for everyone; "Xoá ở phía tôi" hides any
  * message on your devices only (#delete).
  */
-export function DeleteDialog({ chatId, seq, recall, onClose }: CloseProps & { chatId: number; seq: number; recall: boolean }) {
+export function DeleteDialog({ chatId, seq, seqs = [seq], recall, onClose }: CloseProps & { chatId: number; seq: number; seqs?: readonly number[]; recall: boolean }) {
 	const copy = useScreensCopy();
+	const ui = useUi();
 	const { source, store, toasts } = useServices();
+	// Several selected messages: counted titles, no quote of one.
+	const many = seqs.length > 1;
 	const chat = useChat(chatId);
 	const peer = useUser(chat?.type === "private" ? chat.peerUserId : 0);
 	const message = useMessage(chatId, seq);
@@ -64,9 +67,10 @@ export function DeleteDialog({ chatId, seq, recall, onClose }: CloseProps & { ch
 	const authorName = author?.name ?? copy.message.unknownUser;
 	const remove = (forEveryone: boolean) => {
 		setBusy(true);
-		source.deleteMessages(chatId, [seq], forEveryone).then(
+		source.deleteMessages(chatId, seqs, forEveryone).then(
 			() => {
-				toasts.show(forEveryone ? t.recalled : t.hidden);
+				toasts.show(many ? (forEveryone ? t.recalledMany(seqs.length) : t.hiddenMany(seqs.length)) : forEveryone ? t.recalled : t.hidden);
+				ui.selection.set(null);
 				onClose();
 			},
 			() => {
@@ -75,23 +79,31 @@ export function DeleteDialog({ chatId, seq, recall, onClose }: CloseProps & { ch
 			},
 		);
 	};
-	const title = recall ? t.recallTitle : mine ? t.forMeTitle : t.theirsTitle(authorName);
+	const title = many
+		? recall
+			? t.recallManyTitle(seqs.length)
+			: t.forMeManyTitle(seqs.length)
+		: recall
+			? t.recallTitle
+			: mine
+				? t.forMeTitle
+				: t.theirsTitle(authorName);
 	return (
 		<Modal labelledBy={id} onClose={onClose}>
 			<DialogHead id={id} title={title} onClose={onClose} />
 			<div className="dlg-body stack">
-				<Quote chatId={chatId} seq={seq} />
+				{!many && <Quote chatId={chatId} seq={seq} />}
 				{recall ? (
 					<p className="note">
 						<Glyph name="refresh" />
-						<span>{t.recallNote(chatTitle)}</span>
+						<span>{many ? t.recallManyNote(chatTitle) : t.recallNote(chatTitle)}</span>
 					</p>
 				) : (
 					<p className="note">
 						<Icon name="eye-off" />
 						<span>
-							{t.onlyMeNote}
-							{!mine && message != null && ` ${t.onlyAuthor(authorName)}`}
+							{many ? t.onlyMeManyNote : t.onlyMeNote}
+							{!many && !mine && message != null && ` ${t.onlyAuthor(authorName)}`}
 						</span>
 					</p>
 				)}

@@ -156,6 +156,63 @@ describe("messages", () => {
 		await waitFor(() => expect(log.querySelector(".msg.flash")?.textContent).toContain("xem giúp phần cấu hình"), LONG);
 	});
 
+	it("selects several messages from the menu, a click and Shift+click, and leaves with Esc", async () => {
+		const demo = seedDemo();
+		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Tin chọn 1.");
+		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Tin chọn 2.");
+		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Tin chọn 3.");
+		const { log } = await openChat(`/c/${demo.ids.ops}`, "Tin chọn 3.", demo);
+		fireEvent.contextMenu(messageOf(log, "Tin chọn 1."));
+		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin" })).getByRole("menuitem", { name: "Chọn" }));
+		const bar = await screen.findByRole("toolbar", { name: "Thao tác với các tin đã chọn" }, LONG);
+		expect(within(bar).getByText("Đã chọn 1 tin")).toBeTruthy();
+		expect(messageOf(log, "Tin chọn 1.").getAttribute("aria-checked")).toBe("true");
+		// No composer while selecting; Shift+click takes the run up to the third.
+		expect(screen.queryByRole("textbox", { name: /^Tin nhắn tới/ })).toBeNull();
+		fireEvent.click(messageOf(log, "Tin chọn 3."), { shiftKey: true });
+		await waitFor(() => expect(within(bar).getByText("Đã chọn 3 tin")).toBeTruthy());
+		expect(messageOf(log, "Tin chọn 2.").getAttribute("aria-checked")).toBe("true");
+		// A click takes one out again.
+		fireEvent.click(messageOf(log, "Tin chọn 2."));
+		await waitFor(() => expect(within(bar).getByText("Đã chọn 2 tin")).toBeTruthy());
+		expect(within(bar).getByRole("button", { name: "Chuyển tiếp" })).toBeTruthy();
+		expect(within(bar).getByRole("button", { name: "Sao chép" })).toBeTruthy();
+		fireEvent.keyDown(window, { key: "Escape" });
+		await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Thao tác với các tin đã chọn" })).toBeNull());
+		expect(messageOf(log, "Tin chọn 1.").getAttribute("aria-checked")).toBeNull();
+		expect(await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG)).toBeTruthy();
+	});
+
+	it("forwards and deletes the selected messages in one go", async () => {
+		const demo = seedDemo();
+		const first = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Gửi đi 1.");
+		const second = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Gửi đi 2.");
+		const { log } = await openChat(`/c/${demo.ids.ops}`, "Gửi đi 2.", demo);
+		const select = async () => {
+			fireEvent.contextMenu(messageOf(log, "Gửi đi 1."));
+			await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin" })).getByRole("menuitem", { name: "Chọn" }));
+			fireEvent.click(messageOf(log, "Gửi đi 2."));
+			const bar = await screen.findByRole("toolbar", { name: "Thao tác với các tin đã chọn" }, LONG);
+			await waitFor(() => expect(within(bar).getByText("Đã chọn 2 tin")).toBeTruthy());
+			return bar;
+		};
+		let bar = await select();
+		await userEvent.click(within(bar).getByRole("button", { name: "Chuyển tiếp" }));
+		const forward = await screen.findByRole("dialog", { name: "Chuyển tiếp tới" }, LONG);
+		await userEvent.click(within(forward).getByRole("checkbox", { name: /Team Mobile/ }));
+		await userEvent.click(within(forward).getByRole("button", { name: "Gửi tới 1 chat" }));
+		await waitFor(() => expect(demo.fixture.forwards).toEqual([{ from: demo.ids.ops, seqs: [first, second], to: demo.ids.mobile }]), LONG);
+		await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Thao tác với các tin đã chọn" })).toBeNull());
+
+		bar = await select();
+		await userEvent.click(within(bar).getByRole("button", { name: "Xoá" }));
+		const dialog = await screen.findByRole("dialog", { name: "Xoá 2 tin ở phía bạn?" }, LONG);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Xoá ở phía tôi" }));
+		await waitFor(() => expect(within(log).queryByText("Gửi đi 1.")).toBeNull(), LONG);
+		expect(within(log).queryByText("Gửi đi 2.")).toBeNull();
+		expect(screen.queryByRole("toolbar", { name: "Thao tác với các tin đã chọn" })).toBeNull();
+	});
+
 	it("pins quietly when 'Thông báo cho mọi thành viên' is off", async () => {
 		const { demo, log } = await openChat(`/c/${seedDemo().ids.ops}`, "Dashboard ổn định.");
 		const message = messageOf(log, "Dashboard ổn định.");

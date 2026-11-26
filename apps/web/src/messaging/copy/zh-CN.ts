@@ -178,6 +178,9 @@ export const zhCN: MessagingCopy = {
 		deleted: "消息已撤回",
 		quickActions: (name: string) => `${name} 的消息的快捷操作`,
 		quickActionsMine: "你的消息的快捷操作",
+		/** A message's checkbox while selecting messages. */
+		select: (name: string) => `选择 ${name} 的消息`,
+		selectLimit: (max: number) => `最多可选择 ${max} 条消息`,
 		react: "回应",
 		reply: "回复",
 		forward: "转发",

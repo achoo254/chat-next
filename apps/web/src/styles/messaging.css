@@ -501,6 +501,15 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .sub-bar .btn { min-width: 220px; }
 .closed-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2) var(--space-3); min-height: 68px; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); color: var(--c-text-muted); font-size: 0.875rem; text-align: center; }
 .closed-bar .icon { color: var(--c-icon-muted); }
+/* Selecting messages (selection.ts): every message takes a click; the selected ones are marked, and the bar of actions stands in for the composer. */
+.msg.selecting { cursor: pointer; }
+.msg.selecting .bubble, .msg.selecting .avatar-btn { pointer-events: none; }
+.msg.selected { background: var(--c-selected); box-shadow: 0 0 0 var(--space-1) var(--c-selected); }
+.select-tick { flex: none; align-self: center; display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--c-border-strong); border-radius: 50%; color: var(--c-on-primary); }
+.msg.selected .select-tick { border-color: var(--c-primary-solid); background: var(--c-primary-solid); }
+.selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-height: 68px; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--c-border-subtle); background: var(--c-surface); }
+.selection-bar .selection-count { font-weight: 600; }
+@media (max-width: 640px) { .selection-bar .btn span { display: none; } }
 
 /* Message popover: opens at the pointer or the button that asked for it (placed by message-menu.tsx), no dimming. */
 /* Lifted message (phones, Telegram-style): the screen blurs, a copy of the message floats from its place with the reaction row above and the menu below. */

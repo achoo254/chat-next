@@ -54,6 +54,12 @@ export const zhCNScreens: ScreensCopy = {
 		deleteForMe: "仅为我删除",
 		recalled: "消息已撤回",
 		hidden: "已为你删除消息",
+		forMeManyTitle: (count: number) => `仅为你删除 ${count} 条消息？`,
+		recallManyTitle: (count: number) => `撤回 ${count} 条消息？`,
+		recallManyNote: (chat: string) => `这些消息将从“${chat}”中所有人的设备上移除。此操作无法撤销。`,
+		onlyMeManyNote: "这些消息仅在你的设备上隐藏，其他人仍能看到。",
+		recalledMany: (count: number) => `已撤回 ${count} 条消息`,
+		hiddenMany: (count: number) => `已为你删除 ${count} 条消息`,
 	},
 	forward: {
 		title: "转发到",
@@ -707,6 +713,8 @@ export const zhCNScreens: ScreensCopy = {
 	},
 	menu: {
 		askAi: "问 AI",
+		/** Starts selecting messages, with this one selected. */
+		select: "选择",
 		label: "消息操作",
 		labelMine: "对你的消息的操作",
 		react: "回应",
@@ -740,6 +748,18 @@ export const zhCNScreens: ScreensCopy = {
 			"😮": "惊讶",
 			"🙏": "感谢",
 		} as Record<string, string>,
+	},
+	selection: {
+		/** The bar that stands in for the composer while messages are selected. */
+		label: "对所选消息的操作",
+		count: (count: number) => `已选择 ${count} 条消息`,
+		cancel: "取消选择",
+		forward: "转发",
+		saveToCloud: "保存到云端",
+		copy: "复制",
+		download: "下载",
+		delete: "删除",
+		copied: (count: number) => `已复制 ${count} 条消息`,
 	},
 	pinDialog: {
 		title: "置顶这条消息？",

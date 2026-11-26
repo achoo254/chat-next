@@ -45,7 +45,7 @@ export default function Dialog({ request, close }: { request: DialogRequest; clo
 		case "forward":
 			return <ForwardDialog chatId={request.chatId} seq={request.seq} seqs={request.seqs ?? [request.seq]} onClose={close} />;
 		case "delete":
-			return <DeleteDialog chatId={request.chatId} seq={request.seq} recall={request.recall} onClose={close} />;
+			return <DeleteDialog chatId={request.chatId} seq={request.seq} seqs={request.seqs ?? [request.seq]} recall={request.recall} onClose={close} />;
 		case "deleteChat":
 			return <DeleteChatDialog chatId={request.chatId} onClose={close} />;
 		case "pin":

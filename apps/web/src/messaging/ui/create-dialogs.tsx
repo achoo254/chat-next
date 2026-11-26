@@ -546,6 +546,8 @@ export function NewChannelDialog({ onClose }: CloseProps) {
 function canPost(view: DialogView): boolean {
 	const chat = view.chat;
 	if (chat === null || chat.left) return false;
+	// A chat synced with Zalo takes only what you type in its composer (the server refuses a forward).
+	if (chat.externalApp === "zalo") return false;
 	const admin = chat.myRole === "admin" || chat.myRole === "owner";
 	if (chat.type === "channel") return admin;
 	if (chat.type === "group") return admin || (chat.myPermissions & Permission.sendMessages) !== 0;
@@ -555,6 +557,7 @@ function canPost(view: DialogView): boolean {
 export function ForwardDialog({ chatId, seq, seqs, onClose }: CloseProps & { chatId: number; seq: number; seqs: readonly number[] }) {
 	const copy = useScreensCopy();
 	const { remote, source, store, toasts } = useServices();
+	const ui = useUi();
 	const order = useDialogOrder();
 	const message = useMessage(chatId, seq);
 	const nameOf = useNameOf(message == null ? [] : namedUserIds(message));
@@ -591,6 +594,7 @@ export function ForwardDialog({ chatId, seq, seqs, onClose }: CloseProps & { cha
 		try {
 			await forwardAll(comment.trim());
 			toasts.show(copy.forward.done);
+			ui.selection.set(null);
 			onClose();
 		} catch {
 			setBusy(false);

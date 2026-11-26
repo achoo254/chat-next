@@ -54,6 +54,12 @@ export const enScreens: ScreensCopy = {
 		deleteForMe: "Delete for me",
 		recalled: "Message unsent",
 		hidden: "Message deleted for you",
+		forMeManyTitle: (count: number) => `Delete ${count} messages for you?`,
+		recallManyTitle: (count: number) => `Unsend ${count} messages?`,
+		recallManyNote: (chat: string) => `The messages are removed from everyone's devices in “${chat}”. This cannot be undone.`,
+		onlyMeManyNote: "The messages are hidden on your devices only. Others still see them.",
+		recalledMany: (count: number) => `${count} messages unsent`,
+		hiddenMany: (count: number) => `${count} messages deleted for you`,
 	},
 	forward: {
 		title: "Forward to",
@@ -708,6 +714,8 @@ export const enScreens: ScreensCopy = {
 	},
 	menu: {
 		askAi: "Ask AI",
+		/** Starts selecting messages, with this one selected. */
+		select: "Select",
 		label: "Message actions",
 		labelMine: "Actions for your message",
 		react: "React",
@@ -741,6 +749,18 @@ export const enScreens: ScreensCopy = {
 			"😮": "Wow",
 			"🙏": "Thanks",
 		} as Record<string, string>,
+	},
+	selection: {
+		/** The bar that stands in for the composer while messages are selected. */
+		label: "Actions on the selected messages",
+		count: (count: number) => (count === 1 ? "1 message selected" : `${count} messages selected`),
+		cancel: "Clear selection",
+		forward: "Forward",
+		saveToCloud: "Save to Cloud",
+		copy: "Copy",
+		download: "Download",
+		delete: "Delete",
+		copied: (count: number) => (count === 1 ? "1 message copied" : `${count} messages copied`),
 	},
 	pinDialog: {
 		title: "Pin this message?",

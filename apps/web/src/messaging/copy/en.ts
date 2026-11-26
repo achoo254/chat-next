@@ -181,6 +181,9 @@ export const en: MessagingCopy = {
 		deleted: "Message unsent",
 		quickActions: (name: string) => `Quick actions for ${name}'s message`,
 		quickActionsMine: "Quick actions for your message",
+		/** A message's checkbox while selecting messages. */
+		select: (name: string) => `Select ${name}'s message`,
+		selectLimit: (max: number) => `You can select up to ${max} messages`,
 		react: "React",
 		reply: "Reply",
 		forward: "Forward",

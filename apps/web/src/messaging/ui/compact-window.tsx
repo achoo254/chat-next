@@ -20,7 +20,7 @@ import { Conversation, EmptyConversation } from "./conversation.tsx";
 import { DialogHost } from "./dialog-host.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { SurfaceContext, type Surface } from "./surface.ts";
-import { Cell, ComposerIntents, UiContext, useUi, type DialogRequest, type ListMenuTarget, type MenuTarget, type OpenMiniApp, type Ui } from "./ui-context.tsx";
+import { Cell, ComposerIntents, UiContext, useUi, type DialogRequest, type ListMenuTarget, type MenuTarget, type MessageSelection, type OpenMiniApp, type Ui } from "./ui-context.tsx";
 
 /** Unread chats the strip shows; the rest are one click away in the page. */
 const MAX_STRIP_CHATS = 8;
@@ -45,6 +45,7 @@ function CompactContent({ pip, chatId, topicId }: CompactWindowProps & { pip: Wi
 	const ui = useMemo<Ui>(
 		() => ({
 			dialog: new Cell<DialogRequest | null>(null),
+			selection: new Cell<MessageSelection | null>(null),
 			menu: new Cell<MenuTarget | null>(null),
 			listMenu: new Cell<ListMenuTarget | null>(null),
 			miniApp: new Cell<OpenMiniApp | null>(null),

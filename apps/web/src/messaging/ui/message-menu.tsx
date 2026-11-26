@@ -26,6 +26,7 @@ import { isReactionRefused } from "./reaction-refused.ts";
 import { EmojiPicker } from "./emoji-picker.tsx";
 import { MessageBubble, PendingBubble, type LimitedActions } from "./message-item.tsx";
 import { copyText } from "./parts.tsx";
+import { albumSeqs, startSelection } from "./selection-actions.ts";
 import { openAiPanel, useUi, type MenuAnchor } from "./ui-context.tsx";
 
 // The quick reaction row rides in this chunk, so a message loads no extra chunk for it.
@@ -126,16 +127,6 @@ function placeLifted(stack: HTMLElement, from: DOMRect, mine: boolean): void {
 	stack.style.left = `${Math.max(EDGE_PX, Math.min(left, window.innerWidth - width - EDGE_PX))}px`;
 	stack.style.top = `${top}px`;
 	stack.style.setProperty("--lift", `${floating - top}px`);
-}
-
-/** Every message of the album `message` belongs to, in order; just its own seq outside an album. */
-function albumSeqs(items: readonly WindowItem[], message: StoredMessage): number[] {
-	if (message.groupedId === 0) return [message.seq];
-	return items.flatMap((item) =>
-		item.kind === "message" && !item.message.recalled && item.message.groupedId === message.groupedId && item.message.fromId === message.fromId
-			? [item.message.seq]
-			: [],
-	);
 }
 
 export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readOutboxMaxSeq, item: given, limited }: MenuLayerProps) {
@@ -355,6 +346,8 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 		if (canSeeReaders(message, chat, store.selfId, limits)) {
 			entries.push({ label: copy.menu.readBy, icon: "eye", run: () => ui.dialog.set({ kind: "readBy", chatId, seq: message.seq }) });
 		}
+		// Selecting several messages, this one (its whole album) first.
+		entries.push({ label: copy.menu.select, icon: "check", run: () => startSelection(ui, chatId, seqs) });
 		if (!mine && backend.features.has("report")) {
 			entries.push({
 				label: copy.menu.report,
