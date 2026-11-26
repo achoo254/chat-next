@@ -67,6 +67,11 @@ export const BUNDLE_BUDGET = {
 	 * Splitting more startup code into lazy chunks made it worse (157.0 KB with the compact
 	 * window lazy: its shared modules became chunks of their own), and what is left is the
 	 * first screen. The budget is 156 KB since 26/11/2026, raised by the owner.
+	 * 151.9 KB (from 155.6) once five files (the chat list, the compact window, the list
+	 * resizer and the two loaders) are left out of the React Compiler's memoization, which
+	 * only grew them: 3.7 KB gzip, with no change in the open-chat and scroll timings. The
+	 * message list and the conversation grew less (1.2 and 1.5 KB) but are left memoized:
+	 * without it the history scroll dropped 23 frames on the 4x-throttled run (1 before).
 	 */
 	startupJsGzip: 156 * 1024,
 	/**

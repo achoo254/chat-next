@@ -5,6 +5,10 @@
 // "Chưa đọc" filter keeps a chat you just read until you change filters, so
 // the list does not jump (#list-states). Alt+↑/↓ opens the chat above/below.
 // In "Tất cả" the chats of a linked person are one row (people/person-rows.ts).
+
+// The React Compiler leaves this file alone: its memoization only grew the startup bundle (about 1.7 KB gzip
+// for this file) and changed no timing in test/perf.
+"use no memo";
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from "react";
 import type { SelfUser } from "../../api/adapters.ts";
 import { brand } from "../../brand.ts";

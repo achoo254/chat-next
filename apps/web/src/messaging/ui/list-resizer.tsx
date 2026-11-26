@@ -3,6 +3,10 @@
 // focus it and press ←/→ (Home/End for the limits), to change the list's
 // width (the chat list 280–420px by default); the width is kept on this
 // device, one per list. Narrow screens have one column at a time and no handle.
+
+// The React Compiler leaves this file alone: its memoization only grew the startup bundle (about 0.5 KB gzip
+// for this file) and changed no timing in test/perf.
+"use no memo";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
 import { useCopy } from "../copy/use-copy.ts";
 

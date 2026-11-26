@@ -3,6 +3,10 @@
 // page's own state: picking a chat in the strip navigates the page's route, so
 // the chat core keeps following one open chat. The window has its own
 // dialogs, menus and reply/edit state; the data is shared with the page.
+
+// The React Compiler leaves this file alone: its memoization only grew the startup bundle (about 0.7 KB gzip
+// for this file) and changed no timing in test/perf.
+"use no memo";
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useCompactWindow } from "../../compact/compact-window-store.ts";

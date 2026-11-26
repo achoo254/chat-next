@@ -11,6 +11,10 @@
 //   <DelayedLoader />           the same as a plain element (Suspense fallbacks)
 //   <Ready parts>               holds a screen back, with the region's loader,
 //                               until the code and data it starts with are in
+
+// The React Compiler leaves this file alone: its memoization only grew the startup bundle (about 0.4 KB gzip
+// for this file) and changed no timing in test/perf.
+"use no memo";
 import { Suspense, createContext, use, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { BrandLoader } from "./brand-loader.tsx";
 import { isSettled } from "./preload.ts";

@@ -2,6 +2,10 @@
 // logo is the brand icon (virtual:brand-logo, from brand.config.json): inline
 // SVG when it is vector, an <img> of the served icon file when it embeds a
 // raster picture; styles are .brand-logo / .brand-loader in app.css.
+
+// The React Compiler leaves this file alone: its memoization only grew the startup bundle (about 0.4 KB gzip
+// for this file) and changed no timing in test/perf.
+"use no memo";
 import { useId, useLayoutEffect, useRef } from "react";
 import logo from "virtual:brand-logo";
 import { brand } from "../brand.ts";
