@@ -452,6 +452,8 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 .bubble.media { padding: var(--space-1); }
 .bubble.media > p, .bubble.media > .who, .bubble.media > .fwd, .bubble.media > .reply { margin-left: var(--space-2); margin-right: var(--space-2); }
 .bubble.media > p { padding: var(--space-1) 0; }
+/* A picture sets the bubble's width and the caption wraps to it (as Telegram does); otherwise a long caption widens the bubble and leaves a gap beside the fixed-width picture. */
+.bubble.media:has(.media-pic:not(.gone), .album, .media-box:not(.card)) > :is(p, .who, .fwd, .reply) { contain: inline-size; }
 .bubble.media > .who, .bubble.media > .fwd, .bubble.media > .via-bot { padding-top: var(--space-1); }
 .media-box { display: block; max-width: 100%; height: auto; border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
 .media-box.card { width: min(300px, 100%); height: 52px; }
