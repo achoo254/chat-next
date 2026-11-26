@@ -17,7 +17,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { useCopy } from "../copy/use-copy.ts";
 import { isReactionRefused } from "./reaction-refused.ts";
 import { clock, integrationTone, isSavedChat, messagePreview, namedUserIds, toneOf } from "../data/format.ts";
-import { useChat, useConnection, useItem, useMessage, useServices, useUser } from "../data/services.tsx";
+import { useChat, useConnection, useHeldMessage, useItem, useServices, useUser } from "../data/services.tsx";
 import { LabelledIcon, useContextTrigger, useNameOf } from "./chat-row.tsx";
 import { ChatAvatar } from "./parts.tsx";
 import { splitAlert } from "./alert-text.ts";
@@ -282,7 +282,7 @@ function ReplyQuote({ chatId, seq, onJump }: { chatId: number; seq: number; onJu
 	"use no memo";
 	const copy = useCopy();
 	const { store } = useServices();
-	const target = useMessage(chatId, seq);
+	const target = useHeldMessage(chatId, seq);
 	const channel = useChat(chatId)?.type === "channel";
 	const nameOf = useNameOf(target == null ? [] : namedUserIds(target));
 	if (target === undefined) return <span className="reply">…</span>;
