@@ -376,8 +376,6 @@ export function LiveMapStage({ state, initialEvent, onPick, clockSkewMs = 0, con
 			g.suppressClick = false;
 			return;
 		}
-		// The camera's controls handle their own clicks.
-		if (e.target instanceof Element && e.target.closest(".lm-camctl") !== null) return;
 		const h = handle.current;
 		const p = local(e);
 		// A pointer click (not Enter on a button) on a moving packet opens its event.
@@ -448,26 +446,27 @@ export function LiveMapStage({ state, initialEvent, onPick, clockSkewMs = 0, con
 								);
 							})}
 						</div>
-						{status === "ready" && (
-							<div className="lm-camctl">
-								<div className="lm-seg" role="group" aria-label={c.camera.label}>
-									{modes.map((m) => (
-										<button key={m} type="button" aria-pressed={camera.mode === m} data-id={`observe-camera-${m}`} onClick={() => setMode(m)}>
-											{c.camera[m]}
-										</button>
-									))}
-								</div>
-								<span className="lm-camnote" data-id="observe-camera-note">
-									{c.camera.note(where, camera.switches, feed.total)}
-								</span>
-							</div>
-						)}
 						{status === "still" && (
 							<p className="note lm-note" role="status" data-id="observe-still">
 								{t.still}
 							</p>
 						)}
 					</div>
+					{/* Under the scene, never over it: no module is ever covered by the camera's controls. */}
+					{status === "ready" && (
+						<div className="lm-camctl">
+							<div className="lm-seg" role="group" aria-label={c.camera.label}>
+								{modes.map((m) => (
+									<button key={m} type="button" aria-pressed={camera.mode === m} data-id={`observe-camera-${m}`} onClick={() => setMode(m)}>
+										{c.camera[m]}
+									</button>
+								))}
+							</div>
+							<span className="lm-camnote" data-id="observe-camera-note">
+								{c.camera.note(where, camera.switches, feed.total)}
+							</span>
+						</div>
+					)}
 				</div>
 				<div className="lm-col">
 					<SessionBox state={state} hide={hide} hideLabel={t.hideDetails} hideHint={t.hideDetailsHint} approxHint={t.contextApproxHint} onHide={toggleHide} />

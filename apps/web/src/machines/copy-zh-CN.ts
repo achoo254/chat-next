@@ -1441,7 +1441,7 @@ export const zhCNMachines: MachinesCopy = {
 			hideDetailsHint: "隐藏场景上的文件名、域名、命令、MCP 工具名和内容",
 			userDesk: "提示",
 			gateway: "权限",
-			monitoring: "上下文储池",
+			monitoring: "上下文",
 			contextApproxHint: "上下文窗口按模型推定，百分比为近似值",
 		},
 		stations: {

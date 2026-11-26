@@ -1450,7 +1450,7 @@ export const enMachines: MachinesCopy = {
 			hideDetailsHint: "Hide file names, domains, commands, MCP tool names and content on the scene",
 			userDesk: "Prompt",
 			gateway: "Permission",
-			monitoring: "Context reservoir",
+			monitoring: "Context",
 			contextApproxHint: "The context window is assumed from the model, so the percentage is approximate",
 		},
 		stations: {

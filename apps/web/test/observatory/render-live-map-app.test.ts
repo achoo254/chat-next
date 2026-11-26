@@ -91,7 +91,7 @@ describe("mounting the Live Map", () => {
 		expect(handle.canvas.getAttribute("aria-hidden")).toBe("true");
 		expect([handle.canvas.width, handle.canvas.height]).toEqual([2400, 1440]);
 		frames.run(50);
-		expect(texts).toEqual(expect.arrayContaining(["KHO TỆP", "TERMINAL", "KIỂM THỬ", "GIT · CI/CD", "CỔNG MCP", "BỂ NGỮ CẢNH", "CỔNG KHÔNG GIAN · internet", "MODEL", "rảnh", "commit", "prod"]));
+		expect(texts).toEqual(expect.arrayContaining(["KHO TỆP", "TERMINAL", "KIỂM THỬ", "GIT · CI/CD", "CỔNG MCP", "CONTEXT", "CỔNG INTERNET", "MODEL", "rảnh", "commit", "prod"]));
 		handle.resize(600, 360);
 		expect([handle.canvas.width, handle.canvas.height]).toEqual([1200, 720]);
 		handle.destroy();

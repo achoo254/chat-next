@@ -106,24 +106,6 @@ function clip(s: string, px: number, size: number): string {
 	return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
-const segLen = (a: Point, b: Point): number => Math.hypot(b[0] - a[0], b[1] - a[1]);
-
-/** The middle of a path's longest leg, where its label goes. */
-function midOf(p: readonly Point[]): { x: number; y: number; horiz: boolean } {
-	let best = 1;
-	let bl = 0;
-	for (let i = 1; i < p.length; i++) {
-		const l = segLen(p[i - 1] ?? [0, 0], p[i] ?? [0, 0]);
-		if (l > bl) {
-			bl = l;
-			best = i;
-		}
-	}
-	const a = p[best - 1] ?? [0, 0];
-	const b = p[best] ?? a;
-	return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, horiz: a[1] === b[1] };
-}
-
 /** The model's lattice: a centre node and three rings, each node linked to its close neighbours on the next ring. */
 interface Node {
 	readonly r: number;
@@ -188,6 +170,8 @@ export class InteriorPainter {
 	private readonly touched = new Map<PlaceId, number>();
 	/** When the context's compaction began (animation clock); null when none runs. */
 	private compactSince: number | null = null;
+	/** The text's scale (scene-table.ts `text`). */
+	private readonly ts: number;
 	/** Modules' boards, worked out once per state and quarter second (they read the whole log). */
 	private boards = new Map<string, DistrictBoard>();
 	private boardsOf: { state: LiveMapState | null; bucket: number } = { state: null, bucket: -1 };
@@ -197,6 +181,7 @@ export class InteriorPainter {
 
 	constructor(scene: SceneTable, random: () => number = Math.random) {
 		this.scene = scene;
+		this.ts = scene.text;
 		this.random = random;
 		this.stars = Array.from({ length: 70 }, () => ({ a: random() * 7, r: 20 + random() * 44, s: 0.3 + random() }));
 		this.background = this.makeBackground();
@@ -400,13 +385,13 @@ export class InteriorPainter {
 		if (selected === place) this.dashedFrame(r);
 		c.textBaseline = "top";
 		c.textAlign = "left";
-		c.font = `600 ${t.font}px ${MONO}`;
+		c.font = `600 ${t.font * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
 		c.fillText(copy.tags[place], r.x + 10, r.y + 8);
-		c.font = `400 ${t.sub}px ${MONO}`;
+		c.font = `400 ${t.sub * this.ts}px ${MONO}`;
 		c.fillStyle = INK.muted;
 		const n = this.calls(place);
-		c.fillText(n > 0 && withCalls ? `${copy.subs[place]} · ${copy.calls(n)}` : copy.subs[place], r.x + 10, r.y + 10 + t.font + 2);
+		c.fillText(n > 0 && withCalls ? `${copy.subs[place]} · ${copy.calls(n)}` : copy.subs[place], r.x + 10, r.y + 10 + t.font * this.ts + 2);
 		return g;
 	}
 
@@ -423,11 +408,11 @@ export class InteriorPainter {
 		const board = this.board(place);
 		const items = board.kind === "calls" ? board.rows.slice(0, rows) : [];
 		const col = PLACE_COLOR[place];
-		c.font = `400 ${size}px ${MONO}`;
+		c.font = `400 ${size * this.ts}px ${MONO}`;
 		c.textBaseline = "top";
 		c.textAlign = "left";
 		items.forEach((r, k) => {
-			const yy = y + k * (size + 4);
+			const yy = y + k * (size * this.ts + 4);
 			const failed = r.ok === false;
 			const right = failed ? `✗ ${duration(r.runtimeMs)}` : duration(r.runtimeMs);
 			c.fillStyle = r.running ? col : failed ? INK.err : INK.fg;
@@ -511,19 +496,20 @@ export class InteriorPainter {
 			c.lineCap = "butt";
 			// The label: the runtime while a call runs, else the calls, the p95 and the failures; each value says what it is.
 			const first = run[0];
-			if (n > 0 || first !== undefined) {
-				const mid = midOf(r);
+			const spot = this.scene.places[road.place].label;
+			if (spot !== null && (n > 0 || first !== undefined)) {
 				const parts = [copy.calls(n)];
 				if (road.p95Ms !== null) parts.push(copy.p95(duration(road.p95Ms)));
 				if (road.failures > 0) parts.push(copy.failures(road.failures));
 				const txt = first !== undefined ? copy.runtime(duration(Math.max(0, wall - first.startedAt))) : parts.join(" · ");
-				c.font = `500 10.5px ${MONO}`;
+				c.font = `500 ${10.5 * this.ts}px ${MONO}`;
 				const tw = c.measureText(txt).width;
-				const x = mid.horiz ? mid.x - tw / 2 : mid.x + 8;
-				const y = mid.horiz ? mid.y - 18 : mid.y - 7;
+				// Each trace writes at its own spot (scene-table.ts), clear of the others.
+				const x = spot.align === "left" ? spot.at[0] : spot.align === "center" ? spot.at[0] - tw / 2 : spot.at[0] - tw;
+				const y = spot.at[1];
 				c.globalAlpha = dim ? 0.5 : 1;
 				c.fillStyle = "rgba(12,18,26,.88)";
-				c.fillRect(x - 4, y - 2, tw + 8, 15);
+				c.fillRect(x - 4, y - 2, tw + 8, 15 * this.ts);
 				c.fillStyle = first === undefined && road.failures > 0 ? INK.err : col;
 				c.textBaseline = "top";
 				c.textAlign = "left";
@@ -558,7 +544,7 @@ export class InteriorPainter {
 			c.stroke();
 			c.lineWidth = 1;
 			if (move.kind === "batch") {
-				c.font = `600 12px ${MONO}`;
+				c.font = `600 ${12 * this.ts}px ${MONO}`;
 				c.fillStyle = col;
 				c.textAlign = "center";
 				c.textBaseline = "middle";
@@ -572,20 +558,22 @@ export class InteriorPainter {
 		const c = this.c;
 		const { look, state, t, dt, motion, thinking, selected, contentZone, copy } = this.i;
 		const [cx, cy] = this.scene.core.centre;
+		// The design's lattice is drawn for a radius of 120; a larger model scales it.
+		const k = this.scene.core.radius / 120;
 		const think = look.mode === "think" && thinking;
 		const exec = look.mode === "exec";
 		const waiting = look.mode === "wait";
 		const base = waiting ? INK.warn : PLACE_COLOR.core;
 		const energy = think ? 1 : exec ? 0.25 : waiting ? 0.35 : 0.12;
 		const rot = t / (think ? 5000 : 14000);
-		const grd = c.createRadialGradient(cx, cy, 8, cx, cy, 140);
+		const grd = c.createRadialGradient(cx, cy, 8, cx, cy, 140 * k);
 		grd.addColorStop(0, rgba(base, 0.1 + 0.3 * energy));
 		grd.addColorStop(1, rgba(base, 0));
 		c.fillStyle = grd;
 		c.beginPath();
-		c.arc(cx, cy, 140, 0, 7);
+		c.arc(cx, cy, 140 * k, 0, 7);
 		c.fill();
-		for (const r of [34, 62, 88, 112]) {
+		for (const r of [34 * k, 62 * k, 88 * k, 112 * k]) {
 			c.beginPath();
 			c.arc(cx, cy, r, 0, 7);
 			c.strokeStyle = rgba(base, 0.06 + 0.1 * energy);
@@ -593,7 +581,7 @@ export class InteriorPainter {
 		}
 		const pos = (n: Node): Point => {
 			const a = n.a + rot * (n.ring % 2 === 1 ? 1 : -1);
-			return [cx + Math.cos(a) * n.r, cy + Math.sin(a) * n.r];
+			return [cx + Math.cos(a) * n.r * k, cy + Math.sin(a) * n.r * k];
 		};
 		const nodeAt = (k: number): Point => pos(NODES[k] ?? { r: 0, a: 0, ring: 0 });
 		for (const [a, b] of EDGES) {
@@ -651,7 +639,7 @@ export class InteriorPainter {
 		if (selected === "core" || selected === "orchestrator") {
 			c.setLineDash([4, 4]);
 			c.beginPath();
-			c.arc(cx, cy, 120, 0, 7);
+			c.arc(cx, cy, 120 * k, 0, 7);
 			c.strokeStyle = rgba(INK.fg, 0.6);
 			c.stroke();
 			c.setLineDash([]);
@@ -678,7 +666,7 @@ export class InteriorPainter {
 			c.arc(sx, sy, 5, 0, 7);
 			c.fillStyle = sub;
 			c.fill();
-			c.font = `400 11px ${MONO}`;
+			c.font = `400 ${11 * this.ts}px ${MONO}`;
 			c.fillStyle = sub;
 			c.textBaseline = "top";
 			c.textAlign = "left";
@@ -687,18 +675,18 @@ export class InteriorPainter {
 		const model = state.live?.mainModel || state.scene.model;
 		c.textAlign = "center";
 		c.textBaseline = "top";
-		c.font = `600 14px ${MONO}`;
+		c.font = `600 ${14 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
-		c.fillText(copy.modelTitle(model), cx, cy + 124);
-		c.font = `600 12px ${MONO}`;
+		c.fillText(copy.modelTitle(model), cx, cy + 124 * k);
+		c.font = `600 ${12 * this.ts}px ${MONO}`;
 		c.fillStyle = think ? INK.think : waiting ? INK.warn : INK.muted;
-		c.fillText(think ? copy.thinking : waiting ? copy.waiting : exec ? copy.executing : copy.idle, cx, cy + 142);
+		c.fillText(think ? copy.thinking : waiting ? copy.waiting : exec ? copy.executing : copy.idle, cx, cy + 124 * k + 18);
 		if (contentZone === "core" || contentZone === "orchestrator") {
 			const board = this.board("core");
 			if (board.kind === "model" && board.apiTurns > 0) {
-				c.font = `400 11px ${MONO}`;
+				c.font = `400 ${11 * this.ts}px ${MONO}`;
 				c.fillStyle = INK.muted;
-				c.fillText(copy.apiLine(board.apiTurns, Math.round((state.live?.contextTokens ?? 0) / 1000), Math.round(board.tokensPerSecond ?? 0)), cx, cy + 160);
+				c.fillText(copy.apiLine(board.apiTurns, Math.round((state.live?.contextTokens ?? 0) / 1000), Math.round(board.tokensPerSecond ?? 0)), cx, cy + 124 * k + 36);
 			}
 		}
 		c.textAlign = "left";
@@ -740,14 +728,14 @@ export class InteriorPainter {
 			c.strokeRect(p.x - 6, p.y - 6, p.w + 12, p.h + 12);
 			c.setLineDash([]);
 		}
-		c.font = `600 13px ${MONO}`;
+		c.font = `600 ${13 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
 		c.textBaseline = "top";
 		c.textAlign = "left";
 		c.fillText(copy.tags.monitoring, p.x, p.y + p.h + 10);
-		c.font = `400 11.5px ${MONO}`;
+		c.font = `400 ${11.5 * this.ts}px ${MONO}`;
 		c.fillStyle = col;
-		c.fillText(copy.contextLine(percent === null ? null : Math.round(percent), state.live?.contextTokens ?? 0, state.live?.contextWindow ?? 0), p.x, p.y + p.h + 27);
+		c.fillText(copy.contextLine(percent === null ? null : Math.round(percent), state.live?.contextTokens ?? 0, state.live?.contextWindow ?? 0), p.x, p.y + p.h + 10 + 17 * this.ts);
 	}
 
 	/** The token wave: its height and frequency follow the model's output rate. */
@@ -773,7 +761,7 @@ export class InteriorPainter {
 		c.lineWidth = 1.5;
 		c.stroke();
 		c.lineWidth = 1;
-		c.font = `400 10.5px ${MONO}`;
+		c.font = `400 ${10.5 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.muted;
 		c.textBaseline = "top";
 		c.textAlign = "left";
@@ -831,7 +819,7 @@ export class InteriorPainter {
 		}
 		c.textAlign = "right";
 		c.textBaseline = "top";
-		c.font = `600 12px ${MONO}`;
+		c.font = `600 ${12 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
 		c.fillText(copy.portal, p.x + p.w, p.y + p.h + 4);
 		c.textAlign = "left";
@@ -845,9 +833,9 @@ export class InteriorPainter {
 		const live = board.kind === "calls" ? board.rows.find((r) => r.running) : undefined;
 		const n = this.calls("external");
 		c.textAlign = "right";
-		c.font = `400 11px ${MONO}`;
+		c.font = `400 ${11 * this.ts}px ${MONO}`;
 		c.fillStyle = col;
-		c.fillText(live !== undefined ? `▶ ${hide || live.target === "" ? live.tool : live.target}` : n > 0 ? copy.calls(n) : "", p.x + p.w, p.y + p.h + 20);
+		c.fillText(live !== undefined ? `▶ ${hide || live.target === "" ? live.tool : live.target}` : n > 0 ? copy.calls(n) : "", p.x + p.w, p.y + p.h + 4 + 16 * this.ts);
 		c.textAlign = "left";
 	}
 
@@ -860,8 +848,8 @@ export class InteriorPainter {
 		const servers = Object.values(state.scene.mcp);
 		const slotH = 26;
 		const gap = 8;
-		const top = p.y + 40;
-		const fits = Math.floor((p.h - 40 + gap) / (slotH + gap));
+		const top = p.y + 10 + 30 * this.ts;
+		const fits = Math.floor((p.y + p.h - top + gap) / (slotH + gap));
 		const shown = servers.length > fits ? servers.slice(0, fits - 1) : servers;
 		const board = contentZone === "mcp" ? this.board("mcp") : null;
 		c.textBaseline = "middle";
@@ -872,7 +860,7 @@ export class InteriorPainter {
 			c.fillRect(p.x + 10, y, p.w - 20, slotH - 4);
 			c.strokeStyle = on ? PLACE_COLOR.mcp : INK.edge;
 			c.strokeRect(p.x + 10.5, y + 0.5, p.w - 21, slotH - 5);
-			c.font = `400 11px ${MONO}`;
+			c.font = `400 ${11 * this.ts}px ${MONO}`;
 			c.fillStyle = on ? INK.fg : INK.muted;
 			c.textAlign = "left";
 			c.fillText(hide ? copy.mcpServer(k + 1) : clip(s.server, 150, 11), p.x + 18, y + (slotH - 4) / 2);
@@ -887,12 +875,12 @@ export class InteriorPainter {
 			}
 		});
 		if (servers.length === 0) {
-			c.font = `400 11px ${MONO}`;
+			c.font = `400 ${11 * this.ts}px ${MONO}`;
 			c.fillStyle = INK.muted;
 			c.textAlign = "left";
 			c.fillText(copy.noMcp, p.x + 18, top + 10);
 		} else if (servers.length > shown.length) {
-			c.font = `400 11px ${MONO}`;
+			c.font = `400 ${11 * this.ts}px ${MONO}`;
 			c.fillStyle = INK.muted;
 			c.textAlign = "left";
 			c.fillText(copy.moreServers(servers.length - shown.length), p.x + 18, top + shown.length * (slotH + gap) + 10);
@@ -907,12 +895,12 @@ export class InteriorPainter {
 		const run = this.running("files") > 0;
 		this.box("files", PLACE_COLOR.files);
 		if (contentZone === "files") {
-			this.listRows("files", p.x + 10, p.y + 40, p.w - 20, 4);
+			this.listRows("files", p.x + 10, p.y + 10 + 30 * this.ts, p.w - 20, 4);
 			return;
 		}
 		for (let k = 0; k < 36; k++) {
-			const x = p.x + 150 + (k % 12) * 14;
-			const y = p.y + 14 + Math.floor(k / 12) * 24;
+			const x = p.x + p.w - 12 - 12 * 14 + (k % 12) * 14;
+			const y = p.y + p.h - 28 - 2 * 24 + Math.floor(k / 12) * 24;
 			const on = run && Math.sin(wall / 60 - k * 0.7) > 0.3;
 			c.fillStyle = rgba(PLACE_COLOR.files, on ? 0.8 : 0.1);
 			c.fillRect(x, y, 10, 18);
@@ -926,9 +914,9 @@ export class InteriorPainter {
 		const run = this.running("sandbox") > 0;
 		this.box("sandbox", PLACE_COLOR.sandbox);
 		const x = p.x + 8;
-		const y = p.y + 40;
+		const y = p.y + 10 + 30 * this.ts;
 		const w = p.w - 16;
-		const h = p.h - 48;
+		const h = p.y + p.h - 8 - y;
 		c.fillStyle = "#070a0e";
 		c.fillRect(x, y, w, h);
 		if (contentZone === "sandbox" || contentZone === "testing") {
@@ -954,7 +942,7 @@ export class InteriorPainter {
 		const p = this.scene.places.testing.rect;
 		const run = this.running("testing") > 0;
 		this.box("testing", PLACE_COLOR.testing);
-		if (contentZone === "testing") this.listRows("testing", p.x + 10, p.y + 40, p.w - 20, 3, 10);
+		if (contentZone === "testing") this.listRows("testing", p.x + 10, p.y + 10 + 30 * this.ts, p.w - 20, 3, 10);
 		// The last test run's result: all green when it passed, one red when it failed, grey before any.
 		const board = this.board("testing");
 		const last = board.kind === "calls" ? board.rows.find((r) => !r.running) : undefined;
@@ -972,7 +960,7 @@ export class InteriorPainter {
 		const p = this.scene.places.git.rect;
 		this.box("git", PLACE_COLOR.git);
 		const pipe = look.pipeline;
-		const y = p.y + 42;
+		const y = p.y + 12 + 30 * this.ts;
 		const h = 26;
 		const cw = 84;
 		const gap = 18;
@@ -1012,12 +1000,12 @@ export class InteriorPainter {
 				c.fillStyle = PLACE_COLOR.git;
 				c.fillRect(x + 3 + (cw - 30) * f, y + h - 4, 24, 2);
 			}
-			c.font = `600 11px ${MONO}`;
+			c.font = `600 ${11 * this.ts}px ${MONO}`;
 			c.fillStyle = st.status === "idle" ? INK.muted : INK.fg;
 			c.textBaseline = "middle";
 			c.textAlign = "left";
 			c.fillText(copy.steps[k], x + 8, y + h / 2 - 1);
-			c.font = `400 10.5px ${MONO}`;
+			c.font = `400 ${10.5 * this.ts}px ${MONO}`;
 			c.fillStyle = col;
 			c.textAlign = "right";
 			const value =
@@ -1045,7 +1033,7 @@ export class InteriorPainter {
 			c.strokeStyle = rgba(INK.ok, live);
 			c.stroke();
 		}
-		c.font = `400 10px ${MONO}`;
+		c.font = `400 ${10 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.muted;
 		c.textBaseline = "top";
 		c.fillText(copy.prod, dx, y + h + 3);
@@ -1053,7 +1041,7 @@ export class InteriorPainter {
 			const board = this.board("git");
 			const r = board.kind === "calls" ? board.rows[0] : undefined;
 			if (r !== undefined) {
-				c.font = `400 10.5px ${MONO}`;
+				c.font = `400 ${10.5 * this.ts}px ${MONO}`;
 				c.fillStyle = INK.fg;
 				c.fillText(clip(hide || r.target === "" ? r.tool : `${r.tool} ${r.target}`, p.w - 180, 10.5), p.x + 170, p.y + 10);
 			}

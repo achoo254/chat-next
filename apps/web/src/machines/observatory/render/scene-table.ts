@@ -1,12 +1,12 @@
 // Where everything sits inside the machine (the Live Map's scene), in scene
-// pixels of a 1200 × 720 board, as the approved design lays it out
+// pixels of a 1500 × 900 board, as the approved design lays it out (given room)
 // (hoandat-app/plans/dattqh/261125-2211-observatory-machine-interior/reports/prototype-v6.html):
 // the model's neural lattice in the middle, the context reservoir and the
 // token wave beside it, the main modules (files, terminal, testing, Git ·
 // CI/CD) below, the secondary ones (MCP, internet) on the right, the
 // background ones (memory, skills, permission lock, input port) small at the
 // edges. Each module has its rect, tier and the trace from the model to it
-// (straight legs). The scene is drawn in code (render/interior-painter.ts):
+// (straight legs) and the spot its figures are written. The scene is drawn in code (render/interior-painter.ts):
 // there are no image assets.
 import type { StationCode } from "../station-catalog.ts";
 
@@ -26,6 +26,12 @@ export interface Rect {
 /** 1: main, 2: secondary, 3: background (smaller, dimmer while unused). */
 export type Tier = 1 | 2 | 3;
 
+/** Where a trace's figures are written: a point in free space and which way the text runs from it. */
+export interface TraceLabel {
+	readonly at: Point;
+	readonly align: "left" | "center" | "right";
+}
+
 export interface ScenePlace {
 	readonly id: PlaceId;
 	/** The module's box: the click area and the camera's focus box. */
@@ -33,6 +39,8 @@ export interface ScenePlace {
 	readonly tier: Tier;
 	/** The trace from the model to the module; empty when none. */
 	readonly route: readonly Point[];
+	/** Where the trace's figures go, clear of every module, other trace's figures and the model's title; null: none written. */
+	readonly label: TraceLabel | null;
 }
 
 export interface SceneSpace {
@@ -53,75 +61,82 @@ export interface SceneTable {
 	readonly core: SceneCore;
 	/** The token wave's box. */
 	readonly wave: Rect;
+	/** How much larger than the design's the text is drawn (the board grew more, so the traces run longer). */
+	readonly text: number;
 	readonly places: Readonly<Record<PlaceId, ScenePlace>>;
 }
 
-const MODEL: Rect = { x: 508, y: 238, w: 224, h: 224 };
+const MODEL: Rect = { x: 635, y: 298, w: 280, h: 280 };
 
-const place = (id: PlaceId, rect: Rect, tier: Tier, route: readonly Point[] = []): ScenePlace => ({ id, rect, tier, route });
+const place = (id: PlaceId, rect: Rect, tier: Tier, route: readonly Point[] = [], label: TraceLabel | null = null): ScenePlace => ({ id, rect, tier, route, label });
+const at = (x: number, y: number, align: TraceLabel["align"] = "left"): TraceLabel => ({ at: [x, y], align });
 
-/** The scene of the machine's interior. */
+/**
+ * The scene of the machine's interior: the design's layout given room (a
+ * 1500 × 900 board, the same 5:3 as the design's 1200 × 720), so each trace
+ * runs long enough to carry its figures and no two figures, module or the
+ * model's title meet.
+ */
 export const INTERIOR: SceneTable = {
-	space: { width: 1200, height: 720 },
-	core: { centre: [620, 350], radius: 120, orbit: [150, 118] },
-	wave: { x: 300, y: 18, w: 190, h: 62 },
+	space: { width: 1500, height: 900 },
+	core: { centre: [775, 438], radius: 150, orbit: [188, 148] },
+	wave: { x: 375, y: 10, w: 238, h: 62 },
+	text: 1.15,
 	places: {
 		core: place("core", MODEL, 1),
 		orchestrator: place("orchestrator", MODEL, 1),
-		monitoring: place("monitoring", { x: 330, y: 170, w: 120, h: 300 }, 1),
-		files: place("files", { x: 96, y: 520, w: 330, h: 96 }, 1, [
-			[520, 420],
-			[470, 420],
-			[470, 568],
-			[426, 568],
+		monitoring: place("monitoring", { x: 412, y: 212, w: 150, h: 375 }, 1),
+		files: place("files", { x: 120, y: 650, w: 412, h: 120 }, 1, [
+			[650, 525],
+			[588, 525],
+			[588, 710],
+			[532, 710],
+		], at(120, 628)),
+		sandbox: place("sandbox", { x: 1060, y: 610, w: 180, h: 140 }, 1, [
+			[900, 525],
+			[962, 525],
+			[962, 700],
+			[1060, 700],
+		], at(972, 590)),
+		testing: place("testing", { x: 1265, y: 610, w: 215, h: 140 }, 1, [
+			[900, 560],
+			[1372, 560],
+			[1372, 610],
+		], at(1160, 541, "center")),
+		git: place("git", { x: 650, y: 800, w: 550, h: 95 }, 1, [
+			[812, 578],
+			[812, 800],
+		], at(822, 765)),
+		mcp: place("mcp", { x: 1050, y: 200, w: 400, h: 175 }, 2, [
+			[900, 375],
+			[988, 375],
+			[988, 288],
+			[1050, 288],
+		], at(998, 390)),
+		external: place("external", { x: 1325, y: 8, w: 162, h: 162 }, 2, [
+			[862, 312],
+			[862, 88],
+			[1332, 88],
+		], at(1090, 68, "center")),
+		memory: place("memory", { x: 162, y: 100, w: 125, h: 50 }, 3, [
+			[688, 312],
+			[688, 125],
+			[287, 125],
+		], at(480, 105, "center")),
+		skills: place("skills", { x: 162, y: 165, w: 125, h: 50 }, 3, [
+			[715, 312],
+			[715, 190],
+			[287, 190],
+		], at(480, 170, "center")),
+		security: place("security", { x: 588, y: 715, w: 75, h: 55 }, 3, [
+			[700, 565],
+			[700, 662],
+			[625, 662],
+			[625, 715],
 		]),
-		sandbox: place("sandbox", { x: 800, y: 500, w: 170, h: 120 }, 1, [
-			[720, 420],
-			[770, 420],
-			[770, 560],
-			[800, 560],
-		]),
-		testing: place("testing", { x: 1000, y: 500, w: 180, h: 120 }, 1, [
-			[720, 440],
-			[750, 440],
-			[750, 484],
-			[1090, 484],
-			[1090, 500],
-		]),
-		git: place("git", { x: 520, y: 640, w: 440, h: 76 }, 1, [
-			[650, 462],
-			[650, 640],
-		]),
-		mcp: place("mcp", { x: 840, y: 160, w: 320, h: 140 }, 2, [
-			[720, 300],
-			[790, 300],
-			[790, 230],
-			[840, 230],
-		]),
-		external: place("external", { x: 1060, y: 6, w: 130, h: 130 }, 2, [
-			[690, 250],
-			[690, 70],
-			[1066, 70],
-		]),
-		memory: place("memory", { x: 130, y: 100, w: 100, h: 46 }, 3, [
-			[550, 250],
-			[550, 123],
-			[230, 123],
-		]),
-		skills: place("skills", { x: 130, y: 168, w: 100, h: 46 }, 3, [
-			[572, 250],
-			[572, 191],
-			[230, 191],
-		]),
-		security: place("security", { x: 470, y: 572, w: 60, h: 44 }, 3, [
-			[560, 452],
-			[560, 530],
-			[500, 530],
-			[500, 572],
-		]),
-		"user-desk": place("user-desk", { x: 4, y: 306, w: 56, h: 50 }, 3, [
-			[520, 332],
-			[60, 332],
+		"user-desk": place("user-desk", { x: 5, y: 382, w: 70, h: 62 }, 3, [
+			[650, 415],
+			[75, 415],
 		]),
 	},
 };

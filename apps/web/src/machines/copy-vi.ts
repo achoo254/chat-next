@@ -1486,7 +1486,7 @@ export const viMachines = {
 			hideDetailsHint: "Giấu tên tệp, tên miền, lệnh, tên tool MCP và nội dung trên cảnh",
 			userDesk: "Prompt",
 			gateway: "Quyền",
-			monitoring: "Bể ngữ cảnh",
+			monitoring: "Context",
 			contextApproxHint: "Cửa sổ ngữ cảnh được giả định theo model nên phần trăm là gần đúng",
 		},
 		/** The station names of the Live Map, by the code the machine sends (station-catalog.ts). */

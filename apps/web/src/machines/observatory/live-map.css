@@ -67,17 +67,17 @@
 .lm-journey .is-failed { color: var(--lm-err); }
 
 /* The scene: the design's 1200 × 720 board, as wide as the column. */
-.lm-board { position: relative; width: 100%; aspect-ratio: 1200 / 720; overflow: hidden; background: var(--lm-panel); border: 1px solid var(--lm-line); border-radius: 8px; touch-action: none; user-select: none; cursor: grab; }
+.lm-board { position: relative; width: 100%; aspect-ratio: 1500 / 900; overflow: hidden; background: var(--lm-panel); border: 1px solid var(--lm-line); border-radius: 8px; touch-action: none; user-select: none; cursor: grab; }
 .lm-canvas-host, .lm-canvas-host > canvas { position: absolute; inset: 0; display: block; pointer-events: none; }
 /* The modules' buttons, in scene pixels, moved and scaled with the camera (the stage sets the transform). */
 .lm-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .lm-hit { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
 .lm-hit:focus-visible { outline: 2px solid var(--lm-accent); outline-offset: 4px; }
-.lm-camctl { position: absolute; right: 10px; bottom: 10px; display: grid; gap: 4px; justify-items: end; pointer-events: none; }
-.lm-seg { display: inline-flex; pointer-events: auto; padding: 2px; background: rgb(10 13 18 / 0.88); border: 1px solid var(--lm-line); border-radius: 7px; }
+.lm-camctl { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: -4px; }
+.lm-seg { display: inline-flex; padding: 2px; background: rgb(10 13 18 / 0.88); border: 1px solid var(--lm-line); border-radius: 7px; }
 .lm-seg button { font: inherit; font-size: 12.5px; padding: 4px 10px; color: var(--lm-muted); background: transparent; border: 0; border-radius: 5px; cursor: pointer; }
 .lm-seg button[aria-pressed="true"] { color: var(--lm-fg); background: #223044; }
-.lm-camnote { font-family: var(--lm-mono); font-size: 11px; color: var(--lm-muted); background: rgb(10 13 18 / 0.8); padding: 2px 6px; border-radius: 4px; }
+.lm-camnote { font-family: var(--lm-mono); font-size: 11px; color: var(--lm-muted); }
 .lm-note { position: absolute; inset: auto 12px 12px 12px; margin: 0; color: var(--lm-muted); }
 
 /* The column: boxes with a small caps header. */
