@@ -81,14 +81,25 @@ func (r *runner) syncMentions(ctx context.Context, l *chatLink, st bridge.Dialog
 			seqs = append(seqs, m.Seq) // older than the imported history: Chat cannot show it
 		}
 	}
+	// The owner may have seen one in Chat while the list was asked for: the list is then
+	// older than Chat, and this round is skipped (the next one asks again).
+	stale := false
 	if err := r.withLink(ctx, l, func(it *chat.ImportTx) error {
+		if pending, err := pendingOp(ctx, it.Tx(), l.ChatID, "read_mention"); err != nil || pending {
+			stale = pending
+			return err
+		}
+		if n, err := it.UnreadOwnerMentions(ctx); err != nil || n != have {
+			stale = n != have
+			return err
+		}
 		if _, err := it.SetOwnerMentions(ctx, seqs, keepRead); err != nil {
 			return err
 		}
 		n, err := it.UnreadOwnerMentions(ctx)
 		now.chat = n
 		return err
-	}); err != nil {
+	}); err != nil || stale {
 		return err
 	}
 	r.mentionsAt[l.ExternalChat] = now

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"app.local/server/internal/bridge"
 	"app.local/server/internal/chat"
@@ -46,7 +47,10 @@ func TestMentionsOfTheOwnerFollowTheOtherAppAndSeeingOneInChatTellsIt(t *testing
 	}
 	e.eventually(func() bool { return len(e.fake.UnreadMentionsOf("g1")) == 0 },
 		func() string { return fmt.Sprintf("the other app still has %v", e.fake.UnreadMentionsOf("g1")) })
+	// A look at the other app that crossed the read does not bring it back.
+	e.eventually(func() bool { return len(unread()) == 0 }, func() string { return fmt.Sprintf("unread mentions after seeing it = %v", unread()) })
+	time.Sleep(300 * time.Millisecond)
 	if got := unread(); len(got) != 0 {
-		t.Fatalf("unread mentions after seeing it = %v", got)
+		t.Fatalf("unread mentions came back: %v", got)
 	}
 }
