@@ -64,9 +64,11 @@ export const BUNDLE_BUDGET = {
 	 * following a deploy (+0.75 KB); 155.2 KB once only its listeners stay in the entry
 	 * chunk. Vite's modulepreload polyfill, 0.2 KB of startup JS that only adds a
 	 * hint for old browsers, is off (vite.config.ts): 155.0 KB, with no room left.
-	 * The budget stays 155 KB.
+	 * Splitting more startup code into lazy chunks made it worse (157.0 KB with the compact
+	 * window lazy: its shared modules became chunks of their own), and what is left is the
+	 * first screen. The budget is 156 KB since 26/11/2026, raised by the owner.
 	 */
-	startupJsGzip: 155 * 1024,
+	startupJsGzip: 156 * 1024,
 	/**
 	 * Derived: startup CSS was 13.7 KB gzip when the gate started. 20.4 KB on
 	 * 25/11/2026 with the conversation's Ask AI panel, the quick actions that
