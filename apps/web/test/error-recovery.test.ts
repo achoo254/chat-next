@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { RELOAD_GUARD_MS, isChunkLoadError, recoverFromError, reloadForNewBuild, showReloadNotice } from "../src/chunk-reload.ts";
+import { RELOAD_GUARD_MS, isChunkLoadError, reloadForNewBuild } from "../src/error-recovery.ts";
+import { showReloadNotice } from "../src/reload-notice.ts";
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
 	const data = new Map(Object.entries(initial));
@@ -90,13 +91,16 @@ describe("the notice on the splash", () => {
 });
 
 describe("an error that reached the top", () => {
-	it("shows the crash notice only when the error unmounted the app", () => {
+	it("shows the crash notice only when the error unmounted the app", async () => {
+		// A fresh module: the reload tests above left it marked as reloading.
+		vi.resetModules();
+		const { recoverAfterError } = await import("../src/error-recovery.ts");
 		document.documentElement.lang = "vi";
 		document.body.innerHTML = '<div id="splash" hidden><p class="brand-loader-text">Đang tải…</p></div>';
-		expect(recoverFromError(new TypeError("x is undefined"), false)).toBe(false);
+		recoverAfterError(new TypeError("x is undefined"), false);
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(document.getElementById("splash")?.hidden).toBe(true);
-		expect(recoverFromError(new TypeError("x is undefined"), true)).toBe(true);
-		expect(document.querySelector("#splash .brand-loader-text")?.textContent).toBe("Ứng dụng gặp lỗi và đã dừng.");
+		recoverAfterError(new TypeError("x is undefined"), true);
+		await vi.waitFor(() => expect(document.querySelector("#splash .brand-loader-text")?.textContent).toBe("Ứng dụng gặp lỗi và đã dừng."));
 	});
 });
-

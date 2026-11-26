@@ -29,7 +29,7 @@ function render(root: HTMLElement, rpcFetch?: RpcFetch): void {
 			console.error(error);
 			reportClientError("render", error);
 			// React has unmounted the app: a lazy chunk of a build the server no longer serves loads the
-			// current build; anything else leaves a reload button instead of the splash (chunk-reload.ts).
+			// current build; anything else leaves a reload button instead of the splash (error-recovery.ts).
 			recoverAfterError(error, true);
 		},
 	}).render(
