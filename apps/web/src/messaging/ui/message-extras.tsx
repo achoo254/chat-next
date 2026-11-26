@@ -40,10 +40,13 @@ export function ForwardLine({ message }: { message: StoredMessage }) {
 	const sourceChat = useChat(forward?.fromChatId ?? 0);
 	if (forward === null) return null;
 	const name = forward.fromName || user?.name || sourceChat?.title || copy.message.unknownUser;
-	const id = forward.fromChatId !== 0 ? forward.fromChatId : forward.fromUserId;
+	const fromChat = forward.fromChatId !== 0;
+	const id = fromChat ? forward.fromChatId : forward.fromUserId;
+	const photoId = (fromChat ? sourceChat?.photoId : user?.photoId) ?? "";
 	return (
 		<span className="fwd">
-			{copy.message.forwardedFrom} <ChatAvatar id={id} name={name} size="xs" /> <b>{name}</b>
+			{copy.message.forwardedFrom}{" "}
+			<ChatAvatar id={id} name={name} size="xs" photoId={photoId} {...(fromChat ? { chatPhotoOf: id } : { photoOf: id })} /> <b>{name}</b>
 		</span>
 	);
 }
