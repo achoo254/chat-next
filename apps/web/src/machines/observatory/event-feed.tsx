@@ -168,7 +168,7 @@ export function EventFeed({ feed, onEvent, onPlace }: EventFeedProps) {
 							<button type="button" onClick={() => (r.opens ? onEvent(r.eventId) : onPlace(r.place === "orchestrator" ? "core" : r.place))}>
 								<span className="t">{clock(c, r.at)}</span>
 								<span className="sw" aria-hidden="true" />
-								<span className="x">{r.text}</span>
+								<span className="x" title={r.text}>{r.text}</span>
 								<span className={`d ${status}`}>{right}</span>
 							</button>
 						</li>

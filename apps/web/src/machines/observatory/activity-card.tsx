@@ -246,11 +246,11 @@ export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCa
 						{c.card.status[card.status]}
 					</span>
 				</div>
-				<div className="lm-card-what" data-id="observe-card-what">
+				<div className="lm-card-what" data-id="observe-card-what" title={what}>
 					{what}
 				</div>
 				{/* Every row is always there (empty when it has nothing to say), so the card keeps its height as the work changes. */}
-				<div className="lm-card-desc" data-id={desc === "" ? undefined : "observe-card-desc"}>
+				<div className="lm-card-desc" data-id={desc === "" ? undefined : "observe-card-desc"} title={desc === "" ? undefined : desc}>
 					{desc}
 				</div>
 				{showBar ? (
@@ -260,7 +260,7 @@ export function ActivityCard({ card, names, hide, source, onDetail }: ActivityCa
 				) : (
 					<div className="lm-bar is-off" aria-hidden="true" />
 				)}
-				<div className="lm-card-out" data-id={call === null ? undefined : "observe-card-output"}>
+				<div className="lm-card-out" data-id={call === null ? undefined : "observe-card-output"} title={call === null ? undefined : `${c.card.output}: ${outputText(c, answer)}`}>
 					{call !== null && (
 						<>
 							{c.card.output}: <b>{outputText(c, answer)}</b>

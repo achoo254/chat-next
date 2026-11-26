@@ -38,8 +38,8 @@ const RECENT = 6;
 function Row({ k, v, tone = "", id }: { k: string; v: string | number; tone?: "ok" | "err" | ""; id?: string }) {
 	return (
 		<div className="lm-row" data-id={id}>
-			<span>{k}</span>
-			<b className={tone}>{v}</b>
+			<span title={k}>{k}</span>
+			<b className={tone} title={String(v)}>{v}</b>
 		</div>
 	);
 }
