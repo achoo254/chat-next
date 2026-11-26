@@ -42,6 +42,8 @@ import { ProjectConfigHint } from "./project-config.tsx";
 import { AgentText } from "./rich/agent-text.tsx";
 import { leadingCommand } from "./slash-commands.ts";
 import { StatusBar } from "./status-bar.tsx";
+import { ContextHint } from "./usage/context-hint.tsx";
+import { sessionMeter } from "./usage/session-meter.ts";
 import { EMPTY_JOURNAL, orderedItems } from "./transcript/reducer.ts";
 import { answeredModel, contextShare, currentModel, foldTranscript, turnRunning, turnStartedAt, type Block, type ShownAttachment } from "./transcript/tool-fold.ts";
 import { messageCount, splitConversations } from "./transcript/conversation-break.ts";
@@ -143,6 +145,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 	// After the AI's CLI went on in another conversation (/clear), the session shows that one; earlier ones fold away.
 	const conversations = splitConversations(items);
 	const all = foldTranscript(conversations.current, state.pending.get(threadId) ?? []);
+	const meter = sessionMeter(conversations.current);
 	const blocks = all.filter((b) => !isPending(b));
 	const prompts = all.filter(isPending);
 	// A long session opens on its newest items: until its oldest are in, the earlier conversations are counted in part.
@@ -472,6 +475,9 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} takesBack={takesBack} />}
 					<div className="mx-compose-box">
 					{!missing && !advisorThread && (
+						<ContextHint meter={meter} scope={`${machine}/${threadId}`} canCompact={caps?.compaction === true && canSend && !running} onCompact={() => void send("/compact", [])} />
+					)}
+					{!missing && !advisorThread && (
 						<StatusBar
 							ai={ai}
 							dir={dir}
@@ -485,6 +491,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 							threadId={threadId}
 							online={online}
 							switchingTo={switchingTo}
+							meter={meter}
 							account={
 								<AccountMenu
 									ai={ai}

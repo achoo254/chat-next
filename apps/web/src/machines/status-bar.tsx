@@ -18,6 +18,9 @@ import { modeKey, modeLabel, planName, usageOf, type Countdown } from "./status-
 import { defaultModelName, errorText, modelName, providerOf, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 import { usePopover } from "./use-popover.ts";
+import type { SessionMeter } from "./usage/session-meter.ts";
+import { count, tokens, usd } from "./usage/usage-format.ts";
+import { RULE_LIMITS } from "./usage/usage-insights.ts";
 
 /** At this share of a usage window the bar warns. */
 export const USAGE_WARN = 80;
@@ -43,6 +46,8 @@ interface StatusBarProps {
 	account?: ReactNode;
 	/** The account the session moves to after this turn; "" when it stays. */
 	switchingTo?: string;
+	/** What the session's own turns say about its usage (usage/session-meter.ts). */
+	meter?: SessionMeter;
 }
 
 /** "mặc định · Opus 5.5", or "mặc định" while which model it is is not known. */
@@ -55,7 +60,7 @@ function countdown(t: MachinesCopy, left: Countdown | null): string {
 }
 
 
-export function StatusBar({ ai, dir, machine, provider, model, answered, context, info, link, threadId, online, account, switchingTo = "" }: StatusBarProps) {
+export function StatusBar({ ai, dir, machine, provider, model, answered, context, info, link, threadId, online, account, switchingTo = "", meter }: StatusBarProps) {
 	const t = useMachinesCopy();
 	const now = useNow(30_000);
 	const five = usageOf(info?.rateLimits?.fiveHour, now);
@@ -75,6 +80,17 @@ export function StatusBar({ ai, dir, machine, provider, model, answered, context
 					<ModeMenu ai={ai} mode={mode} modes={info?.permissionModes ?? []} bypass={providerOf(machine, provider)?.capabilities?.bypassModeId ?? ""} link={link} threadId={threadId} disabled={!online} />
 				)}
 				{account}
+				{meter !== undefined && meter.show && meter.context !== null && (
+					<span
+						className={meter.near ? "mx-st-item warn" : "mx-st-item"}
+						title={t.usage.meter.contextTitle(tokens(t.usage, meter.context), tokens(t.usage, RULE_LIMITS.maxContext))}
+						data-id="session-context-meter"
+					>
+						<span className="lbl">{t.usage.meter.context}</span>
+						<PercentBar pct={(100 * meter.context) / RULE_LIMITS.maxContext} />
+						<span>{tokens(t.usage, meter.context)}</span>
+					</span>
+				)}
 				{five !== null && five.pct >= USAGE_WARN && (
 					<span
 						className={five.pct >= USAGE_WARN ? "mx-st-item mx-usage warn" : "mx-st-item mx-usage"}
@@ -94,7 +110,7 @@ export function StatusBar({ ai, dir, machine, provider, model, answered, context
 						<span className="sr-only">{`${t.agent.status.usage} ${t.agent.status.week}: ${t.agent.status.usageValue(week.pct, countdown(t, week.left))}`}</span>
 					</span>
 				)}
-				<Details ai={ai} dir={dir} machine={machine} provider={provider} model={model} answered={answered} context={context} info={info} now={now} />
+				<Details ai={ai} dir={dir} machine={machine} provider={provider} model={model} answered={answered} context={context} info={info} now={now} meter={meter} />
 			</div>
 		</div>
 	);
@@ -110,10 +126,11 @@ interface DetailsProps {
 	context: number | null;
 	info: ThreadInfo | undefined;
 	now: number;
+	meter: SessionMeter | undefined;
 }
 
 /** "Chi tiết": every statusline value with its name. */
-function Details({ ai, dir, machine, provider, model, answered, context, info, now }: DetailsProps) {
+function Details({ ai, dir, machine, provider, model, answered, context, info, now, meter }: DetailsProps) {
 	const t = useMachinesCopy();
 	const { locale } = useI18n();
 	const { open, setOpen, ref } = usePopover();
@@ -176,6 +193,12 @@ function Details({ ai, dir, machine, provider, model, answered, context, info, n
 							<>
 								<dt>{t.agent.status.account}</dt>
 								<dd title={t.statusBar.accountHint(ai, account.organization)}>{t.statusBar.account(account.email, planName(account.plan))}</dd>
+							</>
+						)}
+						{meter !== undefined && meter.pricedTurns > 0 && (
+							<>
+								<dt>{t.usage.meter.session}</dt>
+								<dd>{t.usage.meter.sessionValue(usd(t.usage, meter.costUsd), count(t.usage, meter.pricedTurns))}</dd>
 							</>
 						)}
 						{five !== null && usage(`${t.agent.status.usage} ${t.agent.status.fiveHour}`, five, false)}
