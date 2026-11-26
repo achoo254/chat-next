@@ -22,18 +22,29 @@ export type ToolContentAnswer =
 	| { readonly kind: "hidden" | "unavailable" | "pending" | "loading" | "failed" | "off" | "none" | "not_yet" }
 	| { readonly kind: "ok"; readonly content: ToolContent };
 
+/** A call that has ended may not be written on the machine yet ("not_yet"): the card asks again this often, this many times. */
+const NOT_YET_RETRY_MS = 1500;
+const NOT_YET_RETRIES = 8;
+
 /** The content of `eventId` (null: none asked), read for the card. `ended`: the call has ended (else "pending"). */
 export function useToolContent(source: ContentSource | null, eventId: string | null, ended: boolean, hide: boolean): ToolContentAnswer {
 	const key = source === null || eventId === null || hide || !ended || !source.online ? null : `${source.sessionId}\n${eventId}`;
 	const [answer, setAnswer] = useState<{ key: string; value: ToolContentAnswer } | null>(null);
+	const [retry, setRetry] = useState<{ key: string; count: number }>({ key: "", count: 0 });
+	const tries = retry.key === key ? retry.count : 0;
 	useEffect(() => {
 		if (key === null || source === null || eventId === null) return;
 		let active = true;
+		let timer: number | null = null;
 		eventContent(source.link, source.sessionId, eventId).then(
 			(c) => {
 				if (!active) return;
 				const value: ToolContentAnswer = c.state === "stored" ? { kind: "ok", content: parseToolContent(c.text) } : { kind: c.state === "unknown" ? "none" : c.state };
 				setAnswer({ key, value });
+				// The machine writes the call a moment after it ends: ask again until it has.
+				if (value.kind === "not_yet" && tries < NOT_YET_RETRIES) {
+					timer = window.setTimeout(() => setRetry({ key, count: tries + 1 }), NOT_YET_RETRY_MS);
+				}
 			},
 			(error: unknown) => {
 				console.warn("live map: content not answered", error);
@@ -42,8 +53,9 @@ export function useToolContent(source: ContentSource | null, eventId: string | n
 		);
 		return () => {
 			active = false;
+			if (timer !== null) window.clearTimeout(timer);
 		};
-	}, [key, source, eventId]);
+	}, [key, source, eventId, tries]);
 	if (eventId === null) return { kind: "none" };
 	if (hide) return { kind: "hidden" };
 	if (!ended) return { kind: "pending" };
