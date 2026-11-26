@@ -90,7 +90,7 @@ Nhóm Telegram bật chủ đề đồng bộ thành **nhóm dạng forum** tron
 
 Đặt `BRIDGE_PHONE_KEY` trong `/opt/chat/.env` (base64 của ít nhất 32 byte ngẫu nhiên, khác `SESSION_KEY`; không vào repo) để bật; không đặt thì tính năng tắt, server vẫn chạy bình thường. Migration `0066`. cột `users.phone_hmac` của người dùng Chat thật chỉ lấy từ số của chính tài khoản Telegram đã kết nối (`bridge.OwnPhoneReader`, Telegram `users.getUsers(self)`, Telegram đã xác minh số bằng SMS), ghi một lần mỗi lần kết nối; không có ô tự nhập số vì số tự khai không chứng minh được gì. Ai gõ đúng toàn bộ số (mọi dạng `+84…`, `84…`, `0…`) trong ô thêm bạn hoặc tìm người sẽ thấy người đó nếu cài đặt `find_by_phone` cho phép (mặc định mọi người, chỉnh ở Cài đặt → Riêng tư); số không bao giờ hiện ra. Gỡ tài khoản bridge hoặc xoá tài khoản Chat xoá băm này. Zalo chưa có nguồn số của chính tài khoản. Username (`ext_<id>` với người nhập từ app ngoài) chỉ là mã định danh; tìm theo username vẫn còn nhưng xếp sau số điện thoại và email.
 
-Tính năng nối nhiều tài khoản thành «một người» (ADR 0025) đã bỏ ngày 26/11/2026: Chat không còn đọc danh bạ Telegram, không còn ghi băm số của người bên app khác, và chỉ giữ số của chính chủ tài khoản Telegram. Các cột `external_users.phone_hmac` và `external_accounts.phone_book_read_at` còn nằm yên trong DB, không ai đọc, tới bản phát hành xoá cột.
+Tính năng nối nhiều tài khoản thành «một người» (ADR 0025) đã bỏ ngày 26/11/2026: Chat không còn đọc danh bạ Telegram, không còn ghi băm số của người bên app khác, và chỉ giữ số của chính chủ tài khoản Telegram. Các cột `external_users.phone_hmac` và `external_accounts.phone_book_read_at` đã xoá ở migration `0073`.
 
 ## Ngắt kết nối và xoá
 
