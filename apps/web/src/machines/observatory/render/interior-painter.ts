@@ -953,7 +953,7 @@ export class InteriorPainter {
 		const pipe = look.pipeline;
 		const { h, w: cw, gap } = PIPELINE_CELL;
 		const { x: x0, y } = pipelineCell(p, 0);
-		const colourOf = (s: StepStatus): string => (s === "ok" ? INK.ok : s === "err" ? INK.err : s === "run" ? PLACE_COLOR.git : s === "unknown" ? INK.muted : INK.edge);
+		const colourOf = (s: StepStatus): string => (s === "ok" ? INK.ok : s === "err" ? INK.err : s === "run" ? PLACE_COLOR.git : s === "unknown" || s === "cancelled" ? INK.muted : INK.edge);
 		STAGES.forEach((k, idx) => {
 			const x = x0 + idx * (cw + gap);
 			const st = pipe.steps[k];
@@ -1000,7 +1000,7 @@ export class InteriorPainter {
 			c.font = `400 ${10 * this.ts}px ${MONO}`;
 			c.fillStyle = col;
 			const value =
-				st.status === "run" ? duration(Math.max(0, wall - started)) : st.status === "ok" ? `✓ ${duration(st.durationMs ?? 0)}` : st.status === "err" ? copy.stepFailed : st.status === "unknown" ? copy.stepUnknown : untracked ? copy.stepUntracked : "–";
+				st.status === "run" ? duration(Math.max(0, wall - started)) : st.status === "ok" ? `✓ ${duration(st.durationMs ?? 0)}` : st.status === "err" ? copy.stepFailed : st.status === "unknown" ? copy.stepUnknown : st.status === "cancelled" ? copy.stepCancelled : untracked ? copy.stepUntracked : "–";
 			c.fillText(value, x + cw / 2, y + 21);
 			c.textAlign = "left";
 		});

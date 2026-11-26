@@ -72,6 +72,8 @@ function lifecycleRow(c: ObservatoryCopy, e: Extract<LiveMapEvent, { kind: "life
 			return { ...plain, place: "git", text: c.feed.ciStart(label) };
 		case "ci_finished":
 			return { ...plain, place: "git", text: c.feed.ciEnd(label, e.flag), status: e.flag === undefined ? "" : e.flag ? "ok" : "err", durationMs: e.number ?? null };
+		case "ci_cancelled":
+			return { ...plain, place: "git", text: c.feed.ciCancelled(label), status: "", durationMs: e.number ?? null };
 		default:
 			return null;
 	}

@@ -4,7 +4,8 @@
 // push (ci_started / ci_finished: label = workflow, flag = success, number =
 // duration), several workflows folded into one CI step, a new commit
 // resetting the steps after it, prod lit by a successful deploy; a finish
-// without a flag, or a run too long without one, is unknown.
+// without a flag, or a run too long without one, is unknown; a cancelled run is
+// neither passed nor failed.
 import { describe, expect, it } from "vitest";
 import { CI_STALE_MS, pipelineAt, pipelineOf } from "../../../src/machines/observatory/pipeline-model.ts";
 import { played } from "../../observatory/render-fixtures.ts";
@@ -12,7 +13,7 @@ import { lifecycle, prompt, tool } from "./live-map-fixtures.ts";
 
 const git = (use: string, ms: number, flags: number, end?: { ok: boolean; took: number }) =>
 	tool(use, ms, { toolName: "Bash", station: "GIT", target: "git", stationFlags: flags, ...(end === undefined ? {} : { success: end.ok, durationMs: end.took }) });
-const ci = (name: "ci_started" | "ci_finished", key: string, ms: number, label: string, over: { flag?: boolean; number?: number } = {}) => lifecycle(name, key, ms, { station: "GIT", label, ...over });
+const ci = (name: "ci_started" | "ci_finished" | "ci_cancelled", key: string, ms: number, label: string, over: { flag?: boolean; number?: number } = {}) => lifecycle(name, key, ms, { station: "GIT", label, ...over });
 
 const pipe = (events: Parameters<typeof played>[0]) => pipelineOf(played(events).state.log);
 
@@ -116,5 +117,28 @@ describe("the release pipeline", () => {
 		const p = pipe([prompt(1, 0), git("cp", 10, 1 | 2, { ok: false, took: 900 })]);
 		expect(p.steps.commit.status).toBe("err");
 		expect(p.steps.push.status).toBe("err");
+	});
+});
+
+describe("a cancelled CI run", () => {
+	const base = [prompt(1, 0), git("p", 10, 2, { ok: true, took: 100 })];
+
+	it("reads cancelled when it is all there is: not a failure", () => {
+		const p = pipe([...base, ci("ci_started", "a", 200, "CI"), ci("ci_cancelled", "b", 3_200, "CI", { number: 3_000 })]);
+		expect(p.steps.ci).toMatchObject({ status: "cancelled" });
+		expect(p.ci).toEqual({ total: 1, running: 0, failed: 0 });
+	});
+
+	it("does not replace the newer run of the same workflow that replaced it", () => {
+		const p = pipe([...base, ci("ci_started", "a", 200, "CI"), ci("ci_started", "n", 1_200, "CI"), ci("ci_cancelled", "b", 1_300, "CI", { number: 1_100 })]);
+		expect(p.steps.ci.status).toBe("run");
+		const passed = pipe([...base, ci("ci_started", "a", 200, "CI"), ci("ci_started", "n", 1_200, "CI"), ci("ci_cancelled", "b", 1_300, "CI", { number: 1_100 }), ci("ci_finished", "f", 9_000, "CI", { flag: true, number: 7_800 })]);
+		expect(passed.steps.ci.status).toBe("ok");
+	});
+
+	it("yields to a workflow that passed, and to one that failed", () => {
+		const cancelled = [ci("ci_started", "a", 200, "web"), ci("ci_cancelled", "b", 900, "web", { number: 700 })];
+		expect(pipe([...base, ...cancelled, ci("ci_started", "c", 210, "agent"), ci("ci_finished", "d", 5_000, "agent", { flag: true, number: 4_790 })]).steps.ci.status).toBe("ok");
+		expect(pipe([...base, ...cancelled, ci("ci_started", "c", 210, "agent"), ci("ci_finished", "d", 5_000, "agent", { flag: false, number: 4_790 })]).steps.ci.status).toBe("err");
 	});
 });

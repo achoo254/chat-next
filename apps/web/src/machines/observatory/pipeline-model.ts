@@ -12,6 +12,10 @@
 // CI step: running while one still runs, failed when one failed, unknown when
 // one is, with their count. A new commit resets the steps after it.
 //
+// A run GitHub cancelled (`ci_cancelled`: usually a newer push replaced it) is
+// neither a pass nor a failure: it reads "cancelled" when it is all there is,
+// and never takes the place of a run of the same workflow that started later.
+//
 // Which events: the turn of the latest release call (from the prompt before
 // it), and the CI lifecycle events after that prompt even when they land in
 // a later turn (CI ends after Claude's turn often). A session with no release
@@ -21,8 +25,9 @@ import type { LiveMapEvent } from "./live-map-types.ts";
 
 export const CI_STARTED = "ci_started";
 export const CI_FINISHED = "ci_finished";
+export const CI_CANCELLED = "ci_cancelled";
 
-export type StepStatus = "idle" | "run" | "ok" | "err" | "unknown";
+export type StepStatus = "idle" | "run" | "ok" | "err" | "unknown" | "cancelled";
 
 /** A CI run with no outcome this long after it started reads as unknown. */
 export const CI_STALE_MS = 45 * 60_000;
@@ -63,7 +68,7 @@ interface Entry {
 }
 
 function isCi(e: LiveMapEvent): e is Extract<LiveMapEvent, { kind: "lifecycle" }> {
-	return e.kind === "lifecycle" && (e.name === CI_STARTED || e.name === CI_FINISHED);
+	return e.kind === "lifecycle" && (e.name === CI_STARTED || e.name === CI_FINISHED || e.name === CI_CANCELLED);
 }
 
 function releaseSteps(e: LiveMapEvent): ReleaseStep[] {
@@ -120,7 +125,11 @@ export function pipelineOf(log: readonly LiveMapEvent[], now?: number): Pipeline
 			const name = e.label === "" ? "CI" : e.label;
 			const current = workflows.get(name);
 			if (e.name === CI_STARTED) workflows.set(name, { status: "run", startedAt: e.at, durationMs: null, eventId: null });
-			else if (e.flag === undefined) {
+			else if (e.name === CI_CANCELLED) {
+				// The run's own start is its end less its duration (both are GitHub's times, as in `ci_started`); a workflow that started a newer run keeps that one.
+				const startedAt = e.number === undefined ? e.at : e.at - e.number;
+				if (current === undefined || current.startedAt <= startedAt) workflows.set(name, { status: "cancelled", startedAt, durationMs: e.number ?? null, eventId: null });
+			} else if (e.flag === undefined) {
 				// The machine stopped following the run: unknown, unless its outcome is known already.
 				if (current?.status !== "ok" && current?.status !== "err") workflows.set(name, { status: "unknown", startedAt: current?.startedAt ?? e.at, durationMs: null, eventId: null });
 			} else {
@@ -160,7 +169,7 @@ export function pipelineAt(pipeline: Pipeline, log: readonly LiveMapEvent[], now
 function fold(entries: readonly Entry[]): PipelineStep {
 	if (entries.length === 0) return IDLE;
 	const has = (status: Entry["status"]): boolean => entries.some((e) => e.status === status);
-	const status: StepStatus = has("run") ? "run" : has("err") ? "err" : has("unknown") ? "unknown" : "ok";
+	const status: StepStatus = has("run") ? "run" : has("err") ? "err" : has("unknown") ? "unknown" : has("ok") ? "ok" : "cancelled";
 	const startedAt = Math.min(...entries.map((e) => e.startedAt));
 	const ends = entries.map((e) => (e.durationMs === null ? null : e.startedAt + e.durationMs));
 	const durationMs = status === "run" || ends.some((x) => x === null) ? null : Math.max(...ends.map((x) => x ?? 0)) - startedAt;

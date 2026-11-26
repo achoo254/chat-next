@@ -112,6 +112,8 @@ export interface ObservatoryCopy {
 		readonly stepFailed: string;
 		/** A CI step whose outcome is not known (the machine stopped following it, or it ran too long without news). */
 		readonly stepUnknown: string;
+		/** The CI step when GitHub cancelled its run (usually a newer push replaced it). */
+		readonly stepCancelled: string;
 		/** The CI step when a release ran without following CI (deploy does not wait for it). */
 		readonly stepUntracked: string;
 		readonly prod: string;
@@ -160,7 +162,7 @@ export interface ObservatoryCopy {
 		readonly stepRow: (step: string, n: number, p95: string) => string;
 		/** What each release step means, shown on hover of its row. */
 		readonly stepHint: Readonly<Record<"commit" | "push" | "ci" | "deploy", string>>;
-		readonly stepState: Readonly<Record<"idle" | "run" | "ok" | "err" | "unknown", string>>;
+		readonly stepState: Readonly<Record<"idle" | "run" | "ok" | "err" | "unknown" | "cancelled", string>>;
 		readonly waitingFor: string;
 		readonly prompts: string;
 	};
@@ -186,6 +188,7 @@ export interface ObservatoryCopy {
 		readonly bottleneckClosed: (rule: string) => string;
 		readonly ciStart: (name: string) => string;
 		readonly ciEnd: (name: string, ok: boolean | undefined) => string;
+		readonly ciCancelled: (name: string) => string;
 		readonly git: (kind: string) => string;
 	};
 	/** How to read the scene, under it: each paragraph alternates bold and plain parts, bold first. */
@@ -306,6 +309,7 @@ const vi: ObservatoryCopy = {
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		stepFailed: "✗ lỗi",
 		stepUnknown: "? không rõ",
+		stepCancelled: "⊘ đã huỷ",
 		stepUntracked: "không chờ",
 		prod: "prod",
 		tests: { running: "đang chạy…", passed: "đạt", failed: "lỗi", none: "chưa chạy" },
@@ -355,7 +359,7 @@ const vi: ObservatoryCopy = {
 			ci: "Chờ GitHub Actions chạy xong. Deploy không chờ bước này nên ô này chỉ sáng khi Claude tự theo dõi CI (gh run watch, gh pr checks); nét đứt \"không chờ\" là lần phát hành không theo dõi CI.",
 			deploy: "Đưa bản vừa push lên prod; ✓ khi workflow deploy chạy xong, kèm chấm xanh prod.",
 		},
-		stepState: { idle: "–", run: "đang chạy", ok: "đạt", err: "lỗi", unknown: "không rõ" },
+		stepState: { idle: "–", run: "đang chạy", ok: "đạt", err: "lỗi", unknown: "không rõ", cancelled: "đã huỷ" },
 		waitingFor: "Đang chờ quyền",
 		prompts: "Prompt trong phiên",
 	},
@@ -380,6 +384,7 @@ const vi: ObservatoryCopy = {
 		bottleneckClosed: (rule) => `điểm nghẽn đã đóng · ${rule}`,
 		ciStart: (name) => `CI${name === "" ? "" : ` ${name}`} bắt đầu`,
 		ciEnd: (name, ok) => `CI${name === "" ? "" : ` ${name}`} ${ok === undefined ? "không rõ kết quả" : ok ? "đạt" : "lỗi"}`,
+		ciCancelled: (name) => `CI${name === "" ? "" : ` ${name}`} đã huỷ`,
 		git: (kind) => `git ${kind}`,
 	},
 	legend: [
@@ -508,6 +513,7 @@ const en: ObservatoryCopy = {
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		stepFailed: "✗ failed",
 		stepUnknown: "? unknown",
+		stepCancelled: "⊘ cancelled",
 		stepUntracked: "not awaited",
 		prod: "prod",
 		tests: { running: "running…", passed: "passed", failed: "failed", none: "not run yet" },
@@ -557,7 +563,7 @@ const en: ObservatoryCopy = {
 			ci: "Waits for GitHub Actions to finish. Deploy does not wait for it, so this step lights up only when Claude follows CI (gh run watch, gh pr checks); a dashed \"not awaited\" means the release did not follow CI.",
 			deploy: "Ships the pushed commit to production; ✓ once the deploy workflow finishes, with the green prod dot.",
 		},
-		stepState: { idle: "–", run: "running", ok: "passed", err: "failed", unknown: "unknown" },
+		stepState: { idle: "–", run: "running", ok: "passed", err: "failed", unknown: "unknown", cancelled: "cancelled" },
 		waitingFor: "Waiting for permission",
 		prompts: "Prompts in the session",
 	},
@@ -582,6 +588,7 @@ const en: ObservatoryCopy = {
 		bottleneckClosed: (rule) => `bottleneck closed · ${rule}`,
 		ciStart: (name) => `CI${name === "" ? "" : ` ${name}`} started`,
 		ciEnd: (name, ok) => `CI${name === "" ? "" : ` ${name}`} ${ok === undefined ? "outcome unknown" : ok ? "passed" : "failed"}`,
+		ciCancelled: (name) => `CI${name === "" ? "" : ` ${name}`} cancelled`,
 		git: (kind) => `git ${kind}`,
 	},
 	legend: [
@@ -710,6 +717,7 @@ const zhCN: ObservatoryCopy = {
 		steps: { commit: "commit", push: "push", ci: "CI", deploy: "deploy" },
 		stepFailed: "✗ 失败",
 		stepUnknown: "? 未知",
+		stepCancelled: "⊘ 已取消",
 		stepUntracked: "不等待",
 		prod: "prod",
 		tests: { running: "运行中…", passed: "通过", failed: "失败", none: "尚未运行" },
@@ -759,7 +767,7 @@ const zhCN: ObservatoryCopy = {
 			ci: "等待 GitHub Actions 运行结束。部署不等待这一步，所以只有 Claude 自己跟进 CI（gh run watch、gh pr checks）时它才会亮起；虚线“不等待”表示这次发布没有跟进 CI。",
 			deploy: "把刚推送的提交发布到生产环境；部署工作流完成后显示 ✓，并点亮绿色的 prod 圆点。",
 		},
-		stepState: { idle: "–", run: "运行中", ok: "通过", err: "失败", unknown: "未知" },
+		stepState: { idle: "–", run: "运行中", ok: "通过", err: "失败", unknown: "未知", cancelled: "已取消" },
 		waitingFor: "等待授权",
 		prompts: "会话中的提示",
 	},
@@ -784,6 +792,7 @@ const zhCN: ObservatoryCopy = {
 		bottleneckClosed: (rule) => `瓶颈已关闭 · ${rule}`,
 		ciStart: (name) => `CI${name === "" ? "" : ` ${name}`} 开始`,
 		ciEnd: (name, ok) => `CI${name === "" ? "" : ` ${name}`} ${ok === undefined ? "结果未知" : ok ? "通过" : "失败"}`,
+		ciCancelled: (name) => `CI${name === "" ? "" : ` ${name}`} 已取消`,
 		git: (kind) => `git ${kind}`,
 	},
 	legend: [

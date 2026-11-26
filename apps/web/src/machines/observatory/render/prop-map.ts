@@ -143,6 +143,7 @@ export function movesOf(anim: Animation, event: LiveMapEvent | undefined, scene:
 					pulse("external", event.number === 429 ? "warn" : "error");
 					return moves;
 				case "ci_started":
+				case "ci_cancelled":
 					pulse("git");
 					return moves;
 				case "ci_finished":
