@@ -21,7 +21,7 @@ import type { ObservatoryCopy } from "../observatory-copy.ts";
 import type { StepStatus } from "../pipeline-model.ts";
 import type { MoveFrame } from "./animation-director.ts";
 import { clamp01, INK, rgba } from "./ink.ts";
-import { pathPoint, subPath, type SceneLook, type Tone } from "./prop-map.ts";
+import { pathPoint, type SceneLook, type Tone } from "./prop-map.ts";
 import { PIPELINE_CELL, PLACE_IDS, pipelineCell, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
 import {
 	cornerTicks,
@@ -458,7 +458,7 @@ export class InteriorPainter {
 				c.stroke();
 			}
 			if (road.failures > 0 && n > 0) {
-				this.poly(subPath(r, road.failures / n));
+				this.poly(r);
 				c.strokeStyle = rgba(INK.err, 0.8);
 				c.lineWidth = 2;
 				c.stroke();
