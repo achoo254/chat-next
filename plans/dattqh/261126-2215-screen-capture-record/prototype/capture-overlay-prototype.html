@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE - Chụp/quay màn hình (xoá được)</title>
+<!--
+  PROTOTYPE, throwaway. Câu hỏi: lớp chọn vùng + thanh công cụ + thanh quay của `tunelo-capture` nên trông thế nào?
+  3 biến thể cấu trúc khác nhau, chuyển bằng ?variant=A|B|C hoặc phím ← →. Không lưu gì, không gọi backend.
+  Chế độ: Chụp ảnh (giai đoạn 1), Quay video (giai đoạn 2), Ô soạn tin Chat (nút lối vào).
+  Chạy: mở thẳng file này trong trình duyệt.
+-->
+<style>
+:root{--pri:#7c4dff;--pri-d:#6a3de8;--ink:#14121c;--bar:#1d1a2a;--bar2:#2a2640;--txt:#eceaf6;--mut:#9a95b4;--red:#ff4d4f;--ok:#2ec27e}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;font:14px/1.4 system-ui,"Segoe UI",sans-serif;color:var(--txt);background:#0d0b14}
+button{font:inherit;color:inherit;cursor:pointer}
+/* ----- máy tính giả ----- */
+#desk{position:fixed;inset:0;background:linear-gradient(135deg,#27406b,#5b3a86 55%,#c2577a);overflow:hidden}
+.win{position:absolute;background:#f6f6fa;color:#222;border-radius:10px;box-shadow:0 10px 40px #0006;overflow:hidden}
+.win .tb{height:30px;background:#e4e4ee;display:flex;align-items:center;gap:6px;padding:0 10px;font-size:12px;color:#555}
+.win .tb i{width:10px;height:10px;border-radius:50%;background:#bbb;display:block}
+.win .bd{padding:14px;font-size:13px;line-height:1.6}
+.win .bd b{color:#7c4dff}
+.fake-line{height:9px;border-radius:5px;background:#d9d9e6;margin:9px 0}
+.fake-chart{display:flex;gap:8px;align-items:flex-end;height:110px;margin-top:10px}
+.fake-chart span{flex:1;background:linear-gradient(#7c4dff,#9db4ff);border-radius:4px 4px 0 0}
+.secret{background:#fff3cd;border:1px dashed #d4a72c;padding:6px 8px;border-radius:6px;font-family:ui-monospace,monospace;font-size:12px;margin-top:8px}
+/* ----- lớp chọn vùng ----- */
+#dim{position:fixed;inset:0;cursor:crosshair;background:rgba(10,8,20,.55);z-index:10;display:none}
+#hint{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:30;background:var(--bar);padding:8px 14px;border-radius:999px;box-shadow:0 6px 24px #0008;display:none;white-space:nowrap}
+#hint kbd{background:var(--bar2);padding:1px 6px;border-radius:4px;font-size:12px}
+#sel{position:fixed;z-index:12;display:none;border:2px solid var(--pri);box-shadow:0 0 0 9999px rgba(10,8,20,.55)}
+#sel.rec{border:2px dashed var(--red);box-shadow:0 0 0 9999px rgba(10,8,20,.35)}
+#sel.recording{border:2px solid var(--red);box-shadow:0 0 0 9999px rgba(10,8,20,.35),0 0 18px #ff4d4f88}
+#sel canvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+#dims{position:absolute;left:-2px;top:-26px;background:var(--bar);font-size:12px;padding:2px 8px;border-radius:6px;white-space:nowrap}
+#countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:84px;font-weight:700;text-shadow:0 4px 24px #000a}
+.ui{position:fixed;z-index:20;display:none}
+.bar{background:var(--bar);border-radius:12px;box-shadow:0 8px 30px #000a;display:flex;align-items:center;gap:2px;padding:5px;border:1px solid #ffffff14}
+.bar.col{flex-direction:column}
+.sep{width:1px;height:22px;background:#ffffff22;margin:0 4px}
+.bar.col .sep{width:22px;height:1px;margin:4px 0}
+.ib{border:0;background:transparent;min-width:34px;height:34px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;white-space:nowrap}
+.ib:hover{background:var(--bar2)}
+.ib.on{background:var(--pri);color:#fff}
+.ib.pri{background:var(--pri);color:#fff;font-weight:600}
+.ib.pri:hover{background:var(--pri-d)}
+.ib.ghost{color:var(--mut)}
+.ib.danger{background:var(--red);color:#fff;font-weight:600}
+.ib .k{font-size:11px;color:var(--mut)}
+.dot{width:18px;height:18px;border-radius:50%;border:2px solid #fff3;padding:0;min-width:18px;height:18px}
+.dot.on{border-color:#fff;box-shadow:0 0 0 2px var(--pri)}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block;animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.25}}
+.tier2{margin-top:6px;display:flex;gap:10px;align-items:center;padding:6px 10px;background:var(--bar);border-radius:10px;border:1px solid #ffffff14;box-shadow:0 8px 30px #000a;font-size:12px;color:var(--mut)}
+/* ----- danh sách gửi ----- */
+#pick{position:fixed;z-index:40;width:270px;background:var(--bar);border-radius:12px;box-shadow:0 12px 40px #000c;padding:8px;display:none;border:1px solid #ffffff18}
+#pick input{width:100%;background:var(--bar2);border:0;color:var(--txt);padding:8px 10px;border-radius:8px;outline:none;margin-bottom:6px}
+#pick .row{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;cursor:pointer}
+#pick .row:hover{background:var(--bar2)}
+#pick .av{width:28px;height:28px;border-radius:50%;background:var(--pri);display:grid;place-items:center;font-size:12px;font-weight:700}
+#pick .cap{font-size:11px;color:var(--mut);padding:2px 8px 6px}
+#toast{position:fixed;left:50%;top:62px;transform:translateX(-50%);z-index:60;background:var(--ok);color:#052;font-weight:600;padding:9px 16px;border-radius:10px;box-shadow:0 8px 30px #0008;display:none;max-width:86vw}
+#toast.warn{background:#ffcc4d}
+/* ----- cửa sổ Chat giả ----- */
+#chat{position:fixed;inset:0;background:#f3f2f8;color:#1b1830;display:none}
+#chat .side{position:absolute;left:0;top:0;bottom:0;width:260px;background:#fff;border-right:1px solid #e3e1ee;padding:14px}
+#chat .side h4{margin:0 0 10px}
+#chat .item{padding:9px 10px;border-radius:8px}
+#chat .item.act{background:#ece6ff;color:#5b2fd4;font-weight:600}
+#chat .main{position:absolute;left:260px;right:0;top:0;bottom:0;display:flex;flex-direction:column}
+#chat .head{padding:14px 18px;border-bottom:1px solid #e3e1ee;background:#fff;font-weight:600}
+#chat .msgs{flex:1;padding:18px;display:flex;flex-direction:column;gap:10px}
+.bub{max-width:60%;padding:9px 13px;border-radius:14px;background:#fff;border:1px solid #e3e1ee}
+.bub.me{align-self:flex-end;background:#7c4dff;color:#fff;border:0}
+#chat .comp{padding:12px 18px;background:#fff;border-top:1px solid #e3e1ee}
+.tray{display:flex;gap:8px;margin-bottom:8px}
+.chip{background:#ece6ff;color:#5b2fd4;border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:8px;align-items:center}
+.compbox{display:flex;align-items:center;gap:6px;border:1px solid #d7d3ea;border-radius:12px;padding:6px 8px}
+.compbox .fill{flex:1;color:#9a95b4;padding:0 6px}
+.cb{border:0;background:transparent;color:#5b4f95;height:34px;padding:0 9px;border-radius:8px;display:inline-flex;align-items:center;gap:6px}
+.cb:hover{background:#ece6ff}
+.cb.new{outline:2px solid #7c4dff44}
+/* ----- thanh chuyển prototype ----- */
+#switch{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:100;background:#fff;color:#111;border-radius:999px;box-shadow:0 8px 30px #000a;display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:13px;flex-wrap:wrap;justify-content:center;max-width:96vw}
+#switch button{border:0;background:#eee;color:#111;border-radius:999px;height:30px;padding:0 12px}
+#switch button.on{background:#111;color:#fff}
+#switch .lbl{min-width:210px;text-align:center;font-weight:600}
+#switch .sep2{width:1px;height:20px;background:#0003;margin:0 4px}
+</style>
+</head>
+<body>
+
+<!-- máy tính giả: nội dung thật để thấy chú thích/làm mờ -->
+<div id="desk">
+  <div class="win" style="left:6%;top:10%;width:46%;height:56%">
+    <div class="tb"><i></i><i></i><i></i> &nbsp;Báo cáo doanh thu - tháng 11</div>
+    <div class="bd">
+      Doanh thu quý này tăng <b>+18%</b> so với quý trước.
+      <div class="fake-chart"><span style="height:35%"></span><span style="height:52%"></span><span style="height:44%"></span><span style="height:70%"></span><span style="height:88%"></span><span style="height:64%"></span></div>
+      <div class="fake-line" style="width:80%"></div><div class="fake-line" style="width:60%"></div>
+    </div>
+  </div>
+  <div class="win" style="left:44%;top:30%;width:44%;height:50%">
+    <div class="tb"><i></i><i></i><i></i> &nbsp;terminal - deploy.sh</div>
+    <div class="bd" style="background:#17151f;color:#c9c4e6;font-family:ui-monospace,monospace;font-size:12px;height:calc(100% - 30px)">
+      $ ./deploy.sh production<br>build ........ ok<br>migrate ...... ok<br>
+      <span style="color:#ff8a8a">warn: biến môi trường để lộ</span>
+      <div class="secret">API_TOKEN=sk_live_EXAMPLE_NOT_A_REAL_KEY</div>
+      $ _
+    </div>
+  </div>
+</div>
+
+<div id="dim"></div>
+<div id="hint"></div>
+<div id="sel"><div id="dims"></div><canvas id="cv"></canvas><div id="countdown"></div></div>
+<div class="ui" id="u1"></div>
+<div class="ui" id="u2"></div>
+<div id="pick"></div>
+<div id="toast"></div>
+
+<!-- Chat giả: nơi đặt nút lối vào -->
+<div id="chat">
+  <div class="side"><h4>Chat</h4>
+    <div class="item act">Nhóm Dự án</div><div class="item">Anh Minh</div><div class="item">Chat AI · Claude</div><div class="item">Lưu tin nhắn</div>
+  </div>
+  <div class="main">
+    <div class="head">Nhóm Dự án</div>
+    <div class="msgs">
+      <div class="bub">Bạn gửi giúp mình ảnh lỗi nhé?</div>
+      <div class="bub me">Được, mình chụp ngay.</div>
+    </div>
+    <div class="comp">
+      <div class="tray" id="tray"></div>
+      <div class="compbox">
+        <button class="cb" title="Đính kèm">📎</button>
+        <button class="cb new" id="btnShot" title="Chụp màn hình (Ctrl+Alt+A)">✂ Chụp màn hình</button>
+        <button class="cb new" id="btnRec" title="Quay màn hình (Ctrl+Alt+R)">⏺ Quay màn hình</button>
+        <span class="fill">Nhập tin nhắn…</span>
+        <button class="cb">Gửi ➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="switch">
+  <button id="pv">←</button><span class="lbl" id="vl"></span><button id="nv">→</button>
+  <span class="sep2"></span>
+  <button data-mode="shot">Chụp ảnh</button>
+  <button data-mode="rec">Quay video (GĐ2)</button>
+  <button data-mode="chat">Ô soạn tin Chat</button>
+</div>
+
+<script>
+"use strict";
+// PROTOTYPE: không test, không xử lý lỗi, trạng thái chỉ trong bộ nhớ.
+const $ = (s) => document.querySelector(s);
+const VARIANTS = {
+  A: "Thanh ngang dưới vùng chọn (kiểu Zalo)",
+  B: "Bảng công cụ dọc + thanh hành động",
+  C: "Hai tầng: công cụ + thuộc tính, nút Gửi lớn"
+};
+const KEYS = Object.keys(VARIANTS);
+const COLORS = ["#ff4d4f", "#ffcc4d", "#4da3ff", "#2ec27e"];
+const CHATS = ["Nhóm Dự án", "Anh Minh", "Chat AI · Claude", "Lưu tin nhắn", "Nhóm Marketing", "Chị Lan"];
+
+const st = {
+  variant: new URLSearchParams(location.search).get("variant") || "A",
+  mode: "chat",          // shot | rec | chat
+  origin: "hotkey",      // hotkey | chat (nút trong ô soạn tin)
+  rect: null, drag: null,
+  tool: "rect", color: COLORS[0], items: [], cur: null,
+  rec: { phase: "idle", sec: 0, mic: true, sys: true, timer: null }
+};
+if (!VARIANTS[st.variant]) st.variant = "A";
+
+const sel = $("#sel"), cv = $("#cv"), ctx = cv.getContext("2d");
+const u1 = $("#u1"), u2 = $("#u2"), pick = $("#pick");
+
+/* ===== chuyển biến thể / chế độ ===== */
+function setVariant(v) {
+  st.variant = v;
+  const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null, "", u);
+  $("#vl").textContent = v + " · " + VARIANTS[v];
+  if (st.rect) renderUI();
+}
+function setMode(m, origin) {
+  stopRec(true);
+  st.mode = m; st.origin = origin || "hotkey";
+  st.rect = null; st.items = []; st.cur = null;
+  hideAll();
+  document.querySelectorAll("#switch [data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("#chat").style.display = m === "chat" ? "block" : "none";
+  $("#desk").style.display = m === "chat" ? "none" : "block";
+  if (m !== "chat") {
+    $("#dim").style.display = "block";
+    const h = $("#hint");
+    h.style.display = "block";
+    h.innerHTML = m === "shot"
+      ? "Kéo để chọn vùng · <kbd>Esc</kbd> thoát · <kbd>Ctrl+Alt+A</kbd>"
+      : "Kéo để chọn vùng quay · <kbd>Esc</kbd> thoát · <kbd>Ctrl+Alt+R</kbd>";
+  }
+}
+function hideAll() {
+  $("#dim").style.display = "none"; $("#hint").style.display = "none";
+  sel.style.display = "none"; u1.style.display = "none"; u2.style.display = "none"; pick.style.display = "none";
+}
+
+/* ===== chọn vùng ===== */
+$("#dim").addEventListener("pointerdown", (e) => {
+  st.drag = { x: e.clientX, y: e.clientY };
+  $("#dim").setPointerCapture(e.pointerId);
+  $("#hint").style.display = "none";
+});
+$("#dim").addEventListener("pointermove", (e) => {
+  if (!st.drag) return;
+  const x = Math.min(st.drag.x, e.clientX), y = Math.min(st.drag.y, e.clientY);
+  const w = Math.abs(e.clientX - st.drag.x), h = Math.abs(e.clientY - st.drag.y);
+  showSel({ x, y, w, h });
+});
+$("#dim").addEventListener("pointerup", () => {
+  if (!st.drag) return;
+  st.drag = null;
+  if (!st.rect || st.rect.w < 30 || st.rect.h < 30) { st.rect = null; sel.style.display = "none"; return; }
+  $("#dim").style.display = "none";
+  sel.classList.toggle("rec", st.mode === "rec");
+  setupCanvas(); renderUI();
+});
+function showSel(r) {
+  st.rect = r;
+  Object.assign(sel.style, { display: "block", left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px" });
+  $("#dims").textContent = Math.round(r.w) + " × " + Math.round(r.h);
+}
+function setupCanvas() {
+  cv.width = st.rect.w; cv.height = st.rect.h;
+  cv.style.pointerEvents = st.mode === "shot" ? "auto" : "none";
+  redraw();
+}
+
+/* ===== vẽ chú thích ===== */
+function pos(e) { const b = cv.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; }
+cv.addEventListener("pointerdown", (e) => {
+  if (st.mode !== "shot") return;
+  const p = pos(e);
+  if (st.tool === "text") { addText(p); return; }
+  st.cur = { t: st.tool, c: st.color, p0: p, p1: p, pts: [p] };
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", (e) => {
+  if (!st.cur) return;
+  const p = pos(e); st.cur.p1 = p; if (st.cur.t === "pen") st.cur.pts.push(p);
+  redraw();
+});
+cv.addEventListener("pointerup", () => { if (st.cur) { st.items.push(st.cur); st.cur = null; redraw(); } });
+function addText(p) {
+  const inp = document.createElement("input");
+  Object.assign(inp.style, { position: "absolute", left: p.x + "px", top: p.y + "px", font: "bold 18px system-ui", color: st.color, background: "#0006", border: "1px solid #fff6", outline: "none", minWidth: "90px", zIndex: 5 });
+  const col = st.color; sel.appendChild(inp); inp.focus();
+  const done = () => { if (inp.value.trim()) { st.items.push({ t: "text", c: col, p0: p, text: inp.value }); redraw(); } inp.remove(); };
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") done(); e.stopPropagation(); });
+  inp.addEventListener("blur", done, { once: true });
+}
+function redraw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  [...st.items, st.cur].filter(Boolean).forEach(drawItem);
+}
+function drawItem(it) {
+  ctx.strokeStyle = ctx.fillStyle = it.c; ctx.lineWidth = 3; ctx.lineCap = ctx.lineJoin = "round";
+  const { p0, p1 } = it;
+  if (it.t === "rect") ctx.strokeRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
+  else if (it.t === "pen") { ctx.beginPath(); it.pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); }
+  else if (it.t === "arrow") {
+    ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+    const a = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p1.x - 14 * Math.cos(a - .45), p1.y - 14 * Math.sin(a - .45));
+    ctx.lineTo(p1.x - 14 * Math.cos(a + .45), p1.y - 14 * Math.sin(a + .45)); ctx.closePath(); ctx.fill();
+  } else if (it.t === "text") { ctx.font = "bold 18px system-ui"; ctx.fillText(it.text, p0.x, p0.y + 16); }
+  else if (it.t === "blur") {   // mô phỏng làm mờ: khối mosaic
+    const x = Math.min(p0.x, p1.x), y = Math.min(p0.y, p1.y), w = Math.abs(p1.x - p0.x), h = Math.abs(p1.y - p0.y);
+    for (let i = 0; i < w; i += 8) for (let j = 0; j < h; j += 8) {
+      const g = 90 + ((i * 7 + j * 13) % 90); ctx.fillStyle = `rgb(${g},${g},${g + 10})`; ctx.fillRect(x + i, y + j, 8, 8);
+    }
+  }
+}
+
+/* ===== thanh công cụ (3 biến thể) ===== */
+const TOOLS = [["rect", "▭", "Khung"], ["arrow", "➚", "Mũi tên"], ["pen", "✎", "Bút"], ["text", "T", "Chữ"], ["blur", "▦", "Làm mờ"]];
+const toolBtns = (lbl) => TOOLS.map(([k, ic, n]) => `<button class="ib ${st.tool === k ? "on" : ""}" data-tool="${k}" title="${n}">${ic}${lbl ? " " + n : ""}</button>`).join("");
+const colorBtns = () => COLORS.map(c => `<button class="ib dot ${st.color === c ? "on" : ""}" data-color="${c}" style="background:${c}"></button>`).join("");
+const undoBtn = `<button class="ib ghost" data-act="undo" title="Hoàn tác (Ctrl+Z)">↶</button>`;
+const closeBtn = `<button class="ib ghost" data-act="close" title="Thoát (Esc)">✕</button>`;
+const acts = (big) => `
+  <button class="ib" data-act="copy" title="Sao chép vào clipboard">⧉ ${big ? "Sao chép" : ""}</button>
+  <button class="ib" data-act="save" title="Lưu vào Pictures">⬇ ${big ? "Lưu" : ""}</button>
+  <button class="ib" data-act="ai" title="Hỏi AI về ảnh này">✦ Hỏi AI</button>
+  <button class="ib pri" data-act="send">${st.origin === "chat" ? "Thêm vào khay" : "Gửi ➤"}</button>`;
+
+function renderUI() {
+  u1.style.display = u2.style.display = "none"; u1.className = u2.className = "ui"; u2.innerHTML = "";
+  if (st.mode === "rec") return renderRec();
+  const r = st.rect, below = r.y + r.h + 64 < innerHeight;
+  const top = below ? r.y + r.h + 10 : Math.max(8, r.y - 54);
+  if (st.variant === "A") {
+    u1.innerHTML = `<div class="bar">${toolBtns(false)}<span class="sep"></span>${colorBtns()}<span class="sep"></span>${undoBtn}<span class="sep"></span>${acts(false)}${closeBtn}</div>`;
+    place(u1, Math.max(8, r.x), top);
+  } else if (st.variant === "B") {
+    const left = r.x > 70 ? r.x - 58 : r.x + r.w + 10;
+    u1.innerHTML = `<div class="bar col">${toolBtns(false)}<span class="sep"></span>${colorBtns()}<span class="sep"></span>${undoBtn}</div>`;
+    place(u1, left, r.y);
+    u2.innerHTML = `<div class="bar">${acts(true)}${closeBtn}</div>`;
+    place(u2, Math.max(8, r.x + r.w - 380), top);
+  } else {
+    u1.innerHTML = `<div class="bar">${toolBtns(true)}${undoBtn}${closeBtn}</div>
+      <div class="tier2"><span>Màu</span>${colorBtns()}<span>· Nét 3 px</span><span style="flex:1"></span>
+      <button class="ib" data-act="copy">⧉ Sao chép</button><button class="ib" data-act="save">⬇ Lưu</button><button class="ib" data-act="ai">✦ Hỏi AI</button>
+      <button class="ib pri" style="height:40px;padding:0 20px;font-size:15px" data-act="send">${st.origin === "chat" ? "Thêm vào khay ➤" : "Gửi ➤"}</button></div>`;
+    place(u1, Math.max(8, r.x), below ? r.y + r.h + 10 : Math.max(8, r.y - 112));
+  }
+  wire();
+}
+function place(el, x, y) { el.style.display = "block"; el.style.left = Math.min(x, innerWidth - 40) + "px"; el.style.top = y + "px"; }
+
+/* ===== thanh quay (giai đoạn 2) ===== */
+function recBtns() {
+  const R = st.rec, fmt = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  const tog = (k, a, b) => `<button class="ib ${R[k] ? "on" : ""}" data-rec="${k}" title="${a}">${b}</button>`;
+  const audio = tog("mic", "Micro", "🎤") + tog("sys", "Âm thanh hệ thống", "🔊");
+  if (R.phase === "idle") return `<button class="ib danger" data-act="start">⏺ Bắt đầu quay <span class="k">Ctrl+Alt+R</span></button>${audio}<span class="sep"></span><span class="k" style="padding:0 6px">MP4 · 30 fps · tối đa 15:00</span>${closeBtn}`;
+  if (R.phase === "count") return `<span style="padding:0 10px">Chuẩn bị quay…</span>`;
+  return `<span class="rec-dot"></span><b style="padding:0 8px;font-variant-numeric:tabular-nums">${fmt(R.sec)}</b>${R.phase === "pause" ? '<span class="k">Tạm dừng</span>' : ""}
+    <button class="ib" data-act="pause">${R.phase === "pause" ? "▶" : "⏸"}</button>${audio}<button class="ib danger" data-act="stop">⏹ Dừng</button>`;
+}
+function renderRec() {
+  const r = st.rect, below = r.y + r.h + 64 < innerHeight;
+  if (st.variant === "A") { u1.innerHTML = `<div class="bar">${recBtns()}</div>`; place(u1, Math.max(8, r.x), below ? r.y + r.h + 10 : r.y - 54); }
+  else if (st.variant === "B") { u1.innerHTML = `<div class="bar col">${recBtns()}</div>`; place(u1, r.x + r.w + 10 > innerWidth - 90 ? r.x - 120 : r.x + r.w + 10, r.y); }
+  else { u1.innerHTML = `<div class="bar">${recBtns()}</div>`; place(u1, innerWidth / 2 - 190, 14); u1.style.transform = "none"; }
+  wire();
+}
+
+/* ===== hành động ===== */
+function wire() {
+  document.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => { st.tool = b.dataset.tool; renderUI(); });
+  document.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { st.color = b.dataset.color; renderUI(); });
+  document.querySelectorAll("[data-rec]").forEach(b => b.onclick = () => { st.rec[b.dataset.rec] = !st.rec[b.dataset.rec]; renderUI(); });
+  document.querySelectorAll("[data-act]").forEach(b => b.onclick = (e) => act(b.dataset.act, e));
+}
+function act(a, e) {
+  if (a === "undo") { st.items.pop(); redraw(); }
+  else if (a === "close") setMode("chat");
+  else if (a === "copy") toast("Đã sao chép ảnh vào clipboard (" + Math.round(st.rect.w) + "×" + Math.round(st.rect.h) + ")");
+  else if (a === "save") toast("Đã lưu vào Pictures\\Chat\\chup-" + new Date().toTimeString().slice(0, 8).replace(/:/g, "") + ".png");
+  else if (a === "ai") { toast("Đã đính ảnh vào cuộc chat AI · Claude. Đang mở câu hỏi…"); setTimeout(() => setMode("chat"), 1400); }
+  else if (a === "send") { st.origin === "chat" ? addToTray() : openPick(e.currentTarget); }
+  else if (a === "start") startRec();
+  else if (a === "pause") { st.rec.phase = st.rec.phase === "pause" ? "run" : "pause"; renderUI(); }
+  else if (a === "stop") stopRec(false);
+}
+function openPick(anchor) {
+  const b = anchor.getBoundingClientRect(), mb = st.mode === "rec" ? "Clip" : "Ảnh";
+  pick.style.display = "block";
+  pick.style.left = Math.min(b.left, innerWidth - 290) + "px";
+  pick.style.top = Math.max(8, b.top - 330) + "px";
+  const draw = (q) => {
+    pick.innerHTML = `<input id="q" placeholder="Tìm chat…" value="${q}"><div class="cap">Gần đây · ${mb} cũng đã nằm trong clipboard</div>` +
+      CHATS.filter(c => c.toLowerCase().includes(q.toLowerCase())).map(c => `<div class="row" data-chat="${c}"><span class="av">${c[0]}</span>${c}</div>`).join("");
+    const i = $("#q"); i.focus(); i.setSelectionRange(q.length, q.length);
+    i.oninput = () => draw(i.value); i.onkeydown = (e) => e.stopPropagation();
+    pick.querySelectorAll(".row").forEach(r => r.onclick = () => {
+      pick.style.display = "none"; toast("Đã gửi " + mb.toLowerCase() + " vào «" + r.dataset.chat + "»"); setTimeout(() => setMode("chat"), 1300);
+    });
+  };
+  draw("");
+}
+function addToTray() {
+  const label = st.mode === "rec" ? "Clip" : "Ảnh chụp";
+  $("#tray").innerHTML += `<div class="chip">🖼 ${label} ${new Date().toTimeString().slice(0, 5)} · ${Math.round(st.rect.w)}×${Math.round(st.rect.h)} <b>✕</b></div>`;
+  toast(label + " đã vào khay đính kèm của «Nhóm Dự án»"); setTimeout(() => setMode("chat"), 900);
+}
+function startRec() {
+  const R = st.rec; R.phase = "count"; renderUI();
+  const c = $("#countdown"); c.style.display = "flex"; let n = 3; c.textContent = n;
+  const t = setInterval(() => {
+    n--; if (n > 0) { c.textContent = n; return; }
+    clearInterval(t); c.style.display = "none"; R.phase = "run"; R.sec = 0; sel.classList.add("recording"); renderUI();
+    R.timer = setInterval(() => { if (R.phase === "run") { R.sec++; renderUI(); } }, 1000);
+  }, 700);
+}
+function stopRec(silent) {
+  const R = st.rec; clearInterval(R.timer);
+  const was = R.phase === "run" || R.phase === "pause", sec = R.sec;
+  R.phase = "idle"; R.sec = 0; sel.classList.remove("recording"); $("#countdown").style.display = "none";
+  if (silent || !was) return;
+  const mb = (Math.max(sec, 1) * 0.35 * (st.rect.w * st.rect.h) / 400000).toFixed(1);
+  const big = mb > 25;
+  toast("Clip " + String(sec).padStart(2, "0") + "s · ~" + mb + " MB" + (big ? " · lớn hơn 25 MB, không chuyển sang Zalo được" : " · chuyển được sang Zalo"), big);
+  if (st.origin === "chat") setTimeout(addToTray, 900);
+  else setTimeout(() => { renderUI(); const s = document.querySelector("[data-act]"); u1.innerHTML = `<div class="bar"><button class="ib" data-act="copy">⧉ Sao chép</button><button class="ib" data-act="save">⬇ Lưu</button><button class="ib pri" data-act="send">Gửi ➤</button>${closeBtn}</div>`; wire(); }, 900);
+}
+let tt;
+function toast(msg, warn) { const t = $("#toast"); t.textContent = msg; t.className = warn ? "warn" : ""; t.style.display = "block"; clearTimeout(tt); tt = setTimeout(() => t.style.display = "none", 2600); }
+
+/* ===== lối vào từ ô soạn tin + phím ===== */
+$("#btnShot").onclick = () => setMode("shot", "chat");
+$("#btnRec").onclick = () => setMode("rec", "chat");
+$("#pv").onclick = () => setVariant(KEYS[(KEYS.indexOf(st.variant) + KEYS.length - 1) % KEYS.length]);
+$("#nv").onclick = () => setVariant(KEYS[(KEYS.indexOf(st.variant) + 1) % KEYS.length]);
+document.querySelectorAll("#switch [data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode, "hotkey"));
+document.addEventListener("keydown", (e) => {
+  if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if (e.key === "ArrowLeft") $("#pv").click();
+  else if (e.key === "ArrowRight") $("#nv").click();
+  else if (e.key === "Escape") setMode("chat");
+  else if (e.ctrlKey && e.key.toLowerCase() === "z") act("undo");
+  else if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "a") setMode("shot", "hotkey");
+  else if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "r") setMode("rec", "hotkey");
+});
+setVariant(st.variant); setMode("shot", "hotkey");
+</script>
+</body>
+</html>
