@@ -14,6 +14,7 @@ import { countLabel, dayLabel, sameDay } from "../data/format.ts";
 import { useBackendValue, useServices, useWindow } from "../data/services.tsx";
 import type { Topic } from "../data/pending-backend.ts";
 import type { ChatStore, WindowItem } from "../data/store.ts";
+import { flashRow } from "./focus-flash.ts";
 import { MessageItem } from "./message-item.tsx";
 import { itemDate, joinsRun, RUN_GAP_S } from "./message-runs.ts";
 import { pendingTopics } from "../media/media-state.ts";
@@ -207,7 +208,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		if (positioned.current !== placement) {
 			positioned.current = placement;
 			const target = place(element, window_.focusSeq, store.position(chatId, topicId));
-			if (target !== null && window_.focusSeq !== 0) target.classList.add("flash");
+			if (target !== null && window_.focusSeq !== 0) flashRow(target);
 			pinned.current = true;
 			placedTop.current = element.scrollTop;
 			// Whether the newest message is on screen decides marking as read.

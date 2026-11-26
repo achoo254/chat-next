@@ -23,6 +23,7 @@ import { DeliveryHub } from "./merged-delivery.tsx";
 import { MergedMenu, MergedRow } from "./merged-row.tsx";
 import { groupMerged, rowOfMessage, unreadDividerKey, type MergedGroup } from "./merged-rows.ts";
 import type { MergedItem } from "./merged-timeline.ts";
+import { flashRow } from "../ui/focus-flash.ts";
 import { useMergedRead } from "./merged-read.ts";
 import type { LinkedPerson } from "./people-api.ts";
 import { useMergedTimeline } from "./use-merged-timeline.ts";
@@ -112,8 +113,7 @@ export function PersonTimeline({ person, actions }: PersonTimelineProps) {
 			stick.current = false;
 			const element = scroller.current;
 			if (element !== null) element.scrollTop = Math.max(0, row.offsetTop - element.clientHeight / 3);
-			row.classList.add("flash");
-			window.setTimeout(() => row.classList.remove("flash"), 1600);
+			flashRow(row);
 		},
 		[store],
 	);

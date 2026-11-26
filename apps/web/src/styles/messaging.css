@@ -312,7 +312,18 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
 	mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
 }
-.msg.flash .bubble { box-shadow: 0 0 0 2px var(--c-primary); }
+/* The message a jump lands on: a band across the whole list behind it (the list clips what passes its sides) that fades in, holds and fades out, as Telegram does. focus-flash.ts removes the class when it ends. */
+.msg.flash { position: relative; isolation: isolate; }
+.msg.flash::before {
+	content: ""; position: absolute; z-index: -1; inset: calc(-1 * var(--space-1)) -100vw; pointer-events: none;
+	background: color-mix(in srgb, var(--c-primary-solid) 22%, transparent);
+	animation: msg-focus 2200ms var(--ease-standard) both;
+}
+@keyframes msg-focus {
+	0% { opacity: 0; }
+	10%, 62% { opacity: 1; }
+	100% { opacity: 0; }
+}
 /* Sender names: the tone darkened towards the text colour (light: 5.0–6.4:1 on --c-theirs; dark: 8.7:1 and up). */
 .bubble .who { display: block; font-size: 0.8125rem; font-weight: 600; color: color-mix(in srgb, var(--c-viz-blue) 80%, var(--c-text)); margin-bottom: 2px; }
 .bubble .who[class*="s-"] { color: color-mix(in srgb, var(--who) 80%, var(--c-text)); }
