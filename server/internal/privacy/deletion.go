@@ -146,14 +146,6 @@ func (s *Service) eraseQueued(ctx context.Context) (int, error) {
 // operators keep (docs/privacy/data-inventory.md).
 var personalRows = []string{
 	`DELETE FROM contacts WHERE owner_id = $1 OR contact_id = $1`,
-	// The People feature is gone and nothing reads or writes these three tables any more, but rows
-	// written before stay until the tables are dropped. Users are only soft-deleted, so ON DELETE
-	// CASCADE never fires: an erasure still removes them here.
-	`DELETE FROM people_rejections WHERE owner_id = $1 OR user_a = $1 OR user_b = $1`,
-	`DELETE FROM people_members WHERE owner_id = $1 OR user_id = $1`,
-	// The owner's people, and the people of others that the erased user leaves with fewer than two users.
-	`DELETE FROM people WHERE owner_id = $1 OR NOT EXISTS (
-		SELECT 1 FROM people_members m WHERE m.person_id = people.id GROUP BY m.person_id HAVING count(*) >= 2)`,
 	`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`,
 	`DELETE FROM privacy_settings WHERE user_id = $1`,
 	`DELETE FROM notification_settings WHERE user_id = $1`,
