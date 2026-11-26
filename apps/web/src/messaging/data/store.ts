@@ -449,7 +449,9 @@ export class ChatStore {
 	private readLive(view: DialogView): DialogView {
 		const { dialog } = view;
 		const marked = this.liveRead.get(dialog.chatId);
-		if (marked === undefined || (dialog.unreadCount === 0 && dialog.unreadMentionsCount === 0)) return view;
+		// Mentions are left as the server counts them: one stays unread until its message is
+		// shown, not when the chat is read past it.
+		if (marked === undefined || dialog.unreadCount === 0) return view;
 		if (dialog.topSeq > marked && dialog.topSeq > dialog.readInboxMaxSeq) {
 			this.liveRead.set(dialog.chatId, dialog.topSeq);
 			this.noteRead(dialog.chatId, dialog.topSeq);
@@ -460,7 +462,7 @@ export class ChatStore {
 		}
 		return {
 			...view,
-			dialog: { ...dialog, readInboxMaxSeq: Math.max(dialog.readInboxMaxSeq, dialog.topSeq), unreadCount: 0, unreadMentionsCount: 0 },
+			dialog: { ...dialog, readInboxMaxSeq: Math.max(dialog.readInboxMaxSeq, dialog.topSeq), unreadCount: 0 },
 		};
 	}
 

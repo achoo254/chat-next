@@ -240,7 +240,21 @@ type Message struct {
 	// own: it lets the engine rename a chat whose other side was first met without a
 	// name. Nil otherwise.
 	Peer *Participant
+	// Mention is whether the message mentions the owner (or replies to them) as the app
+	// counts it, and whether the owner saw it there; MentionUnknown when the app does
+	// not say.
+	Mention Mention
 }
+
+// Mention is how a message mentions the owner, as the other app tells it.
+type Mention int
+
+const (
+	MentionUnknown Mention = iota
+	MentionNone
+	MentionUnread
+	MentionRead
+)
 
 // ForwardInfo says where a forwarded message came from.
 type ForwardInfo struct {

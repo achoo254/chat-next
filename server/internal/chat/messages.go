@@ -132,16 +132,39 @@ func (t *txn) postMessage(ctx context.Context, ev *Event, c *chatRow, members []
 
 // recordMentions stores who a message mentions or replies to (current
 // members other than the author), the source of unread_mentions_count.
-// replace drops what an earlier version of the message recorded. Private
+// replace drops the people an earlier version of the message mentioned and
+// no longer does; who is still mentioned keeps whether they saw it. Private
 // chats, service messages and forwards record nothing.
 func (t *txn) recordMentions(ctx context.Context, c *chatRow, m *messageRow, content *appv1.Message, replace bool) error {
-	if c.Type == typePrivate || content.GetAction() != nil || content.GetForwardFrom() != nil {
-		return nil
+	users, err := t.mentionedBy(ctx, c, m, content)
+	if err != nil {
+		return err
+	}
+	if users == nil {
+		users = []int64{} // an empty array, not NULL, for the ANY below
 	}
 	if replace {
-		if _, err := t.tx.Exec(ctx, `DELETE FROM message_mentions WHERE chat_id = $1 AND seq = $2`, m.ChatID, m.Seq); err != nil {
+		if _, err := t.tx.Exec(ctx, `DELETE FROM message_mentions WHERE chat_id = $1 AND seq = $2 AND NOT (user_id = ANY($3))`,
+			m.ChatID, m.Seq, users); err != nil {
 			return fmt.Errorf("chat: clear mentions: %w", err)
 		}
+	}
+	if len(users) == 0 {
+		return nil
+	}
+	if _, err := t.tx.Exec(ctx, `
+		INSERT INTO message_mentions (user_id, chat_id, seq) SELECT u, $1, $2 FROM unnest($3::bigint[]) u ORDER BY u
+		ON CONFLICT DO NOTHING`, m.ChatID, m.Seq, users); err != nil {
+		return fmt.Errorf("chat: record mentions: %w", err)
+	}
+	return nil
+}
+
+// mentionedBy lists the current members other than the author that a message
+// mentions (@username, a mention by id) or replies to, by user id.
+func (t *txn) mentionedBy(ctx context.Context, c *chatRow, m *messageRow, content *appv1.Message) ([]int64, error) {
+	if c.Type == typePrivate || content.GetAction() != nil || content.GetForwardFrom() != nil {
+		return nil, nil
 	}
 	var ids []int64
 	var names []string
@@ -158,16 +181,34 @@ func (t *txn) recordMentions(ctx context.Context, c *chatRow, m *messageRow, con
 		}
 	}
 	if len(ids) == 0 && len(names) == 0 && m.ReplyToSeq == 0 {
-		return nil
+		return nil, nil
 	}
+	rows, err := t.tx.Query(ctx, `
+		SELECT DISTINCT mem.user_id FROM chat_members mem JOIN users u ON u.id = mem.user_id
+		WHERE mem.chat_id = $1 AND mem.left_at IS NULL AND mem.user_id <> $2
+			AND (mem.user_id = ANY($3) OR u.username = ANY($4)
+				OR mem.user_id = (SELECT from_id FROM messages WHERE chat_id = $1 AND seq = $5 AND $5 <> 0))
+		ORDER BY mem.user_id`, m.ChatID, m.FromID, ids, names, m.ReplyToSeq)
+	if err != nil {
+		return nil, fmt.Errorf("chat: mentioned members: %w", err)
+	}
+	users, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("chat: mentioned members: %w", err)
+	}
+	return users, nil
+}
+
+// readMentions marks the mentions of me read in the messages I just read in order
+// (seq in (after, upTo], of topics when given): they went past on my screen. A
+// mention older than my read position is left for me to open (ReadMentions).
+func (t *txn) readMentions(ctx context.Context, c *chatRow, me, after, upTo int64, topics []int64) error {
 	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO message_mentions (user_id, chat_id, seq)
-		SELECT DISTINCT mem.user_id, $1::bigint, $2::bigint FROM chat_members mem JOIN users u ON u.id = mem.user_id
-		WHERE mem.chat_id = $1 AND mem.left_at IS NULL AND mem.user_id <> $3
-			AND (mem.user_id = ANY($4) OR u.username = ANY($5)
-				OR mem.user_id = (SELECT from_id FROM messages WHERE chat_id = $1 AND seq = $6 AND $6 <> 0))
-		ON CONFLICT DO NOTHING`, m.ChatID, m.Seq, m.FromID, ids, names, m.ReplyToSeq); err != nil {
-		return fmt.Errorf("chat: record mentions: %w", err)
+		UPDATE message_mentions mm SET read = true FROM messages msg
+		WHERE mm.user_id = $2 AND mm.chat_id = $1 AND NOT mm.read AND mm.seq > $3 AND mm.seq <= $4
+			AND msg.chat_id = mm.chat_id AND msg.seq = mm.seq AND ($5::bigint[] IS NULL OR msg.topic_id = ANY($5))`,
+		c.ID, me, after, upTo, topics); err != nil {
+		return fmt.Errorf("chat: read mentions: %w", err)
 	}
 	return nil
 }
@@ -1447,6 +1488,17 @@ func (t *txn) read(ctx context.Context, c *chatRow, m *memberRow, maxSeq, topicI
 	}
 	if len(moved) == 0 {
 		return nil
+	}
+	lowest := maxSeq
+	for _, topic := range moved {
+		lowest = min(lowest, old[topic])
+	}
+	var mentionTopics []int64
+	if c.Forum {
+		mentionTopics = moved
+	}
+	if err := t.readMentions(ctx, c, me, lowest, maxSeq, mentionTopics); err != nil {
+		return err
 	}
 	write := append(slices.Clone(moved), 0)
 	if _, err := t.tx.Exec(ctx, `

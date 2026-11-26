@@ -224,6 +224,8 @@ export class ChatFixture {
 	private readonly userExtras = new Map<number, UserExtras>();
 	private readonly chatExtras = new Map<number, ChatExtras>();
 	private readonly dialogExtras = new Map<number, { unreadMentionsCount?: number; unreadCount?: number }>();
+	/** Seqs the client said it saw (ReadMentions), in order. */
+	readonly readMentionCalls: number[] = [];
 	readonly blocked = new Set<number>();
 	readonly reactions: { chatId: number; seq: number; emoji: string }[] = [];
 	readonly pins: { chatId: number; seq: number; pinned: boolean }[] = [];
@@ -519,6 +521,11 @@ export class ChatFixture {
 
 	mentions(chatId: number, count: number): void {
 		this.dialogExtras.set(chatId, { ...this.dialogExtras.get(chatId), unreadMentionsCount: count });
+	}
+
+	/** You read past these messages that mention you without seeing them (another device, the other app). */
+	unseenMentions(chatId: number, seqs: readonly number[]): void {
+		for (const seq of seqs) this.server.unseeMention(this.selfId, chatId, seq);
 	}
 
 	/** The server's (capped) unread count for a chat, as GetDialogs reports it. */
@@ -944,6 +951,12 @@ export class ChatFixture {
 				if (req.noLinkPreview) this.sentWithoutPreview.push(req.text);
 				this.send(this.selfId, chatId, req.text, { topicId: req.topicId === 0n ? 1n : req.topicId, replyToSeq: req.replyToSeq });
 				return {};
+			},
+			getUnreadMentions: (req) => ({ seqs: this.server.unreadMentionSeqs(num(req.chatId), this.selfId).map(BigInt) }),
+			readMentions: (req) => {
+				const seen = req.seqs.map(num);
+				this.readMentionCalls.push(...seen);
+				return { ack: this.server.readMentions(this.selfId, num(req.chatId), seen) };
 			},
 			readHistory: (req) => {
 				const chatId = num(req.chatId);

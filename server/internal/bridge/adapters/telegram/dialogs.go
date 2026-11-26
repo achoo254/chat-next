@@ -30,7 +30,7 @@ const (
 // of its kind (Settings › Notifications: private chats, groups, channels), given
 // in defaults as a mute_until.
 func dialogState(d *tg.Dialog, kind notifyKind, defaults map[notifyKind]int64) bridge.DialogState {
-	st := bridge.DialogState{Pinned: d.Pinned, UnreadMark: d.UnreadMark}
+	st := bridge.DialogState{Pinned: d.Pinned, UnreadMark: d.UnreadMark, MentionsKnown: true, UnreadMentions: d.UnreadMentionsCount}
 	if until, ok := d.NotifySettings.GetMuteUntil(); ok {
 		st.MuteUntil = int64(until)
 	} else {

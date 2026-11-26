@@ -185,7 +185,8 @@ var handlers = []handler{
 			return r.onRead(ctx, ev, *ev.Read)
 		},
 		ops: map[string]func(*runner, context.Context, *outboxRow) error{
-			"mark_read": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doMarkRead(ctx, h) },
+			"mark_read":    func(r *runner, ctx context.Context, h *outboxRow) error { return r.doMarkRead(ctx, h) },
+			"read_mention": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doReadMention(ctx, h) },
 		},
 	},
 }

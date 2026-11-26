@@ -155,7 +155,7 @@ function place(element: HTMLElement, focusSeq: number, kept: { seq: number; offs
 export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: MessageListProps) {
 	const copy = useCopy();
 	const { locale } = useI18n();
-	const { store, source, backend, self } = useServices();
+	const { store, source, backend, self, remote } = useServices();
 	const window_ = useWindow(chatId);
 	// Under the newest message, with names even in a private chat (mockups/chat.html #app).
 	const typing = useTypingText(chatId, true, chat?.forum === true ? topicId : null);
@@ -411,11 +411,23 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	const unread = topic !== null ? topic.unreadCount : (dialog?.dialog.unreadCount ?? 0);
 	const mentions = topicId === 0 ? (dialog?.dialog.unreadMentionsCount ?? 0) : 0;
 	const toMention = () => {
-		// Messages unread when the chat was opened count, even if reading it since moved the read mark.
-		const from = unreadFrom !== 0 ? unreadFrom : readInbox + 1;
-		const seq = firstMention(store, chatId, from - 1, self);
 		stick.current = false;
-		store.openWindow(chatId, seq !== 0 ? seq : from);
+		// The server keeps which mentions you have not seen (a mention stays unread until
+		// its message is shown, as in Telegram); the oldest is opened and so read.
+		remote.unreadMentions(chatId, topicId).then(
+			(seqs) => {
+				const seq = seqs[0];
+				if (seq === undefined) return;
+				store.openWindow(chatId, seq);
+				remote.readMentions(chatId, [seq]).catch(() => undefined);
+			},
+			() => {
+				// Offline: the unread messages of the window that mention you.
+				const from = unreadFrom !== 0 ? unreadFrom : readInbox + 1;
+				const seq = firstMention(store, chatId, from - 1, self);
+				store.openWindow(chatId, seq !== 0 ? seq : from);
+			},
+		);
 	};
 	return (
 		<div className="messages-wrap">

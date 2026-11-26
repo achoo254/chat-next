@@ -161,7 +161,7 @@ func (e *Engine) superviseAccount(ctx context.Context, id int64, h *runnerHandle
 			_ = e.db.setStatus(ctx, id, "needs_login", "stored login unreadable")
 			return
 		}
-		r := &runner{e: e, account: a, adapter: adapter, logger: logger, cmds: make(chan *chatLink, 8), syncNow: make(chan struct{}, 1), refusedUntil: map[string]time.Time{}, turn: map[string]int{}, puppets: map[string]int64{},
+		r := &runner{e: e, account: a, adapter: adapter, logger: logger, cmds: make(chan *chatLink, 8), syncNow: make(chan struct{}, 1), refusedUntil: map[string]time.Time{}, turn: map[string]int{}, puppets: map[string]int64{}, mentionsAt: map[string]mentionCounts{},
 			acct: bridge.Account{ID: fmt.Sprint(a.ID), Session: session, State: a.UpdateState}}
 		e.mu.Lock()
 		h.r = r

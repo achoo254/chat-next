@@ -147,11 +147,13 @@ var errLeaseLost = errors.New("bridge: lease lost")
 
 // runner syncs one account until its context ends or it fails.
 type runner struct {
-	e       *Engine
-	account *accountRow
-	adapter bridge.Adapter
-	acct    bridge.Account
-	logger  *slog.Logger
+	// mentionsAt is, per conversation, the counts its mentions last matched at (syncMentions).
+	mentionsAt map[string]mentionCounts
+	e          *Engine
+	account    *accountRow
+	adapter    bridge.Adapter
+	acct       bridge.Account
+	logger     *slog.Logger
 	// links are the synced chats by the id the other app gives them.
 	links map[string]*chatLink
 	// cmds asks the runner to import a chat enabled while it runs.
@@ -753,7 +755,7 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 		}
 		labelled, moved := withLabel(label, m.Text, m.Entities)
 		text, ents := mapContent(labelled, moved, r.e.chat.MessageLengthMax(), r.userOf)
-		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic], Buttons: chatButtons(m.Buttons), Notify: notify && from != r.account.OwnerID}
+		imports[i] = chat.ImportMessage{FromID: from, Date: m.Date, Text: text, Entities: ents, Content: content, TopicID: topicIDs[m.Topic], Buttons: chatButtons(m.Buttons), Notify: notify && from != r.account.OwnerID, OwnerMention: ownerMention(m.Mention)}
 		if m.ReplyTo != "" {
 			target, err := lookupMessage(ctx, it.Tx(), r.account.ID, l.ExternalChat, m.ReplyTo)
 			if err != nil {
@@ -905,7 +907,7 @@ func (r *runner) mayImport(ctx context.Context, it *chat.ImportTx, k messageKey,
 // applyEdit rewrites an imported message when m is newer than the stored one.
 func (r *runner) applyEdit(ctx context.Context, it *chat.ImportTx, k messageKey, have *importedMessage, m bridge.Message) error {
 	text, ents := mapContent(m.Text, m.Entities, r.e.chat.MessageLengthMax(), r.userOf)
-	if _, err := it.Edit(ctx, have.Seq, chat.ImportMessage{Text: text, Entities: ents, Buttons: chatButtons(m.Buttons)}); err != nil {
+	if _, err := it.Edit(ctx, have.Seq, chat.ImportMessage{Text: text, Entities: ents, Buttons: chatButtons(m.Buttons), OwnerMention: ownerMention(m.Mention)}); err != nil {
 		return err
 	}
 	return setVersion(ctx, it.Tx(), k, m.Version)

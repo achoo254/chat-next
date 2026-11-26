@@ -103,6 +103,26 @@ func (s *messagesService) ReadHistory(ctx context.Context, req *connect.Request[
 	})
 }
 
+func (s *messagesService) GetUnreadMentions(ctx context.Context, req *connect.Request[appv1.GetUnreadMentionsRequest]) (*connect.Response[appv1.GetUnreadMentionsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetUnreadMentionsRequest) (*appv1.GetUnreadMentionsResponse, error) {
+		seqs, err := s.chat.GetUnreadMentions(ctx, me, m.GetChatId(), m.GetTopicId())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.GetUnreadMentionsResponse{Seqs: seqs}, nil
+	})
+}
+
+func (s *messagesService) ReadMentions(ctx context.Context, req *connect.Request[appv1.ReadMentionsRequest]) (*connect.Response[appv1.ReadMentionsResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ReadMentionsRequest) (*appv1.ReadMentionsResponse, error) {
+		ack, err := s.chat.ReadMentions(ctx, me, m.GetChatId(), m.GetSeqs())
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.ReadMentionsResponse{Ack: ack}, nil
+	})
+}
+
 func (s *messagesService) PinMessage(ctx context.Context, req *connect.Request[appv1.PinMessageRequest]) (*connect.Response[appv1.PinMessageResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.PinMessageRequest) (*appv1.PinMessageResponse, error) {
 		ack, err := s.chat.PinMessage(ctx, me, m.GetChatId(), m.GetSeq())

@@ -214,6 +214,9 @@ export class FakeServer {
 
 	private readonly users = new Map<number, UserRecord>();
 	private readonly chats = new Map<number, ChatRecord>();
+	/** Per "viewer:chat", mentions read past unseen, and mentions seen (unreadMentionSeqs). */
+	private readonly unseenMentions = new Map<string, Set<number>>();
+	private readonly seenMentions = new Map<string, Set<number>>();
 	private readonly sessions = new Set<Session>();
 	private nextUserId = 1001;
 	private nextChatId = 5001;
@@ -364,16 +367,47 @@ export class FakeServer {
 
 	/** Unread messages that mention `viewer` by id or reply to them, after `after` (the server's message_mentions). */
 	private unreadMentions(chatId: number, viewer: number, after: number): number {
+		return this.unreadMentionSeqs(chatId, viewer, after).length;
+	}
+
+	/**
+	 * Messages that mention the viewer and that they have not seen, oldest first: those above
+	 * their read position, and those read past without being seen (unseeMention) until they
+	 * open them (readMentions), as the server keeps them.
+	 */
+	unreadMentionSeqs(chatId: number, viewer: number, after = this.reads(viewer, chatId).inbox): number[] {
 		const messages = this.visibleMessages(chatId, viewer);
 		const own = new Set(messages.filter((r) => r.sender === viewer).map((r) => num(r.message.seq)));
-		return messages.filter(
-			(r) =>
-				!r.deleted &&
-				r.sender !== viewer &&
-				num(r.message.seq) > after &&
-				(own.has(num(r.message.replyToSeq)) ||
-					r.message.entities.some((e) => e.type === EntityType.MENTION_NAME && num(e.userId) === viewer)),
-		).length;
+		const key = `${viewer}:${chatId}`;
+		const unseen = this.unseenMentions.get(key);
+		const seen = this.seenMentions.get(key);
+		return messages
+			.filter((r) => {
+				const seq = num(r.message.seq);
+				if (r.deleted || r.sender === viewer || seen?.has(seq) === true) return false;
+				if (unseen?.has(seq) === true) return true;
+				return (
+					seq > after &&
+					(own.has(num(r.message.replyToSeq)) ||
+						r.message.entities.some((e) => e.type === EntityType.MENTION_NAME && num(e.userId) === viewer))
+				);
+			})
+			.map((r) => num(r.message.seq));
+	}
+
+	/** The viewer read past a message that mentions them without seeing it (another device, the other app). */
+	unseeMention(viewer: number, chatId: number, seq: number): void {
+		const key = `${viewer}:${chatId}`;
+		this.unseenMentions.set(key, new Set([...(this.unseenMentions.get(key) ?? []), seq]));
+		this.seenMentions.get(key)?.delete(seq);
+	}
+
+	/** ReadMentions: the viewer saw these messages; their sessions get the new count. */
+	readMentions(userId: number, chatId: number, seqs: readonly number[]): WireSyncAck {
+		const key = `${userId}:${chatId}`;
+		this.seenMentions.set(key, new Set([...(this.seenMentions.get(key) ?? []), ...seqs]));
+		for (const seq of seqs) this.unseenMentions.get(key)?.delete(seq);
+		return this.readHistory(userId, chatId, this.reads(userId, chatId).inbox);
 	}
 
 	private visibleMessages(chatId: number, viewer: number): MessageRecord[] {

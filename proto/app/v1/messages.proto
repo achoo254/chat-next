@@ -29,6 +29,13 @@ service MessagesService {
   // Deletes for the caller only (hidden) or for everyone.
   rpc DeleteMessages(DeleteMessagesRequest) returns (DeleteMessagesResponse);
   rpc ReadHistory(ReadHistoryRequest) returns (ReadHistoryResponse);
+  // Messages that mention the caller or reply to them and that the caller has
+  // not seen yet, oldest first: where the "@" button goes. A mention stays
+  // unread until its message is seen, whatever the read position.
+  rpc GetUnreadMentions(GetUnreadMentionsRequest) returns (GetUnreadMentionsResponse);
+  // The caller saw these messages: their mentions of the caller are read.
+  // The caller's sessions get an inbox read with the new count.
+  rpc ReadMentions(ReadMentionsRequest) returns (ReadMentionsResponse);
   // Pins one more message; a chat (and each forum topic) keeps any number
   // of pinned messages. Chat.pinned_seq is the newest pinned message.
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
@@ -484,6 +491,27 @@ message ReadHistoryRequest {
 }
 
 message ReadHistoryResponse {
+  SyncAck ack = 1;
+}
+
+message GetUnreadMentionsRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // Forum groups: only this topic; 0 for the whole chat.
+  int64 topic_id = 2 [jstype = JS_NUMBER];
+}
+
+message GetUnreadMentionsResponse {
+  // Oldest first, at most 100.
+  repeated int64 seqs = 1 [jstype = JS_NUMBER];
+}
+
+message ReadMentionsRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  // At most 100.
+  repeated int64 seqs = 2 [jstype = JS_NUMBER];
+}
+
+message ReadMentionsResponse {
   SyncAck ack = 1;
 }
 

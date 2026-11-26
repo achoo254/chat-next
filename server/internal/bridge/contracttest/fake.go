@@ -44,6 +44,7 @@ type Fake struct {
 	pinned                                     map[string][]string // newest first
 	support                                    map[feature.Feature]feature.Support
 	dialogs                                    map[string]bridge.DialogState
+	mentions                                   map[string][]string // conv -> unread mentions of the owner
 	dialogCalls                                []string
 	infos                                      map[string]bridge.GroupInfo
 	infoCalls                                  []string
@@ -588,6 +589,43 @@ func (f *Fake) SetDialogState(conv string, st bridge.DialogState) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.dialogs[conv] = st
+}
+
+// SetUnreadMentions sets which messages of a conversation mention the owner unseen; the
+// dialog state counts them.
+func (f *Fake) SetUnreadMentions(conv string, ids ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.mentions == nil {
+		f.mentions = map[string][]string{}
+	}
+	f.mentions[conv] = append([]string(nil), ids...)
+	st := f.dialogs[conv]
+	st.MentionsKnown, st.UnreadMentions = true, len(ids)
+	f.dialogs[conv] = st
+}
+
+// UnreadMentionsOf is what the app has unseen for the owner in a conversation now.
+func (f *Fake) UnreadMentionsOf(conv string) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.mentions[conv]...)
+}
+
+// UnreadMentions implements bridge.MentionReader.
+func (f *Fake) UnreadMentions(_ context.Context, _ bridge.Account, conv string) ([]string, error) {
+	return f.UnreadMentionsOf(conv), nil
+}
+
+// ReadMentions implements bridge.MentionReader.
+func (f *Fake) ReadMentions(_ context.Context, _ bridge.Account, conv string, ids []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.mentions[conv] = slices.DeleteFunc(f.mentions[conv], func(id string) bool { return slices.Contains(ids, id) })
+	st := f.dialogs[conv]
+	st.UnreadMentions = len(f.mentions[conv])
+	f.dialogs[conv] = st
+	return nil
 }
 
 // DialogState is what the app has now for a conversation.

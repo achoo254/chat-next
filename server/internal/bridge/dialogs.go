@@ -13,6 +13,20 @@ type DialogState struct {
 	Pinned bool
 	// UnreadMark: the owner marked it as unread by hand.
 	UnreadMark bool
+	// MentionsKnown says UnreadMentions is the app's count of the messages that mention
+	// the owner and that they have not seen.
+	MentionsKnown  bool
+	UnreadMentions int
+}
+
+// MentionReader is implemented by an adapter that keeps, as Telegram does, which
+// messages mentioning the owner they have seen. It goes with "read".
+type MentionReader interface {
+	// UnreadMentions lists the messages of a conversation that mention the owner and
+	// that they have not seen (at most 100, by Message.ID).
+	UnreadMentions(ctx context.Context, acct Account, conv string) ([]string, error)
+	// ReadMentions tells the app the owner saw these messages that mention them.
+	ReadMentions(ctx context.Context, acct Account, conv string, ids []string) error
 }
 
 // DialogReader is implemented by an adapter that supports "notify" or "dialog"

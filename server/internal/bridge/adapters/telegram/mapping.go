@@ -279,6 +279,7 @@ func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bo
 		Media:        mapMedia(msg.Media),
 		Buttons:      mapButtons(msg.ReplyMarkup),
 		Version:      int64(msg.EditDate),
+		Mention:      mentionOf(msg),
 	}
 	for i := range out.Media {
 		out.Media[i].Ref = fmt.Sprintf("%s/%d", conv, msg.ID)
@@ -295,4 +296,17 @@ func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bo
 		out.Forward = b.forwardInfo(h, self)
 	}
 	return out, true
+}
+
+// mentionOf is how a message mentions the owner: Telegram flags a message that mentions
+// them or replies to them, and keeps it "content unread" until they see it.
+func mentionOf(msg *tg.Message) bridge.Mention {
+	switch {
+	case !msg.Mentioned:
+		return bridge.MentionNone
+	case msg.MediaUnread:
+		return bridge.MentionUnread
+	default:
+		return bridge.MentionRead
+	}
 }

@@ -57,6 +57,12 @@ const (
 	// MessagesServiceReadHistoryProcedure is the fully-qualified name of the MessagesService's
 	// ReadHistory RPC.
 	MessagesServiceReadHistoryProcedure = "/app.v1.MessagesService/ReadHistory"
+	// MessagesServiceGetUnreadMentionsProcedure is the fully-qualified name of the MessagesService's
+	// GetUnreadMentions RPC.
+	MessagesServiceGetUnreadMentionsProcedure = "/app.v1.MessagesService/GetUnreadMentions"
+	// MessagesServiceReadMentionsProcedure is the fully-qualified name of the MessagesService's
+	// ReadMentions RPC.
+	MessagesServiceReadMentionsProcedure = "/app.v1.MessagesService/ReadMentions"
 	// MessagesServicePinMessageProcedure is the fully-qualified name of the MessagesService's
 	// PinMessage RPC.
 	MessagesServicePinMessageProcedure = "/app.v1.MessagesService/PinMessage"
@@ -104,6 +110,13 @@ type MessagesServiceClient interface {
 	// Deletes for the caller only (hidden) or for everyone.
 	DeleteMessages(context.Context, *connect.Request[v1.DeleteMessagesRequest]) (*connect.Response[v1.DeleteMessagesResponse], error)
 	ReadHistory(context.Context, *connect.Request[v1.ReadHistoryRequest]) (*connect.Response[v1.ReadHistoryResponse], error)
+	// Messages that mention the caller or reply to them and that the caller has
+	// not seen yet, oldest first: where the "@" button goes. A mention stays
+	// unread until its message is seen, whatever the read position.
+	GetUnreadMentions(context.Context, *connect.Request[v1.GetUnreadMentionsRequest]) (*connect.Response[v1.GetUnreadMentionsResponse], error)
+	// The caller saw these messages: their mentions of the caller are read.
+	// The caller's sessions get an inbox read with the new count.
+	ReadMentions(context.Context, *connect.Request[v1.ReadMentionsRequest]) (*connect.Response[v1.ReadMentionsResponse], error)
 	// Pins one more message; a chat (and each forum topic) keeps any number
 	// of pinned messages. Chat.pinned_seq is the newest pinned message.
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
@@ -199,6 +212,18 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("ReadHistory")),
 			connect.WithClientOptions(opts...),
 		),
+		getUnreadMentions: connect.NewClient[v1.GetUnreadMentionsRequest, v1.GetUnreadMentionsResponse](
+			httpClient,
+			baseURL+MessagesServiceGetUnreadMentionsProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("GetUnreadMentions")),
+			connect.WithClientOptions(opts...),
+		),
+		readMentions: connect.NewClient[v1.ReadMentionsRequest, v1.ReadMentionsResponse](
+			httpClient,
+			baseURL+MessagesServiceReadMentionsProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("ReadMentions")),
+			connect.WithClientOptions(opts...),
+		),
 		pinMessage: connect.NewClient[v1.PinMessageRequest, v1.PinMessageResponse](
 			httpClient,
 			baseURL+MessagesServicePinMessageProcedure,
@@ -278,6 +303,8 @@ type messagesServiceClient struct {
 	editMessage         *connect.Client[v1.EditMessageRequest, v1.EditMessageResponse]
 	deleteMessages      *connect.Client[v1.DeleteMessagesRequest, v1.DeleteMessagesResponse]
 	readHistory         *connect.Client[v1.ReadHistoryRequest, v1.ReadHistoryResponse]
+	getUnreadMentions   *connect.Client[v1.GetUnreadMentionsRequest, v1.GetUnreadMentionsResponse]
+	readMentions        *connect.Client[v1.ReadMentionsRequest, v1.ReadMentionsResponse]
 	pinMessage          *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
 	unpinMessage        *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
 	unpinAllMessages    *connect.Client[v1.UnpinAllMessagesRequest, v1.UnpinAllMessagesResponse]
@@ -329,6 +356,16 @@ func (c *messagesServiceClient) DeleteMessages(ctx context.Context, req *connect
 // ReadHistory calls app.v1.MessagesService.ReadHistory.
 func (c *messagesServiceClient) ReadHistory(ctx context.Context, req *connect.Request[v1.ReadHistoryRequest]) (*connect.Response[v1.ReadHistoryResponse], error) {
 	return c.readHistory.CallUnary(ctx, req)
+}
+
+// GetUnreadMentions calls app.v1.MessagesService.GetUnreadMentions.
+func (c *messagesServiceClient) GetUnreadMentions(ctx context.Context, req *connect.Request[v1.GetUnreadMentionsRequest]) (*connect.Response[v1.GetUnreadMentionsResponse], error) {
+	return c.getUnreadMentions.CallUnary(ctx, req)
+}
+
+// ReadMentions calls app.v1.MessagesService.ReadMentions.
+func (c *messagesServiceClient) ReadMentions(ctx context.Context, req *connect.Request[v1.ReadMentionsRequest]) (*connect.Response[v1.ReadMentionsResponse], error) {
+	return c.readMentions.CallUnary(ctx, req)
 }
 
 // PinMessage calls app.v1.MessagesService.PinMessage.
@@ -398,6 +435,13 @@ type MessagesServiceHandler interface {
 	// Deletes for the caller only (hidden) or for everyone.
 	DeleteMessages(context.Context, *connect.Request[v1.DeleteMessagesRequest]) (*connect.Response[v1.DeleteMessagesResponse], error)
 	ReadHistory(context.Context, *connect.Request[v1.ReadHistoryRequest]) (*connect.Response[v1.ReadHistoryResponse], error)
+	// Messages that mention the caller or reply to them and that the caller has
+	// not seen yet, oldest first: where the "@" button goes. A mention stays
+	// unread until its message is seen, whatever the read position.
+	GetUnreadMentions(context.Context, *connect.Request[v1.GetUnreadMentionsRequest]) (*connect.Response[v1.GetUnreadMentionsResponse], error)
+	// The caller saw these messages: their mentions of the caller are read.
+	// The caller's sessions get an inbox read with the new count.
+	ReadMentions(context.Context, *connect.Request[v1.ReadMentionsRequest]) (*connect.Response[v1.ReadMentionsResponse], error)
 	// Pins one more message; a chat (and each forum topic) keeps any number
 	// of pinned messages. Chat.pinned_seq is the newest pinned message.
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
@@ -489,6 +533,18 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("ReadHistory")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceGetUnreadMentionsHandler := connect.NewUnaryHandler(
+		MessagesServiceGetUnreadMentionsProcedure,
+		svc.GetUnreadMentions,
+		connect.WithSchema(messagesServiceMethods.ByName("GetUnreadMentions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagesServiceReadMentionsHandler := connect.NewUnaryHandler(
+		MessagesServiceReadMentionsProcedure,
+		svc.ReadMentions,
+		connect.WithSchema(messagesServiceMethods.ByName("ReadMentions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	messagesServicePinMessageHandler := connect.NewUnaryHandler(
 		MessagesServicePinMessageProcedure,
 		svc.PinMessage,
@@ -573,6 +629,10 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServiceDeleteMessagesHandler.ServeHTTP(w, r)
 		case MessagesServiceReadHistoryProcedure:
 			messagesServiceReadHistoryHandler.ServeHTTP(w, r)
+		case MessagesServiceGetUnreadMentionsProcedure:
+			messagesServiceGetUnreadMentionsHandler.ServeHTTP(w, r)
+		case MessagesServiceReadMentionsProcedure:
+			messagesServiceReadMentionsHandler.ServeHTTP(w, r)
 		case MessagesServicePinMessageProcedure:
 			messagesServicePinMessageHandler.ServeHTTP(w, r)
 		case MessagesServiceUnpinMessageProcedure:
@@ -634,6 +694,14 @@ func (UnimplementedMessagesServiceHandler) DeleteMessages(context.Context, *conn
 
 func (UnimplementedMessagesServiceHandler) ReadHistory(context.Context, *connect.Request[v1.ReadHistoryRequest]) (*connect.Response[v1.ReadHistoryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.ReadHistory is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) GetUnreadMentions(context.Context, *connect.Request[v1.GetUnreadMentionsRequest]) (*connect.Response[v1.GetUnreadMentionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetUnreadMentions is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) ReadMentions(context.Context, *connect.Request[v1.ReadMentionsRequest]) (*connect.Response[v1.ReadMentionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.ReadMentions is not implemented"))
 }
 
 func (UnimplementedMessagesServiceHandler) PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error) {

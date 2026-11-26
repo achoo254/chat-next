@@ -665,6 +665,15 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				await messages.readHistory({ chatId: BigInt(chatId), maxSeq: BigInt(maxSeq), topicId: BigInt(topicId) });
 			}),
+		unreadMentions: (chatId, topicId) =>
+			call(async () => {
+				const res = await messages.getUnreadMentions({ chatId: BigInt(chatId), topicId: BigInt(topicId) });
+				return res.seqs.map(assertSafeId);
+			}),
+		readMentions: (chatId, seqs) =>
+			call(async () => {
+				await messages.readMentions({ chatId: BigInt(chatId), seqs: seqs.map(BigInt) });
+			}),
 		linkPreview: (url) =>
 			call(async () => {
 				const preview = (await messages.getLinkPreview({ url })).preview;

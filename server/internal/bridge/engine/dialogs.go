@@ -84,6 +84,9 @@ func (r *runner) pollDialogs(ctx context.Context) error {
 				}
 				return err
 			}
+			if err := r.syncMentions(ctx, r.links[conv], st); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

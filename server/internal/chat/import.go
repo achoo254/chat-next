@@ -53,7 +53,21 @@ type ImportMessage struct {
 	// Chat does not allow (a URL scheme it forbids, a limit exceeded) is
 	// dropped; it never loses the message.
 	Buttons [][]IntegrationButton
+	// OwnerMention is whether the message mentions the owner (or replies to them) as the
+	// other app says, and whether the owner saw it there. MentionUnknown leaves it to what
+	// Chat finds in the message, read unless the message notifies.
+	OwnerMention MentionState
 }
+
+// MentionState is how a message of another app mentions the owner of a synced chat.
+type MentionState int
+
+const (
+	MentionUnknown MentionState = iota
+	MentionNone
+	MentionUnread
+	MentionRead
+)
 
 // ImportTx is a transaction on one chat the bridge fills with messages of
 // another app. The chat row is locked, so an import is serialized with
@@ -221,6 +235,9 @@ func (it *ImportTx) Append(ctx context.Context, msgs []ImportMessage) ([]int64, 
 			return nil, err
 		}
 		seqs[i] = posted.Seq
+		if err := it.setOwnerMention(ctx, posted.Seq, msg.OwnerMention, msg.Notify); err != nil {
+			return nil, err
+		}
 	}
 	// A message that notifies stays unread; the rest of an import adds no unread.
 	for _, msg := range msgs {
@@ -347,7 +364,96 @@ func (it *ImportTx) Edit(ctx context.Context, seq int64, msg ImportMessage) (boo
 	if err := it.t.rewriteMessage(ctx, it.c, 0, m, text, content, true, false); err != nil {
 		return false, err
 	}
+	if msg.OwnerMention != MentionUnknown {
+		if err := it.setOwnerMention(ctx, seq, msg.OwnerMention, false); err != nil {
+			return false, err
+		}
+		if err := it.tellOwnerMentions(ctx); err != nil {
+			return false, err
+		}
+	}
 	return true, nil
+}
+
+// setOwnerMention makes the owner's mention row of a message what the other app says.
+// Without word from it, a message that does not notify (history, a silent import) leaves
+// the mention Chat found read, as the read position the import moves would have.
+func (it *ImportTx) setOwnerMention(ctx context.Context, seq int64, state MentionState, notify bool) error {
+	if it.c.Type == typePrivate {
+		return nil
+	}
+	var err error
+	switch state {
+	case MentionUnknown:
+		if notify {
+			return nil
+		}
+		_, err = it.t.tx.Exec(ctx, `UPDATE message_mentions SET read = true WHERE user_id = $1 AND chat_id = $2 AND seq = $3`,
+			it.owner, it.c.ID, seq)
+	case MentionNone:
+		_, err = it.t.tx.Exec(ctx, `DELETE FROM message_mentions WHERE user_id = $1 AND chat_id = $2 AND seq = $3`,
+			it.owner, it.c.ID, seq)
+	default:
+		_, err = it.t.tx.Exec(ctx, `
+			INSERT INTO message_mentions (user_id, chat_id, seq, read) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (user_id, chat_id, seq) DO UPDATE SET read = excluded.read`,
+			it.owner, it.c.ID, seq, state == MentionRead)
+	}
+	if err != nil {
+		return fmt.Errorf("chat: owner mention: %w", err)
+	}
+	return nil
+}
+
+// SetOwnerMentions makes the owner's unread mentions of the chat the given messages, as
+// the other app counts them: others the owner has become read, these unread. keepRead
+// leaves a mention the owner saw in Chat read (a chat that does not tell the other app).
+// It reports whether anything changed; the owner's sessions then get the new count.
+func (it *ImportTx) SetOwnerMentions(ctx context.Context, unread []int64, keepRead bool) (bool, error) {
+	if unread == nil {
+		unread = []int64{}
+	}
+	tag, err := it.t.tx.Exec(ctx, `
+		UPDATE message_mentions SET read = NOT (seq = ANY($3))
+		WHERE user_id = $1 AND chat_id = $2 AND read = (seq = ANY($3)) AND NOT ($4 AND read)`, it.owner, it.c.ID, unread, keepRead)
+	if err != nil {
+		return false, fmt.Errorf("chat: owner mentions: %w", err)
+	}
+	added, err := it.t.tx.Exec(ctx, `
+		INSERT INTO message_mentions (user_id, chat_id, seq)
+		SELECT $1, $2, s FROM unnest($3::bigint[]) s
+		WHERE EXISTS (SELECT 1 FROM messages WHERE chat_id = $2 AND seq = s)
+		ON CONFLICT DO NOTHING`, it.owner, it.c.ID, unread)
+	if err != nil {
+		return false, fmt.Errorf("chat: owner mentions: %w", err)
+	}
+	if tag.RowsAffected()+added.RowsAffected() == 0 {
+		return false, nil
+	}
+	return true, it.tellOwnerMentions(ctx)
+}
+
+// UnreadOwnerMentions counts the owner's unread mentions of the chat as Chat shows them.
+func (it *ImportTx) UnreadOwnerMentions(ctx context.Context) (int, error) {
+	_, m, err := it.t.s.chatFor(ctx, it.t.tx, it.c.ID, it.owner, false)
+	if err != nil {
+		return 0, fmt.Errorf("chat: import owner member: %w", err)
+	}
+	rs, err := it.t.s.readState(ctx, it.t.tx, it.c, m)
+	if err != nil {
+		return 0, err
+	}
+	return int(rs.mentions), nil
+}
+
+// tellOwnerMentions sends the owner's sessions the count of mentions after this change.
+func (it *ImportTx) tellOwnerMentions(ctx context.Context) error {
+	_, m, err := it.t.s.chatFor(ctx, it.t.tx, it.c.ID, it.owner, false)
+	if err != nil {
+		return fmt.Errorf("chat: import owner member: %w", err)
+	}
+	it.t.tellReadCounts(it.c, m)
+	return nil
 }
 
 // Attach gives the message at seq the file in msg and clears its text, without

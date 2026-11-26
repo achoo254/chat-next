@@ -205,7 +205,7 @@ func (s *Service) GetForumTopics(ctx context.Context, me, chatID int64, cursor s
 			(SELECT count(*) FROM (SELECT 1 FROM message_mentions mm
 				JOIN messages msg ON msg.chat_id = mm.chat_id AND msg.seq = mm.seq
 				WHERE mm.user_id = $2 AND mm.chat_id = t.chat_id AND msg.topic_id = t.id AND msg.from_id <> $2
-					AND msg.deleted_at IS NULL AND msg.seq > greatest(coalesce(r.read_inbox_max_seq, 0), $3, $4 - 1)
+					AND NOT mm.read AND msg.deleted_at IS NULL AND msg.seq > greatest($3, $4 - 1)
 					AND NOT EXISTS (SELECT 1 FROM user_hidden_messages h WHERE h.user_id = $2 AND h.chat_id = msg.chat_id AND h.seq = msg.seq)
 				LIMIT $8) mn)
 		FROM forum_topics t

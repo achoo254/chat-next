@@ -128,8 +128,8 @@ describe("messages", () => {
 	it("jumps to an unread mention with the @ button", async () => {
 		const demo = seedDemo();
 		const text = "@ductrung nhờ bạn duyệt bản phát hành.";
-		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, text, { entities: [entity(EntityType.MENTION, text, "@ductrung")] });
-		demo.fixture.mentions(demo.ids.ops, 1);
+		const seq = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, text, { entities: [entity(EntityType.MENTION, text, "@ductrung")] });
+		demo.fixture.unseenMentions(demo.ids.ops, [seq]);
 		// Opened in a background tab, nothing is read yet (an open chat at its
 		// newest message reads the mention, and the "@" goes away).
 		const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
@@ -140,6 +140,20 @@ describe("messages", () => {
 		} finally {
 			visibility.mockRestore();
 		}
+	});
+
+	it("keeps the @ button of a mention not seen yet in a chat read past it, and reads it there", async () => {
+		const demo = seedDemo();
+		const text = "@ductrung xem giúp phần cấu hình.";
+		const seq = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, text, { entities: [entity(EntityType.MENTION, text, "@ductrung")] });
+		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Tin mới hơn.");
+		// Read past it elsewhere (the other app, another device): the mention is still unseen,
+		// and the chat open at its newest message does not clear it.
+		demo.fixture.unseenMentions(demo.ids.ops, [seq]);
+		const { log } = await openChat(`/c/${demo.ids.ops}`, "Tin mới hơn.", demo);
+		await userEvent.click(await screen.findByRole("button", { name: "Tới tin nhắc bạn, 1 tin" }, LONG));
+		await waitFor(() => expect(demo.fixture.readMentionCalls).toEqual([seq]), LONG);
+		await waitFor(() => expect(log.querySelector(".msg.flash")?.textContent).toContain("xem giúp phần cấu hình"), LONG);
 	});
 
 	it("pins quietly when 'Thông báo cho mọi thành viên' is off", async () => {

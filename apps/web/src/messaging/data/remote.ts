@@ -496,6 +496,10 @@ export interface Remote {
 	hideTopic(chatId: number, topicId: number, hidden: boolean): Promise<void>;
 	sendToTopic(chatId: number, topicId: number, text: string, replyToSeq: number, noLinkPreview?: boolean): Promise<void>;
 	readTopic(chatId: number, topicId: number, maxSeq: number): Promise<void>;
+	/** Messages that mention you and that you have not seen, oldest first (the "@" button). */
+	unreadMentions(chatId: number, topicId: number): Promise<number[]>;
+	/** You saw these messages that mention you. */
+	readMentions(chatId: number, seqs: readonly number[]): Promise<void>;
 	linkPreview(url: string): Promise<WebPreview | null>;
 	report(target: ReportTarget, reason: ReportReason, comment: string): Promise<void>;
 	/** Feedback from Settings › Góp ý; ResourceExhausted when sent too fast. */
@@ -582,6 +586,8 @@ const METHODS = [
 	"hideTopic",
 	"sendToTopic",
 	"readTopic",
+	"unreadMentions",
+	"readMentions",
 	"linkPreview",
 	"report",
 	"sendFeedback",

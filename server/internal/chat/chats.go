@@ -1409,6 +1409,9 @@ func (s *Service) readStates(ctx context.Context, q querier, chats map[int64]*ch
 	}
 	topicPos := `greatest(coalesce(r.read_inbox_max_seq, 0), x.joined, x.visible - 1)`
 	chatPos := `greatest(coalesce(r0.read_inbox_max_seq, 0), x.joined, x.visible - 1)`
+	// A mention stays unread until its message is seen (message_mentions.read), whatever
+	// the read position; only what the member can see counts.
+	joinedPos := `greatest(x.joined, x.visible - 1)`
 	rows, err := q.Query(ctx, `
 		SELECT x.chat_id, coalesce(r0.read_inbox_max_seq, 0), c.last_seq, c.chat_pts,
 			CASE WHEN x.forum THEN (
@@ -1429,9 +1432,7 @@ func (s *Service) readStates(ctx context.Context, q querier, chats map[int64]*ch
 			(SELECT count(*) FROM (
 				SELECT 1 FROM message_mentions mm
 				JOIN messages msg ON msg.chat_id = mm.chat_id AND msg.seq = mm.seq
-				LEFT JOIN chat_read_states r ON r.chat_id = msg.chat_id AND r.user_id = $1
-					AND r.topic_id = CASE WHEN x.forum THEN msg.topic_id ELSE 0 END
-				WHERE mm.user_id = $1 AND mm.chat_id = x.chat_id AND `+unreadVisible(topicPos)+`
+				WHERE mm.user_id = $1 AND mm.chat_id = x.chat_id AND NOT mm.read AND `+unreadVisible(joinedPos)+`
 				LIMIT $6) mn)
 		FROM unnest($2::bigint[], $3::bool[], $4::bigint[], $5::bigint[]) AS x(chat_id, forum, joined, visible)
 		JOIN chats c ON c.id = x.chat_id
