@@ -373,7 +373,7 @@ describe("CiWatcher log", () => {
 
   it("says once that a push is not followed: a project that is not on GitHub, or the switch off", () => {
     const r = rig();
-    r.watcher.pushed(pushOf({ projectKey: "https://gitlabs.example.com/team/app.git" }));
+    r.watcher.pushed(pushOf({ projectKey: "https://gitlab.example.com/team/app.git" }));
     r.watcher.pushed(pushOf({ projectKey: "local:app" }));
     r.on.value = false;
     r.watcher.pushed(pushOf());
