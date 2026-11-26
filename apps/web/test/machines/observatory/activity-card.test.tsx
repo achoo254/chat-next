@@ -20,7 +20,7 @@ import { OBSERVATORY_COPY } from "../../../src/machines/observatory/observatory-
 import { placeNames } from "../../../src/machines/observatory/place-names.ts";
 import { played } from "../../observatory/render-fixtures.ts";
 import { FakeLink } from "./fake-observatory-link.ts";
-import { lifecycle, prompt, T0, tool } from "./live-map-fixtures.ts";
+import { api, lifecycle, prompt, T0, tool } from "./live-map-fixtures.ts";
 
 const c = OBSERVATORY_COPY.vi;
 const names = placeNames(viMachines.observe);
@@ -124,11 +124,35 @@ describe("the activity card", () => {
 		expect(idle.text("observe-card-desc")).toBe(c.card.lastJob(c.detail.kinds.tool, true, "100 ms"));
 		expect(idle.container.textContent).not.toContain("acme-crm");
 		idle.unmount();
-		// Shown, the name is there; a built-in tool keeps its own name when hidden.
+		// Shown, the MCP tool reads `server › tool`, once; a built-in tool keeps its own name when hidden.
 		const shown = show(played([prompt(1, 0), mcp()]).state, T0 + 1_010);
-		expect(shown.text("observe-card-what")).toContain("mcp__acme-crm__lookup_customer");
+		expect(shown.text("observe-card-what")).toBe("acme-crm › lookup_customer");
 		shown.unmount();
 		expect(show(played([prompt(1, 0), bash(10)]).state, T0 + 1_010, { hide: true }).text("observe-card-what")).toBe("Bash");
+	});
+
+	it("keeps every row in place whatever it shows, so the card does not jump: description, bar, output, details button", () => {
+		const rows = (state: LiveMapState, now: number): string[] => {
+			const { container, unmount } = show(state, now);
+			const card = container.querySelector("[data-id=observe-card]");
+			// The row each child is (its first class); a modifier such as an idle bar's `is-off` keeps the row.
+			const out = [...(card?.children ?? [])].map((el) => el.className.split(" ")[0] ?? "");
+			unmount();
+			return out;
+		};
+		const idle = rows(played([]).state, T0);
+		expect(idle).toEqual(rows(played([prompt(1, 0), bash(10)]).state, T0 + 2_010));
+		expect(idle).toEqual(rows(played([prompt(1, 0), api("a", 5)]).state, T0 + 100));
+		expect(idle).toEqual(["sr-only", "lm-card-k", "lm-card-what", "lm-card-desc", "lm-bar", "lm-card-out", "lm-card-foot", "lm-journey"]);
+	});
+
+	it("lists the whole journey (no step cut with …), its label once", () => {
+		const reads = Array.from({ length: 6 }, (_, i) => [tool(`f${i}`, 10 + i * 100, { success: true, durationMs: 5 }), tool(`b${i}`, 60 + i * 100, { toolName: "Bash", station: "SANDBOX", success: true, durationMs: 5 })]).flat();
+		const { container } = show(played([prompt(1, 0), ...reads]).state, T0 + 5_000);
+		const journey = container.querySelector("[data-id=observe-card-journey]");
+		expect(journey?.querySelectorAll(".lm-journey-step")).toHaveLength(12);
+		expect(journey?.textContent).not.toContain("…");
+		expect(journey?.textContent?.startsWith(`${c.card.journey}:`)).toBe(true);
 	});
 
 	it("names a subagent of an unknown type from the copy, and says its status to screen readers only when the subject changes", () => {

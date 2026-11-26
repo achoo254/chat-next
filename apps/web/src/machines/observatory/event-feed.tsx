@@ -12,7 +12,7 @@
 // are listed (a lifecycle event this app does not name is left out).
 import { useState, type CSSProperties } from "react";
 import { agentTypeOf } from "./activity-card-model.ts";
-import { clock, duration, ruleName, toolName } from "./drill-format.ts";
+import { callLabel, clock, duration, ruleName } from "./drill-format.ts";
 import type { LiveMapEvent } from "./live-map-types.ts";
 import type { LiveMapState } from "./live-map-state.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
@@ -44,8 +44,7 @@ export interface FeedRow {
 function toolText(c: ObservatoryCopy, state: LiveMapState, e: Extract<LiveMapEvent, { kind: "tool" }>, hide: boolean): string {
 	const agent = agentTypeOf(state, e.agentId);
 	const who = agent === null ? "" : `${agent === "" ? c.card.subagentUnknown : agent} › `;
-	const tool = toolName(c, e.toolName, e.mcpServer, hide);
-	return `${who}${tool}${hide || e.target === "" ? "" : ` ${e.target}`}`;
+	return `${who}${callLabel(e.toolName, e.mcpServer, e.target, hide, c.detail.kinds.tool)}`;
 }
 
 function lifecycleRow(c: ObservatoryCopy, e: Extract<LiveMapEvent, { kind: "lifecycle" }>, hide: boolean): Pick<FeedRow, "place" | "text" | "status" | "durationMs" | "opens"> | null {

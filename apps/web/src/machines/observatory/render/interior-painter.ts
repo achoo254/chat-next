@@ -8,20 +8,20 @@
 // kind), its label the runtime or the calls, p95 and failures; the modules
 // (files, terminal, testing, Git · CI/CD pipeline, MCP slots, the space
 // portal of the internet, memory, skills, the permission lock, the input
-// port), the context reservoir and the token wave; the packets of arriving
-// events; and the overview map. The module the camera is on shows its live
+// port), the context reservoir and the token wave; and the packets of
+// arriving events. The module the camera is on shows its live
 // content (its last calls). "Ẩn chi tiết" leaves out every target and MCP
 // name. Everything comes from the scene's look (prop-map.ts) and the state;
 // nothing here keeps data, only the motion between frames (sparks, stars,
 // the wave's phase, how long ago a module was touched).
 import { districtBoardOf, type BoardRow, type DistrictBoard } from "../district-board-model.ts";
+import { callLabel } from "../drill-format.ts";
 import type { LiveMapState } from "../live-map-state.ts";
 import type { ObservatoryCopy } from "../observatory-copy.ts";
 import type { StepStatus } from "../pipeline-model.ts";
 import type { MoveFrame } from "./animation-director.ts";
-import type { CameraView } from "./camera-director.ts";
 import { pathPoint, subPath, type SceneLook, type Tone } from "./prop-map.ts";
-import { PLACE_IDS, type PlaceId, type Point, type Rect, type SceneFit, type SceneTable } from "./scene-table.ts";
+import { PLACE_IDS, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
 
 /** The design's colours: one dark look on purpose (the inside of a running machine). */
 export const INK = {
@@ -290,36 +290,6 @@ export class InteriorPainter {
 		this.drawPackets();
 	}
 
-	/** The overview map in frame pixels (the caller set the frame's transform): every module, the used ones in colour, and the camera's view. */
-	paintMinimap(ctx: CanvasRenderingContext2D, look: SceneLook, view: CameraView, fit: SceneFit, dpr: number): void {
-		const { width: W, height: H } = this.scene.space;
-		const mw = 150;
-		const mh = 90;
-		const mx = 12;
-		const my = H - mh - 12;
-		const k = mw / W;
-		ctx.save();
-		ctx.setTransform(dpr * fit.scale, 0, 0, dpr * fit.scale, dpr * fit.offsetX, dpr * fit.offsetY);
-		ctx.fillStyle = "rgba(10,13,18,.85)";
-		ctx.fillRect(mx, my, mw, mh);
-		ctx.strokeStyle = INK.edge;
-		ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
-		for (const id of PLACE_IDS) {
-			if (id === "orchestrator") continue;
-			const r = this.scene.places[id].rect;
-			ctx.fillStyle = look.places[id].involved ? PLACE_COLOR[id] : "rgba(133,147,163,.4)";
-			ctx.fillRect(mx + r.x * k, my + r.y * k, Math.max(2, r.w * k), Math.max(2, r.h * k));
-		}
-		const w = this.scene.wave;
-		ctx.fillStyle = "rgba(133,147,163,.4)";
-		ctx.fillRect(mx + w.x * k, my + w.y * k, w.w * k, w.h * k);
-		const vw = W / view.s;
-		const vh = H / view.s;
-		ctx.strokeStyle = INK.fg;
-		ctx.strokeRect(mx + (view.x - vw / 2) * k, my + (view.y - vh / 2) * k, vw * k, vh * k);
-		ctx.restore();
-	}
-
 	private get c(): CanvasRenderingContext2D {
 		if (this.ctx === null) throw new Error("interior painter: no context");
 		return this.ctx;
@@ -443,8 +413,7 @@ export class InteriorPainter {
 	private rowText(r: BoardRow): string {
 		const { copy, hide } = this.i;
 		const agent = r.agent === null ? "" : `${r.agent === "" ? copy.subagentShort : r.agent}›`;
-		const tool = hide && r.mcpServer !== "" ? copy.mcpTool : r.tool;
-		return `${r.running ? "▶ " : ""}${agent}${tool}${hide || r.target === "" ? "" : ` ${r.target}`}`;
+		return `${r.running ? "▶ " : ""}${agent}${callLabel(r.tool, r.mcpServer, r.target, hide, copy.mcpTool)}`;
 	}
 
 	/** A module's live content: its last calls, newest first, the running ones marked. */

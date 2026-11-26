@@ -15,7 +15,7 @@
 // not every runtime tick.
 import type { CSSProperties } from "react";
 import type { ActivityCard as Card, CardCall, JourneyStep } from "./activity-card-model.ts";
-import { duration, toolName } from "./drill-format.ts";
+import { callLabel, duration } from "./drill-format.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
 import { PLACE_COLOR } from "./render/interior-painter.ts";
 import type { PlaceId } from "./render/scene-table.ts";
@@ -35,8 +35,7 @@ export interface ActivityCardProps {
 }
 
 function callWhat(c: ObservatoryCopy, call: CardCall, hide: boolean): string {
-	const tool = toolName(c, call.tool, call.mcpServer, hide);
-	return hide || call.target === "" ? tool : `${tool} ${call.target}`;
+	return callLabel(call.tool, call.mcpServer, call.target, hide, c.detail.kinds.tool);
 }
 
 /** Who made the call: "" for the main agent. */
@@ -86,21 +85,23 @@ function outputText(c: ObservatoryCopy, answer: ToolContentAnswer): string {
 }
 
 function Journey({ steps, names, c }: { steps: readonly JourneyStep[]; names: Readonly<Record<PlaceId, string>>; c: ObservatoryCopy }) {
-	if (steps.length === 0) return null;
+	// The steps wrap onto further lines (never cut with "…"); the box keeps its height and shows the newest steps at its bottom.
 	return (
 		<div className="lm-journey" data-id="observe-card-journey">
-			{c.card.journey}:{" "}
-			{steps.map((step, i) => (
-				// Steps are positional (the same module can come back later): the index is part of their identity.
-				<span key={`${i}-${step.place}`}>
-					{i > 0 && " → "}
-					<span className={step.failed ? "is-failed" : "is-step"} data-place={step.place}>
-						{names[step.place]}
-						{step.count > 1 ? ` ×${step.count}` : ""}
-						{step.failed ? " ✗" : ""}
+			<div className="lm-journey-in">
+				{steps.length > 0 && <span className="lm-journey-label">{c.card.journey}:</span>}
+				{steps.map((step, i) => (
+					// Steps are positional (the same module can come back later): the index is part of their identity.
+					<span key={`${i}-${step.place}`} className="lm-journey-step">
+						{i > 0 && <span className="lm-journey-arrow">→</span>}
+						<span className={step.failed ? "is-failed" : "is-step"} data-place={step.place}>
+							{names[step.place]}
+							{step.count > 1 ? ` ×${step.count}` : ""}
+							{step.failed ? " ✗" : ""}
+						</span>
 					</span>
-				</span>
-			))}
+				))}
+			</div>
 		</div>
 	);
 }
@@ -172,31 +173,32 @@ export function ActivityCard({ card, names, hide, source, tokensPerSecond, conte
 			<div className="lm-card-what" data-id="observe-card-what">
 				{what}
 			</div>
-			{desc !== "" && (
-				<div className="lm-card-desc" data-id="observe-card-desc">
-					{desc}
-				</div>
-			)}
-			{showBar && (
+			{/* Every row is always there (empty when it has nothing to say), so the card keeps its height as the work changes. */}
+			<div className="lm-card-desc" data-id={desc === "" ? undefined : "observe-card-desc"}>
+				{desc}
+			</div>
+			{showBar ? (
 				<div className={`lm-bar${call?.overP95 === true ? " is-over" : ""}`} role="progressbar" aria-label={c.card.status[card.status]} data-id="observe-card-bar">
 					<i />
 				</div>
+			) : (
+				<div className="lm-bar is-off" aria-hidden="true" />
 			)}
-			{call !== null && (
-				<div className="lm-card-out" data-id="observe-card-output">
-					{c.card.output}: <b>{outputText(c, answer)}</b>
-				</div>
-			)}
+			<div className="lm-card-out" data-id={call === null ? undefined : "observe-card-output"}>
+				{call !== null && (
+					<>
+						{c.card.output}: <b>{outputText(c, answer)}</b>
+					</>
+				)}
+			</div>
 			<div className="lm-card-foot">
 				<span className="lm-card-hist" data-id="observe-card-history">
 					{history}
 					{call?.overP95 === true && <span className="lm-warnx"> · {c.card.overP95}</span>}
 				</span>
-				{detailId !== null && (
-					<button type="button" className="lm-btn" data-id="observe-card-more" onClick={() => onDetail(detailId)}>
-						{c.card.more}
-					</button>
-				)}
+				<button type="button" className="lm-btn" data-id="observe-card-more" disabled={detailId === null} onClick={() => detailId !== null && onDetail(detailId)}>
+					{c.card.more}
+				</button>
 			</div>
 			<Journey steps={card.journey} names={names} c={c} />
 		</section>

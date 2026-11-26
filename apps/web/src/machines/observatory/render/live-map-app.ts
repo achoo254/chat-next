@@ -199,7 +199,6 @@ export function mountLiveMap(o: LiveMapMountOptions): LiveMapHandle {
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.setTransform(dpr * placement.scale, 0, 0, dpr * placement.scale, dpr * placement.x, dpr * placement.y);
 		painter.paint(ctx, { look, state, wall: at, t, dt, moves, thinking: isThinking, selected: cameraDirector.selected, contentZone, hide, motion, copy: words.copy, duration: words.duration });
-		painter.paintMinimap(ctx, look, cameraDirector.view, fit, dpr);
 		if (cam.wakeAt !== null) gate.wakeIn(cam.wakeAt - t);
 		// Packets, the camera easing, a glow fading, the model thinking: the full rate.
 		if (moves.length > 0 || !cam.settled || (motion && (painter.animating || isThinking))) return "moving";

@@ -36,6 +36,21 @@ export function toolName(c: ObservatoryCopy, tool: string, mcpServer: string, hi
 	return hideDetails && mcpServer !== "" ? c.detail.kinds.tool : tool;
 }
 
+/**
+ * A tool call in one line, as the card, the event list, the detail and the
+ * scene name it: an MCP tool as `server › tool` (its target names the same),
+ * any other tool with its target. With "Ẩn chi tiết" an MCP tool is
+ * `hiddenTool` and no target shows.
+ */
+export function callLabel(tool: string, mcpServer: string, target: string, hide: boolean, hiddenTool: string): string {
+	if (mcpServer !== "") {
+		if (hide) return hiddenTool;
+		const prefix = `mcp__${mcpServer}__`;
+		return `${mcpServer} › ${tool.startsWith(prefix) ? tool.slice(prefix.length) : tool}`;
+	}
+	return hide || target === "" ? tool : `${tool} ${target}`;
+}
+
 /** An event in one line. Hidden details leave out every filtered label and MCP name. */
 export function eventLabel(c: ObservatoryCopy, e: LiveMapEvent, hideDetails: boolean): string {
 	switch (e.kind) {

@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 import { agentTypeOf } from "./activity-card-model.ts";
 import { coreStateOf, historyBefore, modeOf, percentile, runningCalls, toolCalls, RELEASE_STEPS, type ToolCall } from "./call-history.ts";
 import { districtBoardOf } from "./district-board-model.ts";
-import { clock, duration, eventLabel, ruleName, toolName } from "./drill-format.ts";
+import { callLabel, clock, duration, eventLabel, ruleName, toolName } from "./drill-format.ts";
 import type { LiveMapState } from "./live-map-state.ts";
 import type { LiveMapEvent } from "./live-map-types.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
@@ -90,8 +90,7 @@ export function SessionBox({ state, hide, hideLabel, hideHint, approxHint, onHid
 function callRow(c: ObservatoryCopy, state: LiveMapState, call: ToolCall, hide: boolean): string {
 	const agent = agentTypeOf(state, call.event.agentId);
 	const who = agent === null ? "" : `${agent === "" ? c.card.subagentUnknown : agent} › `;
-	const tool = toolName(c, call.event.toolName, call.event.mcpServer, hide);
-	return `${who}${tool}${hide || call.event.target === "" ? "" : ` ${call.event.target}`}`;
+	return `${who}${callLabel(call.event.toolName, call.event.mcpServer, call.event.target, hide, c.detail.kinds.tool)}`;
 }
 
 function ToolDetail({ state, e, now, hide, source }: { state: LiveMapState; e: Extract<LiveMapEvent, { kind: "tool" }>; now: number; hide: boolean; source: ContentSource | null }) {
