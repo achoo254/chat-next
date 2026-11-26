@@ -222,6 +222,9 @@ message ChatMember {
   uint32 permissions = 3;
   int64 joined_at = 4 [jstype = JS_NUMBER];
   int64 inviter_id = 5 [jstype = JS_NUMBER];
+  // The tag shown beside the member's name (a group of another app: its custom
+  // title or member tag); empty when none.
+  string rank = 6;
 }
 
 // One entry of the caller's chat list.

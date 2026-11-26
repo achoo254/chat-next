@@ -667,12 +667,15 @@ func (x *Chat) GetExternalApp() string {
 }
 
 type ChatMember struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Role          MemberRole             `protobuf:"varint,2,opt,name=role,proto3,enum=app.v1.MemberRole" json:"role,omitempty"`
-	Permissions   uint32                 `protobuf:"varint,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
-	JoinedAt      int64                  `protobuf:"varint,4,opt,name=joined_at,json=joinedAt,proto3" json:"joined_at,omitempty"`
-	InviterId     int64                  `protobuf:"varint,5,opt,name=inviter_id,json=inviterId,proto3" json:"inviter_id,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	UserId      int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Role        MemberRole             `protobuf:"varint,2,opt,name=role,proto3,enum=app.v1.MemberRole" json:"role,omitempty"`
+	Permissions uint32                 `protobuf:"varint,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
+	JoinedAt    int64                  `protobuf:"varint,4,opt,name=joined_at,json=joinedAt,proto3" json:"joined_at,omitempty"`
+	InviterId   int64                  `protobuf:"varint,5,opt,name=inviter_id,json=inviterId,proto3" json:"inviter_id,omitempty"`
+	// The tag shown beside the member's name (a group of another app: its custom
+	// title or member tag); empty when none.
+	Rank          string `protobuf:"bytes,6,opt,name=rank,proto3" json:"rank,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -740,6 +743,13 @@ func (x *ChatMember) GetInviterId() int64 {
 		return x.InviterId
 	}
 	return 0
+}
+
+func (x *ChatMember) GetRank() string {
+	if x != nil {
+		return x.Rank
+	}
+	return ""
 }
 
 // One entry of the caller's chat list.
@@ -5372,7 +5382,7 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\x04left\x18\x0f \x01(\bR\x04left\x12\x14\n" +
 	"\x05forum\x18\x10 \x01(\bR\x05forum\x12'\n" +
 	"\x0fexternal_source\x18\x11 \x01(\tR\x0eexternalSource\x12!\n" +
-	"\fexternal_app\x18\x12 \x01(\tR\vexternalApp\"\xb7\x01\n" +
+	"\fexternal_app\x18\x12 \x01(\tR\vexternalApp\"\xcb\x01\n" +
 	"\n" +
 	"ChatMember\x12\x1b\n" +
 	"\auser_id\x18\x01 \x01(\x03B\x020\x02R\x06userId\x12&\n" +
@@ -5380,7 +5390,8 @@ const file_app_v1_chats_proto_rawDesc = "" +
 	"\vpermissions\x18\x03 \x01(\rR\vpermissions\x12\x1f\n" +
 	"\tjoined_at\x18\x04 \x01(\x03B\x020\x02R\bjoinedAt\x12!\n" +
 	"\n" +
-	"inviter_id\x18\x05 \x01(\x03B\x020\x02R\tinviterId\"\xa3\x04\n" +
+	"inviter_id\x18\x05 \x01(\x03B\x020\x02R\tinviterId\x12\x12\n" +
+	"\x04rank\x18\x06 \x01(\tR\x04rank\"\xa3\x04\n" +
 	"\x06Dialog\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
 	"\atop_seq\x18\x02 \x01(\x03B\x020\x02R\x06topSeq\x12/\n" +

@@ -34,7 +34,7 @@ func (c *conn) rememberUsers(users []tg.UserClass) {
 	}
 }
 
-func membersOf(users []tg.UserClass, admins map[int64]bool, ids []int64, self int64) []bridge.Member {
+func membersOf(users []tg.UserClass, admins map[int64]bool, ranks map[int64]string, ids []int64, self int64) []bridge.Member {
 	byID := map[int64]*tg.User{}
 	for _, raw := range users {
 		if u, ok := raw.(*tg.User); ok {
@@ -47,7 +47,7 @@ func membersOf(users []tg.UserClass, admins map[int64]bool, ids []int64, self in
 		if u == nil || u.Deleted {
 			continue
 		}
-		out = append(out, bridge.Member{Participant: participantUser(u, self), Admin: admins[id]})
+		out = append(out, bridge.Member{Participant: participantUser(u, self), Admin: admins[id], Rank: ranks[id]})
 	}
 	return out
 }
@@ -69,6 +69,7 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 		in := &tg.InputChannel{ChannelID: p.ChannelID, AccessHash: p.AccessHash}
 		var users []tg.UserClass
 		admins := map[int64]bool{}
+		ranks := map[int64]string{}
 		restricted := map[int64]bridge.Perms{}
 		var ids []int64
 		total := 0
@@ -88,13 +89,13 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 				var uid int64
 				switch v := part.(type) {
 				case *tg.ChannelParticipant:
-					uid = v.UserID
+					uid, ranks[v.UserID] = v.UserID, v.Rank
 				case *tg.ChannelParticipantSelf:
-					uid = v.UserID
+					uid, ranks[v.UserID] = v.UserID, v.Rank
 				case *tg.ChannelParticipantCreator:
-					uid, admins[v.UserID] = v.UserID, true
+					uid, admins[v.UserID], ranks[v.UserID] = v.UserID, true, v.Rank
 				case *tg.ChannelParticipantAdmin:
-					uid, admins[v.UserID] = v.UserID, true
+					uid, admins[v.UserID], ranks[v.UserID] = v.UserID, true, v.Rank
 				case *tg.ChannelParticipantBanned:
 					peerUser, isUser := v.Peer.(*tg.PeerUser)
 					if v.Left || !isUser {
@@ -114,7 +115,7 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 			}
 		}
 		c.rememberUsers(users)
-		members := membersOf(users, admins, ids, self)
+		members := membersOf(users, admins, ranks, ids, self)
 		for i := range members {
 			if id, err := strconv.ParseInt(members[i].Participant.ID, 10, 64); err == nil {
 				if p, ok := restricted[id]; ok {
@@ -149,7 +150,7 @@ func (a *Adapter) ListMembers(ctx context.Context, acct bridge.Account, conv str
 			}
 		}
 		c.rememberUsers(full.Users)
-		return membersOf(full.Users, admins, ids, self), true, nil
+		return membersOf(full.Users, admins, nil, ids, self), true, nil
 	}
 	return nil, false, nil
 }

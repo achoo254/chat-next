@@ -12,6 +12,8 @@ type ImportedMember struct {
 	Admin  bool
 	// Perms is the restriction of the member as ChatPermission bits; nil for none.
 	Perms *uint32
+	// Rank is the tag the other app shows beside the member's name; "" for none.
+	Rank string
 }
 
 // SyncMembers makes the puppets that are members of the chat match who the other
@@ -31,6 +33,12 @@ func (it *ImportTx) SyncMembers(ctx context.Context, members []ImportedMember, c
 	want := make(map[int64]bool, len(members))
 	for _, m := range members {
 		if m.UserID == it.owner {
+			// The owner's membership is Chat's own; only their rank follows the other app.
+			ranked, err := it.setRank(ctx, m)
+			if err != nil {
+				return false, err
+			}
+			changed = changed || ranked
 			continue
 		}
 		want[m.UserID] = m.Admin
@@ -51,6 +59,11 @@ func (it *ImportTx) SyncMembers(ctx context.Context, members []ImportedMember, c
 		if tag.RowsAffected() > 0 {
 			changed = true
 		}
+		ranked, err := it.setRank(ctx, m)
+		if err != nil {
+			return false, err
+		}
+		changed = changed || ranked
 		if !m.Admin {
 			var want any
 			if m.Perms != nil {
@@ -110,4 +123,15 @@ func (it *ImportTx) SyncMembers(ctx context.Context, members []ImportedMember, c
 		}
 	}
 	return changed, nil
+}
+
+// setRank writes the rank of a current member when it changed.
+func (it *ImportTx) setRank(ctx context.Context, m ImportedMember) (bool, error) {
+	tag, err := it.t.tx.Exec(ctx, `
+		UPDATE chat_members SET rank = $3 WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL AND rank <> $3`,
+		it.c.ID, m.UserID, m.Rank)
+	if err != nil {
+		return false, fmt.Errorf("chat: sync member rank: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }

@@ -400,6 +400,7 @@ function toMember(member: ChatMember, people: ReadonlyMap<number, Person>): Memb
 	return {
 		person,
 		role: ROLES[member.role] ?? "member",
+		rank: member.rank,
 		permissions: member.permissions,
 		inviterId: assertSafeId(member.inviterId),
 		joinedAt: assertSafeId(member.joinedAt),

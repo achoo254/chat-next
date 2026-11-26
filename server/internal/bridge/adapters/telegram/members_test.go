@@ -14,11 +14,12 @@ func TestMembersOfAGroupKeepOnlyLivePeopleWithTheirRole(t *testing.T) {
 		&tg.User{ID: 3, FirstName: "Đã xoá", Deleted: true},
 		&tg.User{ID: 9, FirstName: "Chủ"},
 	}
-	got := membersOf(users, map[int64]bool{2: true}, []int64{1, 2, 3, 4, 9}, 9)
+	got := membersOf(users, map[int64]bool{2: true}, map[int64]string{2: "BJ", 9: "Toro"}, []int64{1, 2, 3, 4, 9}, 9)
 	if len(got) != 3 {
 		t.Fatalf("members = %+v, want the three live people (a deleted account and an unseen id are left out)", got)
 	}
-	if got[0].Participant.ID != "1" || got[0].Admin || !got[1].Admin || got[1].Participant.Username != "binh" {
+	if got[0].Participant.ID != "1" || got[0].Admin || !got[1].Admin || got[1].Participant.Username != "binh" ||
+		got[0].Rank != "" || got[1].Rank != "BJ" || got[2].Rank != "Toro" {
 		t.Fatalf("members = %+v", got)
 	}
 	if !got[2].Participant.IsSelf {

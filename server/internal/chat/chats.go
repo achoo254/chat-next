@@ -1531,7 +1531,7 @@ func (s *Service) GetMembers(ctx context.Context, me, chatID int64, query, curso
 	for _, m := range list {
 		resp.Members = append(resp.Members, &appv1.ChatMember{
 			UserId: m.UserID, Role: memberRoles[m.Role], Permissions: c.permsOf(m),
-			JoinedAt: m.JoinedAt.Unix(), InviterId: m.InviterID,
+			JoinedAt: m.JoinedAt.Unix(), InviterId: m.InviterID, Rank: m.Rank,
 		})
 		ids = append(ids, m.UserID)
 	}

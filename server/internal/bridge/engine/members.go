@@ -90,13 +90,15 @@ func (r *runner) pollMembers(ctx context.Context) error {
 		var members []chat.ImportedMember
 		for _, m := range list {
 			if m.Participant.IsSelf {
+				// Only the owner's rank: their membership is Chat's own.
+				members = append(members, chat.ImportedMember{UserID: r.account.OwnerID, Rank: m.Rank})
 				continue
 			}
 			id, err := r.e.db.ensurePuppet(ctx, r.account, m.Participant)
 			if err != nil {
 				return err
 			}
-			im := chat.ImportedMember{UserID: id, Admin: m.Admin}
+			im := chat.ImportedMember{UserID: id, Admin: m.Admin, Rank: m.Rank}
 			if m.Perms != nil {
 				bits := bitsOfPerms(*m.Perms)
 				im.Perms = &bits

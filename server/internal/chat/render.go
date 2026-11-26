@@ -117,6 +117,8 @@ func (c *chatRow) peerOf(viewer int64) int64 {
 }
 
 type memberRow struct {
+	// Rank is the tag shown beside the member's name ("" for none).
+	Rank        string
 	ChatID      int64
 	UserID      int64
 	Role        string
@@ -144,14 +146,14 @@ type memberRow struct {
 
 const memberColumns = `m.chat_id, m.user_id, m.role, m.permissions, m.inviter_id, m.joined_at, m.joined_seq,
 	m.visible_from_seq, m.read_outbox_max_seq, m.left_at IS NOT NULL, m.left_at, coalesce(m.left_seq, 0),
-	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0), m.unread_mark, m.hidden_from_ai`
+	m.banned_at IS NOT NULL, m.mute_until, coalesce(m.pin_rank, 0), m.unread_mark, m.hidden_from_ai, m.rank`
 
 func scanMember(row pgx.Row) (*memberRow, error) {
 	m := &memberRow{}
 	var perms *int32
 	err := row.Scan(&m.ChatID, &m.UserID, &m.Role, &perms, &m.InviterID, &m.JoinedAt, &m.JoinedSeq,
 		&m.VisibleFrom, &m.ReadOutbox, &m.Left, &m.LeftAt, &m.LeftSeq, &m.Banned, &m.MuteUntil, &m.PinRank,
-		&m.UnreadMark, &m.HiddenFromAI)
+		&m.UnreadMark, &m.HiddenFromAI, &m.Rank)
 	if perms != nil {
 		p := uint32(*perms)
 		m.Perms = &p

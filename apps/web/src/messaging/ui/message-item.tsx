@@ -24,6 +24,7 @@ import { splitAlert } from "./alert-text.ts";
 import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { bridgeChunk, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
+import { useMemberRank } from "./member-ranks.ts";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor, type Ui } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
 
@@ -551,6 +552,8 @@ export function MessageBubble({
 	// knows that already, and a chat synced with another app (Chat Bridge, read-only copy or
 	// two-way) is imported silently as a whole, so there it would only say how the history arrived.
 	const synced = chat?.externalApp !== undefined;
+	// A synced group shows the sender's tag there ("BJ") as the other app does.
+	const rank = useMemberRank(group && synced && !mine ? chatId : 0, message.fromId);
 	const showSilent = message.silent && !recalled && message.fromId !== store.selfId && !synced;
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;
@@ -664,6 +667,7 @@ export function MessageBubble({
 					{showSender && !integration && (
 						<SenderName name={senderName} tone={tone} hidden={runPrev}>
 							{sender?.isBot === true && <span className="tag">{copy.bot.tag}</span>}
+							{rank !== "" && <span className="rank">{rank}</span>}
 						</SenderName>
 					)}
 					{message.forward !== null && (

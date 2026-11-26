@@ -8,6 +8,8 @@ type Member struct {
 	Admin       bool
 	// Perms is the restriction the group put on them; nil when it did not.
 	Perms *Perms
+	// Rank is the tag the group shows beside their name (a custom title); "" for none.
+	Rank string
 }
 
 // MemberReader is implemented by an adapter that supports "members" coming in. It
@@ -15,7 +17,7 @@ type Member struct {
 type MemberReader interface {
 	// ListMembers returns who is in the group. complete is false when the group is
 	// too big to list in full (the engine then adds and re-roles but never removes).
-	// The account owner is not listed.
+	// The account owner may be listed (Participant.IsSelf), for their own rank.
 	ListMembers(ctx context.Context, acct Account, conv string) (members []Member, complete bool, err error)
 }
 

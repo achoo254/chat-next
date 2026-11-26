@@ -238,3 +238,44 @@ func TestAPersonTheOwnerRemovedDoesNotComeBackWhileTheRemovalWaitsToGoOut(t *tes
 	}
 	e.eventually(func() bool { return len(e.fake.MemberCalls()) == 1 }, func() string { return "the removal never went out" })
 }
+
+// memberRanks is "name:rank" of every active member of the chat, the owner as "owner", by name.
+func (e *env) memberRanks(chatID int64) []string {
+	e.t.Helper()
+	rows, err := e.st.Pool().Query(context.Background(), `
+		SELECT CASE WHEN m.user_id = $2 THEN 'owner' ELSE u.name END || ':' || m.rank
+		FROM chat_members m JOIN users u ON u.id = m.user_id
+		WHERE m.chat_id = $1 AND m.left_at IS NULL ORDER BY 1`, chatID, e.owner)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			e.t.Fatal(err)
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+func TestTheTagsOfMembersInTheOtherAppShowInChatTheOwnersToo(t *testing.T) {
+	e := newEnv(t)
+	conv := e.group("g1")
+	e.fake.AddHistory("g1", e.msg("m1", lan, "tin 1", 1))
+	ranked := func(m bridge.Member, rank string) bridge.Member { m.Rank = rank; return m }
+	self := bridge.Member{Participant: bridge.Participant{ID: "user:1", Name: "Tôi", IsSelf: true}, Rank: "Toro"}
+	e.fake.SetMembers("g1", false, ranked(tgMember("user:11", "An", false), "bướm 1"), ranked(tgMember("user:12", "Bình", true), "BJ"), self)
+	_, chatID := e.enableWith(conv)
+	e.waitTexts(chatID, []string{"tin 1"})
+	want := func(w ...string) {
+		e.eventually(func() bool { return fmt.Sprint(e.memberRanks(chatID)) == fmt.Sprint(w) },
+			func() string { return fmt.Sprintf("ranks = %v, want %v", e.memberRanks(chatID), w) })
+	}
+	want("An:bướm 1", "Bình:BJ", "owner:Toro")
+	// A tag changed or taken away follows.
+	e.fake.SetMembers("g1", false, tgMember("user:11", "An", false), ranked(tgMember("user:12", "Bình", true), "Nháy"), self)
+	want("An:", "Bình:Nháy", "owner:Toro")
+}

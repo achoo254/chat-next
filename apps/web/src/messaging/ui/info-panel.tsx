@@ -341,6 +341,7 @@ function GroupMembers({ chat }: { chat: Chat }) {
 						name={self ? copy.common.you : member.person.name}
 						isBot={member.person.isBot}
 						role={member.role}
+						rank={member.rank}
 						channel={channel}
 						presence={member.person.presence.kind === "online" || self}
 					/>
@@ -357,12 +358,14 @@ interface MemberLineProps {
 	name: string;
 	isBot: boolean;
 	role: string;
+	/** A synced group's tag ("BJ"), shown in place of the role as the other app does. */
+	rank: string;
 	/** Groups say "Trưởng nhóm / Phó nhóm", channels "Chủ kênh / Admin". */
 	channel: boolean;
 	presence: boolean;
 }
 
-function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }: MemberLineProps) {
+function MemberLine({ userId, avatarName, name, isBot, role, rank, channel, presence }: MemberLineProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store } = useServices();
@@ -378,8 +381,14 @@ function MemberLine({ userId, avatarName, name, isBot, role, channel, presence }
 				{name}
 				<small className={online && !isBot ? "on" : undefined}>{label}</small>
 			</span>
-			{role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
-			{role === "admin" && <span className="tag grey">{copy.info.admin(channel)}</span>}
+			{rank !== "" ? (
+				<span className={role === "owner" ? "tag" : "tag grey"}>{rank}</span>
+			) : (
+				<>
+					{role === "owner" && <span className="tag">{copy.info.owner(channel)}</span>}
+					{role === "admin" && <span className="tag grey">{copy.info.admin(channel)}</span>}
+				</>
+			)}
 		</button>
 	);
 }

@@ -39,6 +39,8 @@ export interface ChatInfoChanges {
 export interface Member {
 	readonly person: Person;
 	readonly role: Role;
+	/** The tag shown beside the name (a synced group's custom title); "" for none. */
+	readonly rank: string;
 	readonly permissions: number;
 	readonly inviterId: number;
 	readonly joinedAt: number;

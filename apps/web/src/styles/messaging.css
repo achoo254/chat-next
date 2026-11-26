@@ -413,6 +413,8 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .kb-row button[aria-busy="true"] { color: var(--c-text-muted); cursor: progress; }
 .kb-row button[aria-busy="true"]::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: var(--radius-full); border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite; }
 .who .tag { margin-left: var(--space-1); vertical-align: 1px; }
+/* A synced group member's tag ("BJ"), on the right of the sender line as Telegram shows it. */
+.bubble .who .rank { float: right; margin-left: var(--space-3); font-weight: 400; color: var(--c-text-muted); }
 .int-label { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 0.75rem; font-weight: 600; color: var(--c-text-muted); margin-bottom: var(--space-1); }
 .int-label .icon { width: 14px; height: 14px; }
 .bubble.unsupported { display: flex; gap: var(--space-2); align-items: flex-start; border: 1px dashed var(--c-border-strong); }
