@@ -18,12 +18,21 @@ func TestAPuppetOfABotOfTheOtherAppIsShownAsABotButIsNotOneOfThisSystem(t *testi
 	if _, err := h.st.Pool().Exec(ctx, `UPDATE external_users SET is_bot = true WHERE user_id = $1`, robot); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := h.st.Pool().Exec(ctx, `UPDATE external_users SET bot_info = '{"username":"robot_bot","about":"Bot đếm chữ"}'::jsonb WHERE user_id = $1`, robot); err != nil {
+		t.Fatal(err)
+	}
 	users, err := loadUsers(ctx, h.st.Pool(), h.svc.cfg.TenantID, []int64{robot, person, owner})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := users[robot].render(owner, false); !got.GetIsBot() {
 		t.Fatal("the puppet of a Telegram bot is not shown as a bot")
+	}
+	if got := users[robot].render(owner, false); got.GetUsername() != "robot_bot" || got.GetBio() != "Bot đếm chữ" {
+		t.Fatalf("the bot shows @%q and %q, want its own name and short text", got.GetUsername(), got.GetBio())
+	}
+	if got := users[person].render(owner, false); got.GetUsername() != "" {
+		t.Fatalf("a person's puppet shows @%q", got.GetUsername())
 	}
 	if users[robot].IsBot {
 		t.Fatal("the puppet is a bot of this system (users.is_bot)")

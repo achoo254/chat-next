@@ -329,6 +329,9 @@ type userRow struct {
 	// ExternalBot: a puppet standing for a bot of the other app (external_users.is_bot).
 	// Clients show it as a bot; IsBot, the bot of this system, stays false.
 	ExternalBot bool
+	// ExternalUsername and ExternalAbout are what a bot of the other app says about itself
+	// (its @name and short text), as the bridge read them; "" for anyone else or until read.
+	ExternalUsername, ExternalAbout string
 	// ExternalSource names the app of a puppet user standing for a contact
 	// of another app (ADR 0022), "" for everyone else; such a user is never
 	// found, messaged, added to groups or befriended.
@@ -383,7 +386,8 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	rows, err := q.Query(ctx, `
 		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot, coalesce(u.external_source, ''),
 			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, ''),
-			coalesce(pf.public_id, ''), coalesce(x.is_bot, false), coalesce(x.seen_band, 0), x.online_until
+			coalesce(pf.public_id, ''), coalesce(x.is_bot, false),
+			coalesce(x.bot_info->>'username', ''), coalesce(x.bot_info->>'about', ''), coalesce(x.seen_band, 0), x.online_until
 		FROM users u LEFT JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
 			LEFT JOIN files pf ON pf.id = u.photo_file_id
 			LEFT JOIN external_users x ON x.user_id = u.id
@@ -395,7 +399,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.ExternalSource, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID, &u.ExternalBot, &u.SeenBand, &u.OnlineUntil); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.ExternalSource, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID, &u.ExternalBot, &u.ExternalUsername, &u.ExternalAbout, &u.SeenBand, &u.OnlineUntil); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u
@@ -411,6 +415,13 @@ func (u *userRow) render(viewer int64, blocked bool) *appv1.User {
 		IsBot: u.IsBot || u.ExternalBot, BotInlinePlaceholder: u.InlinePlaceholder, ExternalSource: u.ExternalSource}
 	if u.ExternalSource != "" {
 		out.Username = "" // the generated one is of no use to anyone
+		if u.ExternalBot {
+			// A bot of the other app has a name of its own there and a short text, which the other app shows too.
+			out.Username = u.ExternalUsername
+			if out.Bio == "" {
+				out.Bio = u.ExternalAbout
+			}
+		}
 	}
 	if u.PhotoID != "" && (u.IsBot || u.ID == viewer || u.photoSeenBy[viewer]) {
 		out.Photo = media.PhotoRef(u.PhotoID)
