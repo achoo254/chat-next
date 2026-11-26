@@ -158,6 +158,16 @@ var handlers = []handler{
 		poll: func(r *runner, ctx context.Context) error { return r.pollReactions(ctx) },
 	},
 	{
+		// A person's online status; it names no chat, so it applies whatever the settings.
+		feature: feature.Members,
+		match: func(ev bridge.Event) (string, bool) {
+			return "", ev.Participant != nil && ev.Message == nil
+		},
+		apply: func(r *runner, ctx context.Context, ev bridge.Event) (bool, error) {
+			return r.onPresence(ctx, *ev.Participant)
+		},
+	},
+	{
 		feature: feature.Read,
 		match: func(ev bridge.Event) (string, bool) {
 			if ev.Seen != nil {

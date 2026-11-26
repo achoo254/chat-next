@@ -1527,19 +1527,20 @@ func (s *Service) GetMembers(ctx context.Context, me, chatID int64, query, curso
 		list = list[:limit]
 		resp.NextCursor = fmt.Sprint(list[len(list)-1].UserID)
 	}
-	ents := newEntitySet()
+	ids := make([]int64, 0, len(list))
 	for _, m := range list {
 		resp.Members = append(resp.Members, &appv1.ChatMember{
 			UserId: m.UserID, Role: memberRoles[m.Role], Permissions: c.permsOf(m),
 			JoinedAt: m.JoinedAt.Unix(), InviterId: m.InviterID,
 		})
-		ents.addUsers(me, m.UserID)
+		ids = append(ids, m.UserID)
 	}
-	rendered, err := ents.render(ctx, s.pool, s.cfg.TenantID)
+	// The list shows each member's presence, which the plain user render leaves out.
+	users, err := s.usersWithStatus(ctx, me, ids)
 	if err != nil {
 		return nil, err
 	}
-	resp.Users = rendered.users[me]
+	resp.Users = users
 	return resp, nil
 }
 

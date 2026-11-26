@@ -331,6 +331,11 @@ type userRow struct {
 	// of another app (ADR 0022), "" for everyone else; such a user is never
 	// found, messaged, added to groups or befriended.
 	ExternalSource string
+	// SeenBand and OnlineUntil: a puppet's presence as the other app states it
+	// (external_users.seen_band, online_until); the app already applied the person's
+	// privacy, so Chat shows it as is.
+	SeenBand    int16
+	OnlineUntil *time.Time
 	// InlinePlaceholder: a bot with inline mode on ("" when off).
 	InlinePlaceholder string
 	// Deleted: the account is being erased or was erased; others see a
@@ -376,7 +381,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	rows, err := q.Query(ctx, `
 		SELECT u.id, u.username, u.name, u.bio, coalesce(u.email, ''), u.last_seen_at, u.is_bot, coalesce(u.external_source, ''),
 			u.deletion_requested_at IS NOT NULL OR u.deleted_at IS NOT NULL, coalesce(b.inline_placeholder, ''),
-			coalesce(pf.public_id, ''), coalesce(x.is_bot, false)
+			coalesce(pf.public_id, ''), coalesce(x.is_bot, false), coalesce(x.seen_band, 0), x.online_until
 		FROM users u LEFT JOIN bots b ON b.user_id = u.id AND b.deleted_at IS NULL
 			LEFT JOIN files pf ON pf.id = u.photo_file_id
 			LEFT JOIN external_users x ON x.user_id = u.id
@@ -388,7 +393,7 @@ func loadUsers(ctx context.Context, q querier, tenantID string, ids []int64) (ma
 	defer rows.Close()
 	for rows.Next() {
 		u := &userRow{}
-		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.ExternalSource, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID, &u.ExternalBot); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Name, &u.Bio, &u.Email, &u.LastSeen, &u.IsBot, &u.ExternalSource, &u.Deleted, &u.InlinePlaceholder, &u.PhotoID, &u.ExternalBot, &u.SeenBand, &u.OnlineUntil); err != nil {
 			return nil, fmt.Errorf("chat: load users: %w", err)
 		}
 		out[u.ID] = u

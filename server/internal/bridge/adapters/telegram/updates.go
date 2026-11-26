@@ -86,6 +86,7 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 	})
 	registerPins(d, c, emit)
 	registerSeen(d, emit)
+	registerUserStatus(d, emit)
 	registerReactions(d, self, emit)
 	d.OnReadHistoryOutbox(func(ctx context.Context, _ tg.Entities, u *tg.UpdateReadHistoryOutbox) error {
 		// Only a private chat tells that the other person read: a group

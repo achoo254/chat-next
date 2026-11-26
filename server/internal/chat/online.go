@@ -53,24 +53,24 @@ func (s *Service) GetChatOnlineCount(ctx context.Context, me, chatID int64) (int
 		online = presence.OnlineUsers()
 	}
 	n := int32(0)
-	if len(online) > 0 {
-		// A member counts when the viewer may see them online (statusOf):
-		// the viewer themselves, or last seen shared with everyone, or with
-		// contacts and the viewer is in their list; never someone who
-		// blocked the viewer.
-		if err := s.pool.QueryRow(ctx, `
-			SELECT count(*) FROM (
-				SELECT 1 FROM chat_members m LEFT JOIN privacy_settings p ON p.user_id = m.user_id
-				WHERE m.chat_id = $1 AND m.left_at IS NULL AND m.user_id = ANY($2)
-					AND (m.user_id = $3 OR (
-						NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = m.user_id AND b.blocked_id = $3)
-						AND (coalesce(p.last_seen, $5) = $6
-							OR (coalesce(p.last_seen, $5) = $7
-								AND EXISTS (SELECT 1 FROM contacts ct WHERE ct.owner_id = m.user_id AND ct.contact_id = $3)))))
-				LIMIT $4) x`,
-			c.ID, online, me, onlineCountMax, defaultPrivacy().LastSeen, audEveryone, audContacts).Scan(&n); err != nil {
-			return 0, fmt.Errorf("chat: online count: %w", err)
-		}
+	// A member counts when the viewer may see them online (statusOf):
+	// the viewer themselves, or last seen shared with everyone, or with
+	// contacts and the viewer is in their list; never someone who
+	// blocked the viewer. A puppet counts while the other app says the
+	// person is online (puppetStatus).
+	if err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM (
+			SELECT 1 FROM chat_members m LEFT JOIN privacy_settings p ON p.user_id = m.user_id
+			WHERE m.chat_id = $1 AND m.left_at IS NULL AND ((m.user_id = ANY($2)
+				AND (m.user_id = $3 OR (
+					NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = m.user_id AND b.blocked_id = $3)
+					AND (coalesce(p.last_seen, $5) = $6
+						OR (coalesce(p.last_seen, $5) = $7
+							AND EXISTS (SELECT 1 FROM contacts ct WHERE ct.owner_id = m.user_id AND ct.contact_id = $3))))))
+				OR EXISTS (SELECT 1 FROM external_users x WHERE x.user_id = m.user_id AND x.online_until > now()))
+			LIMIT $4) x`,
+		c.ID, online, me, onlineCountMax, defaultPrivacy().LastSeen, audEveryone, audContacts).Scan(&n); err != nil {
+		return 0, fmt.Errorf("chat: online count: %w", err)
 	}
 	s.onlineMu.Lock()
 	if len(s.onlineCounts) >= onlineCacheLimit {

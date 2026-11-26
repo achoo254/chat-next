@@ -164,7 +164,23 @@ type Participant struct {
 	// recorded time is left as it is; a person the app says is online now is Seen = now.
 	SeenKnown bool
 	Seen      time.Time
+	// SeenBand is how the app states the time: exactly, or only as a band when the
+	// person hides it. Clients show the band, not the time inside it.
+	SeenBand SeenBand
+	// OnlineUntil is set while the app says the person is online now: when that
+	// lapses without a new status.
+	OnlineUntil time.Time
 }
+
+// SeenBand is how precisely the other app states when a person was last online.
+type SeenBand int16
+
+const (
+	SeenExact SeenBand = iota
+	SeenRecently
+	SeenLastWeek
+	SeenLastMonth
+)
 
 // Entity is a normalised text span. Kinds the engine does not know are
 // dropped rather than guessed.
@@ -329,7 +345,8 @@ type Read struct {
 }
 
 // Event is one normalised update. Exactly one of Message, Edit, Delete,
-// Conversation, Topic, Pin, Seen, Read, Reactions or Participant is set. State is the account state after this event; the
+// Conversation, Topic, Pin, Seen, Read, Reactions or Participant is set.
+// Participant alone tells that a person's online status changed (SeenKnown). State is the account state after this event; the
 // engine stores it in the same transaction as the write, so a crash between
 // the two is replayed, not lost.
 type Event struct {

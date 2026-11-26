@@ -217,6 +217,9 @@ func statusOf(u *userRow, viewer int64, p privacyRow, contact, blockedViewer, on
 	if (blockedViewer || u.Deleted) && u.ID != viewer {
 		return &appv1.UserStatus{}
 	}
+	if u.ExternalSource != "" {
+		return puppetStatus(u, now)
+	}
 	exact := u.ID == viewer || allowedBy(p.LastSeen, contact)
 	if online && exact {
 		return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_ONLINE, Expires: now.Add(onlineFor).Unix()}
@@ -244,6 +247,33 @@ func statusOf(u *userRow, viewer int64, p privacyRow, contact, blockedViewer, on
 		return &appv1.UserStatus{}
 	}
 }
+
+// puppetStatus is the presence of a puppet as the other app states it: online until its
+// expiry, the band the person shows, or the exact last-seen time.
+func puppetStatus(u *userRow, now time.Time) *appv1.UserStatus {
+	if u.OnlineUntil != nil && u.OnlineUntil.After(now) {
+		return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_ONLINE, Expires: u.OnlineUntil.Unix()}
+	}
+	switch u.SeenBand {
+	case seenRecently:
+		return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_RECENTLY}
+	case seenLastWeek:
+		return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_LAST_WEEK}
+	case seenLastMonth:
+		return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_LAST_MONTH}
+	}
+	if u.LastSeen == nil {
+		return &appv1.UserStatus{}
+	}
+	return &appv1.UserStatus{Kind: appv1.UserStatusKind_USER_STATUS_KIND_OFFLINE, LastSeen: u.LastSeen.Unix()}
+}
+
+// Bands of external_users.seen_band (bridge.SeenBand).
+const (
+	seenRecently  = 1
+	seenLastWeek  = 2
+	seenLastMonth = 3
+)
 
 // usersWithStatus renders users for me with their presence.
 func (s *Service) usersWithStatus(ctx context.Context, me int64, ids []int64) ([]*appv1.User, error) {
