@@ -89,6 +89,7 @@
 /* The modules' buttons, in scene pixels, moved and scaled with the camera (the stage sets the transform). */
 .lm-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .lm-hit { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.lm-step { position: absolute; border-radius: 5px; background: transparent; cursor: pointer; }
 .lm-hit:focus-visible { outline: 2px solid var(--lm-accent); outline-offset: 4px; }
 .lm-camctl { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: -4px; }
 .lm-seg { display: inline-flex; padding: 2px; background: rgb(10 13 18 / 0.88); border: 1px solid var(--lm-line); border-radius: 7px; }

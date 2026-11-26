@@ -22,7 +22,7 @@ import type { StepStatus } from "../pipeline-model.ts";
 import type { MoveFrame } from "./animation-director.ts";
 import { clamp01, INK, rgba } from "./ink.ts";
 import { pathPoint, subPath, type SceneLook, type Tone } from "./prop-map.ts";
-import { PLACE_IDS, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
+import { PIPELINE_CELL, PLACE_IDS, pipelineCell, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
 import {
 	cornerTicks,
 	EDIT_COLOUR,
@@ -951,11 +951,8 @@ export class InteriorPainter {
 		this.box("git", PLACE_COLOR.git, true, { noSub: false });
 		paintCommitGraph(c, p, PLACE_COLOR.git, look.commits, this.running("git") > 0, wall, motion, { main: "main", head: "HEAD" }, this.ts);
 		const pipe = look.pipeline;
-		const y = p.y + 41;
-		const h = 38;
-		const cw = 70;
-		const gap = 12;
-		const x0 = p.x + 198;
+		const { h, w: cw, gap } = PIPELINE_CELL;
+		const { x: x0, y } = pipelineCell(p, 0);
 		const colourOf = (s: StepStatus): string => (s === "ok" ? INK.ok : s === "err" ? INK.err : s === "run" ? PLACE_COLOR.git : s === "unknown" ? INK.muted : INK.edge);
 		STAGES.forEach((k, idx) => {
 			const x = x0 + idx * (cw + gap);

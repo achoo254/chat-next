@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent,
 import { activityCardOf, DONE_HOLD_MS } from "../activity-card-model.ts";
 import { ActivityCard } from "../activity-card.tsx";
 import { EventFeed, feedRowsOf } from "../event-feed.tsx";
+import { RELEASE_STEPS } from "../call-history.ts";
 import { duration } from "../drill-format.ts";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
 import { DetailBox, SessionBox, type SidePick } from "../live-map-side.tsx";
@@ -32,7 +33,7 @@ import "../live-map.css";
 import type { CameraMode } from "./camera-director.ts";
 import type { CameraState, LiveMapHandle, LiveMapMountOptions, PaintWords, RootPlacement } from "./live-map-app.ts";
 import { lookOf } from "./prop-map.ts";
-import { fitScene, INTERIOR, PLACE_IDS, type PlaceId } from "./scene-table.ts";
+import { fitScene, INTERIOR, PLACE_IDS, pipelineCell, type PlaceId } from "./scene-table.ts";
 
 export const HIDE_DETAILS_KEY = "observe.hideDetails";
 /** "1" keeps the animation log and exposes the scene as window.__liveMap (acceptance runs). */
@@ -439,6 +440,11 @@ export function LiveMapStage({ state, initialEvent, onPick, clockSkewMs = 0, con
 										style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
 									/>
 								);
+							})}
+							{/* The release steps drawn inside the Git module explain themselves on hover; a click still picks the module. */}
+							{RELEASE_STEPS.map((step, i) => {
+								const r = pipelineCell(INTERIOR.places.git.rect, i);
+								return <span key={step} className="lm-step" data-place="git" aria-hidden="true" title={c.side.stepHint[step]} style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />;
 							})}
 						</div>
 						{status === "still" && (

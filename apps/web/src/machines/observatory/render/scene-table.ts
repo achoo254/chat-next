@@ -158,6 +158,14 @@ export function insideRect(p: Point, r: Rect): boolean {
 	return p[0] >= r.x && p[0] <= r.x + r.w && p[1] >= r.y && p[1] <= r.y + r.h;
 }
 
+/** The Git module's release pipeline (commit, push, CI, deploy): where its step boxes sit inside the module, in scene pixels. */
+export const PIPELINE_CELL = { dx: 198, dy: 41, w: 70, h: 38, gap: 12 } as const;
+
+/** The box of the `index`th pipeline step of a Git module at `git`. */
+export function pipelineCell(git: Rect, index: number): Rect {
+	return { x: git.x + PIPELINE_CELL.dx + index * (PIPELINE_CELL.w + PIPELINE_CELL.gap), y: git.y + PIPELINE_CELL.dy, w: PIPELINE_CELL.w, h: PIPELINE_CELL.h };
+}
+
 /** Places tried by a click after the model's lattice, in the design's order. */
 const HIT_ORDER: readonly PlaceId[] = ["monitoring", "files", "sandbox", "testing", "git", "mcp", "external", "memory", "skills", "security", "user-desk"];
 

@@ -188,6 +188,17 @@ describe("the Live Map", () => {
 		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "security" });
 	});
 
+	it("the release steps drawn in the Git module explain themselves on hover, and a click on one still picks the module", async () => {
+		const { state } = played([]);
+		const { onPick } = setup(state);
+		await flush();
+		const hints = OBSERVATORY_COPY.vi.side.stepHint;
+		const steps = [...document.querySelectorAll<HTMLElement>(".lm-step")];
+		expect(steps.map((el) => el.getAttribute("title"))).toEqual([hints.commit, hints.push, hints.ci, hints.deploy]);
+		await userEvent.click(steps[2] as HTMLElement);
+		expect(onPick).toHaveBeenLastCalledWith({ kind: "place", place: "git" });
+	});
+
 	it("focusing a module's button never scrolls the frame and frames it; leaving the scene lets the camera go", async () => {
 		const { state } = played([]);
 		const { handle, container } = setup(state);
