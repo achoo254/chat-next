@@ -16,7 +16,7 @@ const (
 	// other app, and the first look after connecting finds every bot met so far.
 	botInfosPerLook = 3
 	// botInfoMaxAge is how old what a bot says about itself may get before it is read again.
-	botInfoMaxAge = 24 * time.Hour
+	botInfoMaxAge = time.Hour
 	// botInfoLookBudget bounds the time one look spends, as peoplePhotosLookBudget does.
 	botInfoLookBudget = 30 * time.Second
 )
