@@ -103,13 +103,22 @@ describe("the rows of Liên hệ", () => {
 });
 
 describe("the layout of Liên hệ", () => {
-	it("labels the switch shortly in a narrow column and keeps the rows clear of the docked mascot", async () => {
+	it("stacks a row by the list's own width, labels the switch shortly then, and keeps the rows clear of the docked mascot", async () => {
 		const { readFileSync } = await import("node:fs");
 		const { resolve } = await import("node:path");
 		const sheet = readFileSync(resolve(process.cwd(), "src/machines/machines.css"), "utf8");
 		expect(sheet).toMatch(/\.mx-contact-push-short \{ display: none; \}/);
-		const narrow = /@container \(max-width: 560px\) \{[^@]*\.mx-contact-push-short \{ display: inline; \}/.exec(sheet);
-		expect(narrow?.[0]).toContain(".mx-contact-push-long { display: none; }");
+		// The list itself is the container: its width, not the window's, stacks a row below 720px.
+		expect(sheet).toMatch(/\.mx-contact-rows \{[^}]*container: contact-rows \/ inline-size;/);
+		const narrow = /@container contact-rows \(max-width: 720px\) \{[^@]*\}/.exec(sheet)?.[0] ?? "";
+		expect(narrow).toContain(".mx-contact { grid-template-columns: auto minmax(0, 1fr); }");
+		expect(narrow).toContain(".mx-contact-acts { grid-column: 1 / -1;");
+		expect(narrow).toContain(".mx-contact-push-long { display: none; }");
+		expect(narrow).toContain(".mx-contact-push-short { display: inline; }");
+		expect(sheet).not.toMatch(/@container \(max-width: 560px\) \{[^@]*mx-contact/);
+		// One line: the name column keeps 200px beside the actions, and the status never wraps word by word.
+		expect(sheet).toMatch(/\.mx-contact \{ display: grid; grid-template-columns: auto minmax\(200px, 1fr\) auto;/);
+		expect(sheet).toMatch(/\.mx-contact-hidden, \.mx-contact-status \{[^}]*white-space: nowrap;[^}]*\}/);
 		expect(sheet).toContain(':root:has(.adv-mascot[data-side="right"]) .mx-contacts > .mx-body { padding-right: calc(var(--space-5) + 72px); }');
 		expect([viMachines.contacts.pushShort, enMachines.contacts.pushShort]).toEqual(["Đẩy tin", "Push"]);
 	});

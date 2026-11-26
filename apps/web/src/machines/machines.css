@@ -1073,13 +1073,13 @@ dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; m
 .mx-contacts-machine { width: auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx-contacts-search { display: flex; align-items: center; gap: var(--space-2); }
 .mx-contacts-search .input { flex: 1; min-width: 0; }
-.mx-contact-rows { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.mx-contact { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); }
+.mx-contact-rows { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; container: contact-rows / inline-size; }
+.mx-contact { display: grid; grid-template-columns: auto minmax(200px, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); background: var(--c-surface); }
 .mx-contact-main { display: grid; gap: 2px; min-width: 0; }
 .mx-contact-name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
 .mx-contact-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx-contact-apps { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
-.mx-contact-hidden, .mx-contact-status { color: var(--c-text-muted); font-size: 0.75rem; }
+.mx-contact-hidden, .mx-contact-status { min-width: 0; overflow: hidden; color: var(--c-text-muted); font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
 .mx-contact-status.limited, .mx-contact-status.hidden { color: var(--c-warning-text); }
 .mx-contact-status.error, .mx-contact-status.signedOut { color: var(--c-error-text); }
 .mx-contact-acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
@@ -1088,8 +1088,10 @@ dialog.modal.mx-preview .mx-preview-body { display: grid; place-items: center; m
 /* Advisor's mascot docked on the right floats over the page's right edge: the rows keep clear of it (56px and a gap). */
 :root:has(.adv-mascot[data-side="right"]) .mx-contacts > .mx-body { padding-right: calc(var(--space-5) + 72px); }
 .mx-contact-limit { width: auto; }
-/* A narrow column (the panel beside the sessions, phones): the actions go under the name. */
-@container (max-width: 560px) {
+/* The list's own width decides (not the window's): below 720px the name, its badges and the status take the whole
+   first line, and the switch, the limit and the two buttons go on a second one that may wrap; the switch's label
+   is then the short one. */
+@container contact-rows (max-width: 720px) {
 	.mx-contact { grid-template-columns: auto minmax(0, 1fr); }
 	.mx-contact-acts { grid-column: 1 / -1; justify-content: flex-start; }
 	.mx-contact-push-long { display: none; }
