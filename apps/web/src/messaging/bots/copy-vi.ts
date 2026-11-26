@@ -274,6 +274,7 @@ export const viBots = {
 		start: "Bắt đầu",
 		starting: "Đang bắt đầu…",
 		hint: (name: string) => `Gửi /start cho ${name}`,
+		openIn: (app: string) => `Mở trong ${app}`,
 	},
 	link: {
 		title: (name: string) => `Mở ${name}`,

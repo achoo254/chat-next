@@ -19,6 +19,17 @@ Chat Bridge đồng bộ mọi cuộc trò chuyện của chính bạn ở một
 
 Mỗi tin gửi đi có trạng thái ngay trên tin: đồng hồ là đang gửi (Chat xếp hàng và gửi từng tin, cách nhau chừng 0,7 giây, theo đúng thứ tự). Lỗi hiện thành dòng "Chưa gửi sang Telegram" kèm **Gửi lại** và **Xoá tin** (xoá là cách bỏ tin gửi hỏng). Tạm mất mạng hoặc Telegram bảo chờ thì Chat tự thử lại, không mất tin và không gửi trùng. Nếu server dừng đúng lúc đang gửi và quá 10 phút mới chạy lại, tin hiện "Chưa rõ đã gửi sang Telegram chưa": kiểm trong Telegram rồi chọn **Gửi lại** hoặc **Xoá tin**. Bản sửa không sang được (ví dụ Telegram không cho sửa tin cũ nữa) hiện "Bản sửa chưa sang Telegram" kèm **Gửi lại** và **Bỏ qua**.
 
+## Bot của Telegram
+
+Chat với một bot của Telegram nằm ở mục **Bot** của thanh trái, hàng chat có logo Telegram. Bot của Telegram không phải bot của app: nó không có dòng trong bảng `bots`, không có token hay Bot API của app, và hai luồng bot chạy song song, không nối với nhau.
+
+- Cầu nối ghi `external_users.is_bot` mỗi lần gặp người kia (tin nhắn hoặc danh sách cuộc trò chuyện), nên chat cũ tự vào mục Bot sau lần đồng bộ danh sách kế tiếp. Cột `users.is_bot` vẫn chỉ dành cho bot của app; client thấy `is_bot` ở lớp trình bày.
+- Hồ sơ bot lấy bằng `users.getFullUser` của chính tài khoản Telegram đã kết nối (không cần token bot): mô tả, giới thiệu, danh sách lệnh, nút menu và ảnh mô tả, lưu ở `external_users.bot_info`. Mỗi lượt đọc tối đa 3 bot, làm mới sau 24 giờ; ảnh mô tả được chép về kho tệp của chủ tài khoản (`bot_photo_file_id`) vì tham chiếu tệp của Telegram hết hạn.
+- Trong app, chat trống hiện ảnh, mô tả và lệnh như Telegram; ô soạn tin có menu lệnh; «Bắt đầu» gửi tin `/start` bằng đường gửi thường của chat hai chiều (không qua `StartBot`).
+- Nút menu kiểu «mở web app» của bot thành nút **Mở trong Telegram** tới `https://t.me/<tên bot>`: Mini App của Telegram không chạy trong app. Nút callback của bot cũng không bấm được từ Chat (xem Giới hạn).
+- `GetBotInfo` cho bot Telegram chỉ trả cho chủ tài khoản cầu nối; ảnh mô tả lấy bằng ngữ cảnh `bot_description_of` của `GetFileUrl`, cùng điều kiện đó.
+- Chưa làm: menu lệnh theo nhóm có bot Telegram.
+
 ## Ghim
 
 - **Từ Telegram sang Chat:** khi bật đồng bộ, các tin đã ghim ở Telegram (nằm trong cửa sổ lịch sử đã nhập) được ghim trong Chat; ghim và bỏ ghim tin, ghim và bỏ ghim topic ở Telegram hiện sang Chat ngay. Chat đồng bộ từ trước nhận ghim khi server chạy lại. Tin ghim cũ hơn cửa sổ lịch sử không có trong Chat nên không ghim được (nhóm làm việc thường ghim tin rất cũ). Chat không thêm dòng "đã ghim" cho ghim đến từ Telegram.

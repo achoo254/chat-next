@@ -149,6 +149,12 @@ export interface BotInfo {
 	readonly photoId: string;
 	/** The bot's main Mini App ("Mở app"); "" without one. */
 	readonly miniAppUrl: string;
+	/** The app a bot of another app belongs to ("telegram"); "" for a bot of this system. */
+	readonly externalApp: string;
+	/** A bot of another app: where its own "open app" button leads, in that app; "" without one. */
+	readonly openUrl: string;
+	/** A bot of another app: file_id of the picture above its description, fetched with MediaRequest.botDescriptionOf; "" without one. */
+	readonly descriptionPhotoId: string;
 }
 
 /** What the Mini App container loads (OpenMiniApp). */

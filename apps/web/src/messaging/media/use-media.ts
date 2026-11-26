@@ -16,7 +16,7 @@ export type FileState =
 const LOADING: FileState = { status: "loading" };
 
 function requestKey(request: MediaRequest): string {
-	return `${request.chatId}:${request.seq}:${request.fileId}:${request.size ?? "original"}:${request.inlineQueryId ?? ""}:${request.userPhotoOf ?? 0}:${request.chatPhotoOf ?? 0}`;
+	return `${request.chatId}:${request.seq}:${request.fileId}:${request.size ?? "original"}:${request.inlineQueryId ?? ""}:${request.userPhotoOf ?? 0}:${request.chatPhotoOf ?? 0}:${request.botDescriptionOf ?? 0}`;
 }
 
 /**
@@ -37,6 +37,7 @@ export function useMediaFile(request: MediaRequest | null, enabled = true): { re
 	const inlineQueryId = request?.inlineQueryId;
 	const userPhotoOf = request?.userPhotoOf;
 	const chatPhotoOf = request?.chatPhotoOf;
+	const botDescriptionOf = request?.botDescriptionOf;
 	useEffect(() => {
 		if (key === "" || !enabled) return;
 		let active = true;
@@ -51,6 +52,7 @@ export function useMediaFile(request: MediaRequest | null, enabled = true): { re
 			...(inlineQueryId === undefined ? {} : { inlineQueryId }),
 			...(userPhotoOf === undefined ? {} : { userPhotoOf }),
 			...(chatPhotoOf === undefined ? {} : { chatPhotoOf }),
+			...(botDescriptionOf === undefined ? {} : { botDescriptionOf }),
 		};
 		source.mediaFile(wanted).then(
 			(file) => {
@@ -71,7 +73,7 @@ export function useMediaFile(request: MediaRequest | null, enabled = true): { re
 			active = false;
 			if (url !== null) URL.revokeObjectURL(url);
 		};
-	}, [source, store, key, enabled, chatId, seq, fileId, size, kind, inlineQueryId, userPhotoOf, chatPhotoOf]);
+	}, [source, store, key, enabled, chatId, seq, fileId, size, kind, inlineQueryId, userPhotoOf, chatPhotoOf, botDescriptionOf]);
 	const retry = useCallback(() => setAttempt((n) => n + 1), []);
 	const state = result !== null && result.key === key ? result.state : LOADING;
 	return { state, retry };

@@ -195,6 +195,8 @@ type runner struct {
 	windows map[int64]windowProgress
 	// photoHeld are the profile photos whose copy failed, by external_users.id (see pollPeoplePhotos).
 	photoHeld map[int64]heldPhoto
+	// botInfoHeld are the bots whose info could not be read, by external_users.id, until when (see pollBotInfos).
+	botInfoHeld map[int64]time.Time
 	// ownPhoneDone: the owner's own number was read for this connection, or need not be (see recordOwnPhone).
 	ownPhoneDone bool
 	// phoneBookDone: the account's contacts were read for phone numbers, or need not be (see readPhoneBook).

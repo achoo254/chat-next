@@ -505,6 +505,9 @@ func (s *Service) photoFileAccess(ctx context.Context, viewer int64, reqs []*app
 			return err
 		}
 	}
+	if err := s.botDescriptionAccess(ctx, viewer, reqs, out); err != nil {
+		return err
+	}
 	if len(chatIDs) == 0 {
 		return nil
 	}

@@ -10,12 +10,15 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { EventKeys, type ReplyKeyboard, type StoredMessage } from "@achoo254/chat-core";
 import { cryptoRandomId } from "@achoo254/chat-platform";
+import { AppLogo, hasAppLogo } from "../../components/app-logo.tsx";
 import { Icon } from "../../components/screen-icons.tsx";
 import { AiMark } from "../../machines/ai-mark.tsx";
 import type { OpenToken, PlainTextBoxHandle } from "../../components/plain-text-box.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useCopy } from "../copy/use-copy.ts";
+import { appName } from "../data/format.ts";
 import { useServices, useUser } from "../data/services.tsx";
+import { useMediaFile } from "../media/use-media.ts";
 import { ChatAvatar, DialogHead, Modal, useDomId } from "../ui/parts.tsx";
 import { useUi } from "../ui/ui-context.tsx";
 
@@ -125,16 +128,35 @@ export function BotManageRow({ botId }: { botId: number }) {
 	);
 }
 
-/** The bot's profile in its empty chat: description, commands and what starting it means. */
+/** The picture a bot of another app shows above its description in an empty chat. */
+function BotDescriptionPhoto({ botId, fileId }: { botId: number; fileId: string }) {
+	const { state } = useMediaFile({ chatId: 0, seq: 0, fileId, botDescriptionOf: botId, kind: "photo", size: "m" });
+	return state.status === "ok" ? <img className="bot-card-photo" src={state.url} alt="" /> : null;
+}
+
+/**
+ * The bot's profile in its empty chat: description, commands and what starting it means. A bot of
+ * another app (Telegram) shows what that app shows: its picture, description and commands, with
+ * the app's logo; "Bắt đầu" there is a plain /start message, so the consent note is left out.
+ */
 export function BotProfileCard({ botId, chatId }: { botId: number; chatId: number }) {
 	const t = useBotsCopy();
 	const user = useUser(botId);
 	const info = useBotInfo(botId, chatId);
 	const name = info?.name ?? user?.name ?? "";
+	const externalApp = info?.externalApp ?? "";
 	return (
 		<div className="bot-card">
+			{info !== null && info.descriptionPhotoId !== "" && <BotDescriptionPhoto botId={botId} fileId={info.descriptionPhotoId} />}
 			<ChatAvatar id={botId} name={name} size="lg" bot photoOf={botId} photoId={info?.photoId ?? user?.photoId ?? ""} />
-			<h3>{name}</h3>
+			<h3>
+				{name}
+				{hasAppLogo(externalApp) && (
+					<span className="tag-logo" role="img" aria-label={appName(externalApp)}>
+						<AppLogo app={externalApp} />
+					</span>
+				)}
+			</h3>
 			{info !== null && info.description !== "" && <p>{info.description}</p>}
 			{info !== null && info.commands.length > 0 && (
 				<ul>
@@ -146,19 +168,24 @@ export function BotProfileCard({ botId, chatId }: { botId: number; chatId: numbe
 					))}
 				</ul>
 			)}
-			<div className="consent-note">
-				<Icon name="lock" small />
-				<span>{t.start.consent(name)}</span>
-			</div>
+			{externalApp === "" && (
+				<div className="consent-note">
+					<Icon name="lock" small />
+					<span>{t.start.consent(name)}</span>
+				</div>
+			)}
 		</div>
 	);
 }
 
-/** "Bắt đầu" in place of the composer: consent plus "/start" (StartBot with no parameter). */
-export function BotStartBar({ botId }: { botId: number }) {
+/**
+ * "Bắt đầu" in place of the composer: consent plus "/start" (StartBot with no parameter). For a bot of
+ * another app (`external`) it is a plain /start message in the chat, which the bridge sends on.
+ */
+export function BotStartBar({ botId, chatId, external }: { botId: number; chatId: number; external: boolean }) {
 	const t = useBotsCopy();
 	const copy = useCopy();
-	const { bots, toasts } = useServices();
+	const { bots, source, toasts } = useServices();
 	const user = useUser(botId);
 	const [busy, setBusy] = useState(false);
 	// One id for this bar: pressing again after a failure cannot send /start twice.
@@ -166,7 +193,8 @@ export function BotStartBar({ botId }: { botId: number }) {
 	const start = async () => {
 		setBusy(true);
 		try {
-			await bots.start(botId, "", randomId);
+			if (external) await source.sendText(chatId, "/start");
+			else await bots.start(botId, "", randomId);
 			// The chat fills from the update stream; this bar goes once the message is there.
 		} catch {
 			toasts.show(copy.common.failed);
@@ -425,6 +453,11 @@ export function BotLayer(props: BotLayerProps) {
 	};
 	const [opening, setOpening] = useState(false);
 	const openApp = () => {
+		// A bot of another app: its button leads to the bot's page in that app (Chat cannot run its web app).
+		if (info !== null && info.openUrl !== "") {
+			window.open(info.openUrl, "_blank", "noopener,noreferrer");
+			return;
+		}
 		if (opening) return;
 		setOpening(true);
 		launchMiniApp(bots, ui, { botId, chatId, seq: 0, url: "", buttonText: "" })
@@ -441,7 +474,8 @@ export function BotLayer(props: BotLayerProps) {
 	const menuState = entries.length > 0 ? menu.open : null;
 	const keyboardState = active === null ? null : padShown;
 	const placeholder = padShown && active.keyboard.placeholder !== "" ? active.keyboard.placeholder : null;
-	const app = info !== null && info.miniAppUrl !== "" ? t.miniApp.open : null;
+	const app =
+		info === null ? null : info.openUrl !== "" ? t.start.openIn(appName(info.externalApp)) : info.miniAppUrl !== "" ? t.miniApp.open : null;
 	// Told once the bot's info is known: until then the composer keeps the buttons this chat showed last.
 	const known = info !== null;
 	useLayoutEffect(() => {

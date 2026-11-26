@@ -63,6 +63,10 @@ interface FakeBot {
 	deadLetters: DeadLetterSeed[];
 	/** The main Mini App; "" for none. */
 	miniAppUrl: string;
+	/** A bot of another app brought in by the bridge ("telegram"); "" for a bot of this system. */
+	externalApp: string;
+	/** A bot of another app: where its "open app" button leads; "" for none. */
+	openUrl: string;
 }
 
 /** The delivery state GetBotDelivery reports. */
@@ -194,6 +198,8 @@ export class FakeBots {
 			delivery: { ...NO_DELIVERY },
 			deadLetters: [],
 			miniAppUrl: "",
+			externalApp: "",
+			openUrl: "",
 			...extras,
 		});
 		return id;
@@ -473,6 +479,8 @@ export class FakeBots {
 					// Judged by the server's clock, as the real server does.
 					notRunning: bot.owned && Math.floor(Date.now() / 1000) - bot.lastUpdateAt > 120,
 					miniAppUrl: bot.miniAppUrl,
+					externalApp: bot.externalApp,
+					openUrl: bot.openUrl,
 				};
 			},
 			openMiniApp: (req) => {

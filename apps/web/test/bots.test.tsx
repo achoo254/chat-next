@@ -399,6 +399,42 @@ describe("bots in chats", () => {
 		expect(f.bots.calls).toContain(`StartBot ${botId} `);
 	});
 
+	it("shows a bot of Telegram as Telegram does: its description and commands, no consent note, /start as a plain message", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const botId = f.bots.seed("Đếm chữ Bot", "dem_chu_bot", {
+			description: "Tôi giúp đại ca đếm chữ.",
+			owned: false,
+			externalApp: "telegram",
+			openUrl: "https://t.me/dem_chu_bot",
+		});
+		f.bots.setCommands(botId, BotCommandScope.PRIVATE, [{ command: "dem", description: "Đếm số chữ" }]);
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, botId], { externalApp: "telegram" });
+		renderMessaging(f, `/c/${chat}`);
+		const start = await screen.findByRole("button", { name: "Bắt đầu" }, LONG);
+		expect(await screen.findByText("Tôi giúp đại ca đếm chữ.", {}, LONG)).toBeTruthy();
+		expect(screen.getByText("/dem")).toBeTruthy();
+		// The consent note is about this system's bots: a Telegram bot needs none.
+		expect(screen.queryByText(/chưa thể nhắn cho bạn/)).toBeNull();
+		expect(screen.getAllByRole("img", { name: "Telegram" }).length).toBeGreaterThan(0);
+		await userEvent.click(start);
+		expect(await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG)).toBeTruthy();
+		// "/start" went as an ordinary message of the chat, not through this system's StartBot.
+		expect(f.bots.calls.some((call) => call.startsWith("StartBot"))).toBe(false);
+		expect(await screen.findByText("/start", {}, LONG)).toBeTruthy();
+		// The bot's own app button leads to its page in Telegram.
+		const open = await screen.findByRole("button", { name: "Mở trong Telegram" }, LONG);
+		const opened: unknown[][] = [];
+		const original = window.open;
+		window.open = ((...args: unknown[]) => (opened.push(args), null)) as typeof window.open;
+		try {
+			await userEvent.click(open);
+		} finally {
+			window.open = original;
+		}
+		expect(opened[0]?.[0]).toBe("https://t.me/dem_chu_bot");
+	});
+
 	it("tells the owner their bot is not running and links to Developer Console, and hides an empty group count", async () => {
 		const demo = seedDemo();
 		const f = demo.fixture;

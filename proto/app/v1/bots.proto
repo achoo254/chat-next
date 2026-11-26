@@ -184,6 +184,16 @@ message GetBotInfoResponse {
   bool not_running = 7;
   // The bot's main Mini App ("Mở app" in its chat and profile); "" without one.
   string mini_app_url = 8;
+  // The app the bot belongs to ("telegram") when it is a bot of another app that the Chat
+  // Bridge brought in, "" for a bot of this system. Such a bot has no Mini App and no owner
+  // here; "Bắt đầu" is a plain /start message to it.
+  string external_app = 9;
+  // Where the bot's own "open app" button leads, for a bot of another app: its page in that
+  // app. "" when the bot has no such button.
+  string open_url = 10;
+  // The picture the bot shows above its description in an empty chat (a bot of another
+  // app); fetch it with GetFileUrl's bot_description_of context. Unset without one.
+  MediaRef description_photo = 11;
 }
 
 message GetChatBotCommandsRequest {

@@ -165,6 +165,9 @@ message GetFileUrlRequest {
     // A result of the caller's inline query (InlineQueryResponse.query_id),
     // while the query lives (1 hour).
     string inline_query_id = 6;
+    // The picture shown in the empty chat with this bot of another app (a puppet of
+    // the Chat Bridge), for the owner of the account that met the bot.
+    int64 bot_description_of = 7 [jstype = JS_NUMBER];
   }
 }
 

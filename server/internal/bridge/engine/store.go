@@ -329,10 +329,16 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 		var current string
 		var photoWant *string
 		var photoRef string
+		var wasBot bool
 		err := d.pool.QueryRow(ctx, `
-			SELECT u.id, u.name, x.photo_want, coalesce(x.photo_ref, '') FROM external_users x JOIN users u ON u.id = x.user_id
-			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current, &photoWant, &photoRef)
+			SELECT u.id, u.name, x.photo_want, coalesce(x.photo_ref, ''), x.is_bot FROM external_users x JOIN users u ON u.id = x.user_id
+			WHERE x.account_id = $1 AND x.external_user_id = $2`, a.ID, p.ID).Scan(&id, &current, &photoWant, &photoRef, &wasBot)
 		if err == nil {
+			if wasBot != p.IsBot {
+				if _, err := d.pool.Exec(ctx, `UPDATE external_users SET is_bot = $3 WHERE account_id = $1 AND external_user_id = $2`, a.ID, p.ID, p.IsBot); err != nil {
+					return 0, fmt.Errorf("bridge: mark puppet bot: %w", err)
+				}
+			}
 			if current != name && !p.NameUnknown {
 				if _, err := d.pool.Exec(ctx, `UPDATE users SET name = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, id, name); err != nil {
 					return 0, fmt.Errorf("bridge: rename puppet: %w", err)
@@ -370,7 +376,8 @@ func (d *db) ensurePuppet(ctx context.Context, a *accountRow, p bridge.Participa
 
 // createPuppet never sets users.is_bot, even for a bot of the other app:
 // that flag means a bot of this system (a bots row, consent, Bot API), which
-// a puppet is not.
+// a puppet is not. That the contact is a bot of the other app is recorded in
+// external_users.is_bot instead, and shown to clients by the renderer.
 func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participant, name string) (int64, error) {
 	var id int64
 	err := pgx.BeginFunc(ctx, d.pool, func(tx pgx.Tx) error {
@@ -388,8 +395,8 @@ func (d *db) createPuppet(ctx context.Context, a *accountRow, p bridge.Participa
 			return fmt.Errorf("bridge: create puppet: %w", err)
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref, phone_hmac) VALUES ($1, $2, $3, $4, $5, $6)`,
-			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef, d.phones.update(p).value)
+			INSERT INTO external_users (account_id, external_user_id, user_id, photo_want, photo_ref, phone_hmac, is_bot) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			a.ID, p.ID, id, photoWantOf(p), p.PhotoRef, d.phones.update(p).value, p.IsBot)
 		if err != nil {
 			return fmt.Errorf("bridge: link puppet: %w", err)
 		}

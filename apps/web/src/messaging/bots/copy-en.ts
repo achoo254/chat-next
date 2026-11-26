@@ -267,6 +267,7 @@ export const enBots: BotsCopy = {
 		start: "Start",
 		starting: "Starting…",
 		hint: (name) => `Sends /start to ${name}`,
+		openIn: (app: string) => `Open in ${app}`,
 	},
 	link: {
 		title: (name) => `Open ${name}`,

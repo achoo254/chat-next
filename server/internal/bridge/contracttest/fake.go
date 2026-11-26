@@ -64,6 +64,8 @@ type Fake struct {
 	photoCalls                                 []string
 	photoFetches                               int
 	personPhotos                               map[string][]byte
+	botInfos                                   map[string]bridge.BotInfo
+	botInfoCalls                               int
 	personPhotoReadErrs                        map[string]error
 	forwards                                   []string
 	refuse                                     map[string]bool
@@ -1049,3 +1051,25 @@ func (f *Fake) CreateTopic(_ context.Context, _ bridge.Account, conv, title stri
 }
 
 var _ bridge.TopicCreator = (*Fake)(nil)
+
+// SetBotInfo makes the participant a bot that says info about itself.
+func (f *Fake) SetBotInfo(participant string, info bridge.BotInfo) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.botInfos == nil {
+		f.botInfos = map[string]bridge.BotInfo{}
+	}
+	f.botInfos[participant] = info
+}
+
+// BotInfoCalls is how many times the bots' info was read.
+func (f *Fake) BotInfoCalls() int { f.mu.Lock(); defer f.mu.Unlock(); return f.botInfoCalls }
+
+// BotInfo implements bridge.BotInfoReader.
+func (f *Fake) BotInfo(_ context.Context, _ bridge.Account, participant string) (bridge.BotInfo, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.botInfoCalls++
+	info, ok := f.botInfos[participant]
+	return info, ok, nil
+}

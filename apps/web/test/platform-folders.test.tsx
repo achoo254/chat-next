@@ -67,6 +67,22 @@ describe("platform folders", () => {
 		expect(within(again).getAllByRole("img", { name: "Telegram" })).toHaveLength(1);
 	});
 
+	it("lists a bot of Telegram under Bot with the Telegram logo, and keeps people out of it", async () => {
+		const fixture = new ChatFixture();
+		const robot = fixture.addUser("Robot", { username: "robot_bot", isBot: true });
+		const tom = fixture.addUser("Tôm");
+		const botChat = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, robot], { externalApp: "telegram" });
+		const plain = fixture.createChat(ChatType.PRIVATE, "", [fixture.selfId, tom]);
+		fixture.send(robot, botChat, "tin của bot");
+		fixture.send(tom, plain, "tin thường");
+		renderMessaging(fixture, "/");
+		const rail = await screen.findByRole("navigation", { name: "Thư mục chat" }, LONG);
+		await userEvent.click(await within(rail).findByRole("button", { name: /^Bot/ }, LONG));
+		const row = (await screen.findByText("tin của bot", {}, LONG)).closest("a") as HTMLElement;
+		expect(within(row).getAllByRole("img", { name: "Telegram" })).toHaveLength(1);
+		expect(screen.queryByText("tin thường")).toBeNull();
+	});
+
 	it("lists Telegram and Zalo with their logos even when no chat is synced with an app", async () => {
 		const fixture = new ChatFixture();
 		const tom = fixture.addUser("Tôm");

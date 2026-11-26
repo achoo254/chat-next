@@ -174,6 +174,9 @@ function toInfo(response: GetBotInfoResponse): BotInfo {
 		inlinePlaceholder: user.botInlinePlaceholder,
 		photoId: user.photo?.fileId ?? "",
 		miniAppUrl: response.miniAppUrl,
+		externalApp: response.externalApp,
+		openUrl: response.openUrl,
+		descriptionPhotoId: response.descriptionPhoto?.fileId ?? "",
 	};
 }
 

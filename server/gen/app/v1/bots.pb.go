@@ -857,9 +857,19 @@ type GetBotInfoResponse struct {
 	// never did), judged by the server's clock; false for anyone else.
 	NotRunning bool `protobuf:"varint,7,opt,name=not_running,json=notRunning,proto3" json:"not_running,omitempty"`
 	// The bot's main Mini App ("Mở app" in its chat and profile); "" without one.
-	MiniAppUrl    string `protobuf:"bytes,8,opt,name=mini_app_url,json=miniAppUrl,proto3" json:"mini_app_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MiniAppUrl string `protobuf:"bytes,8,opt,name=mini_app_url,json=miniAppUrl,proto3" json:"mini_app_url,omitempty"`
+	// The app the bot belongs to ("telegram") when it is a bot of another app that the Chat
+	// Bridge brought in, "" for a bot of this system. Such a bot has no Mini App and no owner
+	// here; "Bắt đầu" is a plain /start message to it.
+	ExternalApp string `protobuf:"bytes,9,opt,name=external_app,json=externalApp,proto3" json:"external_app,omitempty"`
+	// Where the bot's own "open app" button leads, for a bot of another app: its page in that
+	// app. "" when the bot has no such button.
+	OpenUrl string `protobuf:"bytes,10,opt,name=open_url,json=openUrl,proto3" json:"open_url,omitempty"`
+	// The picture the bot shows above its description in an empty chat (a bot of another
+	// app); fetch it with GetFileUrl's bot_description_of context. Unset without one.
+	DescriptionPhoto *MediaRef `protobuf:"bytes,11,opt,name=description_photo,json=descriptionPhoto,proto3" json:"description_photo,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetBotInfoResponse) Reset() {
@@ -946,6 +956,27 @@ func (x *GetBotInfoResponse) GetMiniAppUrl() string {
 		return x.MiniAppUrl
 	}
 	return ""
+}
+
+func (x *GetBotInfoResponse) GetExternalApp() string {
+	if x != nil {
+		return x.ExternalApp
+	}
+	return ""
+}
+
+func (x *GetBotInfoResponse) GetOpenUrl() string {
+	if x != nil {
+		return x.OpenUrl
+	}
+	return ""
+}
+
+func (x *GetBotInfoResponse) GetDescriptionPhoto() *MediaRef {
+	if x != nil {
+		return x.DescriptionPhoto
+	}
+	return nil
 }
 
 type GetChatBotCommandsRequest struct {
@@ -1163,7 +1194,7 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\x03ack\x18\x04 \x01(\v2\x0f.app.v1.SyncAckR\x03ack\"K\n" +
 	"\x11GetBotInfoRequest\x12\x19\n" +
 	"\x06bot_id\x18\x01 \x01(\x03B\x020\x02R\x05botId\x12\x1b\n" +
-	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\xa6\x02\n" +
+	"\achat_id\x18\x02 \x01(\x03B\x020\x02R\x06chatId\"\xa3\x03\n" +
 	"\x12GetBotInfoResponse\x12 \n" +
 	"\x04user\x18\x01 \x01(\v2\f.app.v1.UserR\x04user\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
@@ -1174,7 +1205,11 @@ const file_app_v1_bots_proto_rawDesc = "" +
 	"\vnot_running\x18\a \x01(\bR\n" +
 	"notRunning\x12 \n" +
 	"\fmini_app_url\x18\b \x01(\tR\n" +
-	"miniAppUrl\"8\n" +
+	"miniAppUrl\x12!\n" +
+	"\fexternal_app\x18\t \x01(\tR\vexternalApp\x12\x19\n" +
+	"\bopen_url\x18\n" +
+	" \x01(\tR\aopenUrl\x12=\n" +
+	"\x11description_photo\x18\v \x01(\v2\x10.app.v1.MediaRefR\x10descriptionPhoto\"8\n" +
 	"\x19GetChatBotCommandsRequest\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\"a\n" +
 	"\x0fChatBotCommands\x12\x1e\n" +
@@ -1253,28 +1288,29 @@ var file_app_v1_bots_proto_depIdxs = []int32{
 	22, // 8: app.v1.StartBotResponse.ack:type_name -> app.v1.SyncAck
 	21, // 9: app.v1.GetBotInfoResponse.user:type_name -> app.v1.User
 	23, // 10: app.v1.GetBotInfoResponse.commands:type_name -> app.v1.BotCommand
-	21, // 11: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
-	23, // 12: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
-	15, // 13: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
-	2,  // 14: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
-	4,  // 15: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
-	6,  // 16: app.v1.BotsService.AllowMiniAppWrite:input_type -> app.v1.AllowMiniAppWriteRequest
-	8,  // 17: app.v1.BotsService.SendMiniAppData:input_type -> app.v1.SendMiniAppDataRequest
-	10, // 18: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
-	12, // 19: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
-	14, // 20: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
-	3,  // 21: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
-	5,  // 22: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
-	7,  // 23: app.v1.BotsService.AllowMiniAppWrite:output_type -> app.v1.AllowMiniAppWriteResponse
-	9,  // 24: app.v1.BotsService.SendMiniAppData:output_type -> app.v1.SendMiniAppDataResponse
-	11, // 25: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
-	13, // 26: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
-	16, // 27: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
-	21, // [21:28] is the sub-list for method output_type
-	14, // [14:21] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	18, // 11: app.v1.GetBotInfoResponse.description_photo:type_name -> app.v1.MediaRef
+	21, // 12: app.v1.ChatBotCommands.bot:type_name -> app.v1.User
+	23, // 13: app.v1.ChatBotCommands.commands:type_name -> app.v1.BotCommand
+	15, // 14: app.v1.GetChatBotCommandsResponse.bots:type_name -> app.v1.ChatBotCommands
+	2,  // 15: app.v1.BotsService.InlineQuery:input_type -> app.v1.InlineQueryRequest
+	4,  // 16: app.v1.BotsService.OpenMiniApp:input_type -> app.v1.OpenMiniAppRequest
+	6,  // 17: app.v1.BotsService.AllowMiniAppWrite:input_type -> app.v1.AllowMiniAppWriteRequest
+	8,  // 18: app.v1.BotsService.SendMiniAppData:input_type -> app.v1.SendMiniAppDataRequest
+	10, // 19: app.v1.BotsService.StartBot:input_type -> app.v1.StartBotRequest
+	12, // 20: app.v1.BotsService.GetBotInfo:input_type -> app.v1.GetBotInfoRequest
+	14, // 21: app.v1.BotsService.GetChatBotCommands:input_type -> app.v1.GetChatBotCommandsRequest
+	3,  // 22: app.v1.BotsService.InlineQuery:output_type -> app.v1.InlineQueryResponse
+	5,  // 23: app.v1.BotsService.OpenMiniApp:output_type -> app.v1.OpenMiniAppResponse
+	7,  // 24: app.v1.BotsService.AllowMiniAppWrite:output_type -> app.v1.AllowMiniAppWriteResponse
+	9,  // 25: app.v1.BotsService.SendMiniAppData:output_type -> app.v1.SendMiniAppDataResponse
+	11, // 26: app.v1.BotsService.StartBot:output_type -> app.v1.StartBotResponse
+	13, // 27: app.v1.BotsService.GetBotInfo:output_type -> app.v1.GetBotInfoResponse
+	16, // 28: app.v1.BotsService.GetChatBotCommands:output_type -> app.v1.GetChatBotCommandsResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_bots_proto_init() }

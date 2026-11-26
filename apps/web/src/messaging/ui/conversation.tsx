@@ -533,7 +533,7 @@ export function Conversation({ chatId, topicId, infoOpen, aiOpen = false }: Conv
 				<ChannelBar chatId={chatId} />
 			) : sendable && notStarted ? (
 				<Suspense fallback={null}>
-					<BotStartBar botId={botId} />
+					<BotStartBar botId={botId} chatId={chatId} external={chat.externalApp !== undefined} />
 				</Suspense>
 			) : sendable ? (
 				<>

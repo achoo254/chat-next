@@ -53,7 +53,17 @@ func (s *botsService) GetBotInfo(ctx context.Context, req *connect.Request[appv1
 				role = botadmin.RoleGroupMember
 			}
 		}
-		return s.bots.Info(ctx, me, m.GetBotId(), role)
+		info, err := s.bots.Info(ctx, me, m.GetBotId(), role)
+		if connect.CodeOf(err) != connect.CodeNotFound {
+			return info, err
+		}
+		// Not a bot of this system: it may be a bot of another app that the Chat Bridge brought in.
+		if external, ok, extErr := s.chat.ExternalBotInfo(ctx, me, m.GetBotId()); extErr != nil {
+			return nil, extErr
+		} else if ok {
+			return external, nil
+		}
+		return info, err
 	})
 }
 
