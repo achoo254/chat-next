@@ -342,11 +342,11 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .stamp .read { color: var(--c-primary); }
 .stamp .fail { color: var(--c-error); }
 .msg.mine .stamp .fail { color: var(--c-on-primary); }
-.fwd { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-primary); }
+.fwd { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-primary); }
 .via-bot { display: block; margin-bottom: 2px; font-size: 0.8125rem; color: var(--c-text-muted); }
 .via-bot b { color: var(--c-primary); font-weight: 600; }
 .fwd b { font-weight: 600; }
-.fwd .avatar.xs { display: inline-grid; width: 18px; height: 18px; font-size: 0.5625rem; vertical-align: -4px; margin: 0 2px; }
+.fwd .avatar.xs { display: inline-grid; flex: none; width: 18px; height: 18px; font-size: 0.5625rem; margin: 0 4px; }
 .reply {
 	display: block; width: 100%; margin-bottom: var(--space-1); padding: 2px var(--space-2); border: 0; border-left: 2px solid var(--c-primary-solid);
 	border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-primary-solid) 8%, transparent); font-size: 0.8125rem; text-align: left;
