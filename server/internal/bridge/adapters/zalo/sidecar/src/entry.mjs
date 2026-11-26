@@ -30,10 +30,10 @@
 //   {"ev":"account","uid":"<digits>"}                the signed-in account, once logged in (both ways);
 //                                                    an id that is not 1-20 digits is error no_account
 //   {"ev":"message","thread":"user"|"group","self":bool,"msgType":..,"content":..,"msgId":..,"cliMsgId":..,"uidFrom":..,"idTo":..,"dName":..,"ts":..,"ttl":..,
-//    "peerName":..,"peerAvatar":..,"peerPhone":..}   1-1 only: peerName is the other person's name for a
+//    "peerName":..,"peerAvatar":..,"peerSeen":..}   1-1 only: peerName is the other person's name for a
 //                                     message the owner sent; peerAvatar (protocol 6) the https URL of their
-//                                     photo; peerPhone (protocol 7) the phone number their profile shows, from
-//                                     the same getUserInfo answer; "" when unknown
+//                                     photo; peerSeen (protocol 11) when they were last online, ms, 0 when unknown;
+//                                     the phone number of their profile is not passed on (protocol 12)
 //   {"ev":"event","name":"typing"|"reaction"|"undo"|"seen"|"delivered"|..,"payload":..}
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
 //   {"ev":"sent","id":..,"msgId":"<digits>","ts":<ms>}    ts is this process's clock when Zalo answered
@@ -75,12 +75,13 @@ import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from
 // 4: send (text, 1-1) and history; old_messages is no longer forwarded as an event (history reads it).
 // 5: a history message carries the hash of its text (textHash), not the text.
 // 6: a 1-1 message carries the other person's photo URL (peerAvatar); the profile is looked up for every 1-1 message.
-// 7: a 1-1 message carries the phone number the other person's profile shows (peerPhone), never written anywhere else.
+// 7: (retired in 12) a 1-1 message carried the phone number the other person's profile shows (peerPhone).
 // 8: file_chunk and send_media send one photo or file to one person.
 // 9: react sets or takes back the owner's reaction to a message; a history message carries its client id (cliMsgId).
 // 10: undo recalls a message the owner sent.
 // 11: a 1-1 message carries when the other person was last online (peerSeen, ms; 0 when unknown).
-const PROTOCOL = 11;
+// 12: a 1-1 message no longer carries the other person's phone number (peerPhone is gone).
+const PROTOCOL = 12;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -157,14 +158,13 @@ function listen(loggedIn) {
 		const isGroup = message.type === ThreadType.Group;
 		const self = Boolean(message.isSelf);
 		const peerUid = String(self ? (data.idTo ?? "") : (data.uidFrom ?? ""));
-		const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", phone: "", seen: 0 };
+		const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", seen: 0 };
 		emit({
 			ev: "message",
 			thread: isGroup ? "group" : "user",
 			self,
 			peerName: self ? peer.name : "",
 			peerAvatar: peer.avatar,
-			peerPhone: peer.phone,
 			peerSeen: peer.seen,
 			msgType: data.msgType,
 			content: data.content,

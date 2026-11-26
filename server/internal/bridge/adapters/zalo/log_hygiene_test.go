@@ -14,7 +14,7 @@ func TestNoSidecarContentReachesTheLog(t *testing.T) {
 		"tok-secret", "dlfl.vn", "zdn.vn", "Hợp đồng bí mật"}
 	lines := []string{
 		`{"ev":"listener","state":"connected"}`,
-		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"bí mật riêng","msgId":"8880002","uidFrom":"5550001","idTo":"0","dName":"Nguyễn Văn Bí","peerPhone":"84900000009","ts":"1763700000000"}`,
+		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"bí mật riêng","msgId":"8880002","uidFrom":"5550001","idTo":"0","dName":"Nguyễn Văn Bí","ts":"1763700000000"}`,
 		`{"ev":"message","thread":"user","self":false,"msgType":"share.file","content":{"title":"Hợp đồng bí mật.pdf","href":"https://dl.dlfl.vn/f?sig=tok-secret","params":"{\"fileSize\":\"10\"}"},"msgId":"8880004","uidFrom":"5550001","idTo":"0"}`,
 		`{"ev":"message","thread":"user","self":false,"msgType":"chat.photo","content":{"href":"https://evil.example/p?tok-secret"},"msgId":"8880005","uidFrom":"5550001","idTo":"0"}`,
 		`{"ev":"message","thread":"user","self":false,"msgType":"chat.photo","content":{"href":"https://f1.zdn.vn/p?tok-secret"},"msgId":"8880006","uidFrom":"5550001","idTo":"0"}`,

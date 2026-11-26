@@ -17,12 +17,12 @@ import (
 // the newest page of 1-1 messages (send, history); version 5 gives a history
 // message the hash of its text instead of the text; version 6 gives a 1-1
 // message the photo URL of the other person; version 7 the phone number their
-// profile shows; version 8 sends a photo or a file to one person (file_chunk,
+// profile showed (dropped in 12); version 8 sends a photo or a file to one person (file_chunk,
 // send_media); version 9 sets or takes back the owner's reaction to a message
 // (react) and gives a history message its client id; version 11 gives a 1-1
 // message when the other person was last online (peerSeen); version 10 recalls a
-// message the owner sent (undo).
-const protocolVersion = 11
+// message the owner sent (undo); version 12 no longer carries the phone number of the other person (peerPhone).
+const protocolVersion = 12
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -125,10 +125,6 @@ type wireEvent struct {
 	PeerName string `json:"peerName"`
 	// PeerAvatar is the https URL of the other person's photo, "" when unknown.
 	PeerAvatar string `json:"peerAvatar"`
-	// PeerPhone is the phone number the other person's profile shows, from the
-	// same lookup as the name; "" when it shows none or was not looked up. It
-	// is never logged.
-	PeerPhone string `json:"peerPhone"`
 	// PeerSeen is when the other person was last online, milliseconds since 1970;
 	// 0 when unknown or hidden.
 	PeerSeen int64       `json:"peerSeen"`
