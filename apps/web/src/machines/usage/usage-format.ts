@@ -50,3 +50,15 @@ export function hintValue(u: UsageCopy, s: Pick<UsageSuggestion, "rule" | "value
 			return count(u, v);
 	}
 }
+
+/** Dollars at API prices: "$512", "$3,50", "$0,0123". */
+export function usd(u: UsageCopy, n: number): string {
+	const digits = n >= 100 ? 0 : n >= 1 ? 2 : 4;
+	return new Intl.NumberFormat(u.locale, { style: "currency", currency: "USD", minimumFractionDigits: n >= 100 ? 0 : 2, maximumFractionDigits: digits }).format(n);
+}
+
+/** A share 0-1 as a whole percent, a small non-zero share as "<1%". */
+export function percent(u: UsageCopy, share: number): string {
+	if (share > 0 && share < 0.005) return `<${new Intl.NumberFormat(u.locale, { style: "percent" }).format(0.01)}`;
+	return new Intl.NumberFormat(u.locale, { style: "percent", maximumFractionDigits: 0 }).format(share);
+}

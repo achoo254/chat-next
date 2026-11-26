@@ -1,16 +1,16 @@
-// The numbers of the "Hiệu quả" page from a machine's UsageReport (remote.proto,
-// "usage of the AIs"): totals of the last 7 and 30 days, the mean context per
-// main-session call of the last 30 days against the 60 days before (the
-// baseline), the share of calls the app opened, and the rules' suggestions.
-// Pure: the page passes the report and today's day.
+// The totals of the "Hiệu quả" page from a machine's UsageReport (remote.proto,
+// "usage of the AIs"): the last 7 and 30 days, the 30 days before them, the
+// mean context per main-session call and the share of calls the app opened.
+// usage-insights.ts holds the page's other views. Pure: the page passes the
+// report and today's day.
 //
 // The machine keys a repository by its origin remote as git has it, so rows
 // are matched by the canonical key (git-remote.ts), the key the page and the
 // projects use.
-import type { UsageReport, UsageSuggestion } from "@achoo254/chat-proto/remote/remote";
+import type { UsageReport } from "@achoo254/chat-proto/remote/remote";
 import { canonicalRemote } from "../git-remote.ts";
 
-/** Days one report covers: the last 30 and the 60 before them, the baseline. */
+/** Days one report covers: the last 30, the 30 before them, and 30 more for the rules' trends. */
 export const REPORT_DAYS = 90;
 export const RECENT_DAYS = 30;
 export const WEEK_DAYS = 7;
@@ -59,13 +59,10 @@ export interface UsageSummary {
 	readonly empty: boolean;
 	readonly week: UsageTotals;
 	readonly month: UsageTotals;
-	readonly baseline: UsageTotals;
-	/** The last 30 days' mean context against the baseline's, in whole percent; null when either has no call. */
-	readonly changePercent: number | null;
+	/** The 30 days before the last 30. */
+	readonly previous: UsageTotals;
 	/** Share of the last 30 days' main-session calls the app opened, whole percent; null without a call. */
 	readonly appPercent: number | null;
-	/** The suggestions of the last 30 days, newest first. */
-	readonly hints: readonly UsageSuggestion[];
 }
 
 type Sum = { mainTurns: number; subagentTurns: number; appTurns: number; input: number; cacheRead: number; cacheWrite: number; output: number; context: number };
@@ -87,14 +84,15 @@ export function summarize(report: UsageReport, key: string, today: string): Usag
 	const wanted = key === "" ? "" : usageKeyOf(key);
 	const weekFrom = shiftDay(today, -(WEEK_DAYS - 1));
 	const monthFrom = shiftDay(today, -(RECENT_DAYS - 1));
+	const previousFrom = shiftDay(today, -(2 * RECENT_DAYS - 1));
 	const week = zero();
 	const month = zero();
-	const baseline = zero();
+	const previous = zero();
 	let calls = 0;
 	for (const row of report.days) {
 		if (wanted !== "" && usageKeyOf(row.repoKey) !== wanted) continue;
 		calls += row.mainTurns + row.subagentTurns;
-		const targets = row.day >= monthFrom ? (row.day >= weekFrom ? [week, month] : [month]) : [baseline];
+		const targets = row.day >= monthFrom ? (row.day >= weekFrom ? [week, month] : [month]) : row.day >= previousFrom ? [previous] : [];
 		for (const t of targets) {
 			t.mainTurns += row.mainTurns;
 			t.subagentTurns += row.subagentTurns;
@@ -106,19 +104,11 @@ export function summarize(report: UsageReport, key: string, today: string): Usag
 			t.context += Number(row.meanContext) * row.mainTurns;
 		}
 	}
-	const recent = totals(month);
-	const before = totals(baseline);
-	const monthStart = new Date(`${monthFrom}T00:00:00`).getTime();
-	const hints = report.suggestions
-		.filter((s) => (wanted === "" || usageKeyOf(s.repoKey) === wanted) && Number(s.at) >= monthStart)
-		.sort((a, b) => Number(b.at - a.at));
 	return {
 		empty: calls === 0,
 		week: totals(week),
-		month: recent,
-		baseline: before,
-		changePercent: recent.meanContext !== null && before.meanContext !== null && before.meanContext > 0 ? Math.round((100 * (recent.meanContext - before.meanContext)) / before.meanContext) : null,
+		month: totals(month),
+		previous: totals(previous),
 		appPercent: month.mainTurns > 0 ? Math.round((100 * month.appTurns) / month.mainTurns) : null,
-		hints,
 	};
 }

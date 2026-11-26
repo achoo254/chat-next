@@ -43,10 +43,40 @@ export class FakeUsage {
 			medianContext: BigInt(meanContext),
 			p90Context: BigInt(meanContext * 2),
 		});
-		const hint = (daysAgo: number, rule: UsageRule, value: number, notified: boolean) => {
+		const hint = (daysAgo: number, rule: UsageRule, value: number, notified: boolean, excessUsd: number) => {
 			const at = Date.now() - daysAgo * 86_400_000;
-			return { rule, sessionId: `demo-session-${rule}`, repoKey: this.repoKey, turn: 41, at: BigInt(at), value: BigInt(value), experimental: rule === UsageRule.MECHANICAL, notifiedAt: BigInt(notified ? at + 60_000 : 0) };
+			return { rule, sessionId: `demo-session-${rule}`, repoKey: this.repoKey, turn: 41, at: BigInt(at), value: BigInt(value), experimental: rule === UsageRule.MECHANICAL, notifiedAt: BigInt(notified ? at + 60_000 : 0), excessUsd };
 		};
+		const model = (daysAgo: number, name: string, mainTurns: number, costUsd: number) => ({
+			repoKey: this.repoKey,
+			day: dayBefore(daysAgo),
+			model: name,
+			inputTokens: 600n,
+			cacheReadTokens: BigInt(mainTurns * 280_000),
+			cacheWriteTokens: 20_000n,
+			outputTokens: 9_000n,
+			mainTurns,
+			subagentTurns: 3,
+			costUsd,
+			priced: true,
+		});
+		const session = (id: string, daysAgo: number, mainTurns: number, costUsd: number, commits: number) => ({
+			provider: "claude",
+			sessionId: id,
+			repoKey: this.repoKey,
+			firstAt: BigInt(Date.now() - daysAgo * 86_400_000),
+			lastAt: BigInt(Date.now() - daysAgo * 86_400_000 + 2 * 3_600_000),
+			mainTurns,
+			subagentTurns: 4,
+			peakContext: 310_000n,
+			model: "claude-opus-5-5",
+			costUsd,
+			unpricedTurns: 0,
+			app: true,
+			outcomeKnown: true,
+			commits,
+			filesChanged: commits * 4,
+		});
 		const on = (rule: UsageRule) => this.switches.find((s) => s.rule === rule)?.enabled === true;
 		return create(UsageReportSchema, {
 			from,
@@ -55,7 +85,11 @@ export class FakeUsage {
 			lastScanAt: BigInt(Date.now() - 4 * 60_000),
 			shape: { usageRatio: 1 },
 			days: this.deleted ? [] : [row(45, 80, 380_000, 10), row(12, 60, 300_000, 20), row(2, 40, 260_000, 18), row(1, 25, 240_000, 9)],
-			suggestions: this.deleted ? [] : [hint(2, UsageRule.CONTEXT, 412_000, true), hint(1, UsageRule.MECHANICAL, 812, false)].filter((h) => on(h.rule)),
+			suggestions: this.deleted ? [] : [hint(2, UsageRule.CONTEXT, 412_000, true, 3.4), hint(1, UsageRule.MECHANICAL, 812, false, 1.2)].filter((h) => on(h.rule)),
+			modelDays: this.deleted
+				? []
+				: [model(45, "claude-opus-5-5", 80, 41), model(12, "claude-opus-5-5", 45, 22), model(12, "claude-sonnet-5-5", 15, 4), model(2, "claude-opus-5-5", 40, 18), model(1, "claude-haiku-5-5", 25, 1)],
+			sessions: this.deleted ? [] : [session("demo-session-1", 2, 120, 18, 0), session("demo-session-2", 12, 60, 14, 4), session("demo-session-3", 1, 25, 1, 1)],
 		});
 	}
 

@@ -1,8 +1,8 @@
 // "Hiệu quả" in a real browser (Chromium) against the fake machine of the
 // visual harness (test/support/remote-machine-demo.ts, whose usage side is
 // test/support/fake-usage.ts): opened from the project's menu in the AI Agent
-// column, it shows the totals, the context against the baseline and the
-// suggestions; switching the experimental rule off drops its suggestion;
+// column, it shows the overview with costs, the chart, the models, the
+// habits and the outcomes; switching the experimental rule off drops its card;
 // deleting the ledger asks in the page first and then shows an empty report.
 // On a phone the page fits the width. Starts its own Vite dev server of the
 // harness, so it needs no backend:
@@ -40,7 +40,7 @@ async function until(page: Page, what: string, check: () => boolean, timeout = 1
 	await page.waitForFunction(check, undefined, { timeout }).catch(() => assert.fail(`timed out waiting for ${what}`));
 }
 
-test("opened from the project's menu: totals, baseline, suggestions, a rule off, the ledger deleted after asking", async () => {
+test("opened from the project's menu: costs, chart, models, habits, outcomes, a rule off, the ledger deleted after asking", async () => {
 	const context = await browser.newContext({ locale: "vi-VN", viewport: { width: 1333, height: 800 } });
 	const page = await context.newPage();
 	const errors: string[] = [];
@@ -57,24 +57,27 @@ test("opened from the project's menu: totals, baseline, suggestions, a rule off,
 	await page.waitForURL((url) => url.pathname === `/ai/1/usage/${encodeURIComponent("local:chat-next")}`);
 
 	const region = page.getByRole("region", { name: u.title });
-	const totals = region.getByRole("table");
-	await totals.waitFor();
-	assert.deepEqual(await totals.getByRole("row", { name: new RegExp(`^${u.mainTurns}`) }).getByRole("cell").allTextContents(), ["65", "125"]);
-	const context30 = region.getByRole("region", { name: u.contextTitle });
-	// 30 days: (60 × 300K + 40 × 260K + 25 × 240K) / 125 = 275.2K against 380K before.
-	assert.match(await context30.textContent() ?? "", new RegExp(u.contextChange(-28)));
-	assert.match(await region.getByRole("region", { name: u.appShareTitle }).textContent() ?? "", /38%/);
-	const hints = region.getByRole("region", { name: u.hintsTitle });
-	assert.deepEqual(await hints.locator("li b").allTextContents(), [u.rules.mechanical.name, u.rules.context.name]);
-	assert.match(await hints.locator("li").first().textContent() ?? "", new RegExp(u.experimental));
+	const overview = region.getByRole("region", { name: u.overview.title });
+	await overview.waitFor();
+	// 30 days of the demo: $18 + $1 + $22 + $4 = $45, against $41 before.
+	const overviewText = (await overview.textContent()) ?? "";
+	assert.ok(overviewText.includes(u.overview.cost) && overviewText.includes(u.overview.up(10)), overviewText);
+	await region.getByRole("region", { name: u.chart.title }).getByRole("img").waitFor();
+	const where = region.getByRole("region", { name: u.where.title });
+	await where.getByRole("button", { name: u.where.models }).click();
+	await where.getByRole("row", { name: /claude-sonnet-5-5/ }).waitFor();
+	const habits = region.getByRole("region", { name: u.habits.title });
+	assert.deepEqual(await habits.locator("[data-id=usage-rule] b").allTextContents(), [u.rules.context.name, u.rules.mechanical.name]);
+	await region.getByRole("region", { name: u.outcome.title }).waitFor();
 
-	// The experimental rule off: the machine is told, and its suggestion leaves the list.
+	// The experimental rule off: the machine is told, and its card leaves the habits.
+	await region.locator("summary", { hasText: u.controls }).click();
 	const rules = region.getByRole("region", { name: u.settingsTitle });
 	const mechanical = rules.getByRole("checkbox", { name: new RegExp(u.rules.mechanical.name) });
 	assert.equal(await mechanical.isChecked(), true);
 	await mechanical.click();
 	await until(page, "the switch on the machine", () => (window as unknown as { __fakeUsage: Fake }).__fakeUsage.seen.includes("usageSettingsSet"));
-	await page.waitForFunction(() => document.querySelectorAll("[data-id=usage-hints] li").length === 1);
+	await page.waitForFunction(() => document.querySelectorAll("[data-id=usage-rule]").length === 1);
 	assert.equal(await mechanical.isChecked(), false);
 
 	// Deleting asks in the page; "Huỷ" sends nothing.
@@ -100,7 +103,7 @@ test("on a phone the page fits the width", async () => {
 	const errors: string[] = [];
 	page.on("pageerror", (err) => errors.push(String(err)));
 	await page.goto(`http://localhost:${PORT}/?at=machine-usage`);
-	await page.getByRole("region", { name: u.title }).getByRole("table").waitFor({ timeout: 30_000 });
+	await page.getByRole("region", { name: u.title }).getByRole("region", { name: u.overview.title }).waitFor({ timeout: 30_000 });
 	const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 	assert.ok(overflow <= 0, `the page is ${overflow}px wider than the screen`);
 	assert.deepEqual(errors, []);
