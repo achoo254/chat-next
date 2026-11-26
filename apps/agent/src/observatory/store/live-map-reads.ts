@@ -129,7 +129,16 @@ const CORE_EVENTS: RowFilter = {
     "kind IN ('permission_request', 'permission_decision', 'permission_denied', 'hook_block', 'compact_start', 'compact_end', 'stop', 'stop_failure') OR (kind = 'notification' AND label IN ('permission_prompt', 'idle_prompt'))",
   params: [],
 };
-const MAIN_THREAD = "agent_id IS NULL OR agent_id = ''";
+/**
+ * Requests Claude Code makes on the session's own thread for its side
+ * features once a turn ends (the next prompt it suggests, the session's
+ * title): no agent, but not the AI working either. The Live Map leaves them
+ * out the same way (apps/web observatory live-map-types.ts SIDE_REQUESTS).
+ */
+export const SIDE_REQUESTS: readonly string[] = ["prompt_suggestion", "generate_session_title"];
+
+/** The main thread's own requests, not its side features'. */
+const MAIN_THREAD = `(agent_id IS NULL OR agent_id = '') AND COALESCE(query_source, '') NOT IN (${SIDE_REQUESTS.map((s) => `'${s}'`).join(", ")})`;
 
 /**
  * The rows of a session sorting before `before` (the oldest of the newest

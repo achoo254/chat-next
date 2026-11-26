@@ -28,7 +28,7 @@ const tool = (id: string, at: number, station: string, success?: boolean): Timel
   entry({ kind: "toolCall", row: { toolUseId: id, sessionId: S, at, toolName: "Bash", station, stationFlags: 0, ...(success === undefined ? {} : { success }) } });
 const event = (kind: SessionEventKind, at: number, extra: { label?: string; toolUseId?: string } = {}): TimelineEntry =>
   entry({ kind: "sessionEvent", row: { dedupeKey: `${kind}:${at}`, sessionId: S, at, kind, ...extra } });
-const api = (at: number, row: Partial<{ model: string; agentId: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; durationMs: number; ttftMs: number }>): TimelineEntry =>
+const api = (at: number, row: Partial<{ model: string; agentId: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; durationMs: number; ttftMs: number; querySource: string }>): TimelineEntry =>
   entry({ kind: "apiRequest", row: { dedupeKey: `r${at}`, sessionId: S, at, ...row } });
 
 function live(entries: TimelineEntry[], extra: Partial<LiveInput> = {}) {
@@ -55,6 +55,16 @@ describe("the core's state", () => {
     expect(live([prompt(T), sub("a1", T + 1, T + 5), event("stop", T + 2)]).core).toBe("waiting_user");
     // The session's end still wins.
     expect(live([prompt(T), sub("a1", T + 1), event("stop", T + 2)], { endedAt: T + 9 }).core).toBe("idle");
+  });
+
+  it("waits for the user through Claude Code's side features after a turn: the prompt it suggests, a helper that only stops", () => {
+    const helper = entry({ kind: "subagent", row: { agentId: "helper", sessionId: S, startedAt: T + 4, endedAt: T + 4 } });
+    const suggestion = api(T + 3, { model: "claude-opus-5-5", inputTokens: 500, outputTokens: 10, durationMs: 800, querySource: "prompt_suggestion" });
+    const state = live([prompt(T), api(T + 1, { model: "claude-opus-5-5", inputTokens: 90_000, outputTokens: 400, durationMs: 4_000 }), event("stop", T + 2), suggestion, helper]);
+    expect(state.core).toBe("waiting_user");
+    // The main thread's numbers stay its own.
+    expect(state.contextTokens).toBe(90_000);
+    expect(live([prompt(T), event("stop", T + 2), api(T + 3, { querySource: "repl_main_thread" })]).core).toBe("thinking");
   });
 
   it("keeps thinking after the turn stops while a shell started in the background may still run, until a new turn or KillShell", () => {

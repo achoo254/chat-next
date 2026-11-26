@@ -18,7 +18,7 @@
 // (the same path as the event detail) and reads them with parseToolContent.
 import { historyBefore, modeOf, runningCalls, toolCalls, type History, type ReleaseStep, type ToolCall } from "./call-history.ts";
 import type { LiveMapState } from "./live-map-state.ts";
-import type { LiveMapEvent } from "./live-map-types.ts";
+import { isMainRequest, type LiveMapEvent } from "./live-map-types.ts";
 import { STATION_PLACE, type PlaceId } from "./render/scene-table.ts";
 import { stationOf, type StationCode } from "./station-catalog.ts";
 
@@ -132,7 +132,7 @@ function subjectOf(state: LiveMapState, calls: readonly ToolCall[], now: number)
 	const last = ended.reduce<ToolCall | null>((best, c) => (best === null || (c.endAt ?? 0) >= (best.endAt ?? 0) ? c : best), null);
 	if (last !== null && now - (last.endAt ?? 0) < DONE_HOLD_MS) return { kind: "done", call: cardCall(state, calls, last, now) };
 	if (mode === "think") {
-		const apiTurns = state.log.filter((e) => e.kind === "api" && e.agentId === "").length;
+		const apiTurns = state.log.filter((e) => e.kind === "api" && isMainRequest(e)).length;
 		return { kind: "think", apiTurns, sinceMs: Math.max(0, now - lastActivityAt(state)) };
 	}
 	return { kind: "idle", last: last === null ? null : cardCall(state, calls, last, now) };
@@ -176,7 +176,7 @@ export function journeyOf(log: readonly LiveMapEvent[]): JourneyStep[] {
 				visit("core");
 				break;
 			case "api":
-				if (e.agentId === "") visit("core");
+				if (isMainRequest(e)) visit("core");
 				break;
 			case "tool": {
 				const place = STATION_PLACE[stationOf(e.station)];

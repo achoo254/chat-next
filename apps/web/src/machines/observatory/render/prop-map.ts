@@ -18,7 +18,7 @@
 // part of a trace to a fraction of its length.
 import { FLAG, historyBefore, modeOf, percentile, runningCalls, toolCalls, type ActivityMode, type ToolCall } from "../call-history.ts";
 import type { Animation, LiveMapState } from "../live-map-state.ts";
-import type { LiveMapEvent } from "../live-map-types.ts";
+import { isMainRequest, type LiveMapEvent } from "../live-map-types.ts";
 import { pipelineOf, type Pipeline } from "../pipeline-model.ts";
 import { stationOf, STATION_CODES, type StationCode } from "../station-catalog.ts";
 import type { Activity } from "./camera-director.ts";
@@ -108,6 +108,7 @@ export function movesOf(anim: Animation, event: LiveMapEvent | undefined, scene:
 			pulse("orchestrator");
 			return moves;
 		case "api":
+			if (event !== undefined && event.kind === "api" && !isMainRequest(event)) return moves;
 			pulse("core");
 			return moves;
 		case "instruction":

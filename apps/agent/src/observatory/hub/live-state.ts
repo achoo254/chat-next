@@ -9,8 +9,10 @@
 // events), and a device replaying keeps them from the events it has.
 //
 // The core's state follows the last event that says something about it:
-// - a prompt, a tool call, a subagent, a main-thread API request, a
-//   permission decided or denied, a hook blocking a call: thinking (the
+// - a prompt, a tool call, a subagent starting, a main-thread API request
+//   (not one of Claude Code's side features after a turn: the prompt it
+//   suggests, the session's title), a permission decided or denied, a hook
+//   blocking a call: thinking (the
 //   records cannot tell thinking from writing);
 // - a permission asked (or a `permission_prompt` notification): waiting for
 //   permission;
@@ -31,6 +33,7 @@
 import { TOOL_ERROR } from "../ingest/normalize-hook-record.ts";
 import { type Station, StationFlag } from "../live-map/station-map.ts";
 import { contextTokensOf, contextWindowOf } from "../live-map/model-window.ts";
+import { SIDE_REQUESTS } from "../store/live-map-reads.ts";
 import type { TimelineEntry } from "../store/timeline-reads.ts";
 
 export type CoreState = "idle" | "thinking" | "waiting_permission" | "waiting_user" | "compacting" | "failed";
@@ -65,7 +68,9 @@ export type LiveInput = {
 /** Tool calls that never ran: denied, or blocked by a hook. */
 const NOT_RUN = new Set(["permission_denied", "hook_block"]);
 
-const isMainThread = (agentId: string | null): boolean => agentId === null || agentId === "";
+/** A request of the main thread doing the session's work: no agent, and not a side feature. */
+const isMainRequest = (r: { agentId: string | null; querySource: string | null }): boolean =>
+  (r.agentId === null || r.agentId === "") && !SIDE_REQUESTS.includes(r.querySource ?? "");
 
 export function liveStateOf(input: LiveInput): LiveState {
   let core: CoreState = "idle";
@@ -101,9 +106,11 @@ export function liveStateOf(input: LiveInput): LiveState {
         backgroundShells.clear();
         break;
       case "subagent":
-        active();
-        if (e.row.endedAt === null || e.row.endedAt === 0) runningSubagents.set(e.row.agentId, e.row.agentType ?? "");
-        else runningSubagents.delete(e.row.agentId);
+        // A start is work; a stop alone is not (Claude Code's side features leave a stop at once after a turn ends).
+        if (e.row.endedAt === null || e.row.endedAt === 0) {
+          active();
+          runningSubagents.set(e.row.agentId, e.row.agentType ?? "");
+        } else runningSubagents.delete(e.row.agentId);
         break;
       case "toolCall":
         active();
@@ -114,7 +121,7 @@ export function liveStateOf(input: LiveInput): LiveState {
         else if (((e.row.stationFlags ?? 0) & StationFlag.background) !== 0 && e.row.success !== false && !notRun.has(e.row.toolUseId)) backgroundShells.add(e.row.toolUseId);
         break;
       case "apiRequest":
-        if (!isMainThread(e.row.agentId)) break;
+        if (!isMainRequest(e.row)) break;
         active();
         lastApi = e.row;
         largest = Math.max(largest, contextTokensOf(e.row));

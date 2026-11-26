@@ -34,7 +34,7 @@ export const subagent = (agent: string, ms: number, endedAt = 0, seq = 0): LiveM
 	at({ kind: "subagent", agentId: agent, agentType: "Explore", endedAt, model: "claude-haiku" }, `subagent:${agent}`, ms, seq);
 
 export const api = (key: string, ms: number, over: Partial<Extract<LiveMapEventBody, { kind: "api" }>> = {}, seq = 0): LiveMapEvent =>
-	at({ kind: "api", agentId: "", model: "claude-opus", outputTokens: 500, durationMs: 3_000, ttftMs: 500, ...over }, `api:${key}`, ms, seq);
+	at({ kind: "api", agentId: "", side: false, model: "claude-opus", outputTokens: 500, durationMs: 3_000, ttftMs: 500, ...over }, `api:${key}`, ms, seq);
 
 export const lifecycle = (name: string, key: string, ms: number, over: Partial<Extract<LiveMapEventBody, { kind: "lifecycle" }>> = {}, seq = 0): LiveMapEvent =>
 	at({ kind: "lifecycle", name, agentId: "", toolUseId: "", station: "CORE", label: "", ...over }, `event:${key}`, ms, seq);

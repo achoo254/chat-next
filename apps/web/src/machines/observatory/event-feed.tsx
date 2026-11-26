@@ -13,7 +13,7 @@
 import { useState, type CSSProperties } from "react";
 import { agentTypeOf } from "./activity-card-model.ts";
 import { callLabel, clock, duration, ruleName } from "./drill-format.ts";
-import type { LiveMapEvent } from "./live-map-types.ts";
+import { isMainRequest, type LiveMapEvent } from "./live-map-types.ts";
 import type { LiveMapState } from "./live-map-state.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
 import { PLACE_COLOR } from "./render/interior-painter.ts";
@@ -90,8 +90,8 @@ export function feedRowsOf(c: ObservatoryCopy, state: LiveMapState, hide: boolea
 				all.push({ ...base, place: "user-desk", text: c.feed.prompt, status: "", durationMs: null, opens: false });
 				break;
 			case "api": {
-				// The model's own requests; a subagent's thinking shows on its calls.
-				if (e.agentId !== "") break;
+				// The model's own requests; a subagent's thinking shows on its calls, and Claude Code's side features after a turn are not the model at work.
+				if (!isMainRequest(e)) break;
 				apiTurn += 1;
 				const tokens = e.contextTokens === undefined ? "" : new Intl.NumberFormat(c.locale).format(e.contextTokens);
 				all.push({ ...base, place: "core", text: c.feed.api(apiTurn, tokens), status: "", durationMs: null, think: true, opens: false });

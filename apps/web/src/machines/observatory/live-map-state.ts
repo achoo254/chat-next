@@ -24,7 +24,7 @@
 // of another epoch, or one past a gap in `seq`, asks for a fresh snapshot; an
 // event at or below the applied `seq` is dropped; an event of a kind this app
 // does not know only moves `seq` on.
-import type { CoreState, LiveMapEvent, LiveMapLiveState, LiveMapSessionInfo, LiveMapSnapshot } from "./live-map-types.ts";
+import { isMainRequest, type CoreState, type LiveMapEvent, type LiveMapLiveState, type LiveMapSessionInfo, type LiveMapSnapshot } from "./live-map-types.ts";
 import { STATION_CODES, stationOf, type StationCode } from "./station-catalog.ts";
 
 /** Events this far behind the newest one still play their animation; older ones only count. */
@@ -263,14 +263,15 @@ function step(d: LiveMapScene, e: SceneEvent): void {
 			return;
 		}
 		case "subagent": {
-			active(d);
+			// A start is work; a stop alone is not (Claude Code's side features leave a stop at once after a turn ends).
+			if (e.endedAt === 0) active(d);
 			const sub = (d.subagents[e.agentId] ??= { agentId: e.agentId, agentType: e.agentType, running: true, station: "ORCHESTRATOR" });
 			sub.agentType = e.agentType;
 			sub.running = e.endedAt === 0;
 			return;
 		}
 		case "api": {
-			if (e.agentId !== "") return;
+			if (!isMainRequest(e)) return;
 			active(d);
 			if (e.model !== "") d.model = e.model;
 			const speed = speedOf(e);

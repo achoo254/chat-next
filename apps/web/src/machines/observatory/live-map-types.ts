@@ -103,6 +103,8 @@ export type LiveMapEventBody =
 	| {
 			readonly kind: "api";
 			readonly agentId: string;
+			/** One of Claude Code's side features after a turn (SIDE_REQUESTS), not the AI working. */
+			readonly side: boolean;
 			readonly model: string;
 			readonly outputTokens?: number;
 			/** The context the request carried (input, cache read, both cache writes); unset when the event gave none of them. */
@@ -246,6 +248,17 @@ export function sessionInfoFromWire(info: ObservatorySessionInfo): LiveMapSessio
 	};
 }
 
+/**
+ * Requests Claude Code makes on the session's own thread for its side
+ * features once a turn ends (the next prompt it suggests, the session's
+ * title): no agent, but not the AI working either. The machine leaves them
+ * out the same way (apps/agent observatory store/live-map-reads.ts).
+ */
+export const SIDE_REQUESTS: readonly string[] = ["prompt_suggestion", "generate_session_title"];
+
+/** A request of the main thread doing the session's work: no agent, and not a side feature. */
+export const isMainRequest = (e: { readonly agentId: string; readonly side: boolean }): boolean => e.agentId === "" && !e.side;
+
 export function liveStateFromWire(live: ObservatoryLiveState): LiveMapLiveState {
 	return {
 		core: known(CORE_STATES, live.core, "idle"),
@@ -308,6 +321,7 @@ function bodyFromWire(kind: ObservatoryEvent["kind"]): LiveMapEventBody {
 			return {
 				kind: "api",
 				agentId: v.agentId,
+				side: v.agentId === "" && SIDE_REQUESTS.includes(v.querySource),
 				model: v.model,
 				...(outputTokens === undefined ? {} : { outputTokens }),
 				...(contextTokens === undefined ? {} : { contextTokens }),

@@ -210,7 +210,7 @@ Trạng thái lõi (`ObservatoryCoreState`) theo sự kiện cuối có nói v�
 
 | Sự kiện | Trạng thái |
 |---|---|
-| prompt, tool, subagent, lượt API của luồng chính, `permission_decision`, `permission_denied`, `hook_block` | `THINKING` (hook và OTel không tách nghĩ với viết) |
+| prompt, tool, subagent bắt đầu, lượt API của luồng chính (trừ việc phụ Claude Code chạy sau lượt: `query_source` là `prompt_suggestion` hoặc `generate_session_title`; một subagent chỉ có lúc dừng cũng không tính), `permission_decision`, `permission_denied`, `hook_block` | `THINKING` (hook và OTel không tách nghĩ với viết) |
 | `permission_request`, `notification` nhãn `permission_prompt` | `WAITING_PERMISSION` |
 | `compact_start` | `COMPACTING`; `compact_end` về `THINKING` nếu đang trong lượt, không thì `WAITING_USER` (hay `IDLE` nếu trước đó rảnh) |
 | `stop`, `notification` nhãn `idle_prompt` | `WAITING_USER` (kết thúc lượt) |

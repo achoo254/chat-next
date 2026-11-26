@@ -118,6 +118,9 @@ describe("the Live Map state", () => {
 		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10)])).toBe("waiting_user");
 		expect(core([prompt(1, 0), lifecycle("stop_failure", "s1", 10)])).toBe("failed");
 		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), prompt(2, 20)])).toBe("thinking");
+		// Claude Code's side features after a turn (the prompt it suggests, a helper that only stops) leave the AI waiting.
+		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), api("sug", 20, { side: true }), subagent("helper", 21, 21)])).toBe("waiting_user");
+		expect(core([prompt(1, 0), lifecycle("stop", "s1", 10), api("main", 20)])).toBe("thinking");
 		// Notifications: a permission prompt waits, an idle prompt ends the turn.
 		expect(core([prompt(1, 0), lifecycle("notification", "n1", 10, { label: "permission_prompt" })])).toBe("waiting_permission");
 		expect(core([prompt(1, 0), lifecycle("notification", "n1", 10, { label: "idle_prompt" })])).toBe("waiting_user");
@@ -174,7 +177,7 @@ describe("the Live Map state", () => {
 	});
 
 	it("takes the main agent's speed over its whole duration when the first token's time is unknown, and keeps it past a request without numbers", () => {
-		const base = { kind: "api", agentId: "", model: "claude-opus", seq: 0, provisional: false } as const;
+		const base = { kind: "api", agentId: "", side: false, model: "claude-opus", seq: 0, provisional: false } as const;
 		const noTtft: LiveMapEvent = { ...base, id: "api:a1", at: 0, outputTokens: 300, durationMs: 1_500 };
 		const noNumbers: LiveMapEvent = { ...base, id: "api:a2", at: 10 };
 		const s = live(start(), numbered([noTtft, noNumbers]));
@@ -182,7 +185,7 @@ describe("the Live Map state", () => {
 	});
 
 	it("reads no speed from a request that streamed for a few milliseconds, and falls back on its whole duration when only the stretch after the first token is that short", () => {
-		const base = { kind: "api", agentId: "", model: "claude-opus", seq: 0, provisional: false } as const;
+		const base = { kind: "api", agentId: "", side: false, model: "claude-opus", seq: 0, provisional: false } as const;
 		const speed = (over: { durationMs: number; ttftMs: number }): number | null => {
 			const e: LiveMapEvent = { ...base, id: "api:s", at: 0, outputTokens: 100, ...over };
 			return live(start(), numbered([e])).scene.tokensPerSecond;
