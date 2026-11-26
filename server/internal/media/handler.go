@@ -154,7 +154,8 @@ const InlineQueryTTL = time.Hour
 // still carries the file and the viewer may still see the message, or the
 // viewer's inline query (chat 0) still lives and shows the file, or the
 // file is still the profile photo of the user named (chat PhotoChat) or
-// the photo of a chat the viewer is in (chat ChatPhotoChat).
+// the photo of a chat the viewer is in (chat ChatPhotoChat) or the picture of a bot of another
+// app that the viewer's account met (chat BotDescriptionChat).
 func (s *Service) authorize(ctx context.Context, token string) (*target, int) {
 	now := s.now()
 	g, err := s.sign.openDownload(token, now)
@@ -197,6 +198,12 @@ func (s *Service) authorize(ctx context.Context, token string) (*target, int) {
 		through = `
 		JOIN chats c ON c.id = $3 AND c.photo_file_id = f.id AND c.deleted_at IS NULL AND $2::bigint > 0
 		JOIN chat_members cm ON cm.chat_id = c.id AND cm.user_id = $4 AND cm.left_at IS NULL`
+	case BotDescriptionChat:
+		// The picture of a bot of another app (seq is its puppet): still the one kept for it,
+		// and the viewer still the owner of the account that met the bot.
+		through = `
+		JOIN external_users x ON x.user_id = $3 AND x.bot_photo_file_id = f.id AND x.is_bot AND $2::bigint > 0
+		JOIN external_accounts a ON a.id = x.account_id AND a.owner_id = $4`
 	case 0:
 		through = `
 		JOIN bot_inline_queries q ON q.num = $3 AND q.user_id = $4 AND q.tenant_id = $5 AND $2::bigint = 0

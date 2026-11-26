@@ -105,7 +105,7 @@ func (s *Service) botDescriptionAccess(ctx context.Context, viewer int64, reqs [
 		if err != nil {
 			return fmt.Errorf("chat: authorize bot picture: %w", err)
 		}
-		out[i] = &media.Access{File: f, ChatID: media.PhotoChat, Seq: bot}
+		out[i] = &media.Access{File: f, ChatID: media.BotDescriptionChat, Seq: bot}
 	}
 	return nil
 }

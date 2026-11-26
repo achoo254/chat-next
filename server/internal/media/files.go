@@ -177,6 +177,10 @@ const PhotoChat = 1<<53 - 1
 // channel's photo (their seq is the chat), next below PhotoChat.
 const ChatPhotoChat = PhotoChat - 1
 
+// BotDescriptionChat is the chat id of download grants for the picture a bot of another
+// app shows in an empty chat (their seq is the bot's puppet user), next below ChatPhotoChat.
+const BotDescriptionChat = PhotoChat - 2
+
 // PhotoRef is a profile photo as clients see it: they fetch it with
 // GetFileUrl's user_photo_of context, in the size they show.
 func PhotoRef(fileID string) *appv1.MediaRef {
