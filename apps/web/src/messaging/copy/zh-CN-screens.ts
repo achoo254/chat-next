@@ -772,6 +772,8 @@ export const zhCNScreens: ScreensCopy = {
 		copied: (count: number) => `已复制 ${count} 条消息`,
 	},
 	pinDialog: {
+		/** Several selected messages pinned together. */
+		titleMany: (count: number) => `置顶 ${count} 条消息？`,
 		title: "置顶这条消息？",
 		notify: "通知所有成员",
 		notifyChannel: "通知所有订阅者",

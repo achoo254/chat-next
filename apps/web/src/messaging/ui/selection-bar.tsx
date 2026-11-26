@@ -114,14 +114,20 @@ export default function SelectionBar({ selection }: { selection: MessageSelectio
 			},
 		},
 		{
-			// As a message's "Ghim", for each one, quietly; all pinned already: unpin them.
+			// As a message's "Ghim": a group or channel asks whether to tell everyone (the pin dialog,
+			// one choice for all), a private chat pins at once; all pinned already: unpin them.
 			label: allPinned ? t.unpin : t.pin,
 			icon: "pin",
 			hidden: live.length === 0 || !canPin(chat ?? null),
 			run: () => {
 				const ids = live.map((message) => message.seq).filter((seq) => isPinned(seq) === allPinned);
+				const direct = chat?.type === "private" || chat?.type === "secret";
+				if (!allPinned && !direct) {
+					ui.dialog.set({ kind: "pin", chatId, seq: ids[0] ?? 0, seqs: ids });
+					return;
+				}
 				void (async () => {
-					for (const seq of ids) await (allPinned ? remote.unpin(chatId, seq) : remote.pin(chatId, seq, false));
+					for (const seq of ids) await (allPinned ? remote.unpin(chatId, seq) : remote.pin(chatId, seq));
 				})().then(() => {
 					if (allPinned) pins.forget(chatId, ids);
 					toasts.show(allPinned ? t.unpinned(ids.length) : t.pinned(ids.length));

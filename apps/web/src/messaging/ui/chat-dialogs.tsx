@@ -506,9 +506,12 @@ function DeleteGroup({ chat, onClose }: CloseProps & { chat: Chat }) {
 }
 
 /** Pins a message in a group or channel, notifying everyone or quietly (PinMessage.silent). */
-export function PinDialog({ chatId, seq, onClose }: CloseProps & { chatId: number; seq: number }) {
+export function PinDialog({ chatId, seq, seqs = [seq], onClose }: CloseProps & { chatId: number; seq: number; seqs?: readonly number[] }) {
 	const copy = useScreensCopy();
+	const ui = useUi();
 	const { remote, toasts } = useServices();
+	// Several selected messages: pinned one by one, all with the same notify choice.
+	const many = seqs.length > 1;
 	const chat = useChat(chatId);
 	const pinnedCount = useDialog(chatId)?.dialog.pinnedMessageCount ?? 0;
 	const [notify, setNotify] = useState(true);
@@ -518,9 +521,12 @@ export function PinDialog({ chatId, seq, onClose }: CloseProps & { chatId: numbe
 	const channel = chat?.type === "channel";
 	const pin = () => {
 		setBusy(true);
-		remote.pin(chatId, seq, notify).then(
+		(async () => {
+			for (const one of seqs) await remote.pin(chatId, one, notify);
+		})().then(
 			() => {
-				toasts.show(copy.menu.pinned);
+				toasts.show(many ? copy.selection.pinned(seqs.length) : copy.menu.pinned);
+				ui.selection.set(null);
 				onClose();
 			},
 			() => {
@@ -531,16 +537,16 @@ export function PinDialog({ chatId, seq, onClose }: CloseProps & { chatId: numbe
 	};
 	return (
 		<Modal labelledBy={id} onClose={onClose} className="narrow">
-			<DialogHead id={id} title={t.title} onClose={onClose} />
+			<DialogHead id={id} title={many ? t.titleMany(seqs.length) : t.title} onClose={onClose} />
 			<div className="dlg-body stack">
-				<Quote chatId={chatId} seq={seq} />
+				{!many && <Quote chatId={chatId} seq={seq} />}
 				<button type="button" className="check-row" role="checkbox" aria-checked={notify} onClick={() => setNotify((on) => !on)}>
 					<span className="tick sq">
 						<Icon name="check" />
 					</span>
 					{channel ? t.notifyChannel : t.notify}
 				</button>
-				{chat != null && (pinnedCount > 0 || chat.pinnedSeq !== 0) && (
+				{!many && chat != null && (pinnedCount > 0 || chat.pinnedSeq !== 0) && (
 					<p className="note">
 						<Icon name="pin" />
 						<span>{t.replaces(chat.title, Math.max(pinnedCount, 1))}</span>

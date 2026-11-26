@@ -773,6 +773,8 @@ export const enScreens: ScreensCopy = {
 		copied: (count: number) => (count === 1 ? "1 message copied" : `${count} messages copied`),
 	},
 	pinDialog: {
+		/** Several selected messages pinned together. */
+		titleMany: (count: number) => `Pin ${count} messages?`,
 		title: "Pin this message?",
 		notify: "Notify all members",
 		notifyChannel: "Notify all subscribers",

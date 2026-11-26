@@ -779,6 +779,8 @@ export const viScreens = {
 		copied: (count: number) => `Đã sao chép ${count} tin`,
 	},
 	pinDialog: {
+		/** Several selected messages pinned together. */
+		titleMany: (count: number) => `Ghim ${count} tin?`,
 		title: "Ghim tin này?",
 		notify: "Thông báo cho mọi thành viên",
 		notifyChannel: "Thông báo cho mọi người đăng ký",

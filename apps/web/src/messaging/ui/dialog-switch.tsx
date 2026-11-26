@@ -49,7 +49,7 @@ export default function Dialog({ request, close }: { request: DialogRequest; clo
 		case "deleteChat":
 			return <DeleteChatDialog chatId={request.chatId} onClose={close} />;
 		case "pin":
-			return <PinDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
+			return <PinDialog chatId={request.chatId} seq={request.seq} seqs={request.seqs ?? [request.seq]} onClose={close} />;
 		case "pinnedList":
 			return <PinnedListDialog chatId={request.chatId} topicId={request.topicId} onClose={close} />;
 		case "reactors":

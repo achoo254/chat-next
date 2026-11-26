@@ -202,7 +202,7 @@ describe("messages", () => {
 		await waitFor(() => expect(written).toEqual(["trả lỗi 403"]));
 	});
 
-	it("pins the selected messages quietly, and unpins them when all are pinned", async () => {
+	it("pins the selected messages with the choice to tell everyone, and unpins them when all are pinned", async () => {
 		const demo = seedDemo();
 		const first = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Ghim 1.");
 		const second = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Ghim 2.");
@@ -217,6 +217,12 @@ describe("messages", () => {
 		};
 		let bar = await select();
 		await userEvent.click(within(bar).getByRole("button", { name: "Ghim" }));
+		// A group asks once for them all, telling everyone unless unticked.
+		const dialog = await screen.findByRole("dialog", { name: "Ghim 2 tin?" }, LONG);
+		const notify = within(dialog).getByRole("checkbox", { name: "Thông báo cho mọi thành viên" });
+		expect(notify.getAttribute("aria-checked")).toBe("true");
+		await userEvent.click(notify);
+		await userEvent.click(within(dialog).getByRole("button", { name: "Ghim" }));
 		await waitFor(() => expect(demo.fixture.silentPins).toEqual([first, second]), LONG);
 		expect(await screen.findByText("Đã ghim 2 tin", {}, LONG)).toBeTruthy();
 		await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Thao tác với các tin đã chọn" })).toBeNull());

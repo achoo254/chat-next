@@ -21,7 +21,8 @@ export type DialogRequest =
 	| { readonly kind: "delete"; readonly chatId: number; readonly seq: number; readonly recall: boolean; readonly seqs?: readonly number[] }
 	/** Private chat: deleted for you; group or channel: deleted for everyone by its owner. */
 	| { readonly kind: "deleteChat"; readonly chatId: number }
-	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number }
+	/** `seqs`: several selected messages pinned together; `seq` is the first. */
+	| { readonly kind: "pin"; readonly chatId: number; readonly seq: number; readonly seqs?: readonly number[] }
 	/** Every pinned message of a chat, or of a forum topic (topicId 0: the whole chat). */
 	| { readonly kind: "pinnedList"; readonly chatId: number; readonly topicId: number }
 	/** Who reacted to a message, opened on one emoji. */
