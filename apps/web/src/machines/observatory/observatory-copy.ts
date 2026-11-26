@@ -49,7 +49,6 @@ export interface ObservatoryCopy {
 		readonly waited: string;
 		readonly p95: string;
 		readonly calls: string;
-		readonly noHistory: string;
 		readonly historyCount: (n: number) => string;
 		readonly overP95: string;
 		readonly thinking: string;
@@ -68,6 +67,8 @@ export interface ObservatoryCopy {
 		readonly outputFailed: string;
 		readonly outputUnavailable: string;
 		readonly journey: string;
+		/** The journey's box before the turn went through any module. */
+		readonly journeyEmpty: string;
 		readonly more: string;
 	};
 	/** The camera's modes and the note under them. */
@@ -114,6 +115,8 @@ export interface ObservatoryCopy {
 		/** A CI step whose outcome is not known (the machine stopped following it, or it ran too long without news). */
 		readonly stepUnknown: string;
 		readonly prod: string;
+		/** The caption of the test bed: a run's outcome (no per-test figures are known). */
+		readonly tests: { readonly running: string; readonly passed: string; readonly failed: string; readonly none: string };
 	};
 	/** The column beside the scene: the session's gauges and the detail (live-map-side.tsx). */
 	readonly side: {
@@ -220,7 +223,6 @@ const vi: ObservatoryCopy = {
 		waited: "Đã chờ",
 		p95: "p95 lịch sử",
 		calls: "Lần gọi",
-		noHistory: "Lần đầu trong phiên · chưa có lịch sử",
 		historyCount: (n) => `(${n} lần trước)`,
 		overP95: "lâu hơn p95 lịch sử",
 		thinking: "Claude đang suy nghĩ",
@@ -239,6 +241,7 @@ const vi: ObservatoryCopy = {
 		outputFailed: "chưa lấy được từ máy",
 		outputUnavailable: "chưa xem được ở đây",
 		journey: "Hành trình",
+		journeyEmpty: "chưa đi qua khối nào",
 		more: "Xem chi tiết",
 	},
 	camera: {
@@ -304,6 +307,7 @@ const vi: ObservatoryCopy = {
 		stepFailed: "✗ lỗi",
 		stepUnknown: "? không rõ",
 		prod: "prod",
+		tests: { running: "đang chạy…", passed: "đạt", failed: "lỗi", none: "chưa chạy" },
 	},
 	side: {
 		session: "Phiên",
@@ -416,7 +420,6 @@ const en: ObservatoryCopy = {
 		waited: "Waited",
 		p95: "p95 history",
 		calls: "Calls",
-		noHistory: "first in this session, no history yet",
 		historyCount: (n) => `(${n} before)`,
 		overP95: "longer than the p95 history",
 		thinking: "Claude is thinking",
@@ -435,6 +438,7 @@ const en: ObservatoryCopy = {
 		outputFailed: "could not get it from the machine",
 		outputUnavailable: "not available here",
 		journey: "Journey",
+		journeyEmpty: "no module visited yet",
 		more: "View details",
 	},
 	camera: {
@@ -500,6 +504,7 @@ const en: ObservatoryCopy = {
 		stepFailed: "✗ failed",
 		stepUnknown: "? unknown",
 		prod: "prod",
+		tests: { running: "running…", passed: "passed", failed: "failed", none: "not run yet" },
 	},
 	side: {
 		session: "Session",
@@ -612,7 +617,6 @@ const zhCN: ObservatoryCopy = {
 		waited: "已等待",
 		p95: "历史 p95",
 		calls: "调用次数",
-		noHistory: "本会话首次，暂无历史",
 		historyCount: (n) => `（之前 ${n} 次）`,
 		overP95: "比历史 p95 更久",
 		thinking: "Claude 正在思考",
@@ -631,6 +635,7 @@ const zhCN: ObservatoryCopy = {
 		outputFailed: "未能从机器获取",
 		outputUnavailable: "此处无法查看",
 		journey: "路径",
+		journeyEmpty: "尚未经过任何模块",
 		more: "查看详情",
 	},
 	camera: {
@@ -696,6 +701,7 @@ const zhCN: ObservatoryCopy = {
 		stepFailed: "✗ 失败",
 		stepUnknown: "? 未知",
 		prod: "prod",
+		tests: { running: "运行中…", passed: "通过", failed: "失败", none: "尚未运行" },
 	},
 	side: {
 		session: "会话",

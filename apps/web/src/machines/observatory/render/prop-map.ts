@@ -221,6 +221,8 @@ export interface SceneLook {
 	readonly mode: ActivityMode;
 	/** Modules and traces outside the AI's current zone read dimmer; false in the free camera, where every module reads at its normal brightness. */
 	readonly dimOthers: boolean;
+	/** Commits seen in the session: the commit graph's length. */
+	readonly commits: number;
 	readonly roads: readonly RoadLook[];
 	readonly places: Readonly<Record<PlaceId, PlaceLook>>;
 	readonly drones: readonly DroneLook[];
@@ -296,6 +298,7 @@ export function lookOf(state: LiveMapState, scene: SceneTable, now?: number, dim
 	return {
 		mode,
 		dimOthers,
+		commits: calls.filter((x) => x.key === "GIT:commit").length,
 		roads,
 		places,
 		drones,

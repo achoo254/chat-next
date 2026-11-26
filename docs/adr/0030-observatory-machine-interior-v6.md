@@ -21,6 +21,13 @@ Bản mẫu v6 (`hoandat-app/plans/dattqh/261125-2211-observatory-machine-interi
   dòng Hành trình xuống dòng thay vì cắt "…", luôn thấy các bước mới nhất; tool MCP ghi `máy chủ › tool`. Bố cục của v6 được nới ra
   (cảnh 1500 × 900 thay 1200 × 720, chữ lớn hơn 15 %): đường dẫn dài hơn và mỗi đường ghi số liệu ở một chỗ trống định sẵn, test kiểm nhãn không
   chạm khối nào, không chạm tên model và không chạm nhau.
+- **Chỉnh giao diện 26/11/2026** (theo bản mẫu mới): hàng trên là thẻ hoạt động ba cột (việc đang làm với thanh chạy không xác định; Runtime, p95 lịch sử,
+  Lần gọi mỗi số một nhãn; nút "Xem chi tiết" ở góc phải trên cùng cạnh Hành trình) cạnh hộp **Phiên** (đưa lên hàng trên, có biểu tượng, thanh nhỏ cho ngữ cảnh);
+  Hành trình là các khối biểu tượng tối đa hai dòng, bước mới nhất sáng ở cuối, bước cũ rơi ra sau "…"; thẻ không còn dòng tok/s và ngữ cảnh (đã có ở Phiên và trên cảnh).
+  Mỗi khối vẽ đúng thứ nó là: kho tệp là ma trận ô (tệp đọc sáng xanh, tệp sửa sáng vàng, tìm quét một cột), terminal là cửa sổ shell với các lệnh gần nhất và kết quả,
+  kiểm thử là dải ô đổi màu theo **kết quả của lượt chạy** (Claude Code không báo từng test, nên không có số đạt/lỗi từng ca), Git là đồ thị commit
+  (main, HEAD, nhánh phụ từ 5 commit) cạnh đường ống phát hành, cổng MCP là các cổng kết nối có biểu tượng dịch vụ; khối nhỏ có biểu tượng riêng. Ở chế độ camera **Tự do**,
+  mọi khối và đường dẫn sáng bình thường (không làm mờ khối ngoài vùng AI đang làm); Tự động và Tập trung vẫn làm mờ.
 - **Vẽ bằng Canvas 2D trong code**, không PixiJS, không tài sản ảnh: bỏ `pixi.js`, `public/observatory/`, bộ đệm tranh của service worker (cache
   `observatory-assets-v1` bị xoá khi worker kích hoạt) và location `/observatory/` của nginx. Chữ trên cảnh vẽ trên canvas như bản mẫu; mỗi khối vẫn
   là một nút DOM trong suốt để dùng bàn phím và để test bấm.

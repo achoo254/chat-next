@@ -31,11 +31,20 @@
 .lm-btn:hover { border-color: var(--lm-accent); }
 .lm-stage button:focus-visible { outline: 2px solid var(--lm-accent); outline-offset: 2px; }
 
-/* The activity card. */
-.lm-card { --fc: var(--lm-muted); display: grid; gap: 6px; align-content: start; padding: 14px 18px; background: var(--lm-panel); border: 1px solid var(--lm-line); border-left: 3px solid var(--fc); border-radius: 10px; }
-.lm-card-k { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* The top row: the activity card and the session box. */
+.lm-top { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: stretch; }
+@container (max-width: 1100px) { .lm-top { grid-template-columns: minmax(0, 1fr); } }
+
+/* The activity card: what Claude does (left), its figures (middle), the details button and the journey (right). */
+.lm-card { --fc: var(--lm-muted); display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(150px, auto) minmax(0, 1.5fr); min-width: 0; background: var(--lm-panel); border: 1px solid var(--lm-line); border-left: 3px solid var(--fc); border-radius: 10px; }
+@container (max-width: 1100px) { .lm-card { grid-template-columns: minmax(0, 1fr); } .lm-card-stats, .lm-card-trail { border-left: 0; border-top: 1px solid var(--lm-line); } }
+@container (max-width: 1100px) { .lm-card-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 14px; } .lm-warnx { grid-column: 1 / -1; } }
+.lm-card-main, .lm-card-stats, .lm-card-trail { display: grid; gap: 6px; align-content: start; min-width: 0; padding: 14px 18px; }
+.lm-card-stats { gap: 12px; align-content: center; border-left: 1px solid var(--lm-line); }
+.lm-card-trail { gap: 12px; border-left: 1px solid var(--lm-line); }
+.lm-card-k { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lm-card-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--fc); }
 .lm-card-kind { font-family: var(--lm-mono); font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; color: var(--fc); text-transform: uppercase; }
-.lm-card-right { display: flex; align-items: center; gap: 10px; font-family: var(--lm-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
 .lm-pill { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; }
 .lm-pill[data-s="run"] { color: var(--fc); }
 .lm-pill[data-s="ok"] { color: var(--lm-ok); }
@@ -53,18 +62,26 @@
 @keyframes lm-ind { from { left: -28%; } to { left: 100%; } }
 .lm-card-out { min-height: 1.4em; line-height: 1.4; font-family: var(--lm-mono); font-size: 13px; color: var(--lm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lm-card-out b { font-weight: 400; color: var(--lm-fg); }
-.lm-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--lm-muted); }
-.lm-card-hist { font-family: var(--lm-mono); font-variant-numeric: tabular-nums; }
-.lm-card-foot .lm-btn:disabled { visibility: hidden; }
-.lm-warnx { color: var(--lm-warn); }
-/* The journey wraps (never "…") in a box of a fixed height: two lines, three on a narrow card; when it holds more, the newest steps stay in view at its bottom. */
-.lm-journey { --lm-jl: 2; display: flex; flex-direction: column; justify-content: flex-end; height: calc(var(--lm-jl) * 1.6em); overflow: hidden; font-family: var(--lm-mono); font-size: 12px; line-height: 1.6; color: var(--lm-muted); }
-@container (max-width: 900px) { .lm-journey { --lm-jl: 3; } }
-.lm-journey-in { display: flex; flex-wrap: wrap; column-gap: 0.5em; }
-.lm-journey-step { display: inline-flex; gap: 0.5em; white-space: nowrap; }
-.lm-journey-arrow { color: var(--lm-muted); }
-.lm-journey .is-step { color: var(--lm-fg); }
-.lm-journey .is-failed { color: var(--lm-err); }
+/* The figures: each with its own icon and label. */
+.lm-stat { display: grid; grid-template-columns: 18px auto; column-gap: 10px; align-items: center; font-family: var(--lm-mono); font-variant-numeric: tabular-nums; }
+.lm-stat-ic { color: var(--lm-muted); }
+.lm-stat-lab { font-size: 12px; color: var(--lm-muted); }
+.lm-stat-val { grid-column: 2; font-size: 15px; font-weight: 600; }
+.lm-stat-val.is-over { color: var(--lm-warn); }
+.lm-warnx { min-height: 1.2em; font-size: 11.5px; color: var(--lm-warn); }
+.lm-ico { display: block; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.lm-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; color: var(--lm-muted); }
+.lm-card-head .lm-btn:disabled { visibility: hidden; }
+/* The journey: chips on two rows (the box is two rows high); the newest is last and lit, the oldest drop out behind "…" (activity-card.tsx Trail). */
+.lm-trail { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 4px; height: 126px; overflow: hidden; }
+.lm-trail-step { flex: none; display: grid; justify-items: center; gap: 2px; width: 68px; padding: 6px 4px; border: 1px solid transparent; border-radius: 8px; background: #141b25; font-size: 11px; line-height: 1.2; text-align: center; color: var(--lm-fg); }
+.lm-trail-ic { font-size: 18px; line-height: 1; color: var(--sc, var(--lm-muted)); }
+.lm-trail-step.is-cur { border-color: var(--fc, var(--sc)); background: rgb(255 255 255 / 0.05); }
+.lm-trail-step.is-failed { color: var(--lm-err); border-color: var(--lm-err); }
+.lm-trail-step.is-failed .lm-trail-ic { color: var(--lm-err); }
+.lm-trail-arrow { flex: none; font-size: 12px; color: var(--lm-muted); }
+.lm-trail-more { flex: none; font-family: var(--lm-mono); color: var(--lm-muted); }
+.lm-trail-empty { font-size: 12.5px; color: var(--lm-muted); }
 
 /* The scene: the design's 1200 × 720 board, as wide as the column. */
 .lm-board { position: relative; width: 100%; aspect-ratio: 1500 / 900; overflow: hidden; background: var(--lm-panel); border: 1px solid var(--lm-line); border-radius: 8px; touch-action: none; user-select: none; cursor: grab; }
@@ -83,8 +100,13 @@
 /* The column: boxes with a small caps header. */
 .lm-box { min-width: 0; background: var(--lm-panel); border: 1px solid var(--lm-line); border-radius: 8px; }
 .lm-box h2 { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 10px 12px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lm-muted); border-bottom: 1px solid var(--lm-line); }
-.lm-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 10px 12px; font-family: var(--lm-mono); font-size: 12.5px; color: var(--lm-muted); }
-.lm-gauges b { font-weight: 500; color: var(--lm-fg); font-variant-numeric: tabular-nums; }
+.lm-session { display: grid; grid-template-rows: auto 1fr auto; }
+.lm-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; align-content: center; padding: 12px; font-family: var(--lm-mono); font-size: 12.5px; color: var(--lm-muted); }
+.lm-g { display: grid; grid-template-columns: 18px auto; column-gap: 8px; align-items: center; }
+.lm-g .lm-ico { color: var(--lm-muted); }
+.lm-g b { grid-column: 2; font-size: 15px; font-weight: 600; color: var(--lm-fg); font-variant-numeric: tabular-nums; }
+.lm-mini { grid-column: 2; height: 4px; margin-top: 3px; overflow: hidden; border-radius: 2px; background: #1d2632; }
+.lm-mini i { display: block; height: 100%; background: var(--lm-think); }
 .lm-toggle { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; font-size: 12.5px; color: var(--lm-muted); cursor: pointer; }
 .lm-detail { display: grid; gap: 6px; padding: 10px 12px; font-size: 13px; color: var(--lm-muted); }
 .lm-detail b { font-weight: 500; color: var(--lm-fg); }

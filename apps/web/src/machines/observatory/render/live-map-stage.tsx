@@ -403,17 +403,12 @@ export function LiveMapStage({ state, initialEvent, onPick, clockSkewMs = 0, con
 
 	return (
 		<section className={`lm-stage${hide ? " is-hidden-details" : ""}`} aria-label={t.label} data-id="observe-stage" data-status={status} data-camera={camera.mode}>
+			<div className="lm-top">
+				<ActivityCard card={card} names={names} hide={hide} source={contentSource ?? null} onDetail={(id) => setPick({ kind: "event", eventId: id })} />
+				<SessionBox state={state} hide={hide} hideLabel={t.hideDetails} hideHint={t.hideDetailsHint} approxHint={t.contextApproxHint} onHide={toggleHide} />
+			</div>
 			<div className="lm-main">
 				<div className="lm-col">
-					<ActivityCard
-						card={card}
-						names={names}
-						hide={hide}
-						source={contentSource ?? null}
-						tokensPerSecond={state.live?.tokensPerSecond ?? state.scene.tokensPerSecond}
-						contextPercent={state.live?.contextPercent ?? null}
-						onDetail={(id) => setPick({ kind: "event", eventId: id })}
-					/>
 					{/* Pointer gestures only move the camera; every action is also a button reachable with Tab. */}
 					{/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
 					<div
@@ -469,7 +464,6 @@ export function LiveMapStage({ state, initialEvent, onPick, clockSkewMs = 0, con
 					)}
 				</div>
 				<div className="lm-col">
-					<SessionBox state={state} hide={hide} hideLabel={t.hideDetails} hideHint={t.hideDetailsHint} approxHint={t.contextApproxHint} onHide={toggleHide} />
 					<DetailBox state={state} pick={pick} now={now} hide={hide} source={contentSource ?? null} names={names} />
 					<EventFeed feed={feed} onEvent={(eventId) => setPick({ kind: "event", eventId })} onPlace={pickPlace} />
 				</div>

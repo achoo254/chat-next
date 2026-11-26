@@ -20,23 +20,30 @@ import type { LiveMapState } from "../live-map-state.ts";
 import type { ObservatoryCopy } from "../observatory-copy.ts";
 import type { StepStatus } from "../pipeline-model.ts";
 import type { MoveFrame } from "./animation-director.ts";
+import { clamp01, INK, rgba } from "./ink.ts";
 import { pathPoint, subPath, type SceneLook, type Tone } from "./prop-map.ts";
 import { PLACE_IDS, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
+import {
+	cornerTicks,
+	EDIT_COLOUR,
+	MCP_ROW_GAP,
+	MCP_ROW_H,
+	paintCommitGraph,
+	paintFileMatrix,
+	paintMcpPort,
+	paintMemoryChip,
+	paintPermissionShield,
+	paintPromptPort,
+	paintShell,
+	paintSkillBolt,
+	paintTestBed,
+	plate,
+	type FileTouch,
+	type ShellLine,
+	type TestState,
+} from "./schematic-marks.ts";
 
-/** The design's colours: one dark look on purpose (the inside of a running machine). */
-export const INK = {
-	board: "#0c121a",
-	box: "#121923",
-	boxGlow: "#141b25",
-	edge: "#2b3644",
-	fg: "#dfe6ee",
-	muted: "#8593a3",
-	ok: "#3dd68c",
-	warn: "#ffc53d",
-	err: "#ff6369",
-	think: "#baa7ff",
-	copper: "#7a5a3c",
-} as const;
+export { INK, rgba };
 
 export const PLACE_COLOR: Readonly<Record<PlaceId, string>> = {
 	core: "#baa7ff",
@@ -86,18 +93,6 @@ export interface PaintInput {
 	readonly motion: boolean;
 	readonly copy: SceneCopy;
 	readonly duration: (ms: number) => string;
-}
-
-const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
-
-function hexRgb(hex: string): [number, number, number] {
-	const n = Number.parseInt(hex.replace("#", ""), 16);
-	return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-export function rgba(hex: string, a: number): string {
-	const [r, g, b] = hexRgb(hex);
-	return `rgba(${r},${g},${b},${clamp01(a)})`;
 }
 
 /** Cuts a text to about `px` wide at `size` px monospace. */
@@ -354,7 +349,7 @@ export class InteriorPainter {
 	}
 
 	/** A module's box with its tag and sub line; returns its glow. */
-	private box(place: PlaceId, col: string, withCalls = true): number {
+	private box(place: PlaceId, col: string, withCalls = true, opts: { iconW?: number; noSub?: boolean } = {}): number {
 		const c = this.c;
 		const { look, selected, copy, wall } = this.i;
 		const p = this.scene.places[place];
@@ -382,16 +377,20 @@ export class InteriorPainter {
 		c.strokeStyle = alarm !== "none" ? (alarm === "alert" ? INK.err : INK.warn) : focus || g > 0.1 ? rgba(col, 0.5 + 0.5 * g) : INK.edge;
 		c.stroke();
 		c.lineWidth = 1;
+		cornerTicks(c, r, col, 0.4 + 0.4 * g);
 		if (selected === place) this.dashedFrame(r);
 		c.textBaseline = "top";
 		c.textAlign = "left";
+		// The text keeps clear of a mark drawn at the right of the box.
+		const room = r.w - 20 - (opts.iconW ?? 0);
 		c.font = `600 ${t.font * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
-		c.fillText(copy.tags[place], r.x + 10, r.y + 8);
+		c.fillText(clip(copy.tags[place], room, t.font * this.ts), r.x + 10, r.y + 8);
+		if (opts.noSub === true) return g;
 		c.font = `400 ${t.sub * this.ts}px ${MONO}`;
 		c.fillStyle = INK.muted;
 		const n = this.calls(place);
-		c.fillText(n > 0 && withCalls ? `${copy.subs[place]} · ${copy.calls(n)}` : copy.subs[place], r.x + 10, r.y + 10 + t.font * this.ts + 2);
+		c.fillText(clip(n > 0 && withCalls ? `${copy.subs[place]} · ${copy.calls(n)}` : copy.subs[place], room, t.sub * this.ts), r.x + 10, r.y + 10 + t.font * this.ts + 2);
 		return g;
 	}
 
@@ -842,129 +841,134 @@ export class InteriorPainter {
 	/** The MCP gate: one slot per server the session used, the one running lit; in focus, each server's last tool. */
 	private drawMcp(): void {
 		const c = this.c;
-		const { state, wall, contentZone, copy, hide, duration } = this.i;
+		const { state, wall, copy, hide, duration, motion } = this.i;
 		const p = this.scene.places.mcp.rect;
 		this.box("mcp", PLACE_COLOR.mcp);
 		const servers = Object.values(state.scene.mcp);
-		const slotH = 26;
-		const gap = 8;
-		const top = p.y + 10 + 30 * this.ts;
-		const fits = Math.floor((p.y + p.h - top + gap) / (slotH + gap));
-		const shown = servers.length > fits ? servers.slice(0, fits - 1) : servers;
-		const board = contentZone === "mcp" ? this.board("mcp") : null;
-		c.textBaseline = "middle";
+		const top = p.y + 10 + 34 * this.ts;
+		const fits = Math.floor((p.y + p.h - 6 - top + MCP_ROW_GAP) / (MCP_ROW_H + MCP_ROW_GAP));
+		const shown = servers.length > fits ? servers.slice(0, Math.max(0, fits - 1)) : servers;
+		const board = this.board("mcp");
 		shown.forEach((s, k) => {
-			const y = top + k * (slotH + gap);
-			const on = s.running > 0;
-			c.fillStyle = on ? rgba(PLACE_COLOR.mcp, 0.25 + 0.25 * Math.sin(wall / 120)) : "#161e29";
-			c.fillRect(p.x + 10, y, p.w - 20, slotH - 4);
-			c.strokeStyle = on ? PLACE_COLOR.mcp : INK.edge;
-			c.strokeRect(p.x + 10.5, y + 0.5, p.w - 21, slotH - 5);
-			c.font = `400 ${11 * this.ts}px ${MONO}`;
-			c.fillStyle = on ? INK.fg : INK.muted;
-			c.textAlign = "left";
-			c.fillText(hide ? copy.mcpServer(k + 1) : clip(s.server, 150, 11), p.x + 18, y + (slotH - 4) / 2);
-			const last = board?.kind === "calls" ? board.rows.find((r) => r.mcpServer === s.server) : undefined;
-			if (last !== undefined) {
-				const prefix = `mcp__${s.server}__`;
-				const tool = hide ? copy.mcpTool : last.tool.startsWith(prefix) ? last.tool.slice(prefix.length) : last.tool;
-				c.textAlign = "right";
-				c.fillStyle = last.running ? PLACE_COLOR.mcp : INK.muted;
-				c.fillText(`${clip(tool, 110, 11)} · ${duration(last.runtimeMs)}`, p.x + p.w - 18, y + (slotH - 4) / 2);
-				c.textAlign = "left";
-			}
+			const last = board.kind === "calls" ? board.rows.find((r) => r.mcpServer === s.server) : undefined;
+			const prefix = `mcp__${s.server}__`;
+			const tool = last === undefined ? "" : hide ? copy.mcpTool : last.tool.startsWith(prefix) ? last.tool.slice(prefix.length) : last.tool;
+			paintMcpPort(
+				c,
+				p.x + 10,
+				top + k * (MCP_ROW_H + MCP_ROW_GAP),
+				p.w - 20,
+				{ name: hide ? copy.mcpServer(k + 1) : s.server, on: s.running > 0, used: s.calls > 0 || s.running > 0, last: last === undefined ? null : { tool: clip(tool, 110, 11), runtime: duration(last.runtimeMs) } },
+				PLACE_COLOR.mcp,
+				wall,
+				motion,
+				this.ts,
+			);
 		});
-		if (servers.length === 0) {
-			c.font = `400 ${11 * this.ts}px ${MONO}`;
-			c.fillStyle = INK.muted;
-			c.textAlign = "left";
-			c.fillText(copy.noMcp, p.x + 18, top + 10);
-		} else if (servers.length > shown.length) {
-			c.font = `400 ${11 * this.ts}px ${MONO}`;
-			c.fillStyle = INK.muted;
-			c.textAlign = "left";
-			c.fillText(copy.moreServers(servers.length - shown.length), p.x + 18, top + shown.length * (slotH + gap) + 10);
-		}
+		c.textBaseline = "middle";
+		c.textAlign = "left";
+		c.font = `400 ${11 * this.ts}px ${MONO}`;
+		c.fillStyle = INK.muted;
+		if (servers.length === 0) c.fillText(copy.noMcp, p.x + 18, top + 12);
+		else if (servers.length > shown.length) c.fillText(copy.moreServers(servers.length - shown.length), p.x + 18, top + shown.length * (MCP_ROW_H + MCP_ROW_GAP) + 12);
 		c.textBaseline = "top";
 	}
 
+	/** Files: a matrix of cells; the sub line is also the colour key (read, edit, search). */
 	private drawFiles(): void {
 		const c = this.c;
-		const { contentZone, wall } = this.i;
+		const { contentZone, wall, hide, copy, motion } = this.i;
 		const p = this.scene.places.files.rect;
 		const run = this.running("files") > 0;
-		this.box("files", PLACE_COLOR.files);
+		this.box("files", PLACE_COLOR.files, false, { noSub: true });
 		if (contentZone === "files") {
 			this.listRows("files", p.x + 10, p.y + 10 + 30 * this.ts, p.w - 20, 4);
 			return;
 		}
-		for (let k = 0; k < 36; k++) {
-			const x = p.x + p.w - 12 - 12 * 14 + (k % 12) * 14;
-			const y = p.y + p.h - 28 - 2 * 24 + Math.floor(k / 12) * 24;
-			const on = run && Math.sin(wall / 60 - k * 0.7) > 0.3;
-			c.fillStyle = rgba(PLACE_COLOR.files, on ? 0.8 : 0.1);
-			c.fillRect(x, y, 10, 18);
-		}
+		const rows = this.board("files");
+		const calls = rows.kind === "calls" ? rows.rows : [];
+		const touches: FileTouch[] = calls.map((r, k) => ({ key: hide || r.target === "" ? r.eventId : r.target, tool: r.tool, strength: r.running ? 0.7 + 0.3 * Math.sin(wall / 90) : 0.85 - k * 0.12 }));
+		paintFileMatrix(c, p, PLACE_COLOR.files, touches, run, calls.some((r) => r.running && (r.tool === "Grep" || r.tool === "Glob")), wall, motion);
+		// The sub line's words wear the colours of what they mean: read, edit, search.
+		c.font = `400 ${TIER[1].sub * this.ts}px ${MONO}`;
+		c.textBaseline = "top";
+		c.textAlign = "left";
+		let x = p.x + 10;
+		const y = p.y + 10 + TIER[1].font * this.ts + 2;
+		const palette = [PLACE_COLOR.files, EDIT_COLOUR, INK.muted];
+		copy.subs.files.split(" · ").forEach((word, i) => {
+			if (i > 0) {
+				c.fillStyle = INK.muted;
+				c.fillText(" · ", x, y);
+				x += c.measureText(" · ").width;
+			}
+			c.fillStyle = palette[i] ?? INK.muted;
+			c.fillText(word, x, y);
+			x += c.measureText(word).width;
+		});
 	}
 
+	/** Terminal: a shell window with the latest commands (and how each ended), the running one marked. */
 	private drawTerminal(): void {
-		const c = this.c;
-		const { contentZone, wall } = this.i;
+		const { contentZone, wall, copy, hide, duration } = this.i;
 		const p = this.scene.places.sandbox.rect;
 		const run = this.running("sandbox") > 0;
-		this.box("sandbox", PLACE_COLOR.sandbox);
-		const x = p.x + 8;
-		const y = p.y + 10 + 30 * this.ts;
-		const w = p.w - 16;
-		const h = p.y + p.h - 8 - y;
-		c.fillStyle = "#070a0e";
-		c.fillRect(x, y, w, h);
+		this.box("sandbox", PLACE_COLOR.sandbox, false);
+		const screen = { x: p.x + 8, y: p.y + 10 + 30 * this.ts, w: p.w - 16, h: p.y + p.h - 8 - (p.y + 10 + 30 * this.ts) };
 		if (contentZone === "sandbox" || contentZone === "testing") {
-			this.listRows("sandbox", x + 6, y + 6, w - 12, 4, 10);
+			plate(this.c, screen, PLACE_COLOR.sandbox, run ? 1 : 0);
+			this.listRows("sandbox", screen.x + 6, screen.y + 18, screen.w - 12, 4, 10);
 			return;
 		}
-		c.save();
-		c.beginPath();
-		c.rect(x, y, w, h);
-		c.clip();
-		const off = run ? (wall / 40) % 9 : 0;
-		const tick = run ? Math.floor(wall / 120) : 0;
-		for (let k = 0; k < 8; k++) {
-			c.fillStyle = rgba(PLACE_COLOR.sandbox, run ? 0.3 + (k === 0 ? 0.5 : 0) : 0.12);
-			c.fillRect(x + 6, y + h - 10 - k * 9 + off, Math.min(w - 12, 12 + ((k * 37 + tick * 13) % 90)), 3);
+		const board = this.board("sandbox");
+		const rows = board.kind === "calls" ? board.rows : [];
+		const label = (r: BoardRow): string => `$ ${callLabel(r.tool, r.mcpServer, r.target, hide, copy.mcpTool)}`;
+		const lines: ShellLine[] = [];
+		for (const r of rows.filter((x) => !x.running).slice(0, 2).reverse()) {
+			lines.push({ text: label(r), colour: INK.fg });
+			lines.push(r.ok === false ? { text: `✗ ${duration(r.runtimeMs)}`, colour: INK.err } : { text: `✓ ${duration(r.runtimeMs)}`, colour: INK.muted });
 		}
-		c.restore();
+		for (const r of rows.filter((x) => x.running)) lines.push({ text: label(r), colour: PLACE_COLOR.sandbox });
+		lines.push(run ? { text: "…", colour: INK.muted } : { text: "$ ", colour: PLACE_COLOR.sandbox });
+		paintShell(this.c, screen, PLACE_COLOR.sandbox, lines, run, wall, this.ts);
 	}
 
+	/** Testing: a bed of cells showing the last run's outcome (green or red), a light travelling it while a run goes. */
 	private drawTesting(): void {
 		const c = this.c;
-		const { contentZone, wall } = this.i;
+		const { contentZone, wall, copy } = this.i;
 		const p = this.scene.places.testing.rect;
 		const run = this.running("testing") > 0;
 		this.box("testing", PLACE_COLOR.testing);
-		if (contentZone === "testing") this.listRows("testing", p.x + 10, p.y + 10 + 30 * this.ts, p.w - 20, 3, 10);
-		// The last test run's result: all green when it passed, one red when it failed, grey before any.
+		if (contentZone === "testing") {
+			this.listRows("testing", p.x + 10, p.y + 10 + 30 * this.ts, p.w - 20, 3, 10);
+			return;
+		}
 		const board = this.board("testing");
 		const last = board.kind === "calls" ? board.rows.find((r) => !r.running) : undefined;
-		for (let k = 0; k < 6; k++) {
-			const grey = "rgba(90,104,122,.5)";
-			c.fillStyle = run ? (Math.sin(wall / 90 + k) > 0 ? INK.warn : grey) : last === undefined ? grey : last.ok === false && k === 2 ? INK.err : INK.ok;
-			c.fillRect(p.x + 12 + k * 22, p.y + p.h - 22, 14, 12);
-		}
+		const state: TestState = run ? "running" : last === undefined ? "none" : last.ok === false ? "fail" : "pass";
+		paintTestBed(c, p, PLACE_COLOR.testing, state, wall);
+		c.font = `500 ${10 * this.ts}px ${MONO}`;
+		c.textBaseline = "top";
+		c.textAlign = "right";
+		c.fillStyle = state === "fail" ? INK.err : state === "pass" ? INK.ok : INK.muted;
+		c.fillText(copy.tests[state === "running" ? "running" : state === "fail" ? "failed" : state === "pass" ? "passed" : "none"], p.x + p.w - 12, p.y + p.h - 20);
+		c.textAlign = "left";
 	}
 
-	/** Git · CI/CD: commit → push → CI → deploy → prod, each step's state and time. */
+	/** Git · CI/CD: the commit graph on the left, the release pipeline (commit, push, CI, deploy, prod) on the right. */
 	private drawGit(): void {
 		const c = this.c;
 		const { look, wall, motion, contentZone, copy, duration, hide } = this.i;
 		const p = this.scene.places.git.rect;
-		this.box("git", PLACE_COLOR.git);
+		this.box("git", PLACE_COLOR.git, true, { noSub: false });
+		paintCommitGraph(c, p, PLACE_COLOR.git, look.commits, this.running("git") > 0, wall, motion, { main: "main", head: "HEAD" }, this.ts);
 		const pipe = look.pipeline;
-		const y = p.y + 12 + 30 * this.ts;
-		const h = 26;
-		const cw = 84;
-		const gap = 18;
-		const x0 = p.x + 12;
+		const y = p.y + 41;
+		const h = 38;
+		const cw = 70;
+		const gap = 12;
+		const x0 = p.x + 198;
 		const colourOf = (s: StepStatus): string => (s === "ok" ? INK.ok : s === "err" ? INK.err : s === "run" ? PLACE_COLOR.git : s === "unknown" ? INK.muted : INK.edge);
 		STAGES.forEach((k, idx) => {
 			const x = x0 + idx * (cw + gap);
@@ -987,7 +991,7 @@ export class InteriorPainter {
 					c.fill();
 				}
 			}
-			this.rr(x, y, cw, h, 4);
+			this.rr(x, y, cw, h, 5);
 			c.fillStyle = st.status === "run" ? rgba(PLACE_COLOR.git, 0.14 + 0.1 * Math.sin(wall / 160)) : "#151c26";
 			c.fill();
 			c.strokeStyle = col;
@@ -998,19 +1002,18 @@ export class InteriorPainter {
 				// No percent is known: an indeterminate sweep.
 				const f = ((wall - started) / 1100) % 1;
 				c.fillStyle = PLACE_COLOR.git;
-				c.fillRect(x + 3 + (cw - 30) * f, y + h - 4, 24, 2);
+				c.fillRect(x + 4 + (cw - 32) * f, y + h - 5, 24, 2);
 			}
+			c.textAlign = "center";
+			c.textBaseline = "top";
 			c.font = `600 ${11 * this.ts}px ${MONO}`;
 			c.fillStyle = st.status === "idle" ? INK.muted : INK.fg;
-			c.textBaseline = "middle";
-			c.textAlign = "left";
-			c.fillText(copy.steps[k], x + 8, y + h / 2 - 1);
-			c.font = `400 ${10.5 * this.ts}px ${MONO}`;
+			c.fillText(copy.steps[k], x + cw / 2, y + 6);
+			c.font = `400 ${10 * this.ts}px ${MONO}`;
 			c.fillStyle = col;
-			c.textAlign = "right";
 			const value =
-				st.status === "run" ? duration(Math.max(0, wall - started)) : st.status === "ok" ? `✓ ${duration(st.durationMs ?? 0)}` : st.status === "err" ? copy.stepFailed : st.status === "unknown" ? copy.stepUnknown : "";
-			c.fillText(value, x + cw - 6, y + h / 2 - 1);
+				st.status === "run" ? duration(Math.max(0, wall - started)) : st.status === "ok" ? `✓ ${duration(st.durationMs ?? 0)}` : st.status === "err" ? copy.stepFailed : st.status === "unknown" ? copy.stepUnknown : "–";
+			c.fillText(value, x + cw / 2, y + 21);
 			c.textAlign = "left";
 		});
 		const dx = x0 + 4 * (cw + gap) - 4;
@@ -1018,18 +1021,19 @@ export class InteriorPainter {
 		const ok = pipe.prod && deploy.status === "ok";
 		const doneAt = (deploy.startedAt ?? 0) + (deploy.durationMs ?? 0);
 		const live = ok && motion ? Math.max(0, 1 - (wall - doneAt) / PROD_RING_MS) : 0;
+		const my = y + h / 2;
 		c.strokeStyle = ok ? rgba(INK.ok, 0.6) : INK.edge;
 		c.beginPath();
-		c.moveTo(dx - gap + 4, y + h / 2);
-		c.lineTo(dx + 3, y + h / 2);
+		c.moveTo(dx - gap + 4, my);
+		c.lineTo(dx + 3, my);
 		c.stroke();
 		c.beginPath();
-		c.arc(dx + 10, y + h / 2, 7, 0, 7);
+		c.arc(dx + 10, my, 7, 0, 7);
 		c.fillStyle = ok ? INK.ok : "#1d2632";
 		c.fill();
 		if (live > 0) {
 			c.beginPath();
-			c.arc(dx + 10, y + h / 2, 7 + (1 - live) * 22, 0, 7);
+			c.arc(dx + 10, my, 7 + (1 - live) * 22, 0, 7);
 			c.strokeStyle = rgba(INK.ok, live);
 			c.stroke();
 		}
@@ -1043,32 +1047,37 @@ export class InteriorPainter {
 			if (r !== undefined) {
 				c.font = `400 ${10.5 * this.ts}px ${MONO}`;
 				c.fillStyle = INK.fg;
-				c.fillText(clip(hide || r.target === "" ? r.tool : `${r.tool} ${r.target}`, p.w - 180, 10.5), p.x + 170, p.y + 10);
+				c.fillText(clip(hide || r.target === "" ? r.tool : `${r.tool} ${r.target}`, p.w - 260, 10.5), p.x + 250, p.y + 10);
 			}
 		}
 	}
 
-	/** Memory, skills, the input port and the permission lock: small modules at the edges. */
+	/** Memory, skills, the input port and the permission lock: small modules at the edges, each with a mark that lights when used. */
 	private drawSmall(): void {
 		const c = this.c;
-		const { look } = this.i;
-		this.withAlpha("memory", () => this.box("memory", PLACE_COLOR.memory));
-		this.withAlpha("skills", () => this.box("skills", PLACE_COLOR.skills));
-		this.withAlpha("user-desk", () => this.box("user-desk", PLACE_COLOR["user-desk"], false));
+		const { look, wall } = this.i;
+		const markAt = (place: PlaceId): { x: number; y: number } => {
+			const r = this.scene.places[place].rect;
+			return { x: r.x + r.w - 32, y: r.y + (r.h - 24) / 2 };
+		};
+		this.withAlpha("memory", () => {
+			this.box("memory", PLACE_COLOR.memory, false, { iconW: 34 });
+			const m = markAt("memory");
+			paintMemoryChip(c, m.x, m.y, 24, PLACE_COLOR.memory, this.glowOf("memory"));
+		});
+		this.withAlpha("skills", () => {
+			this.box("skills", PLACE_COLOR.skills, false, { iconW: 34 });
+			const m = markAt("skills");
+			paintSkillBolt(c, m.x, m.y, 24, PLACE_COLOR.skills, this.glowOf("skills"));
+		});
+		this.withAlpha("user-desk", () => {
+			this.box("user-desk", PLACE_COLOR["user-desk"], false);
+			paintPromptPort(c, this.scene.places["user-desk"].rect, PLACE_COLOR["user-desk"], this.glowOf("user-desk"), wall, this.ts);
+		});
 		c.globalAlpha = this.presence("security");
-		this.box("security", INK.warn, false);
-		const p = this.scene.places.security.rect;
-		const lx = p.x + p.w - 16;
-		const ly = p.y + 22;
-		const waiting = look.mode === "wait";
-		c.strokeStyle = waiting ? INK.warn : INK.muted;
-		c.lineWidth = 2;
-		c.beginPath();
-		c.arc(lx, ly - (waiting ? 0 : 3), 4, Math.PI, 0);
-		c.stroke();
-		c.lineWidth = 1;
-		c.fillStyle = waiting ? INK.warn : INK.muted;
-		c.fillRect(lx - 6, ly, 12, 9);
+		this.box("security", INK.warn, false, { iconW: 14 });
+		const r = this.scene.places.security.rect;
+		paintPermissionShield(c, r.x + r.w - 26, r.y + (r.h - 24) / 2, look.mode === "wait", wall);
 		c.globalAlpha = 1;
 	}
 }

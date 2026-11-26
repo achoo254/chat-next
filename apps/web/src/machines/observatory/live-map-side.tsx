@@ -1,7 +1,8 @@
 // The column beside the Live Map's scene, as the approved design lays it out
 // (prototype v6), above the event list (event-feed.tsx):
 //
-// - "Phiên": the session's model and four gauges (context fill, output
+// - "Phiên" (beside the activity card, above the scene): the session's model
+//   and four gauges with their icons (context fill with a small bar, output
 //   speed, tool calls, running subagents), with "Ẩn chi tiết";
 // - "Chi tiết": what the viewer picked, worked out from the session's own
 //   events (no request to the machine but a call's content):
@@ -22,6 +23,7 @@ import { callLabel, clock, duration, eventLabel, ruleName, toolName } from "./dr
 import type { LiveMapState } from "./live-map-state.ts";
 import type { LiveMapEvent } from "./live-map-types.ts";
 import { useObservatoryCopy, type ObservatoryCopy } from "./observatory-copy.ts";
+import { Ico } from "./observe-icons.tsx";
 import { pipelineOf } from "./pipeline-model.ts";
 import { STATION_PLACE, type PlaceId } from "./render/scene-table.ts";
 import { stationOf, STATION_CODES } from "./station-catalog.ts";
@@ -60,23 +62,40 @@ export function SessionBox({ state, hide, hideLabel, hideHint, approxHint, onHid
 	const tps = modeOf(state) === "think" ? (state.live?.tokensPerSecond ?? state.scene.tokensPerSecond ?? 0) : 0;
 	const subagents = Object.values(state.scene.subagents).filter((s) => s.running).length;
 	return (
-		<div className="lm-box" data-id="observe-session">
+		<div className="lm-box lm-session" data-id="observe-session">
 			<h2>
 				<span>{c.side.session}</span>
 				<span>{model}</span>
 			</h2>
 			<div className="lm-gauges" data-id="observe-meta">
-				<span data-id="observe-context" title={assumed ? approxHint : undefined}>
-					{c.side.context} <b>{percent === null ? "–" : `${assumed ? "~" : ""}${Math.round(percent)}%`}</b>
+				<span className="lm-g" data-id="observe-context" title={assumed ? approxHint : undefined}>
+					<Ico name="layers" />
+					<span>{c.side.context}</span>
+					{" "}
+					<b>{percent === null ? "–" : `${assumed ? "~" : ""}${Math.round(percent)}%`}</b>
+					<span className="lm-mini" aria-hidden="true">
+						<i style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
+					</span>
 				</span>
-				<span>
-					{c.side.speed} <b>{Math.round(tps)}</b> {c.side.tokPerSec}
+				<span className="lm-g">
+					<Ico name="pulse" />
+					<span>{c.side.speed}</span>
+					{" "}
+					<b>
+						{Math.round(tps)} {c.side.tokPerSec}
+					</b>
 				</span>
-				<span>
-					{c.side.tools} <b>{toolCalls(state).length}</b>
+				<span className="lm-g">
+					<Ico name="tools" />
+					<span>{c.side.tools}</span>
+					{" "}
+					<b>{toolCalls(state).length}</b>
 				</span>
-				<span>
-					{c.side.subagents} <b>{subagents}</b>
+				<span className="lm-g">
+					<Ico name="nodes" />
+					<span>{c.side.subagents}</span>
+					{" "}
+					<b>{subagents}</b>
 				</span>
 			</div>
 			<label className="lm-toggle" title={hideHint}>

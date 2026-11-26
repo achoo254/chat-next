@@ -30,7 +30,7 @@ function show(state: LiveMapState, now: number, { hide = false, fake = null as F
 	const source = fake === null ? null : { link: fake.link, sessionId: "s1", online: true };
 	const view = render(
 		<I18nProvider>
-			<ActivityCard card={activityCardOf(state, now)} names={names} hide={hide} source={source} tokensPerSecond={null} contextPercent={null} onDetail={onDetail} />
+			<ActivityCard card={activityCardOf(state, now)} names={names} hide={hide} source={source} onDetail={onDetail} />
 		</I18nProvider>,
 	);
 	const text = (id: string): string => view.container.querySelector(`[data-id=${id}]`)?.textContent ?? "";
@@ -53,8 +53,9 @@ describe("the activity card", () => {
 		expect(text("observe-card-status")).toBe(c.card.status.run);
 		expect(text("observe-card-kind")).toBe(`${c.card.running} · ${names.testing}`);
 		expect(text("observe-card-what")).toBe("Bash pnpm");
-		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 2 s`);
-		expect(text("observe-card-history")).toBe(c.card.noHistory);
+		expect(text("observe-card-runtime")).toBe("2 s");
+		expect(text("observe-card-history")).toBe(c.side.none);
+		expect(text("observe-card-calls")).toBe("1");
 		const bar = container.querySelector("[data-id=observe-card-bar]");
 		expect(bar?.getAttribute("role")).toBe("progressbar");
 		expect(bar?.hasAttribute("aria-valuenow")).toBe(false);
@@ -63,8 +64,10 @@ describe("the activity card", () => {
 
 	it("keeps Runtime and the p95 history apart, and says when the run is longer than that p95", () => {
 		const { text } = show(played([prompt(1, 0), tool("a", 10, { station: "TESTING", success: true, durationMs: 1_000 }), bash(2_000)]).state, T0 + 6_000);
-		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 4 s`);
-		expect(text("observe-card-history")).toBe(`${c.card.p95} 1 s ${c.card.historyCount(1)} · ${c.card.overP95}`);
+		expect(text("observe-card-runtime")).toBe("4 s");
+		expect(text("observe-card-history")).toBe(`1 s ${c.card.historyCount(1)}`);
+		expect(text("observe-card-calls")).toBe("2");
+		expect(text("observe-card-over")).toBe(c.card.overP95);
 	});
 
 	it("once the call ended asks its content by id and shows the description and the output's last line", async () => {
@@ -136,23 +139,24 @@ describe("the activity card", () => {
 			const { container, unmount } = show(state, now);
 			const card = container.querySelector("[data-id=observe-card]");
 			// The row each child is (its first class); a modifier such as an idle bar's `is-off` keeps the row.
-			const out = [...(card?.children ?? [])].map((el) => el.className.split(" ")[0] ?? "");
+			const rowOf = (el: Element): string => el.className.split(" ")[0] ?? "";
+			const out = [...(card?.children ?? [])].flatMap((el) => [rowOf(el), ...(rowOf(el) === "lm-card-main" ? [...el.children].map(rowOf) : [])]);
 			unmount();
 			return out;
 		};
 		const idle = rows(played([]).state, T0);
 		expect(idle).toEqual(rows(played([prompt(1, 0), bash(10)]).state, T0 + 2_010));
 		expect(idle).toEqual(rows(played([prompt(1, 0), api("a", 5)]).state, T0 + 100));
-		expect(idle).toEqual(["sr-only", "lm-card-k", "lm-card-what", "lm-card-desc", "lm-bar", "lm-card-out", "lm-card-foot", "lm-journey"]);
+		expect(idle).toEqual(["sr-only", "lm-card-main", "lm-card-k", "lm-card-what", "lm-card-desc", "lm-bar", "lm-card-out", "lm-card-stats", "lm-card-trail"]);
 	});
 
-	it("lists the whole journey (no step cut with …), its label once", () => {
+	it("lists the whole journey as chips (no step cut with … when they fit), its label once", () => {
 		const reads = Array.from({ length: 6 }, (_, i) => [tool(`f${i}`, 10 + i * 100, { success: true, durationMs: 5 }), tool(`b${i}`, 60 + i * 100, { toolName: "Bash", station: "SANDBOX", success: true, durationMs: 5 })]).flat();
 		const { container } = show(played([prompt(1, 0), ...reads]).state, T0 + 5_000);
 		const journey = container.querySelector("[data-id=observe-card-journey]");
-		expect(journey?.querySelectorAll(".lm-journey-step")).toHaveLength(12);
+		expect(journey?.querySelectorAll(".lm-trail-step")).toHaveLength(12);
 		expect(journey?.textContent).not.toContain("…");
-		expect(journey?.textContent?.startsWith(`${c.card.journey}:`)).toBe(true);
+		expect(container.querySelector(".lm-card-journey-label")?.textContent).toBe(c.card.journey);
 	});
 
 	it("names a subagent of an unknown type from the copy, and says its status to screen readers only when the subject changes", () => {
@@ -167,10 +171,10 @@ describe("the activity card", () => {
 		// The runtime ticks; the spoken status does not.
 		rerender(
 			<I18nProvider>
-				<ActivityCard card={activityCardOf(sub.state, T0 + 5_000)} names={names} hide={false} source={null} tokensPerSecond={null} contextPercent={null} onDetail={() => undefined} />
+				<ActivityCard card={activityCardOf(sub.state, T0 + 5_000)} names={names} hide={false} source={null} onDetail={() => undefined} />
 			</I18nProvider>,
 		);
-		expect(text("observe-card-runtime")).toBe(`${c.card.runtime} 5 s`);
+		expect(text("observe-card-runtime")).toBe("5 s");
 		expect(container.querySelector("[data-id=observe-card-live]")?.textContent).toBe(spoken);
 		expect(spoken).not.toContain("5 s");
 	});
