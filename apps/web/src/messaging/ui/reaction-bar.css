@@ -1,8 +1,10 @@
 /* Quick reactions over the emoji button (reaction-bar.tsx). The row follows the button in the bubble and is mounted on the first
    hover, so it is shown by an animation: a beat after the pointer rests on the button, so a passing pointer does not flash it;
    it stays while the pointer is on it, and a moment after. A picked emoji closes it (reaction-bar.tsx onDone). */
-.react-bar { position: absolute; bottom: 26px; left: 50%; translate: -50% 0; z-index: 2; display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-md); visibility: hidden; transform-origin: bottom center; transition: visibility 0s linear 400ms; }
-/* Centred over the bubble, a little away from the button: it lingers a moment after the pointer leaves, so moving onto it never hides it. */
+.react-bar { position: absolute; bottom: 26px; left: calc(100% + 4px); translate: -50% 0; z-index: 2; display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-full); border: 1px solid var(--c-border-subtle); background: var(--c-surface); box-shadow: var(--shadow-md); visibility: hidden; transform-origin: bottom center; transition: visibility 0s linear 400ms; }
+/* Centred over the emoji button (.msg-react: 24px wide, 8px inside the bubble's far edge, so its centre is 4px past that edge;
+   yours sits on the near edge). It lingers a moment after the pointer leaves, so moving onto it never hides it. */
+.msg.mine .react-bar { left: -4px; }
 .msg-react:hover + .react-bar, .react-bar:hover { visibility: visible; transition-delay: 0s; animation: react-bar-in 140ms var(--ease-standard) 250ms backwards; }
 @keyframes react-bar-in { from { visibility: hidden; opacity: 0; transform: translateY(4px) scale(0.92); } }
 .react-bar > button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; font-size: 1.25rem; line-height: 1; transition: transform 120ms var(--ease-standard); }
