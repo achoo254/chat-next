@@ -23,10 +23,10 @@ func TestPermissionsAndRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 	seq := h.send(member, chatID, "pin me").GetMessage().GetSeq()
-	if _, err := h.svc.PinMessage(ctx, member, chatID, seq); codeOf(err) != connect.CodePermissionDenied {
+	if _, err := h.svc.PinMessage(ctx, member, chatID, seq, false); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("member pins without the permission: %v", err)
 	}
-	if _, err := h.svc.PinMessage(ctx, admin, chatID, seq); err != nil {
+	if _, err := h.svc.PinMessage(ctx, admin, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	if c, _, _ := h.svc.GetChat(ctx, member, chatID); c.GetPinnedSeq() != seq {

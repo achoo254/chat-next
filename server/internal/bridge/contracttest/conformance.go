@@ -246,7 +246,7 @@ func checkPins(t *testing.T, s Subject) {
 		times  int
 	}{{true, 2}, {false, 2}} {
 		for i := 0; i < step.times; i++ {
-			if err := pinner.PinMessage(ctx, s.Account, s.Conversation, id, step.pinned); err != nil {
+			if err := pinner.PinMessage(ctx, s.Account, s.Conversation, id, step.pinned, true); err != nil {
 				if errors.Is(err, bridge.ErrNotAllowed) {
 					t.Skipf("the test account may not pin here: %v", err)
 				}

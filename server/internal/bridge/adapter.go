@@ -526,7 +526,8 @@ type PinReader interface {
 // already pinned, or unpinning what is not, succeeds without effect.
 type Pinner interface {
 	// PinMessage pins or unpins one message, without notifying the members.
-	PinMessage(ctx context.Context, acct Account, conv, id string, pinned bool) error
+	// silent pins without telling the members (unpinning tells nobody).
+	PinMessage(ctx context.Context, acct Account, conv, id string, pinned, silent bool) error
 	// PinTopic pins or unpins a topic of a forum conversation.
 	PinTopic(ctx context.Context, acct Account, conv, topic string, pinned bool) error
 }

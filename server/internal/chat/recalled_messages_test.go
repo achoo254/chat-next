@@ -75,7 +75,7 @@ func TestRecalledMessagesKeepAPlaceholder(t *testing.T) {
 	if _, err := h.svc.SetReaction(ctx, bob, chatID, recalled, "❤️"); codeOf(err) != connect.CodeNotFound {
 		t.Fatalf("react to recalled: %v", err)
 	}
-	if _, err := h.svc.PinMessage(ctx, alice, chatID, recalled); codeOf(err) != connect.CodeNotFound {
+	if _, err := h.svc.PinMessage(ctx, alice, chatID, recalled, false); codeOf(err) != connect.CodeNotFound {
 		t.Fatalf("pin recalled: %v", err)
 	}
 	if _, err := h.svc.SendMessage(ctx, bob, &appv1.SendMessageRequest{ChatId: chatID, Text: "re", ReplyToSeq: recalled}); codeOf(err) != connect.CodeInvalidArgument {

@@ -299,7 +299,7 @@ func (s *Service) pinOrUnpin(ctx context.Context, r *http.Request, bot *botadmin
 		if err = s.allowSend(bot, req.ChatID); err != nil {
 			return nil, err
 		}
-		_, err = s.chat.PinMessage(ctx, bot.ID, req.ChatID, req.Seq)
+		_, err = s.chat.PinMessage(ctx, bot.ID, req.ChatID, req.Seq, false)
 	} else {
 		_, err = s.chat.UnpinMessage(ctx, bot.ID, req.ChatID, req.Seq)
 	}

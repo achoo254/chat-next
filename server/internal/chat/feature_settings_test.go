@@ -44,7 +44,7 @@ func TestAFeatureSetOnItsOwnOverridesTheMessagesForThatFeatureOnly(t *testing.T)
 	if err := h.svc.SetImportedFeature(ctx, owner, chatID, feature.Pins, feature.In); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.svc.PinMessage(ctx, owner, chatID, seq); err != nil {
+	if _, err := h.svc.PinMessage(ctx, owner, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	if rows := h.outboxRows(chatID, seq); !equalStrings(rows, []string{"send:pending"}) {
@@ -76,7 +76,7 @@ func TestAFeatureSetOnItsOwnOverridesTheMessagesForThatFeatureOnly(t *testing.T)
 	if err := h.svc.SetImportedFeature(ctx, owner, reads, feature.Pins, feature.Both); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.svc.PinMessage(ctx, owner, reads, pseq); err != nil {
+	if _, err := h.svc.PinMessage(ctx, owner, reads, pseq, false); err != nil {
 		t.Fatal(err)
 	}
 	if rows := h.outboxRows(reads, pseq); !equalStrings(rows, []string{"pin_message:pending"}) {
@@ -91,7 +91,7 @@ func TestTurningAFeatureSoItNoLongerSendsCancelsWhatItQueued(t *testing.T) {
 	chatID := h.group(owner)
 	h.linkChat(owner, chatID, DirectionBoth)
 	seq := h.send(owner, chatID, "tin").GetMessage().GetSeq()
-	if _, err := h.svc.PinMessage(ctx, owner, chatID, seq); err != nil {
+	if _, err := h.svc.PinMessage(ctx, owner, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.svc.SetImportedFeature(ctx, owner, chatID, feature.Pins, feature.Off); err != nil {

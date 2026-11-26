@@ -85,7 +85,7 @@ func TestImportSetPinnedSkipsServiceMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The service message the real PinMessage posts is itself never pinnable.
-	if _, err := h.svc.PinMessage(ctx, owner, chatID, seqs[0]); err != nil {
+	if _, err := h.svc.PinMessage(ctx, owner, chatID, seqs[0], false); err != nil {
 		t.Fatal(err)
 	}
 	var serviceSeq int64

@@ -86,7 +86,7 @@ func TestAFeatureSwitchedOffNoLongerReceivesOrSends(t *testing.T) {
 	}
 	// outbound: pinning in Chat is not queued
 	seq := e.seqOf(chatID, "m1")
-	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq); err != nil {
+	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	if n := e.pinRows(chatID); n != 0 {
@@ -106,7 +106,7 @@ func TestARowQueuedBeforeAFeatureWasSwitchedOffIsNotSent(t *testing.T) {
 	chatID := e.twoWay()
 	seq := e.seqOf(chatID, "m1")
 	e.stop() // the row waits in the outbox
-	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq); err != nil {
+	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	// switched off behind the back of the chat service (an older server, a manual change)

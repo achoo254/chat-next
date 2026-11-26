@@ -1618,8 +1618,10 @@ func uniqueSorted0(xs []int64) []int64 {
 
 // ----------------------------------------------------------------- pins
 
-// PinMessage pins a message and posts the pinned-message service message.
-func (s *Service) PinMessage(ctx context.Context, me, chatID, seq int64) (*appv1.SyncAck, error) {
+// PinMessage pins a message and posts the pinned-message service message. silent pins
+// without telling the members, which matters in the other app of a synced chat (Telegram
+// notifies the group of a pin unless told not to); the service line never pushes.
+func (s *Service) PinMessage(ctx context.Context, me, chatID, seq int64, silent bool) (*appv1.SyncAck, error) {
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}
@@ -1645,7 +1647,7 @@ func (s *Service) PinMessage(ctx context.Context, me, chatID, seq int64) (*appv1
 		if tag.RowsAffected() == 0 {
 			return nil
 		}
-		if err := t.queuePin(ctx, chatID, me, seq, true); err != nil {
+		if err := t.queuePin(ctx, chatID, me, seq, true, silent); err != nil {
 			return err
 		}
 		if err := t.refreshPinned(ctx, c); err != nil {
@@ -1692,7 +1694,7 @@ func (s *Service) UnpinMessage(ctx context.Context, me, chatID, seq int64) (*app
 		if tag.RowsAffected() == 0 {
 			return nil
 		}
-		if err := t.queuePin(ctx, chatID, me, seq, false); err != nil {
+		if err := t.queuePin(ctx, chatID, me, seq, false, true); err != nil {
 			return err
 		}
 		if err := t.refreshPinned(ctx, c); err != nil {
@@ -1747,7 +1749,7 @@ func (s *Service) UnpinAllMessages(ctx context.Context, me, chatID, topicID int6
 		}
 		slices.Sort(unpinned)
 		for _, seq := range unpinned {
-			if err := t.queuePin(ctx, chatID, me, seq, false); err != nil {
+			if err := t.queuePin(ctx, chatID, me, seq, false, true); err != nil {
 				return err
 			}
 		}

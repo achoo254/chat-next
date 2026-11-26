@@ -15,27 +15,29 @@ import (
 // queuePinOp queues the state wanted for a message (op pin_message, seq the
 // message) or a topic (op pin_topic, seq the topic id) of me, if its chat goes
 // to another app.
-func (t *txn) queuePinOp(ctx context.Context, chatID, me, seq int64, feat feature.Feature, op string, pinned bool) error {
+// silent rides in the payload: whether the other app tells the members of the pin.
+func (t *txn) queuePinOp(ctx context.Context, chatID, me, seq int64, feat feature.Feature, op string, pinned, silent bool) error {
 	l, err := t.outboundLink(ctx, chatID, me, feat)
 	if err != nil || l == nil {
 		return err
 	}
 	if _, err := t.tx.Exec(ctx, `
-		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, pinned) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, pinned, payload)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, jsonb_build_object('silent', $8::bool))
 		ON CONFLICT (chat_id, seq, op) DO UPDATE
-			SET pinned = EXCLUDED.pinned, status = 'pending', attempts = 0, next_attempt_at = now(), last_error = '', updated_at = now()`,
-		l.accountID, l.externalID, chatID, seq, op, string(feat), pinned); err != nil {
+			SET pinned = EXCLUDED.pinned, payload = EXCLUDED.payload, status = 'pending', attempts = 0, next_attempt_at = now(), last_error = '', updated_at = now()`,
+		l.accountID, l.externalID, chatID, seq, op, string(feat), pinned, silent); err != nil {
 		return fmt.Errorf("chat: queue %s: %w", op, err)
 	}
 	return nil
 }
 
-func (t *txn) queuePin(ctx context.Context, chatID, me, seq int64, pinned bool) error {
-	return t.queuePinOp(ctx, chatID, me, seq, feature.Pins, "pin_message", pinned)
+func (t *txn) queuePin(ctx context.Context, chatID, me, seq int64, pinned, silent bool) error {
+	return t.queuePinOp(ctx, chatID, me, seq, feature.Pins, "pin_message", pinned, silent)
 }
 
 func (t *txn) queueTopicPin(ctx context.Context, chatID, me, topicID int64, pinned bool) error {
-	return t.queuePinOp(ctx, chatID, me, topicID, feature.Topics, "pin_topic", pinned)
+	return t.queuePinOp(ctx, chatID, me, topicID, feature.Topics, "pin_topic", pinned, true)
 }
 
 // mayPinTopicOutward reports whether me may change the pin of a topic of a

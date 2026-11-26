@@ -34,7 +34,7 @@ Chat với một bot của Telegram nằm ở mục **Bot** của thanh trái, h
 ## Ghim
 
 - **Từ Telegram sang Chat:** khi bật đồng bộ, các tin đã ghim ở Telegram (nằm trong cửa sổ lịch sử đã nhập) được ghim trong Chat; ghim và bỏ ghim tin, ghim và bỏ ghim topic ở Telegram hiện sang Chat ngay. Chat đồng bộ từ trước nhận ghim khi server chạy lại. Tin ghim cũ hơn cửa sổ lịch sử không có trong Chat nên không ghim được (nhóm làm việc thường ghim tin rất cũ). Chat không thêm dòng "đã ghim" cho ghim đến từ Telegram.
-- **Từ Chat sang Telegram (chat hai chiều):** ghim, bỏ ghim tin và **ghim topic** (menu chuột phải của topic chỉ còn mục Ghim) đổi theo ở Telegram, im lặng (không báo thành viên). Cần quyền ghim ở nhóm Telegram. Nếu Telegram từ chối (không phải quản trị viên, ghim quá nhiều) thì Chat trả ghim về như cũ và báo "Telegram không cho ghim…". Chat chỉ đọc giữ ghim riêng trong Chat, không gửi gì ra ngoài. Tên, màu, đóng và ẩn topic vẫn chỉ đổi ở Telegram.
+- **Từ Chat sang Telegram (chat hai chiều):** ghim, bỏ ghim tin và **ghim topic** (menu chuột phải của topic chỉ còn mục Ghim) đổi theo ở Telegram, báo thành viên hay im lặng theo lựa chọn «Thông báo cho mọi thành viên» khi ghim (bỏ ghim luôn im lặng; hàng ghim xếp trước khi có lựa chọn này vẫn im lặng). Cần quyền ghim ở nhóm Telegram. Nếu Telegram từ chối (không phải quản trị viên, ghim quá nhiều) thì Chat trả ghim về như cũ và báo "Telegram không cho ghim…". Chat chỉ đọc giữ ghim riêng trong Chat, không gửi gì ra ngoài. Tên, màu, đóng và ẩn topic vẫn chỉ đổi ở Telegram.
 - Sau khi ghim tin từ Chat, Telegram đăng một dòng "đã ghim tin nhắn" trong nhóm cho mọi người thấy; bỏ ghim thì không có dòng nào.
 
 ## Tính năng của từng chat

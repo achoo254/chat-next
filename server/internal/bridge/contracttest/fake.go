@@ -504,6 +504,8 @@ type PinCall struct {
 	Message      string
 	Topic        string
 	Pinned       bool
+	// Silent: a pin that does not tell the members.
+	Silent bool
 }
 
 // FailTopicEdits makes every topic edit return err until it is called with nil.
@@ -538,7 +540,7 @@ func (f *Fake) nextPinFailure() error {
 
 // PinMessage implements bridge.Pinner; like the other app it tells the account
 // owner what changed (EchoSent).
-func (f *Fake) PinMessage(_ context.Context, _ bridge.Account, conv, id string, pinned bool) error {
+func (f *Fake) PinMessage(_ context.Context, _ bridge.Account, conv, id string, pinned, silent bool) error {
 	if !f.canWrite(feature.Pins) {
 		return fmt.Errorf("%w: this app does not take pins from Chat", bridge.ErrNotAllowed)
 	}
@@ -547,7 +549,7 @@ func (f *Fake) PinMessage(_ context.Context, _ bridge.Account, conv, id string, 
 		f.mu.Unlock()
 		return err
 	}
-	f.pinCalls = append(f.pinCalls, PinCall{Conversation: conv, Message: id, Pinned: pinned})
+	f.pinCalls = append(f.pinCalls, PinCall{Conversation: conv, Message: id, Pinned: pinned, Silent: silent})
 	list := slices.DeleteFunc(append([]string(nil), f.pinned[conv]...), func(x string) bool { return x == id })
 	if pinned {
 		list = append([]string{id}, list...)

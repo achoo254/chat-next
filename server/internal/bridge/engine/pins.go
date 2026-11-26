@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"app.local/server/internal/bridge"
@@ -126,7 +127,12 @@ func (r *runner) doPin(ctx context.Context, sender bridge.Sender, h *outboxRow, 
 	if topic {
 		err = pinner.PinTopic(ctx, r.acct, conv, ext, h.Pinned)
 	} else {
-		err = pinner.PinMessage(ctx, r.acct, conv, ext, h.Pinned)
+		// A row queued before the choice existed has no payload: it stays silent, as pins were.
+		var p struct {
+			Silent *bool `json:"silent"`
+		}
+		_ = json.Unmarshal(h.Payload, &p)
+		err = pinner.PinMessage(ctx, r.acct, conv, ext, h.Pinned, p.Silent == nil || *p.Silent)
 	}
 	if err != nil {
 		if serr := r.settleCall(ctx, []*outboxRow{h}, err); serr != nil {

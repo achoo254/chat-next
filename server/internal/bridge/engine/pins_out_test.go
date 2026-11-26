@@ -52,12 +52,12 @@ func TestPinningAndUnpinningInChatReachTheOtherApp(t *testing.T) {
 	ctx := context.Background()
 	chatID := e.twoWay()
 	seq := e.seqOf(chatID, "m1")
-	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq); err != nil {
+	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	e.waitOutbox(chatID, seq, "pin_message", "sent")
-	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1 m1  true}]" {
-		t.Fatalf("pins = %v, want m1 pinned in g1", got)
+	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1 m1  true false}]" {
+		t.Fatalf("pins = %v, want m1 pinned in g1, telling the members", got)
 	}
 	// The other app tells the owner about the pin (EchoSent); Chat is already
 	// there and stays pinned once.
@@ -82,7 +82,7 @@ func TestPinsMadeInQuickSuccessionSendOnlyTheLastState(t *testing.T) {
 	for _, pin := range []bool{true, false, true, false} {
 		var err error
 		if pin {
-			_, err = e.chat.PinMessage(ctx, e.owner, chatID, seq)
+			_, err = e.chat.PinMessage(ctx, e.owner, chatID, seq, false)
 		} else {
 			_, err = e.chat.UnpinMessage(ctx, e.owner, chatID, seq)
 		}
@@ -95,7 +95,7 @@ func TestPinsMadeInQuickSuccessionSendOnlyTheLastState(t *testing.T) {
 	}
 	e.start()
 	e.waitOutbox(chatID, seq, "pin_message", "sent")
-	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1 m1  false}]" {
+	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1 m1  false true}]" {
 		t.Fatalf("pins = %v, want the one unpin (the last state)", got)
 	}
 }
@@ -106,7 +106,7 @@ func TestAPinTheOtherAppRefusesIsPutBackInChat(t *testing.T) {
 	chatID := e.twoWay()
 	seq := e.seqOf(chatID, "m2")
 	e.fake.FailPin(fmt.Errorf("%w: CHAT_ADMIN_REQUIRED", bridge.ErrNotAllowed))
-	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq); err != nil {
+	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq, false); err != nil {
 		t.Fatal(err)
 	}
 	e.waitOutbox(chatID, seq, "pin_message", "failed")
@@ -132,7 +132,7 @@ func TestAChatThatOnlyReadsKeepsItsPinsToItself(t *testing.T) {
 	e.fake.AddHistory("g1", e.msg("m1", lan, "tin 1", 1))
 	chatID := e.enable(conv, 100)
 	e.waitTexts(chatID, []string{"tin 1"})
-	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, e.seqOf(chatID, "m1")); err != nil {
+	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, e.seqOf(chatID, "m1"), false); err != nil {
 		t.Fatal(err)
 	}
 	e.waitPinned(chatID, []string{"tin 1"})
@@ -158,7 +158,7 @@ func TestPinningATopicInChatPinsItInTheOtherAppAndWhatTheAppFixesStaysRefused(t 
 		t.Fatal(err)
 	}
 	e.waitOutbox(chatID, topic, "pin_topic", "sent")
-	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1  7 true}]" {
+	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1  7 true false}]" {
 		t.Fatalf("pins = %v, want topic 7 pinned in g1", got)
 	}
 	if !e.topicPinned(chatID, "Hạ tầng") {
@@ -196,3 +196,17 @@ func TestATopicPinTheOtherAppRefusesIsPutBackInChat(t *testing.T) {
 }
 
 var _ = contracttest.PinCall{}
+
+func TestAQuietPinInChatIsQuietInTheOtherApp(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	chatID := e.twoWay()
+	seq := e.seqOf(chatID, "m2")
+	if _, err := e.chat.PinMessage(ctx, e.owner, chatID, seq, true); err != nil {
+		t.Fatal(err)
+	}
+	e.waitOutbox(chatID, seq, "pin_message", "sent")
+	if got := fmt.Sprint(e.fake.Pins()); got != "[{g1 m2  true true}]" {
+		t.Fatalf("pins = %v, want m2 pinned quietly", got)
+	}
+}

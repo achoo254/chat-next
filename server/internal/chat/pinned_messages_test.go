@@ -30,7 +30,7 @@ func (h *harness) pinned(me, chatID, topicID, offset int64, limit int32) *appv1.
 
 func (h *harness) pin(me, chatID, seq int64) {
 	h.t.Helper()
-	if _, err := h.svc.PinMessage(context.Background(), me, chatID, seq); err != nil {
+	if _, err := h.svc.PinMessage(context.Background(), me, chatID, seq, false); err != nil {
 		h.t.Fatal(err)
 	}
 }

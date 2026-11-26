@@ -141,8 +141,8 @@ func translatePin(err error) error {
 	return translateSend(err)
 }
 
-// PinMessage implements bridge.Pinner. Pinning is silent: it does not notify the members.
-func (a *Adapter) PinMessage(ctx context.Context, acct bridge.Account, conv, id string, pinned bool) error {
+// PinMessage implements bridge.Pinner. A silent pin does not notify the members.
+func (a *Adapter) PinMessage(ctx context.Context, acct bridge.Account, conv, id string, pinned, silent bool) error {
 	mid, err := strconv.Atoi(id)
 	if err != nil {
 		return fmt.Errorf("telegram: bad message id %q", id)
@@ -156,7 +156,7 @@ func (a *Adapter) PinMessage(ctx context.Context, acct bridge.Account, conv, id 
 	if err != nil {
 		return err
 	}
-	_, err = c.live.api().MessagesUpdatePinnedMessage(ctx, &tg.MessagesUpdatePinnedMessageRequest{Peer: peer, ID: mid, Unpin: !pinned, Silent: true})
+	_, err = c.live.api().MessagesUpdatePinnedMessage(ctx, &tg.MessagesUpdatePinnedMessageRequest{Peer: peer, ID: mid, Unpin: !pinned, Silent: silent || !pinned})
 	return translatePin(err)
 }
 

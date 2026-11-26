@@ -125,7 +125,7 @@ func (s *messagesService) ReadMentions(ctx context.Context, req *connect.Request
 
 func (s *messagesService) PinMessage(ctx context.Context, req *connect.Request[appv1.PinMessageRequest]) (*connect.Response[appv1.PinMessageResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.PinMessageRequest) (*appv1.PinMessageResponse, error) {
-		ack, err := s.chat.PinMessage(ctx, me, m.GetChatId(), m.GetSeq())
+		ack, err := s.chat.PinMessage(ctx, me, m.GetChatId(), m.GetSeq(), m.GetSilent())
 		if err != nil {
 			return nil, err
 		}
