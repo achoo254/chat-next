@@ -197,6 +197,8 @@ type runner struct {
 	photoHeld map[int64]heldPhoto
 	// botInfoHeld are the bots whose info could not be read, by external_users.id, until when (see pollBotInfos).
 	botInfoHeld map[int64]time.Time
+	// botsAnnounced: the account's bot puppets were announced to the owner's sessions on this connection (see announceBotsOnce).
+	botsAnnounced bool
 	// ownPhoneDone: the owner's own number was read for this connection, or need not be (see recordOwnPhone).
 	ownPhoneDone bool
 	// phoneBookDone: the account's contacts were read for phone numbers, or need not be (see readPhoneBook).

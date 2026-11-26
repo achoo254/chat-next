@@ -1,12 +1,14 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"app.local/server/internal/bridge"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -50,21 +52,40 @@ func (r *runner) markBots(ctx context.Context, list []bridge.Conversation) error
 	if len(ids) == 0 {
 		return nil
 	}
-	if _, err := r.e.db.pool.Exec(ctx, `
+	rows, err := r.e.db.pool.Query(ctx, `
 		UPDATE external_users x SET is_bot = v.is_bot
 		FROM unnest($2::text[], $3::boolean[]) AS v(id, is_bot)
-		WHERE x.account_id = $1 AND x.external_user_id = v.id AND x.is_bot IS DISTINCT FROM v.is_bot`,
-		r.account.ID, ids, flags); err != nil {
+		WHERE x.account_id = $1 AND x.external_user_id = v.id AND x.is_bot IS DISTINCT FROM v.is_bot
+		RETURNING x.user_id`,
+		r.account.ID, ids, flags)
+	if err != nil {
 		return fmt.Errorf("bridge: mark bots: %w", err)
 	}
+	changed, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return fmt.Errorf("bridge: mark bots: %w", err)
+	}
+	for _, userID := range changed {
+		r.announceUser(ctx, userID)
+	}
 	return nil
+}
+
+// announceUser tells the owner's open sessions that a puppet shows differently now (a bot
+// flag, a name, a short text): clients keep the users they have, so they would not look again.
+func (r *runner) announceUser(ctx context.Context, userID int64) {
+	if err := r.e.chat.AnnounceUserChanged(ctx, userID); err != nil && ctx.Err() == nil {
+		r.logger.Warn("telling the owner a contact changed failed", "user_id", userID, "reason", err.Error())
+	}
 }
 
 // botToRead is a bot puppet whose info is missing or old.
 type botToRead struct {
 	id          int64 // external_users.id
+	userID      int64 // the puppet
 	participant string
 	photoID     string // the picture already copied
+	was         []byte // bot_info as it was (nil: never read)
 }
 
 // pollBotInfos reads what bots say about themselves (description, commands, picture), a few
@@ -75,6 +96,9 @@ func (r *runner) pollBotInfos(ctx context.Context) error {
 		return nil
 	}
 	held := []int64{} // not nil: a NULL array would exclude every row
+	if err := r.announceBotsOnce(ctx); err != nil {
+		return err
+	}
 	now := time.Now()
 	for id, until := range r.botInfoHeld {
 		if now.After(until) {
@@ -84,7 +108,7 @@ func (r *runner) pollBotInfos(ctx context.Context) error {
 		held = append(held, id)
 	}
 	rows, err := r.e.db.pool.Query(ctx, `
-		SELECT x.id, x.external_user_id, coalesce(x.bot_info->>'photo_id', '')
+		SELECT x.id, x.user_id, x.external_user_id, coalesce(x.bot_info->>'photo_id', ''), x.bot_info
 		FROM external_users x JOIN users u ON u.id = x.user_id AND u.deleted_at IS NULL
 		WHERE x.account_id = $1 AND x.is_bot AND (x.bot_info_at IS NULL OR x.bot_info_at < now() - make_interval(secs => $2))
 			AND x.id <> ALL($3::bigint[])
@@ -96,7 +120,7 @@ func (r *runner) pollBotInfos(ctx context.Context) error {
 	var todo []botToRead
 	for rows.Next() {
 		var b botToRead
-		if err := rows.Scan(&b.id, &b.participant, &b.photoID); err != nil {
+		if err := rows.Scan(&b.id, &b.userID, &b.participant, &b.photoID, &b.was); err != nil {
 			rows.Close()
 			return fmt.Errorf("bridge: bot infos: %w", err)
 		}
@@ -178,6 +202,44 @@ func (r *runner) takeBotInfo(ctx context.Context, reader bridge.BotInfoReader, b
 			bot_photo_file_id = CASE WHEN $3 THEN bot_photo_file_id ELSE $4 END
 		WHERE id = $1`, b.id, body, keepPhoto, fileID); err != nil {
 		return fmt.Errorf("bridge: store bot info: %w", err)
+	}
+	if botInfoChanged(b.was, body) {
+		r.announceUser(ctx, b.userID)
+	}
+	return nil
+}
+
+// botInfoChanged says whether the info stored now differs from what was stored before (nil: nothing).
+func botInfoChanged(was []byte, now []byte) bool {
+	if was == nil {
+		return true
+	}
+	var before storedBotInfo
+	if err := json.Unmarshal(was, &before); err != nil {
+		return true
+	}
+	normal, err := json.Marshal(before)
+	return err != nil || !bytes.Equal(normal, now)
+}
+
+// announceBotsOnce tells the owner's sessions, once per connection, about every bot puppet
+// of the account: a client that stored such a contact before it showed as a bot, or before
+// it had its @name and short text, would otherwise keep the old copy.
+func (r *runner) announceBotsOnce(ctx context.Context) error {
+	if r.botsAnnounced {
+		return nil
+	}
+	rows, err := r.e.db.pool.Query(ctx, `SELECT user_id FROM external_users WHERE account_id = $1 AND is_bot`, r.account.ID)
+	if err != nil {
+		return fmt.Errorf("bridge: bots to announce: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return fmt.Errorf("bridge: bots to announce: %w", err)
+	}
+	r.botsAnnounced = true
+	for _, id := range ids {
+		r.announceUser(ctx, id)
 	}
 	return nil
 }
