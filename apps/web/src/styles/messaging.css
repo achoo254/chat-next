@@ -301,13 +301,13 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .msg.mine.run-next .bubble { border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-xs); }
 .msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration) { border-bottom-left-radius: 0; }
 .msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported) { border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: 0; }
-.msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration)::before {
+.msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration, .jumbo)::before {
 	content: ""; position: absolute; bottom: 0; left: calc(-1 * var(--tail-w)); width: var(--tail-w); height: var(--tail-h);
 	background: var(--bubble); pointer-events: none;
 	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 0 0, transparent 96%, currentColor 100%);
 	mask: radial-gradient(var(--tail-w) var(--tail-h) at 0 0, transparent 96%, currentColor 100%);
 }
-.msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported)::before {
+.msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported, .jumbo)::before {
 	left: auto; right: calc(-1 * var(--tail-w));
 	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
 	mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
@@ -360,6 +360,15 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
    (message-item.tsx Reactions), so the bubble grows a line and a reaction never covers the text.
    Each emoji is its own soft pill tinted from the bubble's text colour (it reads on your bubble
    and on others'), a 32px-tall button (44px on touch) with a 24px pill. */
+/* Emoji at Telegram's sizes (emoji-text.tsx): a little larger than the letters in a message, and one to three
+   emoji alone drawn big without the bubble, the time on a dark pill under them. */
+.bubble .emoji { font-size: 1.25em; line-height: 1; vertical-align: -0.12em; }
+.bubble.jumbo { padding: 0; background: none; box-shadow: none; }
+.bubble.jumbo .emoji { font-size: var(--jumbo); line-height: 1.1; vertical-align: 0; }
+.bubble.jumbo.j1 { --jumbo: 5rem; }
+.bubble.jumbo.j2 { --jumbo: 4rem; }
+.bubble.jumbo.j3 { --jumbo: 3rem; }
+.bubble.jumbo .stamp { float: none; display: flex; width: fit-content; margin: 2px 0 0 auto; padding: 2px var(--space-2); border-radius: var(--radius-full); background: rgb(0 0 0 / 0.45); color: #fff; }
 .reactions-line { clear: both; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
 .reactions-line > .stamp { float: none; margin: 0 0 4px auto; }
 .reactions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0 calc(-1 * var(--space-1)); }
@@ -369,9 +378,9 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 	min-width: 44px; min-height: 32px; padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text);
 	font-size: 0.75rem; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.reaction::before { content: ""; position: absolute; inset: calc(50% - 12px) 0; z-index: -1; border-radius: var(--radius-full); background: color-mix(in srgb, currentColor 12%, transparent); transition: background var(--dur-fast) var(--ease-standard); }
+.reaction::before { content: ""; position: absolute; inset: calc(50% - 14px) 0; z-index: -1; border-radius: var(--radius-full); background: color-mix(in srgb, currentColor 12%, transparent); transition: background var(--dur-fast) var(--ease-standard); }
 .reaction::after { content: ""; position: absolute; inset: calc(-1 * (var(--space-1) + 2px)) 0; }
-.reaction .r-emoji { font-size: 0.875rem; }
+.reaction .r-emoji { font-size: 1.25rem; line-height: 1; }
 .reaction:hover::before { background: color-mix(in srgb, currentColor 20%, transparent); }
 .reaction[aria-pressed="true"] { font-weight: 600; }
 .reaction[aria-pressed="true"]::before { background: color-mix(in srgb, var(--c-primary-solid) 28%, transparent); }

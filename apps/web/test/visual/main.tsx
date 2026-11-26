@@ -53,12 +53,16 @@ const owned = f.createChat(ChatType.GROUP, "Nhóm đọc sách", [f.selfId, demo
 f.setRole(owned, f.selfId, MemberRole.OWNER);
 f.send(demo.ids.users.minh, owned, "Tuần này đọc chương 3");
 f.ownerNeedsAdmin.add(owned);
-// Reaction pills on short messages (Zalo placement): faces in this small group, at both list edges.
+// Reaction pills on short messages (Telegram placement, inside the bubble): faces in this small group.
 const okSeq = f.send(demo.ids.users.minh, owned, "ok");
 const cSeq = f.send(f.selfId, owned, "c");
 for (const user of [demo.ids.users.minh, demo.ids.users.ha]) f.react(user, owned, cSeq, "👍");
 f.react(demo.ids.users.ha, owned, okSeq, "❤️");
 f.react(f.selfId, owned, okSeq, "😂");
+// Emoji at Telegram's sizes: a text with emoji, and emoji alone shown big without the bubble.
+f.send(demo.ids.users.minh, owned, "Đọc xong rồi 😂 hay lắm 👍");
+f.send(f.selfId, owned, "😂");
+f.send(demo.ids.users.ha, owned, "🎉🎉");
 // Bubble grouping (Telegram style): runs of own and others' messages across a day break,
 // a reply, a link, a code span, mentions and reactions on both sides.
 const cafe = f.createChat(ChatType.GROUP, "Góc cà phê", [f.selfId, demo.ids.users.lan, demo.ids.users.minh], { myRole: MemberRole.MEMBER });

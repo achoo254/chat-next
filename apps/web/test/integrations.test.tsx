@@ -320,7 +320,8 @@ describe("webhook messages", () => {
 		expect(within(bubble).getByText("Firing").className).toBe("sev firing");
 		expect(within(bubble).getByText("Ổ đĩa sắp đầy trên db-02")).toBeTruthy();
 		// Field lines stay as sent; the code block has its own copy button and title.
-		expect(within(bubble).getByText(/🖥️ Máy chủ: db-02\.example\.invalid\s+📊 Đã dùng: 94% \(ngưỡng 90%\)/)).toBeTruthy();
+		// (each emoji is its own span, drawn a little larger than the letters)
+		expect([...bubble.querySelectorAll("p")].some((p) => /🖥️ Máy chủ: db-02\.example\.invalid\s+📊 Đã dùng: 94% \(ngưỡng 90%\)/.test(p.textContent ?? ""))).toBe(true);
 		expect(within(bubble).getByText("Kiểm tra nhanh")).toBeTruthy();
 		expect(within(bubble).getByRole("button", { name: "Sao chép đoạn code" })).toBeTruthy();
 		// Only allowed schemes become buttons; an external link asks first.

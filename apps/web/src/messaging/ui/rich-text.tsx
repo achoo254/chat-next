@@ -15,6 +15,7 @@ import { hostOf, isTrustedHost } from "../data/format.ts";
 import { useServices } from "../data/services.tsx";
 import { EmailEntity } from "./email-entity.tsx";
 import { copyText } from "./parts.tsx";
+import { withEmoji } from "./emoji-text.tsx";
 import { serverHost, serverOrigin } from "../../server-origin.ts";
 
 const APP_SCHEME = brand.urlScheme;
@@ -184,11 +185,11 @@ function renderInline(text: string, node: Node, ctx: RichContext, inControl: boo
 	const out: ReactNode[] = [];
 	let cursor = node.start;
 	node.children.forEach((child, index) => {
-		if (child.start > cursor) out.push(text.slice(cursor, child.start));
+		if (child.start > cursor) out.push(withEmoji(text.slice(cursor, child.start)));
 		out.push(<RichNode key={`${child.start}-${index}`} text={text} node={child} ctx={ctx} inControl={inControl} />);
 		cursor = child.end;
 	});
-	if (cursor < node.end) out.push(text.slice(cursor, node.end));
+	if (cursor < node.end) out.push(withEmoji(text.slice(cursor, node.end)));
 	return out;
 }
 
@@ -311,7 +312,7 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 		inline = [];
 	};
 	root.children.forEach((child, index) => {
-		if (child.start > cursor) inline.push(text.slice(cursor, child.start));
+		if (child.start > cursor) inline.push(withEmoji(text.slice(cursor, child.start)));
 		if (child.entity?.type === "pre") {
 			flush(false);
 			blocks.push(
@@ -326,7 +327,7 @@ export function RichText({ text, entities, ctx, tail }: RichTextProps) {
 		}
 		cursor = child.end;
 	});
-	if (cursor < text.length) inline.push(text.slice(cursor));
+	if (cursor < text.length) inline.push(withEmoji(text.slice(cursor)));
 	flush(true);
 	return <>{blocks}</>;
 }

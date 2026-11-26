@@ -25,6 +25,7 @@ import { pillContent } from "./reaction-pill.ts";
 import { linkOpener, mentionsSelf, RichText, type RichContext } from "./rich-text.tsx";
 import { bridgeChunk, itemOf, useDeliveryContext } from "./bridge-delivery.tsx";
 import { useMemberRank } from "./member-ranks.ts";
+import { jumboCount } from "./emoji-text.tsx";
 import { useSelection } from "./selection.ts";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor, type Ui } from "./ui-context.tsx";
 import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
@@ -568,6 +569,9 @@ export function MessageBubble({
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
+	// One to three emoji alone are drawn big without the bubble, as Telegram does (emoji-text.tsx).
+	const jumbo =
+		integration || hasMedia || preview !== null || message.buttons.length > 0 || message.forward !== null ? 0 : jumboCount(message.text);
 	const read = mine && readOutboxMaxSeq >= message.seq;
 	const admin = chat?.myRole === "admin" || chat?.myRole === "owner";
 	// A recalled message keeps its place only: nothing to reply to, react to or forward.
@@ -713,7 +717,17 @@ export function MessageBubble({
 					</div>
 				</div>
 			) : (
-				<div className={integration ? `bubble integration${alert === null ? "" : ` ${alert.status}`}` : hasMedia ? "bubble media" : "bubble"}>
+				<div
+					className={
+						integration
+							? `bubble integration${alert === null ? "" : ` ${alert.status}`}`
+							: hasMedia
+								? "bubble media"
+								: jumbo > 0
+									? `bubble jumbo j${jumbo}`
+									: "bubble"
+					}
+				>
 					{integration && (
 						<span className="int-label">
 							<Icon name="webhook" />
