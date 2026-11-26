@@ -202,6 +202,37 @@ describe("messages", () => {
 		await waitFor(() => expect(written).toEqual(["trả lỗi 403"]));
 	});
 
+	it("pins the selected messages quietly, and unpins them when all are pinned", async () => {
+		const demo = seedDemo();
+		const first = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Ghim 1.");
+		const second = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Ghim 2.");
+		const { log } = await openChat(`/c/${demo.ids.ops}`, "Ghim 2.", demo);
+		const select = async () => {
+			fireEvent.contextMenu(messageOf(log, "Ghim 1."));
+			await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin" })).getByRole("menuitem", { name: "Chọn" }));
+			fireEvent.click(messageOf(log, "Ghim 2."));
+			const bar = await screen.findByRole("toolbar", { name: "Thao tác với các tin đã chọn" }, LONG);
+			await waitFor(() => expect(within(bar).getByText("Đã chọn 2 tin")).toBeTruthy());
+			return bar;
+		};
+		let bar = await select();
+		await userEvent.click(within(bar).getByRole("button", { name: "Ghim" }));
+		await waitFor(() => expect(demo.fixture.silentPins).toEqual([first, second]), LONG);
+		expect(await screen.findByText("Đã ghim 2 tin", {}, LONG)).toBeTruthy();
+		await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Thao tác với các tin đã chọn" })).toBeNull());
+
+		bar = await select();
+		await userEvent.click(await within(bar).findByRole("button", { name: "Bỏ ghim" }, LONG));
+		await waitFor(
+			() =>
+				expect(demo.fixture.pins.filter((pin) => !pin.pinned)).toEqual([
+					{ chatId: demo.ids.ops, seq: first, pinned: false },
+					{ chatId: demo.ids.ops, seq: second, pinned: false },
+				]),
+			LONG,
+		);
+	});
+
 	it("forwards and deletes the selected messages in one go", async () => {
 		const demo = seedDemo();
 		const first = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Gửi đi 1.");

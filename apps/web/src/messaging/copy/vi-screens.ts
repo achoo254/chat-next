@@ -768,6 +768,11 @@ export const viScreens = {
 		askAi: "Hỏi AI",
 		forward: "Chuyển tiếp",
 		saveToCloud: "Lưu vào Cloud",
+		/** Pins quietly (no notice to every member for each one). */
+		pin: "Ghim",
+		unpin: "Bỏ ghim",
+		pinned: (count: number) => `Đã ghim ${count} tin`,
+		unpinned: (count: number) => `Đã bỏ ghim ${count} tin`,
 		copy: "Sao chép",
 		download: "Tải xuống",
 		delete: "Xoá",

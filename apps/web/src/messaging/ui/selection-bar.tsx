@@ -8,9 +8,11 @@ import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { fullDate, isSavedChat } from "../data/format.ts";
+import { pinnedLists } from "../data/pinned.ts";
 import { useChat, useServices } from "../data/services.tsx";
 import type { WindowItem } from "../data/store.ts";
 import { useNameOf } from "./chat-row.tsx";
+import { canPin } from "./message-menu.tsx";
 import { copyText } from "./parts.tsx";
 import { openAiPanel, useUi, type AiQuote, type MessageSelection } from "./ui-context.tsx";
 
@@ -50,6 +52,9 @@ export default function SelectionBar({ selection }: { selection: MessageSelectio
 	const channel = chat?.type === "channel";
 	// Unsend is offered only when every message is your own, as in a message's menu.
 	const allMine = messages.length > 0 && messages.every((message) => message.fromId === store.selfId && !message.recalled);
+	const pins = pinnedLists(store);
+	const isPinned = (seq: number) => chat?.pinnedSeq === seq || pins.listed(chatId, seq);
+	const allPinned = live.length > 0 && live.every((message) => isPinned(message.seq));
 	const senderOf = (message: StoredMessage) => (channel ? (chat?.title ?? "") : nameOf(message.fromId));
 
 	const actions: { label: string; icon: IconName; run: () => void; hidden?: boolean }[] = [
@@ -106,6 +111,22 @@ export default function SelectionBar({ selection }: { selection: MessageSelectio
 						toasts.show(copy.menu.savedToCloud);
 						done();
 					}, failure);
+			},
+		},
+		{
+			// As a message's "Ghim", for each one, quietly; all pinned already: unpin them.
+			label: allPinned ? t.unpin : t.pin,
+			icon: "pin",
+			hidden: live.length === 0 || !canPin(chat ?? null),
+			run: () => {
+				const ids = live.map((message) => message.seq).filter((seq) => isPinned(seq) === allPinned);
+				void (async () => {
+					for (const seq of ids) await (allPinned ? remote.unpin(chatId, seq) : remote.pin(chatId, seq, false));
+				})().then(() => {
+					if (allPinned) pins.forget(chatId, ids);
+					toasts.show(allPinned ? t.unpinned(ids.length) : t.pinned(ids.length));
+					done();
+				}, failure);
 			},
 		},
 		{

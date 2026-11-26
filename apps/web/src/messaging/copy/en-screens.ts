@@ -762,6 +762,11 @@ export const enScreens: ScreensCopy = {
 		askAi: "Ask AI",
 		forward: "Forward",
 		saveToCloud: "Save to Cloud",
+		/** Pins quietly (no notice to every member for each one). */
+		pin: "Pin",
+		unpin: "Unpin",
+		pinned: (count: number) => (count === 1 ? "1 message pinned" : `${count} messages pinned`),
+		unpinned: (count: number) => (count === 1 ? "1 message unpinned" : `${count} messages unpinned`),
 		copy: "Copy",
 		download: "Download",
 		delete: "Delete",

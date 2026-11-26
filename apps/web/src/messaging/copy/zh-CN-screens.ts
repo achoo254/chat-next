@@ -761,6 +761,11 @@ export const zhCNScreens: ScreensCopy = {
 		askAi: "问 AI",
 		forward: "转发",
 		saveToCloud: "保存到云端",
+		/** Pins quietly (no notice to every member for each one). */
+		pin: "置顶",
+		unpin: "取消置顶",
+		pinned: (count: number) => `已置顶 ${count} 条消息`,
+		unpinned: (count: number) => `已取消置顶 ${count} 条消息`,
 		copy: "复制",
 		download: "下载",
 		delete: "删除",
