@@ -1,0 +1,38 @@
+name: engine-flake
+
+# Runs the tests of the bridge engine again and again on a runner, to catch a wait that now and then
+# runs out (the `go` job of ci.yml failed on different engine tests at times). Started by hand, never
+# by a push: a failing test prints the engine's log, the rows it keeps its progress in and where
+# every goroutine waits (server/internal/bridge/engine/engine_test.go, dumpStall).
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: How many times to run the package
+        default: "8"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  repeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.embedded-postgres-go
+          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('server/go.sum', 'server/internal/store/testdb/testdb.go') }}
+      # Every failure is reported, not only the first: a run of 8 shows how often and which tests stall.
+      - run: go test -race -count="$COUNT" -timeout 55m ./internal/bridge/engine
+        env:
+          COUNT: ${{ inputs.count }}

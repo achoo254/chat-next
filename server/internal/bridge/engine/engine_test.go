@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,6 +60,8 @@ type env struct {
 	adapter bridge.Adapter
 	// phoneKey, when set, turns on recording phone numbers.
 	phoneKey []byte
+	// log is the engine's logger: kept, and printed only when the test fails.
+	log *slog.Logger
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -108,7 +111,7 @@ func newEnvWithMedia(t *testing.T, withMedia bool) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &env{t: t, st: st, chat: svc, fake: contracttest.NewFake("fake"), box: box, owner: u.ID, media: mediaSvc,
+	e := &env{t: t, st: st, chat: svc, fake: contracttest.NewFake("fake"), box: box, owner: u.ID, media: mediaSvc, log: failureLog(t),
 		base: time.Now().Add(-48 * time.Hour).Truncate(time.Second)}
 	if err := st.Pool().QueryRow(ctx, `INSERT INTO external_accounts (owner_id, source, external_ref, secret) VALUES ($1, 'fake', 'fake-user-1', '\x00') RETURNING id`,
 		u.ID).Scan(&e.account); err != nil {
@@ -131,7 +134,7 @@ func (e *env) engine() *engine.Engine {
 	return engine.New(engine.Config{TenantID: "primary", PageSize: 7, PageDelay: time.Millisecond, BatchSize: 5, BackoffMin: 10 * time.Millisecond,
 		BackoffMax: 40 * time.Millisecond, ReconcileEvery: 30 * time.Millisecond, LeaseTTL: 2 * time.Second, Holder: "test",
 		OutboxPoll: 10 * time.Millisecond, StatePoll: 30 * time.Millisecond, DeleteConfirmAfter: 400 * time.Millisecond, SendGap: time.Millisecond, TopicRefreshGap: time.Millisecond},
-		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": adapter}, Logger: quiet,
+		engine.Deps{Pool: e.st.Pool(), Chat: e.chat, Box: box, Media: e.media, Adapters: map[string]bridge.Adapter{"fake": adapter}, Logger: e.log,
 			PhoneKey: e.phoneKey})
 }
 
@@ -203,8 +206,37 @@ func (e *env) eventually(cond func() bool, what func() string) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+	e.dumpStall()
 	e.t.Fatalf("condition never held: %s", what())
 }
+
+// dumpStall prints what a stalled wait leaves to look at: the rows the engine keeps its progress in
+// (without the account's secret) and where every goroutine is waiting. It runs only when a test is
+// about to fail, so a stall seen once on CI says where the engine was stuck.
+func (e *env) dumpStall() {
+	e.t.Helper()
+	ctx := context.Background()
+	for _, table := range []string{"external_accounts", "external_chats"} {
+		var rows string
+		query := fmt.Sprintf(`SELECT coalesce(jsonb_agg(to_jsonb(t) - 'secret'), '[]'::jsonb)::text FROM %s t`, table)
+		if err := e.st.Pool().QueryRow(ctx, query).Scan(&rows); err != nil {
+			rows = "unreadable: " + err.Error()
+		}
+		e.t.Logf("%s at the stall: %s", table, rows)
+	}
+	var stacks bytes.Buffer
+	if profile := pprof.Lookup("goroutine"); profile != nil {
+		_ = profile.WriteTo(&stacks, 1)
+	}
+	text := stacks.String()
+	if len(text) > stallStacksMax {
+		text = text[:stallStacksMax] + "\n(cut)"
+	}
+	e.t.Logf("goroutines at the stall:\n%s", text)
+}
+
+// stallStacksMax caps the goroutine listing of dumpStall.
+const stallStacksMax = 64 << 10
 
 func (e *env) waitTexts(chatID int64, want []string) {
 	e.t.Helper()
