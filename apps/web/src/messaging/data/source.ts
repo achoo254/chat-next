@@ -40,6 +40,8 @@ export interface ChatSource {
 	readonly events: EventBus;
 	dialogs(limit?: number): Promise<DialogView[]>;
 	history(chatId: number, request?: HistoryRequest): Promise<HistoryView>;
+	/** One message from the local database only, never the server; null when it is not stored here. */
+	localMessage(chatId: number, seq: number): Promise<StoredMessage | null>;
 	users(ids: readonly number[]): Promise<User[]>;
 	chat(chatId: number): Promise<Chat | null>;
 	sendText(chatId: number, text: string, options?: SendTextOptions): Promise<PendingMessage | null>;

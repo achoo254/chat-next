@@ -8,6 +8,7 @@ import type { NotificationRequest } from "@achoo254/chat-platform";
 export const CORE_METHODS = [
 	"dialogs",
 	"history",
+	"localMessage",
 	"users",
 	"chat",
 	"sendText",

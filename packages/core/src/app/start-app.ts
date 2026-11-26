@@ -95,6 +95,8 @@ export interface ChatCore {
 	sessionEnded(): SessionEndReason | null;
 	dialogs(limit?: number): Promise<DialogView[]>;
 	history(chatId: number, request?: HistoryRequest): Promise<HistoryView>;
+	/** One message from the local database only, never the server (a reply quote's original); null when it is not stored here. */
+	localMessage(chatId: number, seq: number): Promise<StoredMessage | null>;
 	users(ids: readonly number[]): Promise<User[]>;
 	chat(chatId: number): Promise<Chat | null>;
 	/**
@@ -672,6 +674,10 @@ export async function startApp(platform: Platform, options: StartOptions): Promi
 		botKeyboard: async (chatId, botId) => {
 			active();
 			return repo.newestKeyboard(assertSafeId(chatId), assertSafeId(botId));
+		},
+		localMessage: async (chatId, seq) => {
+			active();
+			return repo.message(assertSafeId(chatId), assertSafeId(seq));
 		},
 		notificationSettings: async () => {
 			active();

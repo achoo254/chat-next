@@ -1175,18 +1175,24 @@ export class ChatStore {
 		if (seq === 0 || this.lookups.has(key) || this.lookupsInFlight.has(key)) return;
 		if (this.message(chatId, seq) !== undefined) return;
 		this.lookupsInFlight.add(key);
+		const settle = (found: StoredMessage | null): void => {
+			if (this.disposed) return;
+			this.lookups.set(key, found);
+			if (found !== null && found.fromId !== this.selfId) this.wantUser(found.fromId);
+			this.emit(`lookup:${key}`);
+		};
+		// A message the device already stores shows at once; only one it lacks is asked of the server (a history request round trip).
 		this.source
-			.history(chatId, { direction: "around", offsetSeq: seq, limit: 1 })
-			.then(
-				(view) => {
-					if (this.disposed) return;
-					const found = view.messages.find((m) => m.seq === seq) ?? null;
-					this.lookups.set(key, found);
-					if (found !== null && found.fromId !== this.selfId) this.wantUser(found.fromId);
-					this.emit(`lookup:${key}`);
-				},
-				(err: unknown) => this.reportError(err, `message ${key}`),
-			)
+			.localMessage(chatId, seq)
+			.catch(() => null)
+			.then((local) => {
+				if (local !== null) {
+					settle(local);
+					return undefined;
+				}
+				return this.source.history(chatId, { direction: "around", offsetSeq: seq, limit: 1 }).then((view) => settle(view.messages.find((m) => m.seq === seq) ?? null));
+			})
+			.catch((err: unknown) => this.reportError(err, `message ${key}`))
 			.finally(() => this.lookupsInFlight.delete(key));
 	}
 

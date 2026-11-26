@@ -1618,6 +1618,7 @@ export function toSource(core: ChatCore): ChatSource {
 		events: core.events,
 		dialogs: (limit) => core.dialogs(limit),
 		history: (chatId, request) => core.history(chatId, request),
+		localMessage: (chatId, seq) => core.localMessage(chatId, seq),
 		users: (ids) => core.users(ids),
 		chat: (chatId) => core.chat(chatId),
 		sendText: (chatId, text, options) => core.sendText(chatId, text, options),
