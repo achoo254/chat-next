@@ -274,7 +274,7 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
    and line colours turn light for every part but the reactions and quick actions (they keep
    the page's colours), so links, mentions, code, replies, previews and files stay readable. */
 .msg.mine .bubble { --bubble: var(--c-mine); color: var(--c-on-primary); }
-.msg.mine .bubble:not(.recalled, .unsupported) > :not(.reactions, .msg-actions, .msg-react) {
+.msg.mine .bubble:not(.recalled, .unsupported) > :not(.msg-actions, .msg-react) {
 	--c-text: var(--c-on-primary);
 	--c-text-muted: var(--c-mine-muted);
 	--c-icon-muted: var(--c-mine-muted);
@@ -356,28 +356,25 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .reply[class*="s-"] b { color: var(--who-text); }
 .reply .q { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .via { font-size: 0.75rem; color: var(--c-text-muted); }
-/* Reactions, Zalo placement (mockups/chat.html#rich-messages): one pill group floats over the bubble's
-   bottom edge, about half outside. The group is the bubble's last child with zero height, so the bubble
-   keeps its height but is never narrower than the pills (they cannot leave the list). Others' messages:
-   bottom-right; yours: bottom-left. Each emoji is a 32px-tall button (44px on touch) drawn as a 24px pill
-   segment, with a 44px-tall hit area. The row makes room below only when it has reactions. */
-.reactions { clear: both; display: flex; justify-content: flex-end; align-items: center; height: 0; transform: translateY(calc(var(--space-2) + 2px)); }
-.msg.mine .reactions { justify-content: flex-start; }
-.msg:has(.reactions) { margin-bottom: var(--space-4); }
+/* Reactions, Telegram placement: the bubble's last line, inside it, with the time at its end
+   (message-item.tsx Reactions), so the bubble grows a line and a reaction never covers the text.
+   Each emoji is its own soft pill tinted from the bubble's text colour (it reads on your bubble
+   and on others'), a 32px-tall button (44px on touch) with a 24px pill. */
+.reactions-line { clear: both; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
+.reactions-line > .stamp { float: none; margin: 0 0 4px auto; }
+.reactions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0 calc(-1 * var(--space-1)); }
+.bubble.media > .reactions-line { padding: 0 var(--space-2) var(--space-2); }
 .reaction {
 	position: relative; z-index: 0; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
-	min-width: 44px; min-height: 32px; padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text-muted);
+	min-width: 44px; min-height: 32px; padding: 0 var(--space-2); border: 0; background: none; color: var(--c-text);
 	font-size: 0.75rem; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-/* A filled pill, no outline: the shadow lifts it off the bubble and the page. */
-.reaction::before { content: ""; position: absolute; inset: calc(50% - 12px) 0; z-index: -1; background: var(--c-surface); box-shadow: var(--shadow-sm); transition: background var(--dur-fast) var(--ease-standard); }
-.reaction:first-child::before { border-radius: var(--radius-full) 0 0 var(--radius-full); }
-.reaction:last-child::before { border-radius: 0 var(--radius-full) var(--radius-full) 0; }
-.reaction:only-child::before { border-radius: var(--radius-full); }
+.reaction::before { content: ""; position: absolute; inset: calc(50% - 12px) 0; z-index: -1; border-radius: var(--radius-full); background: color-mix(in srgb, currentColor 12%, transparent); transition: background var(--dur-fast) var(--ease-standard); }
 .reaction::after { content: ""; position: absolute; inset: calc(-1 * (var(--space-1) + 2px)) 0; }
 .reaction .r-emoji { font-size: 0.875rem; }
-.reaction:hover::before { background: color-mix(in srgb, var(--c-text) 6%, var(--c-surface)); }
-.reaction[aria-pressed="true"] { color: var(--c-primary); font-weight: 600; }
+.reaction:hover::before { background: color-mix(in srgb, currentColor 20%, transparent); }
+.reaction[aria-pressed="true"] { font-weight: 600; }
+.reaction[aria-pressed="true"]::before { background: color-mix(in srgb, var(--c-primary-solid) 28%, transparent); }
 .reaction[aria-pressed="true"]::before { background: var(--c-selected); }
 .reaction:focus-visible { outline: none; z-index: 1; }
 .reaction:focus-visible::before { box-shadow: var(--shadow-focus-primary); }
@@ -1147,7 +1144,6 @@ dialog.modal.ai-sheet[open] { display: flex; flex-direction: column; height: 92d
 	.choice button, .menu button, .react-picker button, .reaction, .chip, .icon-btn, .see-all, .kb-row a, .kb-row button { min-height: 44px; }
 	/* The 44px reaction button is its own hit area (the pill stays 24px); the row below makes room for it. */
 	.reaction::after { content: none; }
-	.msg:has(.reactions) { margin-bottom: var(--space-5); }
 	/* The sender's avatar keeps its drawn size; the padding makes the target 44px. */
 	.avatar-btn { padding: 6px; margin: -6px; }
 	.icon-btn { min-width: 44px; }

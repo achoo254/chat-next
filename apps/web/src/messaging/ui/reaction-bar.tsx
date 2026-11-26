@@ -9,7 +9,8 @@ import { quickReactions } from "./bridge-reactions.ts";
 import { isReactionRefused } from "./reaction-refused.ts";
 import "./reaction-bar.css";
 
-export default function ReactionBar({ chatId, seq, reactions }: { chatId: number; seq: number; reactions: StoredMessage["reactions"] }) {
+/** `onDone`: an emoji was picked; the row goes away (it is shown in the message now). */
+export default function ReactionBar({ chatId, seq, reactions, onDone }: { chatId: number; seq: number; reactions: StoredMessage["reactions"]; onDone: () => void }) {
 	"use no memo";
 	const chosen = reactions.find((reaction) => reaction.chosen)?.emoji;
 	const copy = useScreensCopy();
@@ -17,6 +18,7 @@ export default function ReactionBar({ chatId, seq, reactions }: { chatId: number
 	const { remote, toasts } = useServices();
 	const app = useChat(chatId)?.externalApp;
 	const react = (emoji: string) => {
+		onDone();
 		remote
 			.setReaction(chatId, seq, chosen === emoji ? "" : emoji)
 			.catch((err: unknown) => toasts.show(isReactionRefused(err) ? copy.common.reactionRefused : copy.common.failed));

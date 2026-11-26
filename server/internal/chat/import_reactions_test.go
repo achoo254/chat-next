@@ -59,7 +59,8 @@ func TestImportSetReactionsFollowsTheOtherAppAndLeavesWhatItDoesNotSay(t *testin
 	if !set([]ImportedReaction{{lan, "👍"}, {owner, "❤"}, {minh, "not one emoji"}}, true, false) {
 		t.Fatal("setting reactions changed nothing")
 	}
-	if got := state(); got != "map[lan:👍 member:🙂 owner:❤]" {
+	// The other app's "❤" is kept as Chat's picker writes it, "❤️".
+	if got := state(); got != "map[lan:👍 member:🙂 owner:❤️]" {
 		t.Fatalf("after a complete list: %s (the Chat user keeps theirs, a bad emoji is skipped)", got)
 	}
 	if set([]ImportedReaction{{lan, "👍"}, {owner, "❤"}}, true, false) {
@@ -69,12 +70,12 @@ func TestImportSetReactionsFollowsTheOtherAppAndLeavesWhatItDoesNotSay(t *testin
 	if !set([]ImportedReaction{{minh, "😂"}}, false, false) {
 		t.Fatal("a partial list changed nothing")
 	}
-	if got := state(); got != "map[lan:👍 member:🙂 minh:😂 owner:❤]" {
+	if got := state(); got != "map[lan:👍 member:🙂 minh:😂 owner:❤️]" {
 		t.Fatalf("after a partial list: %s", got)
 	}
 	// keepOwner: the owner is neither changed nor removed
 	set([]ImportedReaction{{owner, "🔥"}}, true, true)
-	if got := state(); got != "map[member:🙂 owner:❤]" {
+	if got := state(); got != "map[member:🙂 owner:❤️]" {
 		t.Fatalf("after a complete list that keeps the owner: %s", got)
 	}
 	// without it, an owner not listed loses theirs

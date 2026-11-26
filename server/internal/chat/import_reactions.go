@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	appv1 "app.local/server/gen/app/v1"
+	"app.local/server/internal/bridge/feature"
 )
 
 // ImportedReaction is the reaction of a person of the other app (their puppet
@@ -41,6 +42,7 @@ func (it *ImportTx) SetReactions(ctx context.Context, seq int64, want []Imported
 			continue
 		}
 		listed = append(listed, r.UserID)
+		r.Emoji = feature.CanonicalEmoji(r.Emoji) // the other app's "❤" is Chat's "❤️"
 		if !validEmoji(r.Emoji) {
 			continue
 		}

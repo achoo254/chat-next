@@ -51,3 +51,20 @@ func TestSupportAllowsOnlyWhatTheAdapterHas(t *testing.T) {
 		t.Error("both ways needs both flows")
 	}
 }
+
+func TestAReactionIsKeptInTheFormChatsPickerWrites(t *testing.T) {
+	for in, want := range map[string]string{
+		"❤":   "❤️",
+		"❤️":  "❤️",
+		"❤‍🔥": "❤️‍🔥",
+		"🕊":   "🕊️",
+		"⚡":   "⚡",
+		"👍":   "👍",
+		"🤷‍♂": "🤷‍♂️",
+		"":    "",
+	} {
+		if got := CanonicalEmoji(in); got != want {
+			t.Errorf("CanonicalEmoji(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

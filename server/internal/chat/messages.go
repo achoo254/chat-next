@@ -1846,6 +1846,7 @@ func (s *Service) SetReaction(ctx context.Context, me, chatID, seq int64, emoji 
 	if emoji != "" && !validEmoji(emoji) {
 		return nil, errInvalid("reaction must be one emoji")
 	}
+	emoji = feature.CanonicalEmoji(emoji)
 	if err := s.allow(ctx, limitWrite, "write", me); err != nil {
 		return nil, err
 	}

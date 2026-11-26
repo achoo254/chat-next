@@ -382,16 +382,22 @@ function ReactionChip({ message, reaction, chat }: { message: StoredMessage; rea
 	);
 }
 
-/** The pill group floats over the bubble's bottom edge (yours: bottom-left, others': bottom-right). */
-function Reactions({ message, chat }: { message: StoredMessage; chat: Chat | null }) {
+/**
+ * Telegram placement: the reactions are the bubble's last line, inside it, with the time at its
+ * end, so the bubble grows a line and they never cover the text.
+ */
+function Reactions({ message, chat, stamp }: { message: StoredMessage; chat: Chat | null; stamp: ReactNode }) {
 	"use no memo";
 	const copy = useCopy();
 	if (message.reactions.length === 0) return null;
 	return (
-		<div className="reactions" role="group" aria-label={copy.message.reactions} title={copy.message.reactionsHint}>
-			{message.reactions.map((reaction) => (
-				<ReactionChip key={reaction.emoji} message={message} reaction={reaction} chat={chat} />
-			))}
+		<div className="reactions-line">
+			<div className="reactions" role="group" aria-label={copy.message.reactions} title={copy.message.reactionsHint}>
+				{message.reactions.map((reaction) => (
+					<ReactionChip key={reaction.emoji} message={message} reaction={reaction} chat={chat} />
+				))}
+			</div>
+			{stamp}
 		</div>
 	);
 }
@@ -455,7 +461,7 @@ function QuickActions({
 			</button>
 			{bar && (
 				<Suspense fallback={null}>
-					<ReactionBar chatId={chatId} seq={seq} reactions={reactions} />
+					<ReactionBar chatId={chatId} seq={seq} reactions={reactions} onDone={() => setBar(false)} />
 				</Suspense>
 			)}
 		</>
@@ -538,7 +544,9 @@ export function MessageBubble({
 	const alert = integration ? splitAlert(message.text, message.entities) : null;
 	// With a preview card or buttons the time goes on its own line at the end (mock #rich-messages);
 	// reactions float over the bubble's edge and take no line.
-	const trailingStamp = !message.recalled && (preview !== null || message.buttons.length > 0);
+	// Reactions take the time onto their own line, as Telegram shows them.
+	const reacted = !message.recalled && message.reactions.length > 0;
+	const trailingStamp = !message.recalled && (preview !== null || message.buttons.length > 0 || reacted);
 	const trigger = useMenuTrigger(chatId, itemKey);
 	const channel = chat?.type === "channel";
 	// Channel posts speak as the channel (mockups/chat.html#channel): an admin's
@@ -759,7 +767,7 @@ export function MessageBubble({
 							<LinkPreviewCard preview={preview} message={message} ctx={ctx} />
 						</Suspense>
 					)}
-					{trailingStamp && <p>{stamp}</p>}
+					{trailingStamp && !reacted && <p>{stamp}</p>}
 					{!inert && (
 						<QuickActions
 							chatId={chatId}
@@ -771,7 +779,7 @@ export function MessageBubble({
 							reactions={message.reactions}
 						/>
 					)}
-					<Reactions message={message} chat={chat} />
+					<Reactions message={message} chat={chat} stamp={stamp} />
 					{mine && !inert && delivery !== null && onItsWay !== null && (onItsWay.status === "failed" || onItsWay.status === "unknown") && (
 						<Suspense fallback={null}>
 							<BridgeFailedRow chatId={chatId} seq={message.seq} />

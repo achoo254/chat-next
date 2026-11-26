@@ -1,5 +1,5 @@
-// Reaction pills, Zalo placement (mockups/chat.html#rich-messages): the
-// group floats over the bubble's bottom edge as its last child, faces in
+// Reaction pills, Telegram placement: the group is the bubble's last line,
+// inside it with the time at its end (never over the text), faces in
 // private chats and groups of at most 10 members ("+N" past three), the
 // count elsewhere, your own reaction pressed, and the labels people hear.
 import { ChatType } from "@achoo254/chat-proto/chats";
@@ -51,7 +51,11 @@ describe("quick reaction bar", () => {
 		expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual(["👍", "❤️", "😂", "😮", "🙏"]);
 		await userEvent.click(within(bar).getByRole("button", { name: "Yêu thích" }));
 		await within(log).findByRole("button", { name: "❤️ 1 người: bạn" }, LONG);
-		const liked = within(messageOf(log, "Chiều nay review PR nhé?")).getByRole("button", { name: "Yêu thích" });
+		// The pick shows in the message and the row goes away.
+		expect(within(messageOf(log, "Chiều nay review PR nhé?")).queryByRole("group", { name: "Thả nhanh cảm xúc" })).toBeNull();
+		await userEvent.hover(within(messageOf(log, "Chiều nay review PR nhé?")).getByRole("button", { name: "Thả cảm xúc" }));
+		const again = await within(messageOf(log, "Chiều nay review PR nhé?")).findByRole("group", { name: "Thả nhanh cảm xúc" }, LONG);
+		const liked = within(again).getByRole("button", { name: "Yêu thích" });
 		expect(liked.getAttribute("aria-pressed")).toBe("true");
 		// Your reaction again takes it back (an empty emoji to the server).
 		await userEvent.click(liked);
@@ -72,14 +76,15 @@ describe("pills in the list", () => {
 		const pill = await within(log).findByRole("button", { name: "❤️ 1 người: Lan Anh" }, LONG);
 		const message = messageOf(log, "c");
 		expect(message.classList.contains("mine")).toBe(true);
-		// The group is the bubble's last child, so it floats over the bubble's bottom edge.
+		// The group is the bubble's last line, inside it, and the time moves onto that line.
 		const group = within(message).getByRole("group", { name: "Biểu cảm" });
-		expect(group.parentElement?.classList.contains("bubble")).toBe(true);
-		expect(group.parentElement?.lastElementChild).toBe(group);
+		const line = group.parentElement;
+		expect(line?.classList.contains("reactions-line")).toBe(true);
+		expect(line?.parentElement?.classList.contains("bubble")).toBe(true);
+		expect(line?.querySelector(":scope > .stamp")).not.toBeNull();
+		expect(message.querySelector(".bubble > p .stamp")).toBeNull();
 		expect(pill.querySelectorAll(".r-avs .avatar")).toHaveLength(1);
 		expect(pill.getAttribute("aria-pressed")).toBe("false");
-		// The time stays on the text's line: reactions add no row inside the bubble.
-		expect(message.querySelector(".bubble > p:last-of-type .stamp")).not.toBeNull();
 		await userEvent.click(pill);
 		await within(log).findByRole("button", { name: "❤️ 2 người: bạn, Lan Anh" }, LONG);
 	});

@@ -60,7 +60,8 @@ func TestReactionsOfTheOtherAppReachChatAndFollowItsChanges(t *testing.T) {
 
 	e.fake.ReactRemotely("g1", "m1", lan, "👍", true)
 	e.fake.ReactRemotely("g1", "m1", self, "❤", true)
-	e.waitReactions(chatID, seq, "[owner=❤ u-lan=👍]")
+	// The other app's "❤" is kept as Chat's picker writes it.
+	e.waitReactions(chatID, seq, "[owner=❤️ u-lan=👍]")
 	// Lan changes theirs, the owner's goes on another device
 	e.fake.ReactRemotely("g1", "m1", lan, "🔥", true)
 	e.fake.ReactRemotely("g1", "m1", self, "", true)
@@ -146,7 +147,7 @@ func TestReactionsSwitchedOffNeitherComeInNorGoOut(t *testing.T) {
 	e.fake.ReactRemotely("g1", "m1", lan, "👍", true)
 	e.react(chatID, seq, "❤")
 	time.Sleep(300 * time.Millisecond)
-	if got := e.reactionsIn(chatID, seq); got != "[owner=❤]" {
+	if got := e.reactionsIn(chatID, seq); got != "[owner=❤️]" {
 		t.Fatalf("with reactions off Chat has %s", got)
 	}
 	if calls := e.fake.ReactionCalls(); len(calls) != 0 {
