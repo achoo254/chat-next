@@ -547,19 +547,19 @@ export function paintSkillBolt(c: CanvasRenderingContext2D, x: number, y: number
 /** The prompt port: a tiny screen with a caret; a ripple leaves it while `glow` fades. */
 export function paintPromptPort(c: CanvasRenderingContext2D, r: Rect, colour: string, glow: number, wall: number, ts: number): void {
 	const x = r.x + 10;
-	const y = r.y + r.h - 17;
+	const y = r.y + r.h - 26;
 	const w = r.w - 20;
-	const h = 11;
+	const h = 17;
 	c.strokeStyle = rgba(colour, 0.45 + 0.4 * glow);
 	c.strokeRect(x + 0.5, y + 0.5, w, h);
 	c.fillStyle = rgba(colour, 0.1 + 0.2 * glow);
 	c.fillRect(x + 1, y + 1, w - 1, h - 1);
-	c.font = `600 ${8 * ts}px ${MONO}`;
+	c.font = `600 ${12 * ts}px ${MONO}`;
 	c.textBaseline = "middle";
 	c.textAlign = "left";
 	c.fillStyle = colour;
-	c.fillText("›", x + 4, y + h / 2 + 1);
-	if (Math.floor(wall / 500) % 2 === 0 || glow > 0) c.fillRect(x + 14, y + 3, 5, h - 6);
+	c.fillText("›", x + 5, y + h / 2 + 1);
+	if (Math.floor(wall / 500) % 2 === 0 || glow > 0) c.fillRect(x + 20, y + 4, 7, h - 8);
 	if (glow > 0) {
 		c.beginPath();
 		c.arc(r.x + r.w, r.y + r.h / 2, 6 + (1 - glow) * 22, 0, 7);
@@ -569,7 +569,12 @@ export function paintPromptPort(c: CanvasRenderingContext2D, r: Rect, colour: st
 }
 
 /** A shield with a lock; while a permission is asked it pulses and the shackle opens. */
-export function paintPermissionShield(c: CanvasRenderingContext2D, x: number, y: number, waiting: boolean, wall: number): void {
+export function paintPermissionShield(c: CanvasRenderingContext2D, x: number, y: number, waiting: boolean, wall: number, scale = 1): void {
+	c.save();
+	c.translate(x, y);
+	c.scale(scale, scale);
+	x = 0;
+	y = 0;
 	const pulse = waiting ? 0.5 + 0.5 * Math.sin(wall / 150) : 0;
 	const colour = waiting ? INK.warn : INK.muted;
 	c.strokeStyle = rgba(colour, waiting ? 0.55 + 0.45 * pulse : 0.75);
@@ -593,5 +598,6 @@ export function paintPermissionShield(c: CanvasRenderingContext2D, x: number, y:
 	c.stroke();
 	c.fillStyle = rgba(colour, 0.8);
 	c.fillRect(x + 8, y + 11, 8, 6);
+	c.restore();
 	c.lineWidth = 1;
 }

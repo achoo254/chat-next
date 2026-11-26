@@ -62,7 +62,10 @@ export const PLACE_COLOR: Readonly<Record<PlaceId, string>> = {
 };
 
 const MONO = '"IBM Plex Mono", ui-monospace, Consolas, monospace';
-const TIER = { 1: { font: 13, sub: 11.5, line: 1.6, alpha: 1 }, 2: { font: 12, sub: 11, line: 1.2, alpha: 0.9 }, 3: { font: 10.5, sub: 10, line: 1, alpha: 0.7 } } as const;
+const TIER = { 1: { font: 13, sub: 11.5, line: 1.6, alpha: 1 }, 2: { font: 12, sub: 11, line: 1.2, alpha: 0.9 }, 3: { font: 13, sub: 12, line: 1.2, alpha: 0.85 } } as const;
+/** Side of the marks at the right of memory and skills, and the permission shield's scale (it is drawn 24 wide). */
+const SMALL_MARK = 36;
+const SHIELD_SCALE = 1.5;
 /** A module glows this long after a packet reached or left it. */
 const GLOW_MS = 1_400;
 /** A compaction sends sparks back through the lattice this long after it starts. */
@@ -800,11 +803,11 @@ export class InteriorPainter {
 			c.stroke();
 			c.setLineDash([]);
 		}
-		c.textAlign = "right";
+		c.textAlign = "center";
 		c.textBaseline = "top";
 		c.font = `600 ${12 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
-		c.fillText(copy.portal, p.x + p.w, p.y + p.h + 4);
+		c.fillText(copy.portal, cx, p.y + p.h + 4);
 		c.textAlign = "left";
 		if (contentZone === "external") {
 			c.fillStyle = "rgba(12,18,26,.9)";
@@ -815,10 +818,10 @@ export class InteriorPainter {
 		const board = this.board("external");
 		const live = board.kind === "calls" ? board.rows.find((r) => r.running) : undefined;
 		const n = this.calls("external");
-		c.textAlign = "right";
+		c.textAlign = "center";
 		c.font = `400 ${11 * this.ts}px ${MONO}`;
 		c.fillStyle = col;
-		c.fillText(live !== undefined ? `▶ ${hide || live.target === "" ? live.tool : live.target}` : n > 0 ? copy.calls(n) : "", p.x + p.w, p.y + p.h + 4 + 16 * this.ts);
+		c.fillText(live !== undefined ? `▶ ${hide || live.target === "" ? live.tool : live.target}` : n > 0 ? copy.calls(n) : "", cx, p.y + p.h + 4 + 16 * this.ts);
 		c.textAlign = "left";
 	}
 
@@ -1042,26 +1045,26 @@ export class InteriorPainter {
 		const { look, wall } = this.i;
 		const markAt = (place: PlaceId): { x: number; y: number } => {
 			const r = this.scene.places[place].rect;
-			return { x: r.x + r.w - 32, y: r.y + (r.h - 24) / 2 };
+			return { x: r.x + r.w - 48, y: r.y + (r.h - SMALL_MARK) / 2 };
 		};
 		this.withAlpha("memory", () => {
-			this.box("memory", PLACE_COLOR.memory, false, { iconW: 34 });
+			this.box("memory", PLACE_COLOR.memory, false, { iconW: 50 });
 			const m = markAt("memory");
-			paintMemoryChip(c, m.x, m.y, 24, PLACE_COLOR.memory, this.glowOf("memory"));
+			paintMemoryChip(c, m.x, m.y, SMALL_MARK, PLACE_COLOR.memory, this.glowOf("memory"));
 		});
 		this.withAlpha("skills", () => {
-			this.box("skills", PLACE_COLOR.skills, false, { iconW: 34 });
+			this.box("skills", PLACE_COLOR.skills, false, { iconW: 50 });
 			const m = markAt("skills");
-			paintSkillBolt(c, m.x, m.y, 24, PLACE_COLOR.skills, this.glowOf("skills"));
+			paintSkillBolt(c, m.x, m.y, SMALL_MARK, PLACE_COLOR.skills, this.glowOf("skills"));
 		});
 		this.withAlpha("user-desk", () => {
 			this.box("user-desk", PLACE_COLOR["user-desk"], false);
 			paintPromptPort(c, this.scene.places["user-desk"].rect, PLACE_COLOR["user-desk"], this.glowOf("user-desk"), wall, this.ts);
 		});
 		c.globalAlpha = this.presence("security");
-		this.box("security", INK.warn, false, { iconW: 14 });
+		this.box("security", INK.warn, false, { iconW: 38 });
 		const r = this.scene.places.security.rect;
-		paintPermissionShield(c, r.x + r.w - 26, r.y + (r.h - 24) / 2, look.mode === "wait", wall);
+		paintPermissionShield(c, r.x + r.w - 42, r.y + (r.h - 24 * SHIELD_SCALE) / 2, look.mode === "wait", wall, SHIELD_SCALE);
 		c.globalAlpha = 1;
 	}
 }

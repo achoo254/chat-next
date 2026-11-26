@@ -118,25 +118,25 @@ export const INTERIOR: SceneTable = {
 			[862, 88],
 			[1332, 88],
 		], at(1090, 68, "center")),
-		memory: place("memory", { x: 162, y: 100, w: 125, h: 50 }, 3, [
+		memory: place("memory", { x: 120, y: 84, w: 190, h: 64 }, 3, [
 			[688, 312],
-			[688, 125],
-			[287, 125],
-		], at(480, 105, "center")),
-		skills: place("skills", { x: 162, y: 165, w: 125, h: 50 }, 3, [
+			[688, 116],
+			[310, 116],
+		], at(500, 96, "center")),
+		skills: place("skills", { x: 120, y: 160, w: 190, h: 64 }, 3, [
 			[715, 312],
-			[715, 190],
-			[287, 190],
-		], at(480, 170, "center")),
-		security: place("security", { x: 588, y: 715, w: 75, h: 55 }, 3, [
+			[715, 192],
+			[310, 192],
+		], at(500, 172, "center")),
+		security: place("security", { x: 570, y: 720, w: 105, h: 70 }, 3, [
 			[700, 565],
 			[700, 662],
 			[625, 662],
-			[625, 715],
+			[625, 720],
 		]),
-		"user-desk": place("user-desk", { x: 5, y: 382, w: 70, h: 62 }, 3, [
+		"user-desk": place("user-desk", { x: 5, y: 372, w: 130, h: 84 }, 3, [
 			[650, 415],
-			[75, 415],
+			[135, 415],
 		]),
 	},
 };
