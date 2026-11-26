@@ -150,6 +150,7 @@ export class ObservatoryService {
       push: (op) => this.store.writer?.push(op),
       problems,
       runGh: opts.runGh,
+      log: opts.log,
       now: this.now,
     });
     // The runner only queues (it scores once the writer's flush returned), so it never throws into the hub's turn.

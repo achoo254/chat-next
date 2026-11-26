@@ -54,15 +54,16 @@ function fakeGh(): FakeGh {
   return gh;
 }
 
-type Rig = { watcher: CiWatcher; gh: FakeGh; ops: WriteOp[]; problems: string[]; on: { value: boolean } };
+type Rig = { watcher: CiWatcher; gh: FakeGh; ops: WriteOp[]; problems: string[]; logs: string[]; on: { value: boolean } };
 
 function rig(): Rig {
   const gh = fakeGh();
   const ops: WriteOp[] = [];
   const problems: string[] = [];
+  const logs: string[] = [];
   const on = { value: true };
-  const watcher = new CiWatcher({ enabled: () => on.value, push: (op) => ops.push(op), problems: (place) => problems.push(place), runGh: gh.runGh });
-  return { watcher, gh, ops, problems, on };
+  const watcher = new CiWatcher({ enabled: () => on.value, push: (op) => ops.push(op), problems: (place) => problems.push(place), log: (line) => logs.push(line), runGh: gh.runGh });
+  return { watcher, gh, ops, problems, logs, on };
 }
 
 const pushOf = (over: Partial<PushToWatch> = {}): PushToWatch => ({ sessionId: "s1", at: PUSH_AT, projectKey: "https://github.com/acme/app.git", branch: "main", ...over });
@@ -326,5 +327,57 @@ describe("the ingest hands pushes to the watcher", () => {
     });
     await expect(ingest.accept(hook("PostToolUse", 1_500, { tool_use_id: "t1", station_flags: StationFlag.push }), "spool")).resolves.toBeUndefined();
     expect(ingest.stats.failed).toBe(1);
+  });
+});
+
+describe("CiWatcher log", () => {
+  it("tells the start, the check of gh, the events and the end of a watch", async () => {
+    const r = rig();
+    r.gh.runs = [raw(1, "completed", "success", 5_000)];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS * 4);
+    expect(r.logs).toEqual([
+      "ci: following acme/app after a push (branch main)",
+      "ci: gh is ready",
+      "ci: 2 event(s) written for acme/app (1 run(s) listed)",
+      "ci: stopped following acme/app (1 run(s) seen)",
+    ]);
+  });
+
+  it("says once why gh keeps a push from being followed: missing, or signed out", async () => {
+    const missing = rig();
+    missing.gh.missing = true;
+    missing.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    missing.watcher.pushed(pushOf({ sessionId: "s2" }));
+    missing.watcher.pushed(pushOf({ sessionId: "s3" }));
+    expect(missing.logs).toEqual([
+      "ci: following acme/app after a push (branch main)",
+      "ci: gh is missing (spawn gh ENOENT): pushes are not followed until the agent restarts",
+      "ci: stopped following acme/app (0 run(s) seen)",
+      "ci: a push is not followed: gh is missing",
+    ]);
+    const out = rig();
+    out.gh.signedOut = true;
+    out.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    out.watcher.pushed(pushOf({ sessionId: "s2" }));
+    out.watcher.pushed(pushOf({ sessionId: "s3" }));
+    expect(out.logs).toEqual([
+      "ci: following acme/app after a push (branch main)",
+      "ci: gh is not signed in to github.com (not logged in): pushes are not followed for 10 minutes",
+      "ci: stopped following acme/app (0 run(s) seen)",
+      "ci: a push is not followed: gh is signed out, checking again later",
+    ]);
+  });
+
+  it("says once that a push is not followed: a project that is not on GitHub, or the switch off", () => {
+    const r = rig();
+    r.watcher.pushed(pushOf({ projectKey: "https://gitlabs.example.com/team/app.git" }));
+    r.watcher.pushed(pushOf({ projectKey: "local:app" }));
+    r.on.value = false;
+    r.watcher.pushed(pushOf());
+    r.watcher.pushed(pushOf());
+    expect(r.logs).toEqual(["ci: a push is not followed: its project is not a GitHub repository", "ci: a push is not followed: the CI watcher or the Observatory is switched off"]);
   });
 });

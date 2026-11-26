@@ -22,6 +22,10 @@
 //   stay under 2 000 calls an hour, well inside GitHub's 5 000 an hour.
 // - A push older than a watch's whole life (a spool read again after a
 //   restart) starts nothing.
+// - Every decision that keeps a push from being followed (gh missing, signed
+//   out, the switch off, a project not on GitHub, too many watches) is told
+//   once per agent run to the log, with the watch's start, its events and its
+//   end: no other trace says why the CI step of the Live Map stays idle.
 import type { PushToWatch } from "../ingest/normalized-record.ts";
 import type { WriteOp } from "../store/write-ops.ts";
 import { type CiWatchState, endWatch, MAX_WATCH_MS, mergePush, newWatch, parseRunList, runListArgs, stepWatch } from "./ci-run-tracking.ts";
@@ -40,6 +44,8 @@ export type CiWatcherOptions = {
   /** Queues a write (the store's batch writer). */
   push: (op: WriteOp) => void;
   problems: (place: string, err: unknown) => void;
+  /** One line of the agent's log (no content: repository names, counts, the first line of an error). */
+  log?: ((line: string) => void) | undefined;
   /** Runs `gh` (execGh by default; tests pass a fake). */
   runGh?: GhRunner | undefined;
   now?: () => number;
@@ -58,6 +64,8 @@ export class CiWatcher {
   private ghMissing = false;
   /** `gh` was signed out: pushes before this time are not followed. */
   private authRetryAt = 0;
+  /** Reasons already logged: a push that is not followed says why once per agent run, not once per push. */
+  private readonly noted = new Set<string>();
 
   constructor(private readonly opts: CiWatcherOptions) {
     this.now = opts.now ?? Date.now;
@@ -72,16 +80,20 @@ export class CiWatcher {
   /** A push that succeeded: starts (or extends) the watch of its session and repository. Never throws. */
   pushed(push: PushToWatch): void {
     try {
-      if (this.ghMissing || this.now() < this.authRetryAt || !this.opts.enabled()) return;
+      if (this.ghMissing) return this.note("gh-missing", "ci: a push is not followed: gh is missing");
+      if (this.now() < this.authRetryAt) return this.note("gh-signed-out", "ci: a push is not followed: gh is signed out, checking again later");
+      if (!this.opts.enabled()) return this.note("off", "ci: a push is not followed: the CI watcher or the Observatory is switched off");
       const repo = githubRepoOf(push.projectKey);
-      if (!repo || this.now() - push.at > MAX_WATCH_MS) return;
+      if (!repo) return this.note("no-repo", "ci: a push is not followed: its project is not a GitHub repository");
+      if (this.now() - push.at > MAX_WATCH_MS) return this.note("old-push", "ci: a push is not followed: it is older than a watch lasts");
       const key = `${push.sessionId}\n${repo}`;
       const current = this.watches.get(key);
       if (current) {
         mergePush(current.state, push.at, push.branch);
         return;
       }
-      if (this.watches.size >= MAX_WATCHES) return;
+      if (this.watches.size >= MAX_WATCHES) return this.note("too-many", `ci: a push is not followed: ${MAX_WATCHES} watches already run`);
+      this.log(`ci: following ${repo} after a push (branch ${push.branch ?? "unknown"})`);
       const watch: Watch = { state: newWatch(push.sessionId, repo, push.at, push.branch), timer: undefined };
       this.watches.set(key, watch);
       this.schedule(key, watch);
@@ -109,6 +121,7 @@ export class CiWatcher {
     if (!watch) return;
     clearTimeout(watch.timer);
     this.watches.delete(key);
+    this.log(`ci: stopped following ${watch.state.repo} (${watch.state.started.size} run(s) seen${quiet ? ", switched off" : ""})`);
     if (quiet) return;
     try {
       for (const op of endWatch(watch.state, this.now())) this.opts.push(op);
@@ -160,9 +173,26 @@ export class CiWatcher {
 
   /** One poll's runs: their events written; whether the watch is done. Throws when the output is not a run list. */
   private step(state: CiWatchState, stdout: string): boolean {
-    const step = stepWatch(state, parseRunList(stdout), this.now());
+    const runs = parseRunList(stdout);
+    const step = stepWatch(state, runs, this.now());
     for (const op of step.ops) this.opts.push(op);
+    if (step.ops.length > 0) this.log(`ci: ${step.ops.length} event(s) written for ${state.repo} (${runs.length} run(s) listed)`);
     return step.done;
+  }
+
+  private log(line: string): void {
+    try {
+      this.opts.log?.(line);
+    } catch {
+      // A failing log never stops a watch.
+    }
+  }
+
+  /** `line` once per agent run for `reason`. */
+  private note(reason: string, line: string): void {
+    if (this.noted.has(reason)) return;
+    this.noted.add(reason);
+    this.log(line);
   }
 
   private ghReady(): Promise<boolean> {
@@ -178,17 +208,28 @@ export class CiWatcher {
   private async checkGh(): Promise<boolean> {
     try {
       await this.runGh(["--version"]);
-    } catch {
+    } catch (err) {
       this.ghMissing = true;
+      this.log(`ci: gh is missing (${firstLine(err)}): pushes are not followed until the agent restarts`);
       return false;
     }
     try {
       await this.runGh(["auth", "status", "--hostname", "github.com"]);
+      this.log("ci: gh is ready");
       return true;
-    } catch {
+    } catch (err) {
+      this.log(`ci: gh is not signed in to github.com (${firstLine(err)}): pushes are not followed for ${AUTH_RETRY_MS / 60_000} minutes`);
       this.authRetryAt = this.now() + AUTH_RETRY_MS;
       this.ghCheck = undefined;
       return false;
     }
   }
+}
+
+const MAX_ERROR_CHARS = 160;
+
+/** The first line of an error's message, cut short, for the log. */
+function firstLine(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err);
+  return (text.split(/\r?\n/)[0] ?? "").slice(0, MAX_ERROR_CHARS);
 }
