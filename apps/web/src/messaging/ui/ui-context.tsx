@@ -142,6 +142,8 @@ export interface AiQuote {
 	readonly text: string;
 	/** Its code and pre spans (entities), for the quick actions that need a request in it. */
 	readonly code?: readonly string[];
+	/** Several selected messages asked about together (seq and date are the first's). */
+	readonly messages?: readonly AiQuote[];
 }
 
 /**

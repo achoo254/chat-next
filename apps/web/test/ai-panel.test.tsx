@@ -94,6 +94,24 @@ describe("opening the AI panel", () => {
 		await waitFor(() => expect(screen.queryByRole("complementary", { name: "AI" })).toBeNull());
 	});
 
+	it("«Hỏi AI» of several selected messages opens the panel about them all", async () => {
+		const { fixture, chatId, lan } = lanChat();
+		fixture.send(lan, chatId, "và mang theo laptop nhé");
+		renderMessaging(fixture, `/c/${chatId}`);
+		await openMenuOf(QUESTION);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Chọn" }, LONG));
+		const log = await screen.findByRole("log", { name: "Tin nhắn" }, LONG);
+		fireEvent.click(within(log).getByText("và mang theo laptop nhé"));
+		const bar = await screen.findByRole("toolbar", { name: "Thao tác với các tin đã chọn" }, LONG);
+		await waitFor(() => expect(within(bar).getByText("Đã chọn 2 tin")).toBeTruthy());
+		await userEvent.click(within(bar).getByRole("button", { name: "Hỏi AI" }));
+		const quote = within(await panel()).getByRole("region", { name: "Tin đang hỏi" });
+		expect(within(quote).getByText("2 tin đã chọn")).toBeTruthy();
+		expect(quote.querySelector("blockquote")?.textContent).toBe(`Lan: ${QUESTION}\nLan: và mang theo laptop nhé`);
+		// Selecting ends: the composer is back.
+		expect(await screen.findByRole("textbox", { name: /Tin nhắn tới/ }, LONG)).toBeTruthy();
+	});
+
 	it("'/ai …' opens the panel with the question and sends nothing into the chat", async () => {
 		const { fixture, chatId } = lanChat();
 		renderMessaging(fixture, `/c/${chatId}`);

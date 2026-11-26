@@ -60,7 +60,9 @@ export function putInComposer(drafts: Drafts, ui: Ui, target: { readonly chatId:
 
 /** The quoted message and a question about it, as the AI reads them. */
 export function aboutQuote(copy: FullCopy, quote: AiQuote, locale: string, question: string): string {
-	const quoted = copy.aiPanel.quoted(quote.sender, `${clock(quote.date, locale)} ${fullDate(quote.date, locale)}`, quote.seq, quote.text);
+	// Several selected messages: each as one quote, in order.
+	const one = (q: AiQuote) => copy.aiPanel.quoted(q.sender, `${clock(q.date, locale)} ${fullDate(q.date, locale)}`, q.seq, q.text);
+	const quoted = quote.messages === undefined ? one(quote) : quote.messages.map(one).join("\n\n");
 	return question === "" ? quoted : `${quoted}\n\n${question}`;
 }
 
@@ -358,9 +360,11 @@ function QuoteCard({ quote, locale, copy, disabled, onChip, onRemove }: { quote:
 		<section className="ai-quote" aria-label={copy.aiPanel.quote}>
 			<div className="ai-quote-head">
 				<strong>{quote.sender}</strong>
-				<span className="muted">
-					{clock(quote.date, locale)} · #{quote.seq}
-				</span>
+				{quote.messages === undefined && (
+					<span className="muted">
+						{clock(quote.date, locale)} · #{quote.seq}
+					</span>
+				)}
 				<button type="button" className="icon-btn" aria-label={copy.aiPanel.removeQuote} title={copy.aiPanel.removeQuote} onClick={onRemove}>
 					<Icon name="x" small />
 				</button>

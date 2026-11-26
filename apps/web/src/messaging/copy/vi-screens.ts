@@ -712,6 +712,8 @@ export const viScreens = {
 				"Dựng request từ tin này. Gọi localman_list_workspaces; nếu có nhiều workspace thì HỎI TÔI chọn workspace nào bằng câu hỏi có lựa chọn. Rồi gọi localman_list_collections cho workspace đó và HỎI TÔI chọn collection nào bằng câu hỏi có lựa chọn (không tự chọn, không có mặc định). Chỉ sau đó mới lưu bằng localman_create_collection_node.",
 		},
 		/** The quoted message as the AI reads it, before the question. */
+		/** The head of a quote of several selected messages. */
+		quotedMany: (count: number) => `${count} tin đã chọn`,
 		quoted: (sender: string, time: string, seq: number, text: string): string => `Về tin #${seq} của ${sender} lúc ${time}:\n${text}`,
 		replaceTitle: "Thay nội dung đang soạn?",
 		replaceBody: "Ô soạn tin đang có chữ. Thay bằng câu trả lời của AI?",
@@ -731,6 +733,8 @@ export const viScreens = {
 		forward: "Chuyển tiếp",
 		saveToCloud: "Lưu vào Cloud của tôi",
 		savedToCloud: "Đã lưu vào Cloud của tôi",
+		/** Copies only the part of the message's text selected with the mouse. */
+		copySelected: "Sao chép đoạn đã chọn",
 		copy: "Sao chép",
 		copiedText: "Đã sao chép nội dung",
 		download: "Tải xuống",
@@ -761,6 +765,7 @@ export const viScreens = {
 		label: "Thao tác với các tin đã chọn",
 		count: (count: number) => `Đã chọn ${count} tin`,
 		cancel: "Bỏ chọn",
+		askAi: "Hỏi AI",
 		forward: "Chuyển tiếp",
 		saveToCloud: "Lưu vào Cloud",
 		copy: "Sao chép",

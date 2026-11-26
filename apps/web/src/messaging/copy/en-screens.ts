@@ -707,6 +707,8 @@ export const enScreens: ScreensCopy = {
 			localmanSave:
 				"Build a request from this message. Call localman_list_workspaces; if there are several workspaces, ASK ME which one with a multiple-choice question. Then call localman_list_collections for that workspace and ASK ME which collection with a multiple-choice question (do not pick one yourself, there is no default). Only then save it with localman_create_collection_node.",
 		},
+		/** The head of a quote of several selected messages. */
+		quotedMany: (count: number) => `${count} selected messages`,
 		quoted: (sender: string, time: string, seq: number, text: string): string => `About message #${seq} from ${sender} at ${time}:\n${text}`,
 		replaceTitle: "Replace what you are typing?",
 		replaceBody: "The message box has text in it. Replace it with the AI's reply?",
@@ -725,6 +727,8 @@ export const enScreens: ScreensCopy = {
 		forward: "Forward",
 		saveToCloud: "Save to My Cloud",
 		savedToCloud: "Saved to My Cloud",
+		/** Copies only the part of the message's text selected with the mouse. */
+		copySelected: "Copy selected text",
 		copy: "Copy",
 		copiedText: "Text copied",
 		download: "Download",
@@ -755,6 +759,7 @@ export const enScreens: ScreensCopy = {
 		label: "Actions on the selected messages",
 		count: (count: number) => (count === 1 ? "1 message selected" : `${count} messages selected`),
 		cancel: "Clear selection",
+		askAi: "Ask AI",
 		forward: "Forward",
 		saveToCloud: "Save to Cloud",
 		copy: "Copy",

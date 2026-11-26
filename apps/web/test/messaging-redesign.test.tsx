@@ -183,6 +183,25 @@ describe("messages", () => {
 		expect(await screen.findByRole("textbox", { name: /^Tin nhắn tới/ }, LONG)).toBeTruthy();
 	});
 
+	it("copies only the text selected with the mouse from the message menu", async () => {
+		const written: string[] = [];
+		Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (text: string) => Promise.resolve(void written.push(text)) } });
+		const demo = seedDemo();
+		demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Máy chủ S3 trả lỗi 403 lúc sáng.");
+		const { log } = await openChat(`/c/${demo.ids.ops}`, "Máy chủ S3 trả lỗi 403 lúc sáng.", demo);
+		const text = within(messageOf(log, "Máy chủ S3 trả lỗi 403 lúc sáng.")).getByText("Máy chủ S3 trả lỗi 403 lúc sáng.");
+		const node = text.firstChild;
+		if (node === null) throw new Error("no text node");
+		const range = document.createRange();
+		range.setStart(node, 11);
+		range.setEnd(node, 22);
+		window.getSelection()?.removeAllRanges();
+		window.getSelection()?.addRange(range);
+		fireEvent.contextMenu(text);
+		await userEvent.click(within(await screen.findByRole("menu", { name: "Thao tác với tin" })).getByRole("menuitem", { name: "Sao chép đoạn đã chọn" }));
+		await waitFor(() => expect(written).toEqual(["trả lỗi 403"]));
+	});
+
 	it("forwards and deletes the selected messages in one go", async () => {
 		const demo = seedDemo();
 		const first = demo.fixture.send(demo.ids.users.huy, demo.ids.ops, "Gửi đi 1.");

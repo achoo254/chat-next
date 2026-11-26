@@ -129,12 +129,23 @@ function placeLifted(stack: HTMLElement, from: DOMRect, mine: boolean): void {
 	stack.style.setProperty("--lift", `${floating - top}px`);
 }
 
+/** The text selected with the mouse inside one message, "" when none (or it runs outside it). */
+function selectedTextIn(itemKey: string): string {
+	const selection = window.getSelection();
+	if (selection === null || selection.isCollapsed) return "";
+	const row = document.querySelector(`.messages [data-key="${itemKey}"]`);
+	if (row === null || !row.contains(selection.anchorNode) || !row.contains(selection.focusNode)) return "";
+	return selection.toString().trim();
+}
+
 export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readOutboxMaxSeq, item: given, limited }: MenuLayerProps) {
 	const copy = useScreensCopy();
 	const ui = useUi();
 	const { store, source, remote, backend, toasts, self } = useServices();
 	const pins = pinnedLists(store);
 	const stored = useItem(chatId, itemKey);
+	// The text selected inside this message when the menu opened (a right click keeps it).
+	const [picked] = useState(() => selectedTextIn(itemKey));
 	const item = given ?? stored;
 	const author = useUser(item?.kind === "message" && item.message.fromId !== store.selfId ? item.message.fromId : 0);
 	const menu = useRef<HTMLDivElement>(null);
@@ -209,6 +220,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 	};
 
 	if (item === undefined) return null;
+	const pickedText = picked;
 	const mine = item.kind === "pending" || item.message.fromId === store.selfId;
 	const failure = (err: unknown) => {
 		void err;
@@ -245,6 +257,16 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 	}
 
 	const entries: MenuEntry[] = [];
+	// Part of the message's text selected with the mouse (as Telegram's "Copy Selected Text").
+	if (pickedText !== "") {
+		entries.push({
+			label: copy.menu.copySelected,
+			icon: "copy",
+			run: () => {
+				void copyText(pickedText).then((ok) => toasts.show(ok ? copy.menu.copiedText : copy.common.failed));
+			},
+		});
+	}
 	if (item.kind === "pending") {
 		const pending = item.pending;
 		if (pending.failure !== null) {

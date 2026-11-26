@@ -706,6 +706,8 @@ export const zhCNScreens: ScreensCopy = {
 			localmanSave:
 				"根据这条消息构建请求。调用 localman_list_workspaces；如果有多个工作区，用选择题问我选哪个工作区。然后为该工作区调用 localman_list_collections，并用选择题问我要保存到哪个集合（不要自行选择，没有默认值）。之后才用 localman_create_collection_node 保存。",
 		},
+		/** The head of a quote of several selected messages. */
+		quotedMany: (count: number) => `已选择 ${count} 条消息`,
 		quoted: (sender: string, time: string, seq: number, text: string): string => `关于 ${sender} 在 ${time} 发送的第 ${seq} 条消息：\n${text}`,
 		replaceTitle: "替换正在输入的内容？",
 		replaceBody: "消息输入框中已有文字。要用 AI 的回复替换吗？",
@@ -724,6 +726,8 @@ export const zhCNScreens: ScreensCopy = {
 		forward: "转发",
 		saveToCloud: "保存到我的云端",
 		savedToCloud: "已保存到我的云端",
+		/** Copies only the part of the message's text selected with the mouse. */
+		copySelected: "复制所选文字",
 		copy: "复制",
 		copiedText: "文字已复制",
 		download: "下载",
@@ -754,6 +758,7 @@ export const zhCNScreens: ScreensCopy = {
 		label: "对所选消息的操作",
 		count: (count: number) => `已选择 ${count} 条消息`,
 		cancel: "取消选择",
+		askAi: "问 AI",
 		forward: "转发",
 		saveToCloud: "保存到云端",
 		copy: "复制",

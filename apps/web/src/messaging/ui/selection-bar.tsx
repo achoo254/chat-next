@@ -12,7 +12,7 @@ import { useChat, useServices } from "../data/services.tsx";
 import type { WindowItem } from "../data/store.ts";
 import { useNameOf } from "./chat-row.tsx";
 import { copyText } from "./parts.tsx";
-import { useUi, type MessageSelection } from "./ui-context.tsx";
+import { openAiPanel, useUi, type AiQuote, type MessageSelection } from "./ui-context.tsx";
 
 /** The selected messages this device holds, oldest first. */
 function selectedMessages(items: readonly WindowItem[], seqs: readonly number[]): StoredMessage[] {
@@ -53,6 +53,37 @@ export default function SelectionBar({ selection }: { selection: MessageSelectio
 	const senderOf = (message: StoredMessage) => (channel ? (chat?.title ?? "") : nameOf(message.fromId));
 
 	const actions: { label: string; icon: IconName; run: () => void; hidden?: boolean }[] = [
+		{
+			label: t.askAi,
+			icon: "bulb",
+			hidden: live.length === 0,
+			run: () => {
+				// The chat's AI panel opens about every selected message, as the menu's "Hỏi AI" does for one.
+				const quotes: AiQuote[] = live.map((message) => ({
+					seq: message.seq,
+					sender: senderOf(message),
+					date: message.date,
+					text: message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]`,
+					code: message.entities.filter((e) => e.type === "code" || e.type === "pre").map((e) => message.text.slice(e.offset, e.offset + e.length)),
+				}));
+				const first = quotes[0];
+				if (first === undefined) return;
+				openAiPanel(ui, chatId, {
+					quote:
+						quotes.length === 1
+							? first
+							: {
+									seq: first.seq,
+									sender: copy.aiPanel.quotedMany(quotes.length),
+									date: first.date,
+									text: quotes.map((q) => `${q.sender}: ${q.text}`).join("\n"),
+									code: quotes.flatMap((q) => q.code ?? []),
+									messages: quotes,
+								},
+				});
+				done();
+			},
+		},
 		{
 			label: t.forward,
 			icon: "forward",
