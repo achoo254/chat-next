@@ -115,12 +115,13 @@ cache_write_tokens=9, cost_usd_estimate=10, has_cost=11, git_ops=12, session_eve
   `commit` 1, `push` 2, `deploy` 4, `write` 8, `memory` 16, `estimated` 32 (đặt theo nhãn đã lọc, có thể sai), `background` 64 (lệnh Bash/PowerShell chạy với `run_in_background`), `ci` 128 (lệnh theo dõi CI: `gh run watch|view|list|rerun`, `gh pr checks`,
   `glab ci …`, `glab pipeline …`; trạm vẫn `GIT`). Nguồn: `apps/agent/src/observatory/live-map/station-map.ts`.
 - `session_event.kind`: `permission_request`, `permission_decision`, `permission_denied`, `hook_block`, `compact_start`, `compact_end`, `stop`, `stop_failure`,
-  `notification`, `model_change`, `permission_mode`, `todo_counts`, `api_error`, `mcp_connection`, `ci_started`, `ci_finished` (`SESSION_EVENT_KINDS` trong
+  `notification`, `model_change`, `permission_mode`, `todo_counts`, `api_error`, `mcp_connection`, `ci_started`, `ci_finished`, `ci_cancelled` (`SESSION_EVENT_KINDS` trong
   `apps/agent/src/observatory/store/observatory-rows.ts`). Loại lạ: thiết bị bỏ qua.
 - `ci_started` / `ci_finished`: một lượt chạy GitHub Actions sau `git push` của phiên (agent theo dõi bằng `gh run list` mỗi 15 giây, chỉ khi `project_key` là
   remote GitHub, `gh` đã đăng nhập và công tắc `observatory.ci.enabled` bật; `apps/agent/src/observatory/ci/ci-watcher.ts`). `label` là tên workflow,
   `station` là `GIT`; `ci_started` có `at` là lúc lượt chạy được tạo; `ci_finished` có `at` là lúc xong, `flag` là kết quả `success`, `number` là thời gian
-  chạy (ms). Khoá trùng theo id lượt chạy và loại. Không có URL, commit message hay tên người. Lượt theo dõi kết thúc khi lượt chạy chưa xong (hết 30 phút,
+  chạy (ms). Lượt chạy bị huỷ (thường vì có push mới hơn thay nó) ghi `ci_cancelled` thay cho `ci_finished`: `at` là lúc huỷ, `number` là thời gian chạy, **không
+  đặt `flag`**; thiết bị hiện "đã huỷ" (không ✓ cũng không ✗) và không để nó thay trạng thái của lượt chạy mới hơn cùng workflow. Khoá trùng theo id lượt chạy và loại. Không có URL, commit message hay tên người. Lượt theo dõi kết thúc khi lượt chạy chưa xong (hết 30 phút,
   `gh` đăng xuất, agent dừng hoặc xoá dữ liệu) thì ghi `ci_finished` **không đặt `flag`** và không có `number`: kết quả không rõ, `at` là lúc
   agent bỏ theo dõi; khoá trùng riêng (id lượt chạy kèm `unknown`), nên kết quả thật đọc được sau vẫn được lưu và thắng. Thiết bị hiện `flag` không đặt là "không
   rõ" (không ✓ cũng không ✗), và coi một lượt `ci_started` chưa có `ci_finished` quá 45 phút là không rõ (agent khởi động lại giữa chừng, hoặc người dùng tắt

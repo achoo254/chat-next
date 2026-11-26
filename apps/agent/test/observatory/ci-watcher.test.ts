@@ -101,6 +101,17 @@ describe("CiWatcher", () => {
     expect(r.gh.calls.filter((c) => c[0] === "--version")).toHaveLength(1);
   });
 
+  it("writes ci_cancelled, with no flag, for a run GitHub cancelled", async () => {
+    const r = rig();
+    r.gh.runs = [raw(7, "completed", "cancelled", 3_000)];
+    r.watcher.pushed(pushOf());
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(brief(r.ops)).toEqual([
+      ["s1", "ci_started", "CI", undefined, undefined, "GIT"],
+      ["s1", "ci_cancelled", "CI", undefined, 3_000, "GIT"],
+    ]);
+  });
+
   it("flags a failed run as not successful", async () => {
     const r = rig();
     r.gh.runs = [raw(5, "completed", "failure", 30_000, "Deploy")];

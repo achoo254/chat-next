@@ -131,6 +131,7 @@ export const SESSION_EVENT_KINDS = [
   "ci_started",
   /** That run done: flag whether it succeeded, number how long it ran (ms). */
   "ci_finished",
+  "ci_cancelled",
 ] as const;
 
 export type SessionEventKind = (typeof SESSION_EVENT_KINDS)[number];

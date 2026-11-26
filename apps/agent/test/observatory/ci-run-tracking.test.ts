@@ -15,6 +15,7 @@ const run = (id: number, over: Partial<CiRun> = {}): CiRun => ({
   name: "CI",
   completed: false,
   success: false,
+  cancelled: false,
   createdAt: PUSH_AT + 5_000,
   updatedAt: PUSH_AT + 5_000,
   headBranch: "main",
@@ -55,8 +56,8 @@ describe("parseRunList", () => {
       { databaseId: 14, status: "queued", createdAt: "not a date", updatedAt: "2026-11-25T10:00:06Z" },
     ]);
     expect(parseRunList(out)).toEqual([
-      { id: 11, name: "CI", completed: false, success: false, createdAt: PUSH_AT + 5_000, updatedAt: PUSH_AT + 6_000, headBranch: "main" },
-      { id: 12, name: "Deploy", completed: true, success: false, createdAt: PUSH_AT + 5_000, updatedAt: PUSH_AT + 125_000, headBranch: "main" },
+      { id: 11, name: "CI", completed: false, success: false, cancelled: false, createdAt: PUSH_AT + 5_000, updatedAt: PUSH_AT + 6_000, headBranch: "main" },
+      { id: 12, name: "Deploy", completed: true, success: false, cancelled: false, createdAt: PUSH_AT + 5_000, updatedAt: PUSH_AT + 125_000, headBranch: "main" },
     ]);
   });
 

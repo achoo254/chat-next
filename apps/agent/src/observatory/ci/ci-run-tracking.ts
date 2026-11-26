@@ -6,7 +6,8 @@
 // created after its first push less PUSH_SLACK_MS (the run is created by
 // GitHub, whose clock and the push's own may differ), on the pushed branch
 // when it was read. Each run gives `ci_started` the first time it is seen and
-// `ci_finished` once it completed; both are keyed by the run's id, so a run
+// `ci_finished` once it completed (`ci_cancelled` instead when GitHub cancelled
+// it, usually because a newer push replaced it); each is keyed by the run's id, so a run
 // seen again, or by a second watch of the session, is stored once. A watch is
 // done once it saw a run, every run it saw completed and no new run came for
 // QUIET_POLLS polls; before its first run it waits FIRST_RUN_GRACE_MS after
@@ -43,7 +44,7 @@ export function runListArgs(repo: string): string[] {
 }
 
 /** One run as the watcher reads it; times in Unix ms. */
-export type CiRun = { id: number; name: string | undefined; completed: boolean; success: boolean; createdAt: number; updatedAt: number; headBranch: string | undefined };
+export type CiRun = { id: number; name: string | undefined; completed: boolean; success: boolean; cancelled: boolean; createdAt: number; updatedAt: number; headBranch: string | undefined };
 
 const rawRun = z.object({
   databaseId: z.number().int().positive(),
@@ -75,6 +76,7 @@ export function parseRunList(stdout: string): CiRun[] {
       name: labelValue(r.data.name, MAX_NAME_CHARS),
       completed: r.data.status === "completed",
       success: r.data.conclusion === "success",
+      cancelled: r.data.conclusion === "cancelled",
       createdAt,
       updatedAt,
       headBranch: r.data.headBranch ?? undefined,
@@ -116,11 +118,14 @@ export function mergePush(state: CiWatchState, at: number, branch: string | unde
 }
 
 /** The session event of a run: started (at its creation) or finished (at its last update, with outcome and duration). */
-function runEventOp(state: CiWatchState, run: CiRun, kind: "ci_started" | "ci_finished"): WriteOp {
+function runEventOp(state: CiWatchState, run: CiRun, kind: "ci_started" | "ci_finished" | "ci_cancelled"): WriteOp {
   const facts =
     kind === "ci_started"
       ? { sessionId: state.sessionId, at: run.createdAt, station: "GIT", label: run.name }
-      : { sessionId: state.sessionId, at: run.updatedAt, station: "GIT", label: run.name, flag: run.success, number: Math.max(0, run.updatedAt - run.createdAt) };
+      : kind === "ci_cancelled"
+        ? // Cancelled (usually replaced by a newer push): neither a pass nor a failure, so no flag.
+          { sessionId: state.sessionId, at: run.updatedAt, station: "GIT", label: run.name, number: Math.max(0, run.updatedAt - run.createdAt) }
+        : { sessionId: state.sessionId, at: run.updatedAt, station: "GIT", label: run.name, flag: run.success, number: Math.max(0, run.updatedAt - run.createdAt) };
   return sessionEventOp(kind, facts, [run.id]);
 }
 
@@ -143,7 +148,7 @@ export function stepWatch(state: CiWatchState, runs: readonly CiRun[], now: numb
     if (!run.completed) busy = true;
     else if (!state.finished.has(run.id)) {
       state.finished.add(run.id);
-      ops.push(runEventOp(state, run, "ci_finished"));
+      ops.push(runEventOp(state, run, run.cancelled ? "ci_cancelled" : "ci_finished"));
     }
   }
   // Quiet polls count only once a run was seen; before that, the grace after the push decides.
