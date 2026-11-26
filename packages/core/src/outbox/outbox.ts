@@ -613,8 +613,9 @@ export class Outbox {
 			if (dialog.readInboxMaxSeq < maxSeq) {
 				const { repo, selfId } = this.options;
 				const unread = await repo.countIncomingAfter(chatId, maxSeq, selfId);
-				const mentions = unread === 0 ? 0 : await repo.countMentionsAfter(chatId, maxSeq, selfId);
-				putLocalRead(w, chatId, maxSeq, unread, mentions);
+				// A mention stays unread until its message is seen: only those just read past go.
+				const seen = await repo.countMentionsIn(chatId, dialog.readInboxMaxSeq, maxSeq, selfId);
+				putLocalRead(w, chatId, maxSeq, unread, seen);
 			}
 			w.add("DELETE FROM outbox WHERE chat_id = ? AND kind = 'read' AND failure IS NULL", [chatId]);
 			this.insert(w, chatId, { kind: "read", maxSeq }, 0);

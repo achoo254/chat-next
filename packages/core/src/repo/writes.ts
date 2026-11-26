@@ -420,17 +420,19 @@ export function retopDialog(w: WriteBatch, chatId: number): void {
 }
 
 /**
- * Optimistic local read: the position and the unread and mention counts
- * taken from the messages this device holds. The server's read update for
- * this read is not applied here (the ack moves past it), so these counts
- * stay until the next dialog fetch; the mention count only goes down.
+ * Optimistic local read: the position and the unread count taken from the
+ * messages this device holds, and the mention count less the mentions just
+ * read past (`seenMentions`): one read past earlier, elsewhere, stays until
+ * its message is seen. The server's read update for this read is not applied
+ * here (the ack moves past it), so these counts stay until the next dialog
+ * fetch; the mention count only goes down.
  */
-export function putLocalRead(w: WriteBatch, chatId: number, maxSeq: number, unreadCount: number, unreadMentions: number): void {
+export function putLocalRead(w: WriteBatch, chatId: number, maxSeq: number, unreadCount: number, seenMentions: number): void {
 	w.add(
 		`UPDATE read_states SET read_inbox_max_seq = ?1, unread_count = ?2,
-			unread_mentions_count = min(unread_mentions_count, ?5)
+			unread_mentions_count = max(0, unread_mentions_count - ?5)
 		WHERE chat_id = ?3 AND topic_id = ?4 AND read_inbox_max_seq <= ?1`,
-		[maxSeq, unreadCount, chatId, CHAT_TOPIC, unreadMentions],
+		[maxSeq, unreadCount, chatId, CHAT_TOPIC, seenMentions],
 	);
 	w.emit(EventKeys.dialog(chatId));
 }

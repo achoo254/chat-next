@@ -241,15 +241,16 @@ export class Repository {
 	 * Incoming messages after `seq` that mention the user or reply to them
 	 * (the "@" count after reading up to it); placeholders do not count.
 	 */
-	async countMentionsAfter(chatId: number, seq: number, selfId: number): Promise<number> {
+	/** Messages in (after, upTo] that mention you or reply to you, among those this device holds. */
+	async countMentionsIn(chatId: number, after: number, upTo: number, selfId: number): Promise<number> {
 		const self = await this.driver.query("SELECT username FROM users WHERE id = ?", [selfId]);
 		const username = str(self[0] ?? {}, "username");
 		const rows = await this.driver.query(
 			`SELECT m.text, m.entities, EXISTS (
 				SELECT 1 FROM messages o WHERE o.chat_id = m.chat_id AND o.seq = m.reply_to_seq AND o.from_id = ?3
 			) AS reply_to_me
-			FROM messages m WHERE m.chat_id = ?1 AND m.seq > ?2 AND m.from_id <> ?3 AND m.recalled = 0`,
-			[chatId, seq, selfId],
+			FROM messages m WHERE m.chat_id = ?1 AND m.seq > ?2 AND m.seq <= ?4 AND m.from_id <> ?3 AND m.recalled = 0`,
+			[chatId, after, selfId, upTo],
 		);
 		return rows.filter(
 			(row) =>
