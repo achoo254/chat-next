@@ -750,6 +750,30 @@ describe("the dock", () => {
 		parts.link.stop();
 	});
 
+	it("a file over the machine's limit is told in an alert card over the terminal, with its name and the limit", async () => {
+		const parts = links();
+		await until(() => parts.link.snapshot().status.kind === "open", "link open");
+		const limits = { fileMaxBytes: 4, messageMaxBytes: 1_000_000, messageMaxFiles: 10, imageMaxBytes: 1_000_000, pieceMaxBytes: 64_000 };
+		const view = render(
+			<I18nProvider>
+				<TerminalDock machine="1" link={parts.link} online terminal={parts.terminal} thread={{ id: "t1", dir: "/w/app", chat: "/ai/1/s/t1", aiName: "Claude Code" }} store={refusing()} touch={false} imageLimits={limits} />
+			</I18nProvider>,
+		);
+		await until(() => sent("termOpen").length === 1, "the AI");
+		const dock = view.container.querySelector("[data-id=terminal-dock]");
+		if (dock === null) throw new Error("no dock");
+		const dataTransfer = { types: ["Files"], files: [new File(["too big for the limit"], "recording.mov")], dropEffect: "none" };
+		fireEvent.dragEnter(dock, { dataTransfer });
+		fireEvent.drop(dock, { dataTransfer });
+		const alert = await screen.findByRole("alert");
+		expect(alert.textContent).toContain("recording.mov");
+		expect(sent("attachmentUpload")).toEqual([]);
+		fireEvent.click(alert.querySelector("button") as HTMLElement);
+		expect(screen.queryByRole("alert")).toBeNull();
+		parts.terminal.stop();
+		parts.link.stop();
+	});
+
 	it("a file dropped on a session's terminal on a machine that cannot take it is kept from the browser, and the dock says why", async () => {
 		const parts = links();
 		await until(() => parts.link.snapshot().status.kind === "open", "link open");

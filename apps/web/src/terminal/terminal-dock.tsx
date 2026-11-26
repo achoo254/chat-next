@@ -31,6 +31,7 @@ import { latencyProbe } from "./latency-probe.ts";
 import { AGENT_TERMINAL_IMAGES, versionAtLeast } from "../machines/agent-version.ts";
 import { copyWithContext, useAdvisorScope } from "../advisor/advisor-context.tsx";
 import { limitsOf, type Limits } from "../machines/attachments.ts";
+import { formatBytes } from "../messaging/media/media-format.ts";
 import { DropZone, useFileDrop } from "../machines/attachment-tray.tsx";
 import { useDictation } from "./dictation.ts";
 import { ImageTooLarge, imageIntoMachine, pathInput } from "./terminal-image.ts";
@@ -708,6 +709,8 @@ export function TerminalDock({
 	// An image into the session's terminal: sent to the machine, its saved path typed where the AI reads it.
 	const [imageProgress, setImageProgress] = useState<number | null>(null);
 	const [imageError, setImageError] = useState("");
+	/** A file over the machine's size limit: a card over the terminal, since a line of small text goes unseen. */
+	const [tooLargeAlert, setTooLargeAlert] = useState("");
 	const imageAbort = useRef<AbortController | null>(null);
 	/** Files go to the machine one after another; the dock leaving stops the ones not sent yet. */
 	const uploads = useRef<Promise<void>>(Promise.resolve());
@@ -738,13 +741,16 @@ export function TerminalDock({
 			},
 			(err: unknown) => {
 				setImageProgress(null);
-				if (!abort.signal.aborted) setImageError(err instanceof ImageTooLarge ? tt.keys.imageTooLarge : tt.keys.imageFailed);
+				if (abort.signal.aborted) return;
+				if (err instanceof ImageTooLarge && imageLimits !== null) setTooLargeAlert(t.agent.attach.tooLarge(err.message, formatBytes(imageLimits.fileMaxBytes, locale)));
+				else setImageError(tt.keys.imageFailed);
 			},
 		);
 	};
 	/** Queues files behind any still going; a new batch clears the last batch's error, a failure in it stays shown. */
 	const sendFiles = (files: readonly File[]) => {
 		setImageError("");
+		setTooLargeAlert("");
 		for (const file of files) uploads.current = uploads.current.then(() => (leaving.current ? undefined : sendFile(file)));
 	};
 	const pickImage = (file: File) => sendFiles([file]);
@@ -995,6 +1001,15 @@ export function TerminalDock({
 				</p>
 			)}
 			<div className="tx-body">
+				{tooLargeAlert !== "" && (
+					<div className="tx-file-alert" role="alert" data-id="terminal-file-alert">
+						<Icon name="alert-triangle" />
+						<p>{tooLargeAlert}</p>
+						<button type="button" className="btn btn-sm" onClick={() => setTooLargeAlert("")}>
+							{t.agent.attach.dismiss}
+						</button>
+					</div>
+				)}
 				{view.tabs.map((x) => (
 					<div key={x.id} className="tx-tab-body" hidden={x.id !== tab?.id}>
 						<TerminalSplits root={x.root} label={() => tt.resize} renderPane={renderPane} onRatio={(id, ratio) => setLayout((l) => setRatio(l, id, ratio))} />

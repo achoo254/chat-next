@@ -132,6 +132,9 @@
 @media (prefers-reduced-motion: reduce) { .tx-loading-mark::after, .tx-loading-line, .tx-loading-prompt i, .tx-preview-chip, .tx-preview-chip::before { animation: none; } }
 .tx-failed { z-index: 3; background: rgb(17 19 24 / 0.92); }
 .tx-failed p { margin: 0; max-width: 420px; }
+.tx-file-alert { position: absolute; left: 50%; top: var(--space-4); z-index: 4; display: grid; justify-items: center; gap: var(--space-2); width: min(420px, calc(100% - 2 * var(--space-4))); transform: translateX(-50%); padding: var(--space-4); border: 1px solid var(--c-error); border-radius: var(--radius-lg, 12px); background: var(--c-surface); color: var(--c-text); text-align: center; font-size: 0.9375rem; box-shadow: 0 12px 32px rgb(0 0 0 / 0.45); }
+.tx-file-alert svg { width: 28px; height: 28px; color: var(--c-error); }
+.tx-file-alert p { margin: 0; overflow-wrap: anywhere; }
 
 /* The phone keyboard's input: at the caret, invisible, 16px so iOS does not zoom. */
 .tx-ime { position: absolute; left: 6px; top: 4px; z-index: 1; width: 2px; min-height: 16px; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; opacity: 0; font-size: 16px; color: transparent; background: transparent; caret-color: transparent; }
