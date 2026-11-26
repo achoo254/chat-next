@@ -72,8 +72,9 @@ export const BUNDLE_BUDGET = {
 	 * only grew them: 3.7 KB gzip, with no change in the open-chat and scroll timings. The
 	 * message list and the conversation grew less (1.2 and 1.5 KB) but are left memoized:
 	 * without it the history scroll dropped 23 frames on the 4x-throttled run (1 before).
+	 * The budget is 153 KB since 26/11/2026, lowered by the owner to keep the gain (about 1 KB of room).
 	 */
-	startupJsGzip: 156 * 1024,
+	startupJsGzip: 153 * 1024,
 	/**
 	 * Derived: startup CSS was 13.7 KB gzip when the gate started. 20.4 KB on
 	 * 25/11/2026 with the conversation's Ask AI panel, the quick actions that
