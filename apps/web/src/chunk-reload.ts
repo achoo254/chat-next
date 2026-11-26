@@ -2,7 +2,8 @@
 // its lazy chunks that the server no longer serves (nginx serves only the
 // current release's /assets/). The import then fails, React unmounts the app
 // and only the page splash ("Đang tải…") is left. When that happens the page
-// reloads once, which loads the current build. A second failure within
+// reloads once, which loads the current build. This module is loaded only
+// when an error reaches the top (error-recovery.ts keeps startup small). A second failure within
 // RELOAD_GUARD_MS does not reload again (the new build itself may be broken
 // or the network down): the splash shows a message and a reload button.
 // Any other error that unmounts the app shows the same notice, without an
@@ -86,19 +87,17 @@ export function showReloadNotice(kind: NoticeKind = "chunk", doc: Document = doc
 	splash.appendChild(button);
 }
 
-/** Handles a chunk failure that reached the top: reload once, else show the notice. Returns whether it was one. */
-export function recoverFromChunkError(error: unknown): boolean {
-	if (!isChunkLoadError(error)) return false;
-	if (!reloading && !reloadForNewBuild()) showReloadNotice("chunk");
+/**
+ * Handles an error that reached the top. A failed chunk reloads once (else the
+ * chunk notice); any other error shows the crash notice only when it unmounted
+ * the app (`unmounted`, from React's onUncaughtError). Returns whether it acted.
+ */
+export function recoverFromError(error: unknown, unmounted: boolean): boolean {
+	if (isChunkLoadError(error)) {
+		if (!reloading && !reloadForNewBuild()) showReloadNotice("chunk");
+		return true;
+	}
+	if (!unmounted) return false;
+	showReloadNotice("crash");
 	return true;
-}
-
-/** Listens for failed dynamic imports that do not reach React (Vite's preload event, unhandled rejections). */
-export function installChunkReload(): void {
-	addEventListener("vite:preloadError", (event) => {
-		recoverFromChunkError((event as Event & { payload?: unknown }).payload ?? new Error("Unable to preload CSS"));
-	});
-	addEventListener("unhandledrejection", (event) => {
-		recoverFromChunkError(event.reason);
-	});
 }

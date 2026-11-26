@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app.tsx";
 import { applyStoredAppearance } from "./appearance.ts";
 import { followSharedTheme } from "./shared-theme.ts";
-import { installChunkReload, recoverFromChunkError, showReloadNotice } from "./chunk-reload.ts";
+import { installErrorRecovery, recoverAfterError } from "./error-recovery.ts";
 import { installErrorReporter, reportClientError } from "./error-reporter.ts";
 import { captureInstallPrompt } from "./install-prompt.ts";
 import { registerServiceWorker } from "./register-service-worker.ts";
@@ -13,7 +13,7 @@ import "@achoo254/app-shell/tokens.css";
 import "./styles/app.css";
 
 installErrorReporter();
-installChunkReload();
+installErrorRecovery();
 applyStoredAppearance();
 followSharedTheme();
 // The browser announces installability once, early; Settings › Cài ứng dụng uses it later.
@@ -30,7 +30,7 @@ function render(root: HTMLElement, rpcFetch?: RpcFetch): void {
 			reportClientError("render", error);
 			// React has unmounted the app: a lazy chunk of a build the server no longer serves loads the
 			// current build; anything else leaves a reload button instead of the splash (chunk-reload.ts).
-			if (!recoverFromChunkError(error)) showReloadNotice("crash");
+			recoverAfterError(error, true);
 		},
 	}).render(
 		<StrictMode>

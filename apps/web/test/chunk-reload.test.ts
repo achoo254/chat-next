@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RELOAD_GUARD_MS, isChunkLoadError, reloadForNewBuild, showReloadNotice } from "../src/chunk-reload.ts";
+import { RELOAD_GUARD_MS, isChunkLoadError, recoverFromError, reloadForNewBuild, showReloadNotice } from "../src/chunk-reload.ts";
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
 	const data = new Map(Object.entries(initial));
@@ -88,3 +88,15 @@ describe("the notice on the splash", () => {
 		expect(document.querySelector("#splash .brand-loader-text")?.textContent).toBe("应用出错，已停止运行。");
 	});
 });
+
+describe("an error that reached the top", () => {
+	it("shows the crash notice only when the error unmounted the app", () => {
+		document.documentElement.lang = "vi";
+		document.body.innerHTML = '<div id="splash" hidden><p class="brand-loader-text">Đang tải…</p></div>';
+		expect(recoverFromError(new TypeError("x is undefined"), false)).toBe(false);
+		expect(document.getElementById("splash")?.hidden).toBe(true);
+		expect(recoverFromError(new TypeError("x is undefined"), true)).toBe(true);
+		expect(document.querySelector("#splash .brand-loader-text")?.textContent).toBe("Ứng dụng gặp lỗi và đã dừng.");
+	});
+});
+
