@@ -106,6 +106,48 @@ func (it *ImportTx) SetOwnerDialogPinned(ctx context.Context, pinned bool) (bool
 	return true, nil
 }
 
+// MarkOwnerTopicRead moves the owner's read position of one topic of a forum up to upToSeq,
+// as the other app says they read that topic there. It never moves back. It reports whether
+// the position moved; the owner's sessions then get the topic's new count.
+func (it *ImportTx) MarkOwnerTopicRead(ctx context.Context, topicID, upToSeq int64) (bool, error) {
+	upToSeq = min(upToSeq, it.c.LastSeq)
+	if upToSeq <= 0 || !it.c.Forum {
+		return false, nil
+	}
+	tag, err := it.t.tx.Exec(ctx, `
+		INSERT INTO chat_read_states (chat_id, user_id, topic_id, read_inbox_max_seq) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (chat_id, user_id, topic_id) DO UPDATE
+			SET read_inbox_max_seq = excluded.read_inbox_max_seq, updated_at = now()
+			WHERE chat_read_states.read_inbox_max_seq < excluded.read_inbox_max_seq`, it.c.ID, it.owner, topicID, upToSeq)
+	if err != nil {
+		return false, fmt.Errorf("chat: owner topic read position: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+	_, m, err := it.t.s.chatFor(ctx, it.t.tx, it.c.ID, it.owner, false)
+	if err != nil {
+		return false, fmt.Errorf("chat: import owner member: %w", err)
+	}
+	inbox := &appv1.UpdateRead{ChatId: it.c.ID, MaxSeq: upToSeq, TopicId: topicID}
+	ev := it.t.event(kindRead, it.c.ID, it.owner)
+	it.t.toUsers(ev, []int64{it.owner}, &appv1.Update{Kind: &appv1.Update_Read{Read: inbox}})
+	it.t.beforeWrite = append(it.t.beforeWrite, func(ctx context.Context) error {
+		rs, err := it.t.s.readState(ctx, it.t.tx, it.c, m)
+		if err != nil {
+			return err
+		}
+		inbox.UnreadCount, inbox.UnreadMentionsCount, inbox.TopSeq = rs.unread, rs.mentions, rs.topSeq
+		if it.c.SyncMode == syncLarge {
+			inbox.ChatPts = rs.chatPts
+		}
+		n, err := it.t.s.topicUnread(ctx, it.t.tx, it.c.ID, m, topicID)
+		inbox.TopicUnreadCount = n
+		return err
+	})
+	return true, nil
+}
+
 // MarkOwnerRead moves the owner's read position of the chat up to upToSeq, as the other app
 // says they read there (on another device). It never moves back and does not go past the newest
 // message. It reports whether the position moved.

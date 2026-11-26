@@ -35,7 +35,42 @@ func (a *Adapter) MarkRead(ctx context.Context, acct bridge.Account, conv, upToI
 	return translatePin(err)
 }
 
-var _ bridge.ReadWriter = (*Adapter)(nil)
+// MarkTopicRead implements bridge.TopicReadWriter: a topic of a forum is read with
+// messages.readDiscussion on the message that opened it (1 for General). Should Telegram
+// refuse that for a topic, the forum is read as a whole up to the message instead.
+func (a *Adapter) MarkTopicRead(ctx context.Context, acct bridge.Account, conv, topic, upToID string) error {
+	id, err := strconv.Atoi(upToID)
+	if err != nil {
+		return fmt.Errorf("%w: message id %q", bridge.ErrNotAllowed, upToID)
+	}
+	top, err := strconv.Atoi(topic)
+	if err != nil {
+		return fmt.Errorf("%w: topic %q", bridge.ErrNotAllowed, topic)
+	}
+	c, release, err := a.acquire(ctx, acct)
+	if err != nil {
+		return err
+	}
+	defer release()
+	peer, err := c.inputPeer(ctx, conv)
+	if err != nil {
+		return err
+	}
+	_, err = c.live.api().MessagesReadDiscussion(ctx, &tg.MessagesReadDiscussionRequest{Peer: peer, MsgID: top, ReadMaxID: id})
+	if err == nil {
+		return nil
+	}
+	if p, ok := peer.(*tg.InputPeerChannel); ok && tg.IsMsgIDInvalid(err) {
+		_, err = c.live.api().ChannelsReadHistory(ctx, &tg.ChannelsReadHistoryRequest{
+			Channel: &tg.InputChannel{ChannelID: p.ChannelID, AccessHash: p.AccessHash}, MaxID: id})
+	}
+	return translatePin(err)
+}
+
+var (
+	_ bridge.ReadWriter      = (*Adapter)(nil)
+	_ bridge.TopicReadWriter = (*Adapter)(nil)
+)
 
 // registerSeen turns the owner's reading on another device into bridge.Seen events.
 func registerSeen(d tg.UpdateDispatcher, emit func(context.Context, bridge.Event) error) {
@@ -49,6 +84,11 @@ func registerSeen(d tg.UpdateDispatcher, emit func(context.Context, bridge.Event
 	d.OnReadChannelInbox(func(ctx context.Context, _ tg.Entities, u *tg.UpdateReadChannelInbox) error {
 		return emit(ctx, bridge.Event{Seen: &bridge.Seen{
 			Conversation: prefixChannel + strconv.FormatInt(u.ChannelID, 10), MaxID: strconv.Itoa(u.MaxID)}})
+	})
+	// A topic of a forum read on another device.
+	d.OnReadChannelDiscussionInbox(func(ctx context.Context, _ tg.Entities, u *tg.UpdateReadChannelDiscussionInbox) error {
+		return emit(ctx, bridge.Event{Seen: &bridge.Seen{
+			Conversation: prefixChannel + strconv.FormatInt(u.ChannelID, 10), MaxID: strconv.Itoa(u.ReadMaxID), Topic: strconv.Itoa(u.TopMsgID)}})
 	})
 }
 

@@ -24,8 +24,22 @@ func (r *runner) onSeen(ctx context.Context, ev bridge.Event, s bridge.Seen) (bo
 	if err != nil || seq == 0 {
 		return false, err
 	}
+	var topicID int64
+	if s.Topic != "" {
+		id, ok, err := lookupTopic(ctx, r.e.db.pool, r.account.ID, s.Conversation, s.Topic)
+		if err != nil || !ok {
+			return false, err // a topic Chat does not have: nothing to read
+		}
+		topicID = id
+	}
 	err = r.withLink(ctx, l, func(it *chat.ImportTx) error {
-		if _, err := it.MarkOwnerRead(ctx, seq); err != nil {
+		var err error
+		if s.Topic != "" {
+			_, err = it.MarkOwnerTopicRead(ctx, topicID, seq)
+		} else {
+			_, err = it.MarkOwnerRead(ctx, seq)
+		}
+		if err != nil {
 			return err
 		}
 		return saveState(ctx, it.Tx(), r.account.ID, ev.State)
@@ -45,10 +59,25 @@ func (r *runner) doMarkRead(ctx context.Context, h *outboxRow) error {
 		return err
 	}
 	var p struct {
-		Seq int64 `json:"seq"`
+		Seq   int64 `json:"seq"`
+		Topic int64 `json:"topic"`
 	}
 	if err := json.Unmarshal(h.Payload, &p); err != nil {
 		return db.setOutbox(ctx, []int64{h.ID}, "failed", "bad payload", time.Time{})
+	}
+	// A topic read goes to that topic of the other app.
+	var topic string
+	var topicWriter bridge.TopicReadWriter
+	if p.Topic != 0 {
+		ext, ok, err := externalTopic(ctx, db.pool, r.account.ID, h.ExternalChat, p.Topic)
+		if err != nil {
+			return err
+		}
+		tw, can := r.adapter.(bridge.TopicReadWriter)
+		if !ok || !can {
+			return db.setOutbox(ctx, []int64{h.ID}, "cancelled", "", time.Time{})
+		}
+		topic, topicWriter = ext, tw
 	}
 	var id string
 	err := db.pool.QueryRow(ctx, `
@@ -61,7 +90,12 @@ func (r *runner) doMarkRead(ctx context.Context, h *outboxRow) error {
 	if err != nil {
 		return fmt.Errorf("bridge: newest message to mark read: %w", err)
 	}
-	if err := w.MarkRead(ctx, r.acct, h.ExternalChat, id); err != nil {
+	if topicWriter != nil {
+		err = topicWriter.MarkTopicRead(ctx, r.acct, h.ExternalChat, topic, id)
+	} else {
+		err = w.MarkRead(ctx, r.acct, h.ExternalChat, id)
+	}
+	if err != nil {
 		return r.settleCall(ctx, []*outboxRow{h}, err)
 	}
 	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})

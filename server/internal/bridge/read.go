@@ -8,6 +8,14 @@ import "context"
 type Seen struct {
 	Conversation string
 	MaxID        string
+	// Topic is the topic of a forum read there (Message.Topic); "" for the whole conversation.
+	Topic string
+}
+
+// TopicReadWriter is implemented by an adapter whose forums are read one topic at a time:
+// when the owner reads a topic in Chat, the other app marks that topic read up to the message.
+type TopicReadWriter interface {
+	MarkTopicRead(ctx context.Context, acct Account, conv, topic, upToID string) error
 }
 
 // ReadWriter is implemented by an adapter that supports "read" going out: when the owner

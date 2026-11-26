@@ -44,18 +44,20 @@ func (t *txn) queueState(ctx context.Context, chatID, me int64, feat feature.Fea
 // queueRead queues "the owner read the chat up to seq" for the other app, keeping the
 // highest seq when several are queued before one is sent. The row has no message of its own:
 // the engine finds the newest message of the other app at or below seq when it sends.
-func (t *txn) queueRead(ctx context.Context, chatID, me, seq int64) error {
+// The row of a read is keyed by its topic (the outbox seq column: 0 for the whole chat), so
+// reads of different topics each go out and later reads of one replace its earlier one.
+func (t *txn) queueRead(ctx context.Context, chatID, me, topicID, seq int64) error {
 	l, err := t.outboundLink(ctx, chatID, me, feature.Read)
 	if err != nil || l == nil {
 		return err
 	}
 	if _, err := t.tx.Exec(ctx, `
 		INSERT INTO external_outbox (account_id, external_chat_id, chat_id, seq, op, feature, payload)
-		VALUES ($1, $2, $3, 0, 'mark_read', 'read', jsonb_build_object('seq', $4::bigint))
+		VALUES ($1, $2, $3, $5, 'mark_read', 'read', jsonb_build_object('seq', $4::bigint, 'topic', $5::bigint))
 		ON CONFLICT (chat_id, seq, op) DO UPDATE
-			SET payload = jsonb_build_object('seq', greatest((external_outbox.payload->>'seq')::bigint, $4::bigint)),
+			SET payload = jsonb_build_object('seq', greatest((external_outbox.payload->>'seq')::bigint, $4::bigint), 'topic', $5::bigint),
 				status = 'pending', attempts = 0, next_attempt_at = now(), last_error = '', updated_at = now()`,
-		l.accountID, l.externalID, chatID, seq); err != nil {
+		l.accountID, l.externalID, chatID, seq, topicID); err != nil {
 		return fmt.Errorf("chat: queue read: %w", err)
 	}
 	return nil

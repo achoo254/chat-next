@@ -1409,10 +1409,8 @@ func (s *Service) ReadHistory(ctx context.Context, me, chatID, maxSeq, topicID i
 		if err := t.read(ctx, c, m, maxSeq, topicID); err != nil {
 			return err
 		}
-		if topicID == 0 {
-			return t.queueRead(ctx, chatID, me, maxSeq)
-		}
-		return nil
+		// The other app of a synced chat reads the chat, or the one topic read.
+		return t.queueRead(ctx, chatID, me, topicID, maxSeq)
 	})
 	if err != nil {
 		return nil, err

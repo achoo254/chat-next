@@ -3,6 +3,7 @@ package engine_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -319,4 +320,41 @@ func TestARenameOfATopicWithTopicsSwitchedOffStaysInChatOnly(t *testing.T) {
 	if _, _, err := e.chat.EditForumTopic(ctx, e.owner, &appv1.EditForumTopicRequest{ChatId: chatID, TopicId: topic, Title: &title}); err == nil {
 		t.Fatal("a topic of a chat that only receives its topics was renamed from Chat")
 	}
+}
+
+// topicReadOf is the owner's read position of a topic of the chat (0 when none).
+func (e *env) topicReadOf(chatID, topicID int64) int64 {
+	e.t.Helper()
+	var seq int64
+	if err := e.st.Pool().QueryRow(context.Background(), `
+		SELECT coalesce(max(read_inbox_max_seq), 0) FROM chat_read_states WHERE chat_id = $1 AND user_id = $2 AND topic_id = $3`,
+		chatID, e.owner, topicID).Scan(&seq); err != nil {
+		e.t.Fatal(err)
+	}
+	return seq
+}
+
+func TestATopicReadInChatIsReadThereAndOneReadThereIsReadInChat(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	conv := e.forumConv()
+	e.fake.AddHistory("g1", e.inTopic("11", lan, "tin 1", "7", 1), e.inTopic("12", lan, "tin 2", "7", 2), e.inTopic("13", lan, "tin 3", "9", 3))
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"tin 1", "tin 2", "tin 3"})
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "backfill not done" })
+	if err := e.chat.SetImportedDirection(ctx, e.owner, chatID, chat.DirectionBoth); err != nil {
+		t.Fatal(err)
+	}
+	infra, design := e.topicIDByTitle(chatID, "Hạ tầng"), e.topicIDByTitle(chatID, "Thiết kế")
+	// Reading one topic in Chat reads that topic of the other app, up to its message.
+	if _, err := e.chat.ReadHistory(ctx, e.owner, chatID, e.seqOf(chatID, "12"), infra); err != nil {
+		t.Fatal(err)
+	}
+	e.eventually(func() bool { return slices.Contains(e.fake.MarkReads(), "g1/7:12") },
+		func() string { return fmt.Sprintf("reads sent: %v", e.fake.MarkReads()) })
+	// The other topic read on another device of the other app is read in Chat.
+	e.fake.Push(bridge.Event{Seen: &bridge.Seen{Conversation: "g1", MaxID: "13", Topic: "9"}})
+	want := e.seqOf(chatID, "13")
+	e.eventually(func() bool { return e.topicReadOf(chatID, design) == want },
+		func() string { return fmt.Sprintf("topic read at %d, want %d", e.topicReadOf(chatID, design), want) })
 }

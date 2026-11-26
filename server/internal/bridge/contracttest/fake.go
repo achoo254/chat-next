@@ -1033,6 +1033,17 @@ func (f *Fake) MarkReads() []string {
 	return append([]string(nil), f.reads...)
 }
 
+// MarkTopicRead implements bridge.TopicReadWriter; it is recorded as "conv/topic:id".
+func (f *Fake) MarkTopicRead(_ context.Context, _ bridge.Account, conv, topic, upToID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.support[feature.Read].Out {
+		return fmt.Errorf("%w: this app does not take that from Chat", bridge.ErrNotAllowed)
+	}
+	f.reads = append(f.reads, conv+"/"+topic+":"+upToID)
+	return nil
+}
+
 // MarkRead implements bridge.ReadWriter.
 func (f *Fake) MarkRead(_ context.Context, _ bridge.Account, conv, upToID string) error {
 	f.mu.Lock()
