@@ -32,10 +32,11 @@ func setSeen(p *bridge.Participant, status tg.UserStatusClass, now time.Time) bo
 	var until time.Time
 	switch s := status.(type) {
 	case *tg.UserStatusOnline:
+		// Online until Expires; a status read after it lapsed means last seen then, not now.
 		seen = now
 		until = time.Unix(int64(s.Expires), 0)
 		if !until.After(now) {
-			until = time.Time{}
+			seen, until = until, time.Time{}
 		}
 	case *tg.UserStatusOffline:
 		seen = time.Unix(int64(s.WasOnline), 0)

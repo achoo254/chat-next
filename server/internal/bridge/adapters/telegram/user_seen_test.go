@@ -26,7 +26,7 @@ func TestWithUserSeen(t *testing.T) {
 		online bool
 	}{
 		{"online is now until it expires", user(&tg.UserStatusOnline{Expires: int(now.Add(5 * time.Minute).Unix())}, false), true, [2]time.Duration{0, 0}, bridge.SeenExact, true},
-		{"an expired online is not online", user(&tg.UserStatusOnline{Expires: int(now.Add(-time.Minute).Unix())}, false), true, [2]time.Duration{0, 0}, bridge.SeenExact, false},
+		{"an expired online is last seen when it lapsed", user(&tg.UserStatusOnline{Expires: int(now.Add(-time.Minute).Unix())}, false), true, [2]time.Duration{-time.Minute, -time.Minute}, bridge.SeenExact, false},
 		{"offline keeps the exact time", user(&tg.UserStatusOffline{WasOnline: int(now.Add(-2 * time.Hour).Unix())}, false), true, [2]time.Duration{-2 * time.Hour, -2 * time.Hour}, bridge.SeenExact, false},
 		{"recently is within three days", user(&tg.UserStatusRecently{}, false), true, [2]time.Duration{-72 * time.Hour, 0}, bridge.SeenRecently, false},
 		{"last week is within a week", user(&tg.UserStatusLastWeek{}, false), true, [2]time.Duration{-7 * 24 * time.Hour, -3 * 24 * time.Hour}, bridge.SeenLastWeek, false},
