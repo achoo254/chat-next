@@ -71,6 +71,8 @@ class StreamLiveness {
 export type ControlOptions = {
   /** Tests shorten it; the default suits the holders' confirmations. */
   streamTimeoutMs?: number;
+  /** Hears the port once the endpoint listens (the machine's info lists it). */
+  onListening?: (port: number) => void;
 };
 
 /** What the control channel drives. The machine is absent in a tunnel-only service (tests). */
@@ -365,6 +367,7 @@ export function serveControl(target: ControlTarget, options: ControlOptions = {}
     const addr = server.address();
     const port = typeof addr === "object" && addr ? addr.port : 0;
     writeFileSync(controlFile(target.dir), JSON.stringify({ port, token, pid: process.pid }), { mode: 0o600 });
+    options.onListening?.(port);
   });
   return () => {
     server.close();

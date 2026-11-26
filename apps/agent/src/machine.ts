@@ -39,6 +39,8 @@ import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
 import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
+import { PROCESS_STARTED_AT, agentRuntimeBody } from "./agent-runtime.ts";
+import type { HeldTunnel } from "./tunnels/tunnel-service.ts";
 import { attachmentLimitsBody } from "./attachments/uploads.ts";
 import { Projects } from "./projects/projects.ts";
 import { writeCommitMessage } from "./workspace/commit-message.ts";
@@ -158,6 +160,10 @@ export class Machine {
   private server: Server | undefined;
   private wss: WebSocketServer | undefined;
   private port = 0;
+  /** The local commands' endpoint (control-socket.ts), set once it listens; listed in the machine's info. */
+  controlPort = 0;
+  /** The tunnels the service holds for `tunelo http` / `tunelo tcp` (tunnel-service.ts); none until set. */
+  heldTunnels: () => readonly HeldTunnel[] = () => [];
   private stopRotation: (() => void) | undefined;
   private connections = new Set<Connection>();
   private lastPing = 0;
@@ -805,6 +811,15 @@ export class Machine {
       agentUpdate: this.updater.info(),
       terminal: this.terminal.availability(),
       advisor: { available: this.sessionMcpEnabled(), ...this.advisorStatus() },
+      runtime: agentRuntimeBody({
+        pid: process.pid,
+        startedAt: PROCESS_STARTED_AT,
+        linkPort: this.port,
+        mcpPort: portOf(this.opts.mcp?.httpUrl),
+        observatory: this.observatory.receiverPort(),
+        controlPort: this.controlPort,
+        tunnels: this.heldTunnels(),
+      }),
     });
   }
 

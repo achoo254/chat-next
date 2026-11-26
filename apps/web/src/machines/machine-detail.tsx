@@ -26,7 +26,9 @@ import { AGENT_LIVE_MAP, terminalGate, versionAtLeast } from "./agent-version.ts
 import { MachineClaudeSessions } from "./observatory/machine-claude-sessions.tsx";
 import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
-import { aiName, mcpAiName, useEntry, useHub, useLink } from "./use-machines.ts";
+import { AgentRuntimeRows } from "./agent-runtime-rows.tsx";
+import { connOf } from "./machine-status.ts";
+import { aiName, mcpAiName, useEntry, useHub, useLink, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const AUDIT_FIRST = 20;
@@ -43,6 +45,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 	const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	const now = useNow();
 	const online = state.status.kind === "open";
 	const name = entry?.name ?? "";
 	const local = machine === LOCAL_REF;
@@ -180,6 +183,7 @@ export function MachineDetail({ machine }: { machine: string }) {
 							tunelo {state.info?.agentVersion || entry.agentVersion || "—"}{" "}
 							{online && state.info !== null && <AgentUpdateSetting link={link} info={state.info} progress={state.agentUpdate} online={online} />}
 						</dd>
+						<AgentRuntimeRows t={t} conn={connOf(entry, state, now)} info={state.info} now={now} />
 					</dl>
 					<div className="acts">
 						{!local && (

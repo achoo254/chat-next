@@ -2464,6 +2464,48 @@ message MachineInfo {
   // macOS only (tunelo 3.17.0+): the folders macOS protects and tunelo's
   // access to each; see "macOS folder access".
   repeated MacFolder mac_folders = 26;
+  // The tunelo service process and the ports it uses now; unset from a
+  // tunelo released before it (3.29.0 and older).
+  AgentRuntime runtime = 27;
+}
+
+// The tunelo service process that answers this MachineInfo.
+message AgentRuntime {
+  uint32 pid = 1;
+  // Unix milliseconds the service started.
+  int64 started_at = 2;
+  // What the service listens on (on 127.0.0.1) and the machine's ports its
+  // tunnels publish, in that order.
+  repeated AgentPort ports = 3;
+}
+
+enum AgentPortKind {
+  AGENT_PORT_KIND_UNSPECIFIED = 0;
+  // The devices' link, reached through the machine's tunnel.
+  AGENT_PORT_KIND_DEVICE_LINK = 1;
+  // tunelo's MCP for the sessions the service opens.
+  AGENT_PORT_KIND_SESSION_MCP = 2;
+  // Observatory's receiver of the AI's logs.
+  AGENT_PORT_KIND_OBSERVATORY = 3;
+  // The local `tunelo` commands' control endpoint.
+  AGENT_PORT_KIND_CONTROL = 4;
+  // A port of the machine a `tunelo http` tunnel publishes (tunelo connects
+  // to it; it is the machine's program that listens).
+  AGENT_PORT_KIND_TUNNEL_HTTP = 5;
+  // A port of the machine a `tunelo tcp` tunnel publishes.
+  AGENT_PORT_KIND_TUNNEL_TCP = 6;
+}
+
+message AgentPort {
+  AgentPortKind kind = 1;
+  // 1 to 65535.
+  uint32 port = 2;
+  // False when tunelo wants the port but another program holds it
+  // (Observatory's receiver tries it again now and then). Always true for
+  // tunnels.
+  bool listening = 3;
+  // Tunnels only: the public URLs the server granted, once it has.
+  repeated string urls = 4;
 }
 
 enum TerminalAvailability {

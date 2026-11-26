@@ -344,6 +344,14 @@ export class ObservatoryService {
     return this.receiver.state === "listening" && port !== undefined && token !== undefined ? { port, token } : undefined;
   }
 
+  /** The receiver's port while it listens or waits for another program to let go of it; undefined otherwise. */
+  receiverPort(): { port: number; listening: boolean } | undefined {
+    const port = this.receiver.running?.port;
+    const state = this.receiver.state;
+    if (port === undefined || (state !== "listening" && state !== "port-taken")) return undefined;
+    return { port, listening: state === "listening" };
+  }
+
   /** One hook event of a session the agent runs through the SDK: queued, returns at once, never throws (sdk-hook-feed.ts). */
   takeHookEvent(event: string, payload: unknown, label?: string): void {
     this.intake.takeHookEvent(event, payload, label);

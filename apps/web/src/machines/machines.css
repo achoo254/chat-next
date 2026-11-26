@@ -360,6 +360,10 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0; font-size: 0.875rem; }
 .mx-kv dt { color: var(--c-text-muted); }
 .mx-kv dd { margin: 0; }
+.mx-ports { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.mx-ports li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
+.mx-ports .mono { min-width: 5ch; }
+.mx-port-url { overflow-wrap: anywhere; }
 .mx-mac-folders { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .mx-mac-folders li { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .mx-mac-folder-name { display: flex; flex-direction: column; min-width: 0; flex: 1 1 12rem; }
