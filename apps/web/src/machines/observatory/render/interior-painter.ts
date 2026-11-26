@@ -260,7 +260,7 @@ export class InteriorPainter {
 		}
 		this.drawTraces();
 		// The token wave is a background module of the design: dim, dimmer still while the AI works elsewhere.
-		this.c.globalAlpha = TIER[3].alpha * 0.75 * (input.look.mode === "idle" ? 1 : 0.45);
+		this.c.globalAlpha = TIER[3].alpha * 0.75 * (input.look.mode === "idle" || !input.look.dimOthers ? 1 : 0.45);
 		this.drawWave();
 		this.c.globalAlpha = 1;
 		this.withAlpha("monitoring", () => this.drawReservoir());
@@ -439,7 +439,7 @@ export class InteriorPainter {
 			const n = road.place === "user-desk" || road.place === "security" ? 0 : road.calls;
 			const run = road.running;
 			const hot = run.length > 0 || road.waiting || this.glowOf(road.place) > 0;
-			const dim = look.mode !== "idle" && !look.places[road.place].involved && !hot;
+			const dim = look.dimOthers && look.mode !== "idle" && !look.places[road.place].involved && !hot;
 			const w = 1.2 + Math.min(7, Math.log2(1 + n) * 1.7);
 			this.poly(r);
 			c.lineCap = "round";

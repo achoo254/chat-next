@@ -219,6 +219,8 @@ export interface DroneLook {
 
 export interface SceneLook {
 	readonly mode: ActivityMode;
+	/** Modules and traces outside the AI's current zone read dimmer; false in the free camera, where every module reads at its normal brightness. */
+	readonly dimOthers: boolean;
 	readonly roads: readonly RoadLook[];
 	readonly places: Readonly<Record<PlaceId, PlaceLook>>;
 	readonly drones: readonly DroneLook[];
@@ -266,8 +268,8 @@ function roadsOf(state: LiveMapState, scene: SceneTable, calls: readonly ToolCal
 	return out;
 }
 
-/** The look of `state`; with `now` (machine ms), a CI run with no news for too long reads as unknown (pipeline-model.ts). */
-export function lookOf(state: LiveMapState, scene: SceneTable, now?: number): SceneLook {
+/** The look of `state`; with `now` (machine ms), a CI run with no news for too long reads as unknown (pipeline-model.ts). `dimOthers` false (the free camera) keeps modules outside the AI's zone at normal brightness. */
+export function lookOf(state: LiveMapState, scene: SceneTable, now?: number, dimOthers = true): SceneLook {
 	const mode = modeOf(state);
 	const calls = toolCalls(state);
 	const running = runningCalls(state);
@@ -285,7 +287,7 @@ export function lookOf(state: LiveMapState, scene: SceneTable, now?: number): Sc
 		const active = (st?.running.length ?? 0) > 0 || (id === "security" && mode === "wait");
 		let presence: number = TIER_ALPHA[p.tier];
 		if (p.tier === 3 && !used && !active) presence *= 0.75;
-		if (mode !== "idle" && !involved.has(id) && !active) presence *= 0.45;
+		if (dimOthers && mode !== "idle" && !involved.has(id) && !active) presence *= 0.45;
 		places[id] = { presence, active, involved: involved.has(id), used, bottleneck: st?.bottleneck ?? "none" };
 	}
 	const subagents = Object.values(state.scene.subagents).filter((s) => s.running);
@@ -293,6 +295,7 @@ export function lookOf(state: LiveMapState, scene: SceneTable, now?: number): Sc
 	const newest = state.log[state.log.length - 1];
 	return {
 		mode,
+		dimOthers,
 		roads,
 		places,
 		drones,

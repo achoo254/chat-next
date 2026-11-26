@@ -91,6 +91,18 @@ describe("the activity and the look", () => {
 		expect(idle.places.memory.presence).toBeLessThan(idle.places.files.presence);
 	});
 
+	it("keeps every district at its normal brightness in the free camera", () => {
+		const { state } = played([prompt(1, 0), tool("a", 10)]);
+		const dimmed = lookOf(state, scene);
+		const free = lookOf(state, scene, undefined, false);
+		expect(dimmed.dimOthers).toBe(true);
+		expect(dimmed.places.mcp.presence).toBeLessThan(0.5);
+		expect(free.dimOthers).toBe(false);
+		expect(free.places.mcp.presence).toBe(0.9);
+		expect(free.places.memory.presence).toBeCloseTo(0.7 * 0.75);
+		expect(sameLook(dimmed, free)).toBe(false);
+	});
+
 	it("flies a subagent's drone to the district of its call, home when it has none", () => {
 		const { state } = played([prompt(1, 0), subagent("ag", 5), subagent("ag2", 6), tool("r", 10, { agentId: "ag", station: "SANDBOX" })]);
 		const look = lookOf(state, scene);

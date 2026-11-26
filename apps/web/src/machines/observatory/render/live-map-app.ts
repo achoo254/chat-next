@@ -133,7 +133,9 @@ export function mountLiveMap(o: LiveMapMountOptions): LiveMapHandle {
 	let hide = o.hide === true;
 	let state = o.state;
 	const wall = (): number => (o.wallClock ?? Date.now)();
-	let look: SceneLook = lookOf(state, scene, wall());
+	/** The free camera shows every module at normal brightness; the others dim what the AI is not using. */
+	let dimOthers = true;
+	let look: SceneLook = lookOf(state, scene, wall(), dimOthers);
 	/** What the camera follows, worked out once per state. */
 	let activity: Activity = activityOf(state);
 	/** The newest event the model thinks for and when it came (this clock): past CORE_SPIN_IDLE_MS without a newer one, it stops. */
@@ -181,11 +183,15 @@ export function mountLiveMap(o: LiveMapMountOptions): LiveMapHandle {
 		const at = wall();
 		const dt = lastT === null ? 16 : Math.min(64, Math.max(0, t - lastT));
 		lastT = t;
-		if (look.pipeline.ciStaleAt !== null && at >= look.pipeline.ciStaleAt) look = lookOf(state, scene, at);
+		if (look.pipeline.ciStaleAt !== null && at >= look.pipeline.ciStaleAt) look = lookOf(state, scene, at, dimOthers);
 		const before = cameraDirector.view;
 		const cam = cameraDirector.step(activity, t, !motion);
 		if (cam.view !== before) place();
 		const mode = cameraDirector.mode;
+		if ((mode !== "free") !== dimOthers) {
+			dimOthers = mode !== "free";
+			look = lookOf(state, scene, at, dimOthers);
+		}
 		const contentZone = mode === "free" ? activityZone(activity) : (cameraDirector.peeked ?? (mode === "focus" ? cameraDirector.selected : cam.zone));
 		const next: CameraState = { mode, zone: cam.zone, contentZone, switches: cameraDirector.switches };
 		if (next.mode !== camera.mode || next.zone !== camera.zone || next.contentZone !== camera.contentZone || next.switches !== camera.switches) {
@@ -227,7 +233,7 @@ export function mountLiveMap(o: LiveMapMountOptions): LiveMapHandle {
 			state = next;
 			const t = now();
 			activity = activityOf(state);
-			const nextLook = lookOf(state, scene, wall());
+			const nextLook = lookOf(state, scene, wall(), dimOthers);
 			if (!sameLook(look, nextLook)) look = nextLook;
 			noteThinking(t);
 			director.play(animations, state, t);
