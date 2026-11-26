@@ -12,13 +12,15 @@ Bản mẫu v6 (`hoandat-app/plans/dattqh/261125-2211-observatory-machine-interi
 
 ## Quyết định
 
-- **Giao diện y hệt bản mẫu v6**: thẻ hoạt động trên cùng; cảnh bên trong máy 1200 × 720 (model là lưới nơ-ron ở giữa, bể ngữ cảnh và sóng token
-  bên trái, kho tệp, terminal, kiểm thử, Git · CI/CD bên dưới, cổng MCP và cổng không gian internet bên phải, bộ nhớ, kỹ năng, khoá quyền, cổng nhập nhỏ
+- **Giao diện y hệt bản mẫu v6**: thẻ hoạt động trên cùng; cảnh bên trong máy (model là lưới nơ-ron ở giữa, khối Context và sóng token
+  bên trái, kho tệp, terminal, kiểm thử, Git · CI/CD bên dưới, cổng MCP và cổng internet bên phải, bộ nhớ, kỹ năng, khoá quyền, cổng nhập nhỏ
   ở rìa; đường dẫn từ model tới từng khối, dày theo số lần gọi, phần đỏ theo tỷ lệ lỗi, nhãn tách runtime khỏi p95 lịch sử) với ba chế độ camera (bản đồ tổng quan của v6
-  bỏ theo yêu cầu 26/11/2026); cột phải gồm **Phiên** (model, ngữ cảnh, tốc độ, lần gọi tool, subagent, "Ẩn chi tiết"), **Chi tiết** (sự kiện hoặc khối được chọn) và
+  bỏ theo yêu cầu 26/11/2026; nút camera nằm dưới cảnh để không che khối nào); cột phải gồm **Phiên** (model, ngữ cảnh, tốc độ, lần gọi tool, subagent, "Ẩn chi tiết"), **Chi tiết** (sự kiện hoặc khối được chọn) và
   **Sự kiện** (mới nhất trên cùng, tối đa 80 dòng: giờ, màu khối, nội dung, runtime ✓ / lỗi / chạy…); dưới cùng là chú giải cách đọc cảnh. Một giao
   diện tối cố định, theo màu của bản mẫu. Thẻ hoạt động giữ chiều cao cố định (mọi dòng luôn có chỗ, kể cả khi trống) để không nháy dòng;
-  dòng Hành trình xuống dòng thay vì cắt "…", luôn thấy các bước mới nhất; tool MCP ghi `máy chủ › tool`.
+  dòng Hành trình xuống dòng thay vì cắt "…", luôn thấy các bước mới nhất; tool MCP ghi `máy chủ › tool`. Bố cục của v6 được nới ra
+  (cảnh 1500 × 900 thay 1200 × 720, chữ lớn hơn 15 %): đường dẫn dài hơn và mỗi đường ghi số liệu ở một chỗ trống định sẵn, test kiểm nhãn không
+  chạm khối nào, không chạm tên model và không chạm nhau.
 - **Vẽ bằng Canvas 2D trong code**, không PixiJS, không tài sản ảnh: bỏ `pixi.js`, `public/observatory/`, bộ đệm tranh của service worker (cache
   `observatory-assets-v1` bị xoá khi worker kích hoạt) và location `/observatory/` của nginx. Chữ trên cảnh vẽ trên canvas như bản mẫu; mỗi khối vẫn
   là một nút DOM trong suốt để dùng bàn phím và để test bấm.
