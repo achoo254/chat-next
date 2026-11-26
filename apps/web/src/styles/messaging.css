@@ -316,7 +316,8 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 /* Sender names: the tone darkened towards the text colour (light: 5.0–6.4:1 on --c-theirs; dark: 8.7:1 and up). */
 .bubble .who { display: block; font-size: 0.8125rem; font-weight: 600; color: color-mix(in srgb, var(--c-viz-blue) 80%, var(--c-text)); margin-bottom: 2px; }
 .bubble .who[class*="s-"] { color: color-mix(in srgb, var(--who) 80%, var(--c-text)); }
-.bubble p { margin: 0; white-space: pre-wrap; }
+/* Inter turns an x after a digit into ×; a message shows what was typed. */
+.bubble p { margin: 0; white-space: pre-wrap; font-feature-settings: "calt" 0; }
 /* The paragraph holds the floating time (.stamp), so the bubble grows a line when the last one is full. */
 .bubble p:has(> .stamp) { display: flow-root; }
 .bubble code { font-family: var(--font-mono); font-size: 0.8125rem; padding: 0 var(--space-1); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--c-text) 9%, transparent); }

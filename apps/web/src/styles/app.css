@@ -32,7 +32,7 @@ button { cursor: pointer; }
 [hidden] { display: none !important; }
 /* Message boxes (components/plain-text-box.tsx, TipTap): ProseMirror's own rules, which TipTap would inject.
    Each composer gives the look (padding, fill, height); the box grows with its lines and scrolls past its max-height. */
-.plain-text-box { position: relative; min-width: 0; overflow-y: auto; white-space: pre-wrap; white-space: break-spaces; overflow-wrap: anywhere; font-variant-ligatures: none; font-feature-settings: "liga" 0; cursor: text; }
+.plain-text-box { position: relative; min-width: 0; overflow-y: auto; white-space: pre-wrap; white-space: break-spaces; overflow-wrap: anywhere; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; cursor: text; }
 .plain-text-box[contenteditable="false"] { cursor: default; }
 .plain-text-box p { position: relative; margin: 0; }
 .plain-text-box img.ProseMirror-separator { display: inline; border: 0; margin: 0; }
