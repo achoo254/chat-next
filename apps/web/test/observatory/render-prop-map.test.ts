@@ -38,9 +38,9 @@ describe("moves", () => {
 
 	it("a call sends a packet out along its district's road and back at its end, red when it failed", () => {
 		const out = moves([prompt(1, 0), tool("r1", 10, { station: "FILES" })]).filter((m) => m.eventId === "tool:r1");
-		expect(out).toEqual([expect.objectContaining({ kind: "packet-out", place: "files", tone: "normal", path: scene.places.files.route })]);
+		expect(out).toEqual([expect.objectContaining({ kind: "packet-out", place: "files", tone: "normal", path: scene.places.files.road })]);
 		const back = moves([prompt(1, 0), tool("r1", 10, { station: "FILES" }), tool("r1", 20, { station: "FILES", success: false })]).filter((m) => m.eventId === "tool:r1");
-		expect(back.at(-1)).toMatchObject({ kind: "packet-back", tone: "error", path: [...scene.places.files.route].reverse() });
+		expect(back.at(-1)).toMatchObject({ kind: "packet-back", tone: "error", path: [...scene.places.files.road].reverse() });
 	});
 
 	it("every move names its source event", () => {

@@ -22,7 +22,8 @@ import type { StepStatus } from "../pipeline-model.ts";
 import type { MoveFrame } from "./animation-director.ts";
 import { clamp01, INK, rgba } from "./ink.ts";
 import { pathPoint, type SceneLook, type Tone } from "./prop-map.ts";
-import { PIPELINE_CELL, PLACE_IDS, pipelineCell, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
+import { failureShare, pathLength, pathSlice, roadWidth } from "./road-geometry.ts";
+import { MODEL_TITLE_WIDTH, PIPELINE_CELL, PLACE_IDS, pipelineCell, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
 import {
 	cornerTicks,
 	EDIT_COLOUR,
@@ -442,7 +443,7 @@ export class InteriorPainter {
 			const run = road.running;
 			const hot = run.length > 0 || road.waiting || this.glowOf(road.place) > 0;
 			const dim = look.dimOthers && look.mode !== "idle" && !look.places[road.place].involved && !hot;
-			const w = 1.2 + Math.min(7, Math.log2(1 + n) * 1.7);
+			const w = roadWidth(n);
 			this.poly(r);
 			c.lineCap = "round";
 			c.lineJoin = "round";
@@ -453,14 +454,34 @@ export class InteriorPainter {
 				c.stroke();
 				c.setLineDash([]);
 			} else {
-				c.strokeStyle = rgba(col, (dim ? 0.14 : 0.3) + (hot ? 0.2 : 0));
+				// Three layers make one cable: a faint bed, the body whose width is the calls, and a fine bright core.
+				c.strokeStyle = rgba(col, dim ? 0.025 : 0.075);
+				c.lineWidth = w + 7;
+				c.stroke();
+				c.strokeStyle = rgba(col, (dim ? 0.16 : 0.42) + (hot ? 0.18 : 0));
 				c.lineWidth = w;
 				c.stroke();
+				c.strokeStyle = rgba(col, dim ? 0.16 : 0.48);
+				c.lineWidth = Math.max(0.8, Math.min(1.8, w * 0.28));
+				c.stroke();
 			}
-			if (road.failures > 0 && n > 0) {
-				this.poly(r);
-				c.strokeStyle = rgba(INK.err, 0.8);
-				c.lineWidth = 2;
+			// The failures: the end of the same track, as long as the failure rate (and never too short to see).
+			const share = n > 0 ? failureShare(road.failures, n, pathLength(r)) : 0;
+			if (share > 0) {
+				this.poly(pathSlice(r, 1 - share, 1));
+				c.strokeStyle = rgba(INK.err, 0.92);
+				c.lineWidth = Math.max(2, Math.min(4, w * 0.62));
+				c.stroke();
+			}
+			// The port where the road meets its module, lit while it carries traffic, red once a call failed.
+			if (n > 0 || hot) {
+				const [px, py] = r[r.length - 1] ?? [0, 0];
+				c.beginPath();
+				c.arc(px, py, 3.4, 0, 7);
+				c.fillStyle = INK.board;
+				c.fill();
+				c.strokeStyle = rgba(road.failures > 0 && n > 0 ? INK.err : col, dim ? 0.3 : 0.95);
+				c.lineWidth = 1.6;
 				c.stroke();
 			}
 			// Running: dashes flow from the caller to the module (no made-up progress); amber once past the session's p95.
@@ -679,7 +700,7 @@ export class InteriorPainter {
 		c.textBaseline = "top";
 		c.font = `600 ${14 * this.ts}px ${MONO}`;
 		c.fillStyle = INK.fg;
-		c.fillText(copy.modelTitle(model), cx, cy + 124 * k);
+		c.fillText(clip(copy.modelTitle(model), MODEL_TITLE_WIDTH, 14 * this.ts), cx, cy + 124 * k);
 		c.font = `600 ${12 * this.ts}px ${MONO}`;
 		c.fillStyle = think ? INK.think : waiting ? INK.warn : INK.muted;
 		c.fillText(think ? copy.thinking : waiting ? copy.waiting : exec ? copy.executing : copy.idle, cx, cy + 124 * k + 18);

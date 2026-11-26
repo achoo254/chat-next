@@ -9,6 +9,7 @@
 // (straight legs) and the spot its figures are written. The scene is drawn in code (render/interior-painter.ts):
 // there are no image assets.
 import type { StationCode } from "../station-catalog.ts";
+import { roundCorners } from "./road-geometry.ts";
 
 /** The 13 places of the scene. */
 export const PLACE_IDS = ["core", "user-desk", "orchestrator", "memory", "skills", "files", "mcp", "external", "security", "sandbox", "testing", "git", "monitoring"] as const;
@@ -37,8 +38,13 @@ export interface ScenePlace {
 	/** The module's box: the click area and the camera's focus box. */
 	readonly rect: Rect;
 	readonly tier: Tier;
-	/** The trace from the model to the module; empty when none. */
+	/** The trace from the model to the module as set by hand, with right-angle corners; empty when none. */
 	readonly route: readonly Point[];
+	/**
+	 * The same trace with its corners rounded and sampled (road-geometry.ts): the one track the road's body, its
+	 * packets and its red stretch all follow. Empty when the place has no route.
+	 */
+	readonly road: readonly Point[];
 	/** Where the trace's figures go, clear of every module, other trace's figures and the model's title; null: none written. */
 	readonly label: TraceLabel | null;
 }
@@ -68,8 +74,17 @@ export interface SceneTable {
 
 const MODEL: Rect = { x: 635, y: 298, w: 280, h: 280 };
 
-const place = (id: PlaceId, rect: Rect, tier: Tier, route: readonly Point[] = [], label: TraceLabel | null = null): ScenePlace => ({ id, rect, tier, route, label });
+/** The widest the model's title is drawn (longer names are cut with …): the roads and figures around it are laid out clear of this width. */
+export const MODEL_TITLE_WIDTH = 220;
+
+const place = (id: PlaceId, rect: Rect, tier: Tier, route: readonly Point[] = [], label: TraceLabel | null = null): ScenePlace => ({ id, rect, tier, route, road: roundCorners(route), label });
 const at = (x: number, y: number, align: TraceLabel["align"] = "left"): TraceLabel => ({ at: [x, y], align });
+
+/**
+ * The routes are set so that no two cross, none runs through a module, a figure or the model's title (at most MODEL_TITLE_WIDTH wide), and the one that
+ * turns back farthest (memory) leaves the model on the outer side of its neighbour (skills); testing runs on
+ * the upper lane and sandbox drops from the lower one. test/observatory/render-roads.test.ts holds them to it.
+ */
 
 /**
  * The scene of the machine's interior: the design's layout given room (a
@@ -93,20 +108,20 @@ export const INTERIOR: SceneTable = {
 			[532, 710],
 		], at(120, 628)),
 		sandbox: place("sandbox", { x: 1060, y: 610, w: 180, h: 140 }, 1, [
-			[900, 525],
-			[962, 525],
+			[900, 560],
+			[962, 560],
 			[962, 700],
 			[1060, 700],
-		], at(972, 590)),
+		], at(980, 590)),
 		testing: place("testing", { x: 1265, y: 610, w: 215, h: 140 }, 1, [
-			[900, 560],
-			[1372, 560],
+			[900, 525],
+			[1372, 525],
 			[1372, 610],
-		], at(1160, 541, "center")),
+		], at(1160, 500, "center")),
 		git: place("git", { x: 650, y: 800, w: 550, h: 95 }, 1, [
-			[812, 578],
-			[812, 800],
-		], at(822, 765)),
+			[905, 578],
+			[905, 800],
+		], at(915, 765)),
 		mcp: place("mcp", { x: 1050, y: 200, w: 400, h: 175 }, 2, [
 			[900, 375],
 			[988, 375],
@@ -119,20 +134,18 @@ export const INTERIOR: SceneTable = {
 			[1332, 88],
 		], at(1090, 68, "center")),
 		memory: place("memory", { x: 120, y: 84, w: 190, h: 64 }, 3, [
-			[688, 312],
-			[688, 116],
+			[715, 312],
+			[715, 116],
 			[310, 116],
 		], at(500, 96, "center")),
 		skills: place("skills", { x: 120, y: 160, w: 190, h: 64 }, 3, [
-			[715, 312],
-			[715, 192],
+			[688, 312],
+			[688, 192],
 			[310, 192],
 		], at(500, 172, "center")),
 		security: place("security", { x: 570, y: 720, w: 105, h: 70 }, 3, [
-			[700, 565],
-			[700, 662],
-			[625, 662],
-			[625, 720],
+			[650, 560],
+			[650, 720],
 		]),
 		"user-desk": place("user-desk", { x: 5, y: 372, w: 130, h: 84 }, 3, [
 			[650, 415],

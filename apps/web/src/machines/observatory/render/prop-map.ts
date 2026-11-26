@@ -22,7 +22,10 @@ import { isMainRequest, type LiveMapEvent } from "../live-map-types.ts";
 import { pipelineOf, type Pipeline } from "../pipeline-model.ts";
 import { stationOf, STATION_CODES, type StationCode } from "../station-catalog.ts";
 import type { Activity } from "./camera-director.ts";
+import { pathPoint } from "./road-geometry.ts";
 import { PLACE_IDS, STATION_PLACE, type PlaceId, type Point, type SceneTable } from "./scene-table.ts";
+
+export { pathPoint };
 
 export { FLAG };
 
@@ -57,10 +60,10 @@ export function placeCentre(scene: SceneTable, place: PlaceId): Point {
 	return [r.x + r.w / 2, r.y + r.h / 2];
 }
 
-/** A place's road: its route, or a single point at its centre when it has none. */
+/** A place's road: its rounded track, or a single point at its centre when it has none. */
 export function roadOf(scene: SceneTable, place: PlaceId): readonly Point[] {
-	const route = scene.places[place].route;
-	return route.length >= 2 ? route : [placeCentre(scene, place)];
+	const road = scene.places[place].road;
+	return road.length >= 2 ? road : [placeCentre(scene, place)];
 }
 
 function builder(eventId: string, estimated: boolean) {
@@ -248,7 +251,7 @@ function roadsOf(state: LiveMapState, scene: SceneTable, calls: readonly ToolCal
 	const out: RoadLook[] = [];
 	for (const id of PLACE_IDS) {
 		const place = scene.places[id];
-		if (place.route.length < 2) continue;
+		if (place.road.length < 2) continue;
 		const station = stationAt(id);
 		const ended = station === undefined ? [] : calls.filter((c) => c.station === station && c.endAt !== undefined);
 		const durations = ended.map((c) => c.event.durationMs ?? (c.endAt ?? c.event.at) - c.event.at);
@@ -260,7 +263,7 @@ function roadsOf(state: LiveMapState, scene: SceneTable, calls: readonly ToolCal
 			});
 		out.push({
 			place: id,
-			path: place.route,
+			path: place.road,
 			calls: id === "user-desk" ? prompts : id === "security" ? asks : ended.length,
 			failures: ended.filter((c) => c.ok === false).length,
 			p95Ms: percentile(durations, 0.95),
@@ -321,37 +324,4 @@ export function sameLook(a: SceneLook, b: SceneLook): boolean {
 	return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function lengths(path: readonly Point[]): { legs: number[]; total: number } {
-	const legs: number[] = [];
-	let total = 0;
-	for (let i = 1; i < path.length; i++) {
-		const a = path[i - 1] ?? [0, 0];
-		const b = path[i] ?? a;
-		const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-		legs.push(len);
-		total += len;
-	}
-	return { legs, total };
-}
-
-/** The point at `t` (0 to 1) along a path of straight legs, by length. */
-export function pathPoint(path: readonly Point[], t: number): Point {
-	const first = path[0];
-	if (first === undefined) return [0, 0];
-	if (path.length === 1 || t <= 0) return first;
-	const { legs, total } = lengths(path);
-	if (total === 0) return first;
-	let left = Math.min(1, t) * total;
-	for (let i = 0; i < legs.length; i++) {
-		const len = legs[i] ?? 0;
-		const a = path[i] ?? first;
-		const b = path[i + 1] ?? a;
-		if (left <= len || i === legs.length - 1) {
-			const f = len === 0 ? 1 : Math.min(1, left / len);
-			return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
-		}
-		left -= len;
-	}
-	return path[path.length - 1] ?? first;
-}
 
