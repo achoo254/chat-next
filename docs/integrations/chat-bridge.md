@@ -25,6 +25,7 @@ Chat với một bot của Telegram nằm ở mục **Bot** của thanh trái, h
 
 - Cầu nối ghi `external_users.is_bot` mỗi lần gặp người kia (tin nhắn hoặc danh sách cuộc trò chuyện), nên chat cũ tự vào mục Bot sau lần đồng bộ danh sách kế tiếp. Cột `users.is_bot` vẫn chỉ dành cho bot của app; client thấy `is_bot` ở lớp trình bày.
 - Hồ sơ bot lấy bằng `users.getFullUser` của chính tài khoản Telegram đã kết nối (không cần token bot): mô tả, giới thiệu, danh sách lệnh, nút menu và ảnh mô tả, lưu ở `external_users.bot_info`. Mỗi lượt đọc tối đa 3 bot, làm mới sau 24 giờ; ảnh mô tả được chép về kho tệp của chủ tài khoản (`bot_photo_file_id`) vì tham chiếu tệp của Telegram hết hạn.
+- Cột thông tin của bot có khối «Bot này làm được gì?» (ảnh mô tả và mô tả, bỏ mô tả khi chỉ lặp lại giới thiệu ngắn), vì chat bot đã đồng bộ luôn có tin nên không bao giờ hiện chat trống.
 - Trong app, chat trống hiện ảnh, mô tả và lệnh như Telegram; ô soạn tin có menu lệnh; «Bắt đầu» gửi tin `/start` bằng đường gửi thường của chat hai chiều (không qua `StartBot`).
 - Nút menu kiểu «mở web app» của bot thành nút **Mở trong Telegram** tới `https://t.me/<tên bot>`: Mini App của Telegram không chạy trong app. Nút callback của bot cũng không bấm được từ Chat (xem Giới hạn).
 - `GetBotInfo` cho bot Telegram chỉ trả cho chủ tài khoản cầu nối; ảnh mô tả lấy bằng ngữ cảnh `bot_description_of` của `GetFileUrl`, cùng điều kiện đó.

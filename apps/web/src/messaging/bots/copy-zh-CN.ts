@@ -267,6 +267,7 @@ export const zhCNBots: BotsCopy = {
 		start: "开始",
 		starting: "正在开始…",
 		hint: (name) => `向 ${name} 发送 /start`,
+		whatItDoes: "这个机器人能做什么？",
 		openIn: (app: string) => `在${app}中打开`,
 	},
 	link: {

@@ -135,6 +135,26 @@ function BotDescriptionPhoto({ botId, fileId }: { botId: number; fileId: string 
 }
 
 /**
+ * In the info column of a bot of another app: what Telegram shows in the bot's empty chat (its
+ * picture and description), which a synced chat never shows because it always has messages. The
+ * description is left out when it only repeats the short text already shown under the name.
+ */
+export function BotDescriptionSection({ botId, chatId }: { botId: number; chatId: number }) {
+	const t = useBotsCopy();
+	const info = useBotInfo(botId, chatId);
+	if (info === null || info.externalApp === "") return null;
+	const description = info.description !== info.about ? info.description : "";
+	if (description === "" && info.descriptionPhotoId === "") return null;
+	return (
+		<div className="info-sec bot-desc">
+			<h3>{t.start.whatItDoes}</h3>
+			{info.descriptionPhotoId !== "" && <BotDescriptionPhoto botId={botId} fileId={info.descriptionPhotoId} />}
+			{description !== "" && <p>{description}</p>}
+		</div>
+	);
+}
+
+/**
  * The bot's profile in its empty chat: description, commands and what starting it means. A bot of
  * another app (Telegram) shows what that app shows: its picture, description and commands, with
  * the app's logo; "Bắt đầu" there is a plain /start message, so the consent note is left out.

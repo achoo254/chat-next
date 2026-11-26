@@ -412,8 +412,10 @@ describe("bots in chats", () => {
 		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, botId], { externalApp: "telegram" });
 		renderMessaging(f, `/c/${chat}`);
 		const start = await screen.findByRole("button", { name: "Bắt đầu" }, LONG);
-		expect(await screen.findByText("Tôi giúp đại ca đếm chữ.", {}, LONG)).toBeTruthy();
-		expect(screen.getByText("/dem")).toBeTruthy();
+		// The empty chat shows the description (the info column shows it too, hence the card).
+		const card = (await screen.findByText("Đếm số chữ", {}, LONG)).closest(".bot-card") as HTMLElement;
+		expect(within(card).getByText("Tôi giúp đại ca đếm chữ.")).toBeTruthy();
+		expect(within(card).getByText("/dem")).toBeTruthy();
 		// The consent note is about this system's bots: a Telegram bot needs none.
 		expect(screen.queryByText(/chưa thể nhắn cho bạn/)).toBeNull();
 		expect(screen.getAllByRole("img", { name: "Telegram" }).length).toBeGreaterThan(0);
@@ -433,6 +435,48 @@ describe("bots in chats", () => {
 			window.open = original;
 		}
 		expect(opened[0]?.[0]).toBe("https://t.me/dem_chu_bot");
+	});
+
+	it("shows what a bot of Telegram says it can do in its info column, unless that only repeats its short text", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const long = f.bots.seed("Đếm chữ Bot", "dem_chu_bot", {
+			description: "Tôi đếm chữ trong tin đại ca gửi.",
+			about: "Bot đếm chữ",
+			owned: false,
+			externalApp: "telegram",
+		});
+		const same = f.bots.seed("Nhắc việc Bot", "nhac_viec_bot", {
+			description: "Chỉ nhắc việc.",
+			about: "Chỉ nhắc việc.",
+			owned: false,
+			externalApp: "telegram",
+		});
+		const longChat = f.createChat(ChatType.PRIVATE, "", [f.selfId, long], { externalApp: "telegram" });
+		const sameChat = f.createChat(ChatType.PRIVATE, "", [f.selfId, same], { externalApp: "telegram" });
+		f.send(long, longChat, "Xin chào đại ca");
+		f.send(same, sameChat, "Nhắc đại ca");
+		renderMessaging(f, `/c/${longChat}`);
+		const info = await screen.findByRole("complementary", { name: "Thông tin bot" }, LONG);
+		expect(await within(info).findByText("Bot này làm được gì?", {}, LONG)).toBeTruthy();
+		expect(within(info).getByText("Tôi đếm chữ trong tin đại ca gửi.")).toBeTruthy();
+	});
+
+	it("leaves the 'what can this bot do' block out when the description only repeats the short text", async () => {
+		const demo = seedDemo();
+		const f = demo.fixture;
+		const same = f.bots.seed("Nhắc việc Bot", "nhac_viec_bot", {
+			description: "Chỉ nhắc việc.",
+			about: "Chỉ nhắc việc.",
+			owned: false,
+			externalApp: "telegram",
+		});
+		const chat = f.createChat(ChatType.PRIVATE, "", [f.selfId, same], { externalApp: "telegram" });
+		f.send(same, chat, "Nhắc đại ca");
+		renderMessaging(f, `/c/${chat}`);
+		const info = await screen.findByRole("complementary", { name: "Thông tin bot" }, LONG);
+		await waitFor(() => expect(f.bots.calls.some((call) => call === `GetBotInfo ${same}`)).toBe(true));
+		expect(within(info).queryByText("Bot này làm được gì?")).toBeNull();
 	});
 
 	it("tells the owner their bot is not running and links to Developer Console, and hides an empty group count", async () => {
