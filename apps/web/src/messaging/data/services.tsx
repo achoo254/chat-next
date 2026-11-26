@@ -2,7 +2,7 @@
 // start-up, so a context is fine for it; everything that changes often is
 // read from ChatStore through the hooks below (useSyncExternalStore per key).
 import type { Transport } from "@connectrpc/connect";
-import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { AdvisorProfile, Chat, ChatTyping, ConnectionState, DialogView, MediaLimits, NotificationSettings, StoredMessage, User } from "@achoo254/chat-core";
 import type { SelfUser } from "../../api/adapters.ts";
 import { useCopy } from "../copy/use-copy.ts";
@@ -244,6 +244,20 @@ export function useMessage(chatId: number, seq: number): StoredMessage | null | 
 	useEffect(() => {
 		if (message === undefined && seq !== 0) store.wantMessage(chatId, seq);
 	}, [store, message, chatId, seq]);
+	return message;
+}
+
+/**
+ * `useMessage` for a bar that stays on screen while the window changes under it (the reply bar
+ * over the composer): a jump to the newest messages drops an old message from the window, and
+ * until its lookup returns the bar keeps showing the message it had instead of a blank.
+ */
+export function useHeldMessage(chatId: number, seq: number): StoredMessage | null | undefined {
+	const message = useMessage(chatId, seq);
+	const key = `${chatId}:${seq}`;
+	const [held, setHeld] = useState<{ key: string; message: StoredMessage } | null>(null);
+	if (message != null && (held === null || held.key !== key || held.message !== message)) setHeld({ key, message });
+	if (message === undefined && held?.key === key) return held.message;
 	return message;
 }
 

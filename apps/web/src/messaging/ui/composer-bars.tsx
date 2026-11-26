@@ -6,7 +6,7 @@ import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { messagePreview, namedUserIds } from "../data/format.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
-import { useChat, useMessage, useServices } from "../data/services.tsx";
+import { useChat, useHeldMessage, useServices } from "../data/services.tsx";
 import { useNameOf } from "./chat-row.tsx";
 import { useIntent } from "./ui-context.tsx";
 
@@ -15,7 +15,7 @@ export function ComposeBar({ chatId, onCancel }: { chatId: number; onCancel: () 
 	const copy = useScreensCopy();
 	const { store } = useServices();
 	const intent = useIntent(chatId);
-	const target = useMessage(chatId, intent?.seq ?? 0);
+	const target = useHeldMessage(chatId, intent?.seq ?? 0);
 	const channel = useChat(chatId)?.type === "channel";
 	const nameOf = useNameOf(target == null ? [] : namedUserIds(target));
 	if (intent === null) return null;
