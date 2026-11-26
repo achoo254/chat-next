@@ -162,7 +162,8 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 	// A message's topic is known once the forum's topics are loaded.
 	const topicsLoaded = useBackendValue((pending) => pending.topics(chatId) !== null);
 	const scroller = useRef<HTMLDivElement>(null);
-	const anchor = useRef<{ key: string; offset: number } | null>(null);
+	/** The first visible row as the last scroll left it: where its top was in the list, so a later change of layout above it shows as how far that top moved. */
+	const anchor = useRef<{ key: string; top: number } | null>(null);
 	// The first message on screen: where the reader is, kept when the chat is left scrolled up.
 	const keptRow = useRef<{ seq: number; offset: number } | null>(null);
 	const stick = useRef(true);
@@ -222,7 +223,13 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		const saved = anchor.current;
 		if (saved === null) return;
 		const node = element.querySelector<HTMLElement>(`[data-key="${saved.key}"]`);
-		if (node !== null) element.scrollTop = node.offsetTop - saved.offset;
+		if (node === null) return;
+		// Only what moved the row in the list is undone, not the reader's own scrolling since the last scroll event
+		// (a trackpad's momentum): putting the old offset back made the list jump back a frame at every update.
+		const moved = node.offsetTop - saved.top;
+		if (moved === 0) return;
+		saved.top = node.offsetTop;
+		element.scrollTop += moved;
 	}, [window_, keys.length, lastKey, typing, store, chatId, topicId]);
 
 	// The open chat's row clicked again (as Telegram does): to the newest message,
@@ -309,7 +316,7 @@ export function MessageList({ chatId, topicId, topic, chat, dialog, empty }: Mes
 		const first = [...element.querySelectorAll<HTMLElement>("[data-key]")].find(
 			(node) => node.offsetTop + node.offsetHeight > element.scrollTop,
 		);
-		anchor.current = first === undefined ? null : { key: first.dataset.key ?? "", offset: first.offsetTop - element.scrollTop };
+		anchor.current = first === undefined ? null : { key: first.dataset.key ?? "", top: first.offsetTop };
 		// The first message on screen (a day or the unread divider is no message), remembered when the chat is left.
 		const firstMessage = [...element.querySelectorAll<HTMLElement>("[data-key][data-seq]")].find((node) => node.offsetTop + node.offsetHeight > element.scrollTop);
 		keptRow.current = firstMessage === undefined ? null : { seq: Number(firstMessage.dataset.seq), offset: firstMessage.offsetTop - element.scrollTop };
