@@ -158,6 +158,8 @@ export interface ObservatoryCopy {
 		readonly errors: string;
 		readonly recent: string;
 		readonly stepRow: (step: string, n: number, p95: string) => string;
+		/** What each release step means, shown on hover of its row. */
+		readonly stepHint: Readonly<Record<"commit" | "push" | "ci" | "deploy", string>>;
 		readonly stepState: Readonly<Record<"idle" | "run" | "ok" | "err" | "unknown", string>>;
 		readonly waitingFor: string;
 		readonly prompts: string;
@@ -347,6 +349,12 @@ const vi: ObservatoryCopy = {
 		errors: "Lỗi",
 		recent: "Gần đây (runtime từng lần)",
 		stepRow: (step, n, p95) => `${step} · ${n} lần · p95 ls ${p95}`,
+		stepHint: {
+			commit: "Claude chạy git commit trong lượt phát hành gần nhất. Commit mới bắt đầu lại cả đường ống.",
+			push: "Claude đẩy commit lên main bằng git push.",
+			ci: "Chờ GitHub Actions chạy xong. Deploy không chờ bước này nên ô này chỉ sáng khi Claude tự theo dõi CI (gh run watch, gh pr checks); nét đứt \"không chờ\" là lần phát hành không theo dõi CI.",
+			deploy: "Đưa bản vừa push lên prod; ✓ khi workflow deploy chạy xong, kèm chấm xanh prod.",
+		},
 		stepState: { idle: "–", run: "đang chạy", ok: "đạt", err: "lỗi", unknown: "không rõ" },
 		waitingFor: "Đang chờ quyền",
 		prompts: "Prompt trong phiên",
@@ -543,6 +551,12 @@ const en: ObservatoryCopy = {
 		errors: "Failures",
 		recent: "Recent (runtime of each)",
 		stepRow: (step, n, p95) => `${step} · ${n}× · p95 hist ${p95}`,
+		stepHint: {
+			commit: "Claude ran git commit in the latest release turn. A new commit restarts the whole pipeline.",
+			push: "Claude pushed the commit to main with git push.",
+			ci: "Waits for GitHub Actions to finish. Deploy does not wait for it, so this step lights up only when Claude follows CI (gh run watch, gh pr checks); a dashed \"not awaited\" means the release did not follow CI.",
+			deploy: "Ships the pushed commit to production; ✓ once the deploy workflow finishes, with the green prod dot.",
+		},
 		stepState: { idle: "–", run: "running", ok: "passed", err: "failed", unknown: "unknown" },
 		waitingFor: "Waiting for permission",
 		prompts: "Prompts in the session",
@@ -739,6 +753,12 @@ const zhCN: ObservatoryCopy = {
 		errors: "失败",
 		recent: "最近（每次运行时间）",
 		stepRow: (step, n, p95) => `${step} · ${n} 次 · 历史 p95 ${p95}`,
+		stepHint: {
+			commit: "Claude 在最近一次发布回合中运行了 git commit。新的提交会让整条流水线重新开始。",
+			push: "Claude 用 git push 把提交推送到 main。",
+			ci: "等待 GitHub Actions 运行结束。部署不等待这一步，所以只有 Claude 自己跟进 CI（gh run watch、gh pr checks）时它才会亮起；虚线“不等待”表示这次发布没有跟进 CI。",
+			deploy: "把刚推送的提交发布到生产环境；部署工作流完成后显示 ✓，并点亮绿色的 prod 圆点。",
+		},
 		stepState: { idle: "–", run: "运行中", ok: "通过", err: "失败", unknown: "未知" },
 		waitingFor: "等待授权",
 		prompts: "会话中的提示",

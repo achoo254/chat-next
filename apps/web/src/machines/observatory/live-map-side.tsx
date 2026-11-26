@@ -35,11 +35,11 @@ export type SidePick = { readonly kind: "event"; readonly eventId: string } | { 
 /** Recent calls a module's detail lists. */
 const RECENT = 6;
 
-function Row({ k, v, tone = "", id }: { k: string; v: string | number; tone?: "ok" | "err" | ""; id?: string }) {
+function Row({ k, v, tone = "", id, hint }: { k: string; v: string | number; tone?: "ok" | "err" | ""; id?: string; hint?: string }) {
 	return (
 		<div className="lm-row" data-id={id}>
-			<span title={k}>{k}</span>
-			<b className={tone} title={String(v)}>{v}</b>
+			<span title={hint ?? k}>{k}</span>
+			<b className={tone} title={hint ?? String(v)}>{v}</b>
 		</div>
 	);
 }
@@ -227,7 +227,7 @@ function PlaceDetail({ state, place, now, hide }: { state: LiveMapState; place: 
 				RELEASE_STEPS.map((step) => {
 					const of = all.filter((x) => x.key === `GIT:${step}` && x.endAt !== undefined).map((x) => x.event.durationMs ?? 0);
 					const p95 = percentile(of, 0.95);
-					return <Row key={step} k={c.side.stepRow(c.scene.steps[step], of.length, p95 === null ? "–" : duration(c, p95))} v={c.side.stepState[pipe.steps[step].status]} />;
+					return <Row key={step} k={c.side.stepRow(c.scene.steps[step], of.length, p95 === null ? "–" : duration(c, p95))} v={c.side.stepState[pipe.steps[step].status]} hint={c.side.stepHint[step]} />;
 				})}
 			{ended.length === 0 ? (
 				<div>{c.side.noCallsYet}</div>
