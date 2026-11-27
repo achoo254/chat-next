@@ -56,9 +56,16 @@ pub fn cover(attrs: WindowAttributes, _handle: Option<MonitorHandle>, place: &Pl
         .with_inner_size(LogicalSize::new(place.width, place.height))
 }
 
+/// Fullscreen on the monitor winit matched; one it did not match is covered by a window of its place and size.
 #[cfg(not(target_os = "macos"))]
-pub fn cover(attrs: WindowAttributes, handle: Option<MonitorHandle>, _place: &Place) -> WindowAttributes {
-    attrs.with_fullscreen(Some(winit::window::Fullscreen::Borderless(handle)))
+pub fn cover(attrs: WindowAttributes, handle: Option<MonitorHandle>, place: &Place) -> WindowAttributes {
+    use winit::dpi::{PhysicalPosition, PhysicalSize};
+    match handle {
+        Some(h) => attrs.with_fullscreen(Some(winit::window::Fullscreen::Borderless(Some(h)))),
+        None => attrs
+            .with_position(PhysicalPosition::new(place.x, place.y))
+            .with_inner_size(PhysicalSize::new(place.width, place.height)),
+    }
 }
 
 /// Above the menu bar and the Dock (macOS); elsewhere the window level set at creation is enough.
