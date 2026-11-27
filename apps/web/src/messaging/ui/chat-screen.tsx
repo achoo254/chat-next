@@ -28,6 +28,9 @@ import {
 	Cell,
 	ComposerIntents,
 	UiContext,
+	AI_PHONE_QUERY,
+	rememberAiPanel,
+	rememberedAiPanel,
 	type AiPanelRequest,
 	type ComposerFill,
 	followChatOnScreen,
@@ -93,7 +96,9 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 
 	const ui = useMemo<Ui>(() => {
 		const miniApp = new Cell<OpenMiniApp | null>(null);
-		const ai = new Cell<AiPanelRequest | null>(null);
+		// A computer reopens the panel it had open; a phone keeps its sheet closed until asked.
+		const ai = new Cell<AiPanelRequest | null>(typeof window.matchMedia === "function" && window.matchMedia(AI_PHONE_QUERY).matches ? null : rememberedAiPanel());
+		ai.subscribe(() => rememberAiPanel(ai.get() !== null));
 		return {
 			dialog: new Cell<DialogRequest | null>(null),
 			selection: new Cell<MessageSelection | null>(null),
@@ -154,7 +159,8 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 			if (picked !== undefined) {
 				event.preventDefault();
 				setFolder(picked);
-				if (route.name === "contacts") navigate(paths.home);
+				// Contacts or a topic list hold the column: go back to the chat list.
+				if (searchRef.current === null) navigate(paths.home);
 			}
 		};
 		document.addEventListener("keydown", onKey);
@@ -192,13 +198,15 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 	const showAi = aiRequest !== null && chat != null && panel === "chat" && !contacts && route.name === "chat" && !miniAppDocked;
 	const showInfo = infoOpen && chat != null && panel === "chat" && !contacts && !miniAppDocked && !showAi;
 
+	// Contacts or a forum's topic list hold the list column; picking a folder brings the chat list back.
+	const topicList = topics !== null && chat != null && panel === "chat";
 	const pickFolder = (next: Folder) => {
 		setFolder(next);
-		if (contacts) navigate(paths.home);
+		if (contacts || topicList) navigate(paths.home);
 	};
 	const pickApp = (next: string) => {
 		setApp(next);
-		if (contacts) navigate(paths.home);
+		if (contacts || topicList) navigate(paths.home);
 	};
 	// An app folder that is no longer listed (its chats are all gone) is no longer picked; Telegram and Zalo always are.
 	const apps = useAppFolders();
@@ -239,7 +247,7 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 					</LoaderBoundary>
 				) : (
 					<>
-						{topics !== null && chat != null && panel === "chat" ? (
+						{topicList ? (
 							<Suspense fallback={<section className="list" aria-busy="true" />}>
 								<TopicListColumn chat={chat} title={title} topics={topics} currentTopicId={topic?.id ?? 0} />
 							</Suspense>

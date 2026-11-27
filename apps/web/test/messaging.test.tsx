@@ -310,6 +310,23 @@ describe("topics", () => {
 		expect(within(info).getByTitle(`chat.example.test/c/${demo.ids.forum}/t/12`)).toBeTruthy();
 	});
 
+	it("goes back to the chat list when a folder on the rail is picked from the topic list", async () => {
+		const demo = seedDemo();
+		renderMessaging(demo.fixture, `/c/${demo.ids.forum}/t/12`);
+		await screen.findByRole("list", { name: "Chủ đề" }, LONG);
+
+		const rail = screen.getByRole("navigation", { name: "Thư mục chat" });
+		await userEvent.click(within(rail).getByRole("button", { name: /^Nhóm/ }));
+		await waitFor(() => expect(screen.queryByRole("list", { name: "Chủ đề" })).toBeNull(), LONG);
+		expect(window.location.pathname).toBe("/");
+
+		// Ctrl+1 picks the first folder from the topic list the same way.
+		renderMessaging(demo.fixture, `/c/${demo.ids.forum}`);
+		await screen.findByRole("list", { name: "Chủ đề" }, LONG);
+		fireEvent.keyDown(document, { key: "1", code: "Digit1", ctrlKey: true });
+		await waitFor(() => expect(screen.queryByRole("list", { name: "Chủ đề" })).toBeNull(), LONG);
+	});
+
 	it("breaks the line on Shift+Enter, sends both lines on Enter and empties the box", async () => {
 		const demo = seedDemo();
 		renderMessaging(demo.fixture, `/c/${demo.ids.forum}/t/4`);
