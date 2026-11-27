@@ -28,9 +28,6 @@ import {
 	Cell,
 	ComposerIntents,
 	UiContext,
-	AI_PHONE_QUERY,
-	rememberAiPanel,
-	rememberedAiPanel,
 	type AiPanelRequest,
 	type ComposerFill,
 	followChatOnScreen,
@@ -96,9 +93,7 @@ export function ChatScreen({ self, route, folder, app: pickedApp, onFolder: setF
 
 	const ui = useMemo<Ui>(() => {
 		const miniApp = new Cell<OpenMiniApp | null>(null);
-		// A computer reopens the panel it had open; a phone keeps its sheet closed until asked.
-		const ai = new Cell<AiPanelRequest | null>(typeof window.matchMedia === "function" && window.matchMedia(AI_PHONE_QUERY).matches ? null : rememberedAiPanel());
-		ai.subscribe(() => rememberAiPanel(ai.get() !== null));
+		const ai = new Cell<AiPanelRequest | null>(null);
 		return {
 			dialog: new Cell<DialogRequest | null>(null),
 			selection: new Cell<MessageSelection | null>(null),
