@@ -282,17 +282,25 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 /** The faces of a pill: up to 3 latest people who reacted, newest first, "+N" for the rest. */
 function ReactorAvatars({ ids, more }: { ids: readonly number[]; more: number }) {
 	"use no memo";
-	const { self } = useServices();
-	const nameOf = useNameOf(ids);
 	return (
 		<span className="r-avs" aria-hidden="true">
 			{ids.map((id) => (
-				// Your own avatar shows your initials, not "Bạn".
-				<ChatAvatar key={id} id={id} name={id === self.id ? self.name : nameOf(id)} size="xs" />
+				<ReactorAvatar key={id} id={id} />
 			))}
 			{more > 0 && <span className="r-n">+{more}</span>}
 		</span>
 	);
+}
+
+/** One face of a pill: the person's photo over their initials, as beside their messages. */
+function ReactorAvatar({ id }: { id: number }) {
+	"use no memo";
+	const { self } = useServices();
+	const nameOf = useNameOf([id]);
+	const user = useUser(id === self.id ? 0 : id);
+	// Your own avatar shows your initials (and photo), not "Bạn".
+	const mine = id === self.id;
+	return <ChatAvatar id={id} name={mine ? self.name : nameOf(id)} size="xs" photoOf={id} photoId={mine ? self.photoId : (user?.photoId ?? "")} />;
 }
 
 /**
