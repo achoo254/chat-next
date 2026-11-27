@@ -18,7 +18,8 @@ export function canRecordScreen(): boolean {
  * system's sound too, where the browser offers it. Call it from the click.
  */
 export function requestScreen(audio: boolean): Promise<MediaStream> {
-	return navigator.mediaDevices.getDisplayMedia({ video: true, audio });
+	// Chrome and Edge open their picker on "Entire screen": the region is picked on it afterwards.
+	return navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "monitor" }, audio });
 }
 
 /**

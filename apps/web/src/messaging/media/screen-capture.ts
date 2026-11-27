@@ -1,5 +1,6 @@
 // Screenshots and screen recordings as files for the composer's tray: one
-// frame of the shared screen as a PNG, the recording's container chosen
+// frame of the shared screen, or the region dragged on it, as a PNG; a
+// recording cropped to a region (where the browser can); the container chosen
 // from what the browser records (MP4 first: it carries its length and plays
 // everywhere; WebM otherwise), and file names that carry the local time.
 
@@ -37,8 +38,50 @@ function firstFrame(video: HTMLVideoElement): Promise<void> {
 	});
 }
 
-/** Takes one frame of a shared screen as a PNG file, then stops sharing. */
-export async function screenshotFile(stream: MediaStream, at = new Date()): Promise<File> {
+/** A rectangle in pixels of the shared screen. */
+export interface Rect {
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+/**
+ * A drag on the shown picture (client pixels, any direction) as a rectangle
+ * of the shared screen, clamped to it. `shown` is where the picture is drawn,
+ * `width`/`height` its real size. Null for a drag too small to mean a region.
+ */
+export function toSourceRect(
+	from: { readonly x: number; readonly y: number },
+	to: { readonly x: number; readonly y: number },
+	shown: Rect,
+	width: number,
+	height: number,
+	minShown = 8,
+): Rect | null {
+	if (!(shown.width > 0) || !(shown.height > 0)) return null;
+	const clampX = (value: number) => Math.min(Math.max(value - shown.x, 0), shown.width);
+	const clampY = (value: number) => Math.min(Math.max(value - shown.y, 0), shown.height);
+	const left = Math.min(clampX(from.x), clampX(to.x));
+	const right = Math.max(clampX(from.x), clampX(to.x));
+	const top = Math.min(clampY(from.y), clampY(to.y));
+	const bottom = Math.max(clampY(from.y), clampY(to.y));
+	if (right - left < minShown || bottom - top < minShown) return null;
+	const scaleX = width / shown.width;
+	const scaleY = height / shown.height;
+	return evenRect({ x: left * scaleX, y: top * scaleY, width: (right - left) * scaleX, height: (bottom - top) * scaleY }, width, height);
+}
+
+/** Whole, even pixels inside width × height: video frames crop only on even edges. */
+export function evenRect(rect: Rect, width: number, height: number): Rect {
+	const even = (value: number) => Math.max(0, Math.floor(value / 2) * 2);
+	const x = Math.min(even(rect.x), Math.max(0, even(width) - 2));
+	const y = Math.min(even(rect.y), Math.max(0, even(height) - 2));
+	return { x, y, width: Math.max(2, Math.min(even(rect.width), even(width - x))), height: Math.max(2, Math.min(even(rect.height), even(height - y))) };
+}
+
+/** Takes one frame of a shared screen onto a canvas, then stops sharing. */
+export async function grabFrame(stream: MediaStream): Promise<HTMLCanvasElement> {
 	const video = document.createElement("video");
 	video.muted = true;
 	video.playsInline = true;
@@ -52,13 +95,74 @@ export async function screenshotFile(stream: MediaStream, at = new Date()): Prom
 		const context = canvas.getContext("2d");
 		if (context === null) throw new Error("no 2d canvas");
 		context.drawImage(video, 0, 0, canvas.width, canvas.height);
-		const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-		if (blob === null) throw new Error("the screenshot could not be encoded");
-		return new File([blob], captureName("screenshot", "png", at), { type: "image/png" });
+		return canvas;
 	} finally {
 		video.srcObject = null;
 		stopStream(stream);
 	}
+}
+
+/** The region (or the whole frame when null) of a grabbed frame as a PNG file. */
+export async function screenshotFile(frame: HTMLCanvasElement, region: Rect | null, at = new Date()): Promise<File> {
+	let canvas = frame;
+	if (region !== null) {
+		canvas = document.createElement("canvas");
+		canvas.width = region.width;
+		canvas.height = region.height;
+		const context = canvas.getContext("2d");
+		if (context === null) throw new Error("no 2d canvas");
+		context.drawImage(frame, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height);
+	}
+	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+	if (blob === null) throw new Error("the screenshot could not be encoded");
+	return new File([blob], captureName("screenshot", "png", at), { type: "image/png" });
+}
+
+/** The parts of mediacapture-transform used to crop a recording (Chrome and Edge expose them on the page). */
+interface FrameProcessor {
+	readonly readable: ReadableStream<VideoFrame>;
+}
+interface FrameGenerator extends MediaStreamTrack {
+	readonly writable: WritableStream<VideoFrame>;
+}
+interface TransformApi {
+	readonly MediaStreamTrackProcessor?: new (init: { track: MediaStreamTrack }) => FrameProcessor;
+	readonly MediaStreamTrackGenerator?: new (init: { kind: "video" }) => FrameGenerator;
+}
+
+/** Whether this browser can record only a region of the shared screen. */
+export function canCropRecording(): boolean {
+	const api = globalThis as TransformApi;
+	return typeof api.MediaStreamTrackProcessor === "function" && typeof api.MediaStreamTrackGenerator === "function" && typeof VideoFrame === "function";
+}
+
+/**
+ * A video track showing only `region` of `track`. Driven by the frames
+ * themselves, not timers, so it keeps going while the chat is in the
+ * background. Stopping `track` ends it.
+ */
+export function croppedTrack(track: MediaStreamTrack, region: Rect): MediaStreamTrack {
+	const api = globalThis as TransformApi;
+	if (api.MediaStreamTrackProcessor === undefined || api.MediaStreamTrackGenerator === undefined) throw new Error("cropping a recording is not supported");
+	const processor = new api.MediaStreamTrackProcessor({ track });
+	const generator = new api.MediaStreamTrackGenerator({ kind: "video" });
+	const crop = new TransformStream<VideoFrame, VideoFrame>({
+		transform(frame, controller) {
+			try {
+				const shown = frame.visibleRect ?? { x: 0, y: 0, width: frame.codedWidth, height: frame.codedHeight };
+				// A window shared and then resized: keep the region inside the frame.
+				const inside = evenRect(region, shown.width, shown.height);
+				controller.enqueue(new VideoFrame(frame, { visibleRect: { x: shown.x + inside.x, y: shown.y + inside.y, width: inside.width, height: inside.height } }));
+			} finally {
+				frame.close();
+			}
+		},
+	});
+	void processor.readable
+		.pipeThrough(crop)
+		.pipeTo(generator.writable)
+		.catch(() => undefined);
+	return generator;
 }
 
 /** The container to record a screen into; "" lets the browser choose. */

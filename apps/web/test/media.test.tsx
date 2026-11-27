@@ -499,10 +499,15 @@ describe("screen capture", () => {
 		const { f, chat } = setup(true);
 		await open(f, chat);
 		await attachMenuItem("Chụp màn hình");
+		// The frame fills the page to pick a region; sharing has already stopped.
+		const picker = await screen.findByRole("dialog", { name: "Chọn vùng chụp" }, LONG);
+		expect(track.stopped).toBe(true);
+		expect(within(picker).getByRole("button", { name: "Chụp vùng này" })).toHaveProperty("disabled", true);
+		await userEvent.click(within(picker).getByRole("button", { name: "Cả màn hình" }));
 		const tray = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
 		expect(within(tray).getByText(/^screenshot-\d{8}-\d{6}\.png$/)).toBeTruthy();
 		expect(drawImage).toHaveBeenCalled();
-		expect(track.stopped).toBe(true);
+		expect(screen.queryByRole("dialog", { name: "Chọn vùng chụp" })).toBeNull();
 	});
 
 	it("takes a screenshot with Alt+S and records with Alt+R", async () => {
@@ -520,6 +525,9 @@ describe("screen capture", () => {
 		await open(f, chat);
 		await screen.findByRole("button", { name: "Đính kèm" }, LONG);
 		fireEvent.keyDown(document, { key: "ß", code: "KeyS", altKey: true });
+		// Enter with no region drawn takes the whole screen.
+		const picker = await screen.findByRole("dialog", { name: "Chọn vùng chụp" }, LONG);
+		fireEvent.keyDown(picker, { key: "Enter" });
 		const tray = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
 		expect(within(tray).getByText(/^screenshot-\d{8}-\d{6}\.png$/)).toBeTruthy();
 		fireEvent.keyDown(document, { key: "®", code: "KeyR", altKey: true });

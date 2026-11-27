@@ -33,7 +33,7 @@ import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
-import { canRecordScreen, canShareScreen, refusedShare, requestScreen, screenKey } from "../media/screen-share.ts";
+import { canRecordScreen, canShareScreen, requestScreen, screenKey } from "../media/screen-share.ts";
 import { sizeLimitLabel } from "../media/size-limit-label.ts";
 import { openAiPanel, useCell, useIntent, useUi } from "./ui-context.tsx";
 
@@ -47,6 +47,7 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
 const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
 const ScreenRecorder = lazy(() => import("../media/screen-recorder.tsx"));
+const ScreenshotRegion = lazy(() => import("../media/screenshot-region.tsx"));
 const BotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotLayer })));
 // The draft is "@bot_username query": inline mode of that bot.
 const InlineResults = lazy(() => import("../bots/inline-results.tsx"));
@@ -132,6 +133,8 @@ export function Composer({
 	const [recording, setRecording] = useState(false);
 	// The screen share being recorded, asked for in the attach menu's click.
 	const [screenShare, setScreenShare] = useState<Promise<MediaStream> | null>(null);
+	// The screen share a screenshot is being taken from (its region picked over the page).
+	const [screenshot, setScreenshot] = useState<Promise<MediaStream> | null>(null);
 	const pickMedia = useRef<HTMLInputElement>(null);
 	const pickFiles = useRef<HTMLInputElement>(null);
 	const attachButton = useRef<HTMLButtonElement>(null);
@@ -400,26 +403,11 @@ export function Composer({
 	// The browser shares the screen only from inside the click: ask first, load the capture code after.
 	const takeScreenshot = () => {
 		setAttachOpen(false);
+		if (screenshot !== null) return;
 		const shared = requestScreen(false);
-		void Promise.all([shared, import("../media/screen-capture.ts")])
-			.then(([stream, capture]) => capture.screenshotFile(stream))
-			.then(
-				(file) => {
-					addAttachments(chatId, topicId, [file]);
-					area.current?.focus();
-				},
-				(err: unknown) => {
-					// A share that came through stops even when the capture code did not load (stopping twice is harmless).
-					void shared.then(
-						(stream) => {
-							for (const track of stream.getTracks()) track.stop();
-						},
-						() => undefined,
-					);
-					// Closing the picker is not an error.
-					if (!refusedShare(err)) toasts.show(copy.composer.screenshotFailed);
-				},
-			);
+		// Without this a closed picker would be reported unhandled until the screenshot code loads.
+		shared.catch(() => undefined);
+		setScreenshot(shared);
 	};
 
 	const recordScreen = () => {
@@ -433,7 +421,7 @@ export function Composer({
 	// ⌥S / Alt+S takes a screenshot, ⌥R / Alt+R records the screen, as the attach menu does; the key press is the gesture the browser needs.
 	const onScreenKey = useEffectEvent((event: KeyboardEvent) => {
 		const key = screenKey(event);
-		if (key === null || !mediaOn || intent?.mode === "edit" || recording || screenShare !== null) return;
+		if (key === null || !mediaOn || intent?.mode === "edit" || recording || screenShare !== null || screenshot !== null) return;
 		if (key === "screenshot" ? !canShareScreen() : !canRecordScreen()) return;
 		event.preventDefault();
 		if (key === "screenshot") takeScreenshot();
@@ -515,6 +503,19 @@ export function Composer({
 	}
 	return (
 		<div className="composer-wrap">
+			{screenshot !== null && (
+				<Suspense fallback={null}>
+					<ScreenshotRegion
+						stream={screenshot}
+						chatId={chatId}
+						topicId={topicId}
+						onClose={() => {
+							setScreenshot(null);
+							area.current?.focus();
+						}}
+					/>
+				</Suspense>
+			)}
 			{inline !== null && !editing && !withFiles && (
 				<Suspense fallback={null}>
 					<InlineResults
