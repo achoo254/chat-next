@@ -431,6 +431,8 @@ export const enScreens: ScreensCopy = {
 		folders: "Filters All, Personal, Groups, Bots, Unread",
 		list: "Keyboard shortcuts",
 		compactWindow: "Open or close the compact always-on-top window",
+		screenshot: "Take a screenshot into the tray",
+		recordScreen: "Record the screen",
 		compose: "Write and reply",
 		send: "Send message",
 		newline: "New line",

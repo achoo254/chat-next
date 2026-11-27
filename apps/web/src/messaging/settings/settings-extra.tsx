@@ -26,6 +26,7 @@ import { DevicePush, usePushOnDevice } from "./device-push.tsx";
 import { InstallSettings } from "./install-app.tsx";
 import { AccountSettings } from "./account-settings.tsx";
 import { McpSettings } from "./mcp-settings.tsx";
+import { canRecordScreen, canShareScreen } from "../media/screen-share.ts";
 import ProfilePhotoField from "./profile-photo.tsx";
 import type { SelfUser } from "../../api/adapters.ts";
 import { ChatAvatar, Choice, Switch, useDomId } from "../ui/parts.tsx";
@@ -614,6 +615,8 @@ function ShortcutSettings() {
 						{ label: t.editLast, hint: t.editLastHint, keys: [["↑"]] },
 						{ label: t.reply, keys: [], text: t.doubleClick },
 						{ label: t.escape, keys: [["Esc"]] },
+						...(canShareScreen() ? [{ label: t.screenshot, keys: [["alt", "S"]] }] : []),
+						...(canRecordScreen() ? [{ label: t.recordScreen, keys: [["alt", "R"]] }] : []),
 					])}
 				</dl>
 			</div>

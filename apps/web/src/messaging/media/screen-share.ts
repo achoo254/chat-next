@@ -21,6 +21,22 @@ export function requestScreen(audio: boolean): Promise<MediaStream> {
 	return navigator.mediaDevices.getDisplayMedia({ video: true, audio });
 }
 
+/**
+ * The screen shortcut a key press is: ⌥S / Alt+S a screenshot, ⌥R / Alt+R a
+ * screen recording. Read from the physical key: on macOS ⌥S types "ß".
+ */
+export function screenKey(event: Pick<KeyboardEvent, "code" | "altKey" | "metaKey" | "ctrlKey" | "shiftKey" | "repeat">): "screenshot" | "record" | null {
+	if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey || event.repeat) return null;
+	if (event.code === "KeyS") return "screenshot";
+	if (event.code === "KeyR") return "record";
+	return null;
+}
+
+/** "⌥S" on macOS, "Alt+S" elsewhere: how the menu names a screen shortcut. */
+export function altKeyLabel(letter: string): string {
+	return /Mac|iPhone|iPad/.test(navigator.userAgent) ? `⌥${letter}` : `Alt+${letter}`;
+}
+
 /** The person closed the picker or refused sharing: nothing to report. */
 export function refusedShare(err: unknown): boolean {
 	return err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError");

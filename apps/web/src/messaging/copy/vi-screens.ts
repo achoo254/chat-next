@@ -433,6 +433,8 @@ export const viScreens = {
 		folders: "Bộ lọc Tất cả, Cá nhân, Nhóm, Bot, Chưa đọc",
 		list: "Danh sách phím tắt",
 		compactWindow: "Mở hoặc đóng cửa sổ nhỏ luôn nổi",
+		screenshot: "Chụp màn hình vào khay gửi",
+		recordScreen: "Quay màn hình",
 		compose: "Soạn và trả lời",
 		send: "Gửi tin",
 		newline: "Xuống dòng",

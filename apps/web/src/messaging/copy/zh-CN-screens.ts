@@ -431,6 +431,8 @@ export const zhCNScreens: ScreensCopy = {
 		folders: "筛选：全部、个人、群组、机器人、未读",
 		list: "键盘快捷键",
 		compactWindow: "打开或关闭置顶小窗口",
+		screenshot: "截屏并放入待发送列表",
+		recordScreen: "录屏",
 		compose: "撰写与回复",
 		send: "发送消息",
 		newline: "换行",

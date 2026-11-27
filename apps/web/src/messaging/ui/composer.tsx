@@ -33,7 +33,7 @@ import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
-import { canRecordScreen, canShareScreen, refusedShare, requestScreen } from "../media/screen-share.ts";
+import { canRecordScreen, canShareScreen, refusedShare, requestScreen, screenKey } from "../media/screen-share.ts";
 import { sizeLimitLabel } from "../media/size-limit-label.ts";
 import { openAiPanel, useCell, useIntent, useUi } from "./ui-context.tsx";
 
@@ -429,6 +429,21 @@ export function Composer({
 		shared.catch(() => undefined);
 		setScreenShare(shared);
 	};
+
+	// ⌥S / Alt+S takes a screenshot, ⌥R / Alt+R records the screen, as the attach menu does; the key press is the gesture the browser needs.
+	const onScreenKey = useEffectEvent((event: KeyboardEvent) => {
+		const key = screenKey(event);
+		if (key === null || !mediaOn || intent?.mode === "edit" || recording || screenShare !== null) return;
+		if (key === "screenshot" ? !canShareScreen() : !canRecordScreen()) return;
+		event.preventDefault();
+		if (key === "screenshot") takeScreenshot();
+		else recordScreen();
+	});
+	useEffect(() => {
+		const onKey = (event: KeyboardEvent) => onScreenKey(event);
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, []);
 
 	const onKeyDown = (event: KeyboardEvent) => {
 		if (event.key === "Escape" && intent !== null) {

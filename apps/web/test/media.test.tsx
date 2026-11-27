@@ -482,7 +482,8 @@ describe("screen capture", () => {
 	async function attachMenuItem(name: string) {
 		await userEvent.click(await screen.findByRole("button", { name: "Đính kèm" }, LONG));
 		const menu = await screen.findByRole("menu", { name: "Đính kèm" }, LONG);
-		await userEvent.click(within(menu).getByRole("menuitem", { name }));
+		// The item names its shortcut too: "Chụp màn hình Alt+S" (⌥S on macOS).
+		await userEvent.click(within(menu).getByRole("menuitem", { name: new RegExp(`^${name}\\s*(Alt\\+|⌥)[SR]$`) }));
 	}
 
 	it("puts a screenshot of the shared screen in the tray and stops sharing", async () => {
@@ -502,6 +503,32 @@ describe("screen capture", () => {
 		expect(within(tray).getByText(/^screenshot-\d{8}-\d{6}\.png$/)).toBeTruthy();
 		expect(drawImage).toHaveBeenCalled();
 		expect(track.stopped).toBe(true);
+	});
+
+	it("takes a screenshot with Alt+S and records with Alt+R", async () => {
+		const shot = fakeShare();
+		const rec = fakeShare();
+		const shares = [shot.stream, rec.stream];
+		stubScreen(() => Promise.resolve(shares.shift() ?? rec.stream));
+		vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+		vi.spyOn(HTMLMediaElement.prototype, "readyState", "get").mockReturnValue(HTMLMediaElement.HAVE_ENOUGH_DATA);
+		vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(1280);
+		vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(720);
+		vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+		vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((done) => done(new Blob([bytes(900).slice()], { type: "image/png" })));
+		const { f, chat } = setup(true);
+		await open(f, chat);
+		await screen.findByRole("button", { name: "Đính kèm" }, LONG);
+		fireEvent.keyDown(document, { key: "ß", code: "KeyS", altKey: true });
+		const tray = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
+		expect(within(tray).getByText(/^screenshot-\d{8}-\d{6}\.png$/)).toBeTruthy();
+		fireEvent.keyDown(document, { key: "®", code: "KeyR", altKey: true });
+		const recorder = await screen.findByRole("group", { name: "Quay màn hình" }, LONG);
+		await waitFor(() => expect(within(recorder).getByRole("timer")).toBeTruthy(), LONG);
+		// While recording the keys do nothing more.
+		fireEvent.keyDown(document, { key: "ß", code: "KeyS", altKey: true });
+		await userEvent.click(within(recorder).getByRole("button", { name: "Huỷ quay màn hình" }));
+		expect(rec.track.stopped).toBe(true);
 	});
 
 	it("says nothing when the screen picker is closed", async () => {

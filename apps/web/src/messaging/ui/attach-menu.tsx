@@ -4,6 +4,7 @@
 import type { RefObject } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
+import { altKeyLabel } from "../media/screen-share.ts";
 import { PopupMenu } from "./popup-menu.tsx";
 
 interface AttachMenuProps {
@@ -36,12 +37,18 @@ export default function AttachMenu({ boundary, limit, onMedia, onFiles, onScreen
 				<button type="button" role="menuitem" onClick={onScreenshot}>
 					<Icon name="camera" />
 					{copy.composer.attachScreenshot}
+					<small>
+						<kbd>{altKeyLabel("S")}</kbd>
+					</small>
 				</button>
 			)}
 			{onRecordScreen !== undefined && (
 				<button type="button" role="menuitem" onClick={onRecordScreen}>
 					<Icon name="screen-record" />
 					{copy.composer.attachRecordScreen}
+					<small>
+						<kbd>{altKeyLabel("R")}</kbd>
+					</small>
 				</button>
 			)}
 		</PopupMenu>
