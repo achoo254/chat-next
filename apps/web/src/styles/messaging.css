@@ -301,13 +301,13 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 .msg.mine.run-next .bubble { border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-xs); }
 .msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration) { border-bottom-left-radius: 0; }
 .msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported) { border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: 0; }
-.msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration, .jumbo, .sticker)::before {
+.msg:not(.run-next) .bubble:not(.recalled, .unsupported, .integration, .jumbo, .bare)::before {
 	content: ""; position: absolute; bottom: 0; left: calc(-1 * var(--tail-w)); width: var(--tail-w); height: var(--tail-h);
 	background: var(--bubble); pointer-events: none;
 	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 0 0, transparent 96%, currentColor 100%);
 	mask: radial-gradient(var(--tail-w) var(--tail-h) at 0 0, transparent 96%, currentColor 100%);
 }
-.msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported, .jumbo, .sticker)::before {
+.msg.mine:not(.run-next) .bubble:not(.recalled, .unsupported, .jumbo, .bare)::before {
 	left: auto; right: calc(-1 * var(--tail-w));
 	-webkit-mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
 	mask: radial-gradient(var(--tail-w) var(--tail-h) at 100% 0, transparent 96%, currentColor 100%);
@@ -375,12 +375,12 @@ mark { background: var(--c-mark); color: inherit; border-radius: 2px; padding: 0
 /* Emoji at Telegram's sizes (emoji-text.tsx): a little larger than the letters in a message, and one to three
    emoji alone drawn big without the bubble, the time on a dark pill under them. */
 .bubble .emoji { font-size: 1.25em; line-height: 1; vertical-align: -0.12em; }
-.bubble.jumbo, .bubble.sticker { padding: 0; background: none; box-shadow: none; }
+.bubble.jumbo, .bubble.bare { padding: 0; background: none; box-shadow: none; }
 .bubble.jumbo .emoji { font-size: var(--jumbo); line-height: 1.1; vertical-align: 0; }
 .bubble.jumbo.j1 { --jumbo: 5rem; }
 .bubble.jumbo.j2 { --jumbo: 4rem; }
 .bubble.jumbo.j3 { --jumbo: 3rem; }
-.bubble.jumbo .stamp, .bubble.sticker .stamp { float: none; display: flex; width: fit-content; margin: 2px 0 0 auto; padding: 2px var(--space-2); border-radius: var(--radius-full); background: rgb(0 0 0 / 0.45); color: #fff; }
+.bubble.jumbo .stamp, .bubble.bare .stamp { float: none; display: flex; width: fit-content; margin: 2px 0 0 auto; padding: 2px var(--space-2); border-radius: var(--radius-full); background: rgb(0 0 0 / 0.45); color: #fff; }
 .reactions-line { clear: both; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-1) var(--space-3); margin-top: var(--space-1); }
 .reactions-line > .stamp { float: none; margin: 0 0 4px auto; }
 .reactions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0 calc(-1 * var(--space-1)); }
@@ -467,9 +467,9 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 /* A picture sets the bubble's width and the caption wraps to it (as Telegram does); otherwise a long caption widens the bubble and leaves a gap beside the fixed-width picture. */
 .bubble.media:has(.media-pic:not(.gone), .album, .media-box:not(.card), .sticker-pic, .video-sticker, .animated-sticker) > :is(p, .who, .fwd, .reply) { contain: inline-size; }
 .bubble.media > .who, .bubble.media > .fwd, .bubble.media > .via-bot { padding-top: var(--space-1); }
-/* A bare sticker: the time sits in a pill under it, with no bubble to frame it. */
-.bubble.media.sticker { padding: 0; }
-.bubble.sticker > p { margin: 0; padding: 0; }
+/* A bare sticker or GIF: the time sits in a pill under it, with no bubble to frame it. */
+.bubble.media.bare { padding: 0; }
+.bubble.bare > p { margin: 0; padding: 0; }
 .media-box { display: block; max-width: 100%; height: auto; border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
 .media-box.card { width: min(300px, 100%); height: 52px; }
 .media-slot { display: grid; justify-items: start; gap: var(--space-1); min-width: 0; }

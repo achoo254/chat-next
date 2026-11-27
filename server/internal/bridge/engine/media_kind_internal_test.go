@@ -32,3 +32,21 @@ func TestFileNameOfAnimatedSticker(t *testing.T) {
 		t.Fatalf("file name = %q, want sticker.tgs", got)
 	}
 }
+
+// A GIF is a looping clip under a name the apps recognise; a GIF of another type stays a file.
+func TestGifIsStoredAsLoopingClip(t *testing.T) {
+	clip := bridge.Media{Kind: "gif", Name: "giphy.mp4", MimeType: "video/mp4"}
+	if kind, ok := uploadKind(clip); kind != appv1.MediaKind_MEDIA_KIND_VIDEO || !ok {
+		t.Fatalf("gif mp4: got (%v, %v), want video", kind, ok)
+	}
+	if got := fileNameOf(clip); got != "gif.mp4" {
+		t.Fatalf("file name = %q, want gif.mp4", got)
+	}
+	other := bridge.Media{Kind: "gif", Name: "old.gif", MimeType: "image/gif"}
+	if kind, ok := uploadKind(other); kind != appv1.MediaKind_MEDIA_KIND_DOCUMENT || !ok {
+		t.Fatalf("gif image: got (%v, %v), want document", kind, ok)
+	}
+	if got := fileNameOf(other); got != "old.gif" {
+		t.Fatalf("file name = %q, want old.gif", got)
+	}
+}

@@ -46,6 +46,7 @@ export const enMedia: MediaCopy = {
 		open: "View photo",
 		sticker: "Animated sticker",
 		stillSticker: "Sticker",
+		gif: "GIF, open to view large",
 		video: "Video",
 		playVideo: (ms) => (ms > 0 ? `Play video, ${words(ms)}` : "Play video"),
 		album: (n) => `Album of ${n} photos and videos`,

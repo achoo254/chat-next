@@ -3,7 +3,7 @@
 // fixed picture boxes, album rows of the message list and shared media.
 import type { StoredMessage } from "@achoo254/chat-core";
 import { describe, expect, it } from "vitest";
-import { albumBox, isSticker, mediaBox } from "../src/messaging/media/box.ts";
+import { albumBox, isGif, isSticker, mediaBox } from "../src/messaging/media/box.ts";
 import {
 	encodeWaveform,
 	fileExt,
@@ -174,5 +174,15 @@ describe("isSticker", () => {
 		expect(isSticker({ kind: "photo", mimeType: "image/webp", fileName: "holiday.webp" })).toBe(false);
 		expect(isSticker({ kind: "video", mimeType: "video/mp4", fileName: "sticker.mp4" })).toBe(false);
 		expect(isSticker({ kind: "document", mimeType: "image/webp", fileName: "sticker.webp" })).toBe(false);
+	});
+});
+
+describe("isGif", () => {
+	it("tells a GIF the bridge copied from an ordinary video", () => {
+		expect(isGif({ kind: "video", mimeType: "video/mp4", fileName: "gif.mp4" })).toBe(true);
+		expect(isGif({ kind: "video", mimeType: "video/mp4", fileName: "GIF.MP4" })).toBe(true);
+		expect(isGif({ kind: "video", mimeType: "video/mp4", fileName: "holiday.mp4" })).toBe(false);
+		expect(isGif({ kind: "document", mimeType: "video/mp4", fileName: "gif.mp4" })).toBe(false);
+		expect(isGif({ kind: "video", mimeType: "video/webm", fileName: "gif.mp4" })).toBe(false);
 	});
 });

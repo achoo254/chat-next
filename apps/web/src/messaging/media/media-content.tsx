@@ -12,7 +12,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
 import { useConnection, useItem, useServices } from "../data/services.tsx";
 import { AnimatedSticker } from "./animated-sticker.tsx";
-import { boxStyle, isSticker, isVisual, mediaBox } from "./box.ts";
+import { boxStyle, isGif, isSticker, isVisual, mediaBox } from "./box.ts";
 import { downloadMedia } from "./download.ts";
 import { VideoFrame, FRAME_MAX_BYTES } from "./video-frame.tsx";
 import { fileExt, formatBytes, isAnimatedSticker, isVideoSticker, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
@@ -299,6 +299,23 @@ function StillSticker({ chatId, seq, media }: { chatId: number; seq: number; med
 	);
 }
 
+/** A GIF: the clip loops in place, muted, over its blurred thumb; a click opens the viewer. */
+function GifView({ chatId, seq, media, label }: { chatId: number; seq: number; media: MediaRef; label: string }) {
+	const copy = useMediaCopy();
+	const [ref, near] = useNearViewport();
+	if (media.size > FRAME_MAX_BYTES) return <PictureView chatId={chatId} seq={seq} media={media} label={label} />;
+	return (
+		<div ref={ref} className="media-pic gif" style={boxStyle(mediaBox(media.width, media.height))}>
+			<PictureLayers thumb={inlineThumbUrl(media.inlineThumb)} url={null} />
+			<VideoFrame chatId={chatId} seq={seq} media={media} enabled={near} loop className="pic-full" />
+			<button type="button" className="pic-open" aria-label={copy.media.gif} onClick={() => viewer.set({ chatId, seq })} />
+			<span className="chip-on-media" aria-hidden="true">
+				GIF
+			</span>
+		</div>
+	);
+}
+
 /** The file of one message, by kind. */
 export function MessageMedia({ message }: { message: StoredMessage }) {
 	const copy = useMediaCopy();
@@ -310,6 +327,7 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 			return <PictureView chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 		case "video":
 			if (isVideoSticker(media)) return <VideoSticker chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
+			if (isGif(media)) return <GifView chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 			return <PictureView chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 		case "voice":
 		case "audio":

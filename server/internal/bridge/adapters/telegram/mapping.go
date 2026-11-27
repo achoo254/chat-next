@@ -230,6 +230,7 @@ func mapMedia(m tg.MessageMediaClass) []bridge.Media {
 // documentMedia classifies a document by its attributes.
 func documentMedia(d *tg.Document) bridge.Media {
 	m := bridge.Media{Kind: "document", MimeType: d.MimeType, Size: d.Size}
+	animated := false
 	for _, a := range d.Attributes {
 		switch v := a.(type) {
 		case *tg.DocumentAttributeFilename:
@@ -246,10 +247,15 @@ func documentMedia(d *tg.Document) bridge.Media {
 		case *tg.DocumentAttributeSticker:
 			m.Kind = "sticker"
 		case *tg.DocumentAttributeAnimated:
-			m.Kind = "gif"
+			animated = true
 		case *tg.DocumentAttributeImageSize:
 			m.Width, m.Height = v.W, v.H
 		}
+	}
+	// A GIF is a silent clip that carries the video attribute too, in any
+	// order; the animated flag decides, unless the document is a sticker.
+	if animated && m.Kind != "sticker" {
+		m.Kind = "gif"
 	}
 	return m
 }

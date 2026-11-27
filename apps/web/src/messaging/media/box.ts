@@ -51,6 +51,11 @@ export function isSticker(media: Pick<MediaRef, "kind" | "mimeType" | "fileName"
 	}
 }
 
+/** A GIF the bridge copied from Telegram: a silent MP4 stored as gif.mp4 that loops in place. */
+export function isGif(media: Pick<MediaRef, "kind" | "mimeType" | "fileName">): boolean {
+	return media.kind === "video" && media.mimeType === "video/mp4" && media.fileName.toLowerCase() === "gif.mp4";
+}
+
 /**
  * Inline style of a picture box: a fixed width that shrinks with the
  * bubble on narrow screens, the height following the aspect ratio.

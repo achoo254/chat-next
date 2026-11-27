@@ -10,7 +10,7 @@
 /* The inline thumb is a few hundred bytes: upscaled and blurred until the real image lands on top. */
 .pic-thumb { filter: blur(12px); transform: scale(1.12); }
 .pic-open { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; padding: 0; border: 0; background: none; color: var(--c-on-primary); cursor: zoom-in; }
-.media-pic.video .pic-open { cursor: pointer; }
+.media-pic.video .pic-open, .media-pic.gif .pic-open { cursor: pointer; }
 .pic-open:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -4px; }
 .pic-state { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .pic-state > * { pointer-events: auto; }

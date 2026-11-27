@@ -47,6 +47,7 @@ export const zhCNMedia: MediaCopy = {
 		open: "查看照片",
 		sticker: "动态贴纸",
 		stillSticker: "贴纸",
+		gif: "GIF 动图，点击放大查看",
 		video: "视频",
 		playVideo: (ms) => (ms > 0 ? `播放视频，${words(ms)}` : "播放视频"),
 		album: (n) => `包含 ${n} 张照片和视频的相册`,

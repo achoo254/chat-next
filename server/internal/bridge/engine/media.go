@@ -22,6 +22,9 @@ const defaultMediaMax = 25 << 20
 // tgsMime is the type of Telegram's animated stickers: gzipped Lottie JSON.
 const tgsMime = "application/x-tgsticker"
 
+// gifMime is the type of the clip Telegram sends for a GIF.
+const gifMime = "video/mp4"
+
 // uploadKind maps a media kind of an adapter to a kind of Chat's media
 // service; ok is false for what Chat cannot show (animated Lottie stickers,
 // locations, polls, contacts).
@@ -35,7 +38,14 @@ func uploadKind(m bridge.Media) (appv1.MediaKind, bool) {
 		return appv1.MediaKind_MEDIA_KIND_VOICE, true
 	case "audio":
 		return appv1.MediaKind_MEDIA_KIND_AUDIO, true
-	case "document", "gif":
+	case "document":
+		return appv1.MediaKind_MEDIA_KIND_DOCUMENT, true
+	case "gif":
+		// Telegram sends GIFs as silent MP4 clips: the apps loop them in
+		// place. Any other type stays a file.
+		if m.MimeType == gifMime {
+			return appv1.MediaKind_MEDIA_KIND_VIDEO, true
+		}
 		return appv1.MediaKind_MEDIA_KIND_DOCUMENT, true
 	case "sticker":
 		// A static sticker is an image and a video sticker a clip. The
@@ -177,6 +187,10 @@ func fileNameOf(m bridge.Media) string {
 	if m.MimeType == tgsMime {
 		// The apps tell an animated sticker by this extension, whatever name Telegram gave.
 		return "sticker.tgs"
+	}
+	if m.Kind == "gif" && m.MimeType == gifMime {
+		// The apps tell a GIF from an ordinary video by this name.
+		return "gif.mp4"
 	}
 	if m.Name != "" {
 		return m.Name

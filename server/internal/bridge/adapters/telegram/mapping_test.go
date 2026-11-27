@@ -105,6 +105,18 @@ func TestMapMediaKinds(t *testing.T) {
 	if v := mapMedia(doc(&tg.DocumentAttributeVideo{W: 1, H: 2, Duration: 3}))[0]; v.Duration != 3*time.Second || v.Width != 1 {
 		t.Errorf("video = %+v", v)
 	}
+	// A GIF carries the video attribute too, before or after the animated one.
+	for _, m := range []tg.MessageMediaClass{
+		doc(&tg.DocumentAttributeAnimated{}, &tg.DocumentAttributeVideo{W: 4, H: 3}),
+		doc(&tg.DocumentAttributeVideo{W: 4, H: 3}, &tg.DocumentAttributeAnimated{}),
+	} {
+		if g := mapMedia(m)[0]; g.Kind != "gif" || g.Width != 4 || g.Height != 3 {
+			t.Errorf("gif = %+v", g)
+		}
+	}
+	if s := mapMedia(doc(&tg.DocumentAttributeSticker{}, &tg.DocumentAttributeAnimated{}))[0]; s.Kind != "sticker" {
+		t.Errorf("animated sticker = %+v", s)
+	}
 }
 
 func TestTranslateErrors(t *testing.T) {

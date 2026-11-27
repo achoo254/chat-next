@@ -47,6 +47,7 @@ export const viMedia = {
 		open: "Xem ảnh",
 		sticker: "Nhãn dán động",
 		stillSticker: "Nhãn dán",
+		gif: "Ảnh GIF, bấm để xem lớn",
 		video: "Video",
 		playVideo: (ms: number) => (ms > 0 ? `Phát video, ${words(ms)}` : "Phát video"),
 		album: (n: number) => `Album ${n} ảnh và video`,
