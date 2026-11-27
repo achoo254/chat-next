@@ -179,9 +179,9 @@ class NoMessageIdError extends Error {
 }
 
 /** Sends one photo or file, `data` being its bytes, to the user `to`; returns the id Zalo gave the message. */
-export async function sendMedia(api, to, file, data) {
+export async function sendMedia(api, to, file, data, type = ThreadType.User) {
 	const attachment = { data, filename: file.name, metadata: { totalSize: data.length, width: file.width, height: file.height } };
-	const result = await api.sendMessage({ msg: file.text, attachments: [attachment] }, to, ThreadType.User);
+	const result = await api.sendMessage({ msg: file.text, attachments: [attachment] }, to, type);
 	const id = result?.attachment?.[0]?.msgId;
 	const msgId = typeof id === "number" || typeof id === "string" ? String(id) : "";
 	if (!/^[0-9]{1,30}$/.test(msgId)) throw new NoMessageIdError();

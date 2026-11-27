@@ -21,8 +21,10 @@ import (
 // send_media); version 9 sets or takes back the owner's reaction to a message
 // (react) and gives a history message its client id; version 11 gives a 1-1
 // message when the other person was last online (peerSeen); version 10 recalls a
-// message the owner sent (undo); version 12 no longer carries the phone number of the other person (peerPhone).
-const protocolVersion = 12
+// message the owner sent (undo); version 12 no longer carries the phone number of the other person (peerPhone);
+// version 13 delivers group messages with the group's id, name and photo, lets send, send_media, react,
+// undo and history name a group (group), and reads the name and photo of groups (group_info).
+const protocolVersion = 13
 
 // maxLineBytes bounds one line of the sidecar's stdout. A QR image is about
 // 10 KiB and a text message far less; a longer line is a broken sidecar.
@@ -40,6 +42,7 @@ const (
 	cmdSendMedia = "send_media"
 	cmdReact     = "react"
 	cmdUndo      = "undo"
+	cmdGroupInfo = "group_info"
 )
 
 // Events the sidecar writes on stdout.
@@ -57,17 +60,20 @@ const (
 	evError      = "error"
 	// Answers to a command with an id (send, history). They are routed to
 	// the caller by id and never reach the listener's loop.
-	evSent         = "sent"
-	evReacted      = "reacted"
-	evUndone       = "undone"
-	evSendError    = "send_error"
-	evHistory      = "history"
-	evHistoryError = "history_error"
+	evSent           = "sent"
+	evReacted        = "reacted"
+	evUndone         = "undone"
+	evSendError      = "send_error"
+	evHistory        = "history"
+	evHistoryError   = "history_error"
+	evGroupInfo      = "group_info"
+	evGroupInfoError = "group_info_error"
 )
 
 // isAnswer reports whether an event answers a command with an id.
 func isAnswer(ev string) bool {
-	return ev == evSent || ev == evReacted || ev == evUndone || ev == evSendError || ev == evHistory || ev == evHistoryError
+	return ev == evSent || ev == evReacted || ev == evUndone || ev == evSendError || ev == evHistory || ev == evHistoryError ||
+		ev == evGroupInfo || ev == evGroupInfoError
 }
 
 // command is one line written to the sidecar.
@@ -95,6 +101,10 @@ type command struct {
 	Icon     *string `json:"icon,omitempty"`
 	Width    int     `json:"width,omitempty"`
 	Height   int     `json:"height,omitempty"`
+	// Group says To (history: Peer) is the id of a group, not of a person.
+	Group bool `json:"group,omitempty"`
+	// group_info: the ids of the groups to read.
+	Groups []string `json:"groups,omitempty"`
 }
 
 // errCodeSessionRejected is the error code of a login Zalo refused (sidecar
@@ -129,6 +139,11 @@ type wireEvent struct {
 	// 0 when unknown or hidden.
 	PeerSeen int64       `json:"peerSeen"`
 	TS       looseString `json:"ts"`
+	// GroupID, GroupName and GroupAvatar describe the group of a group message;
+	// the name and the photo URL are "" when the sidecar could not look them up.
+	GroupID     looseString `json:"groupId"`
+	GroupName   string      `json:"groupName"`
+	GroupAvatar string      `json:"groupAvatar"`
 	// event, listener, error
 	Name    string          `json:"name"`
 	Payload json.RawMessage `json:"payload"`
@@ -141,6 +156,15 @@ type wireEvent struct {
 	Count    int              `json:"count"`
 	OldestTS looseString      `json:"oldestTs"`
 	Messages []historyMessage `json:"messages"`
+	// group_info: the name and photo of each group Zalo told about, by id.
+	Groups map[string]groupWire `json:"groups"`
+}
+
+// groupWire is what group_info says about one group.
+type groupWire struct {
+	Name   string `json:"name"`
+	About  string `json:"about"`
+	Avatar string `json:"avatar"`
 }
 
 // historyMessage is one message of a history page (sidecar src/history.mjs).

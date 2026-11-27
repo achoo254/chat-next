@@ -90,3 +90,19 @@ export function pageFor(messages, peer) {
 	own.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
 	return { count: messages.length, oldestTs, messages: own.slice(-MAX_HISTORY_MESSAGES) };
 }
+
+/** Most messages of a group read for one history request. */
+export const GROUP_HISTORY_COUNT = 50;
+
+/**
+ * The newest page of the group `groupId`, in the shape of pageFor. zca-js 2.3.0
+ * `api.getGroupChatHistory(groupId, count)` makes exactly one request: GET
+ * <zpwServiceMap.group[0]>/api/group/history, answered with `{ groupMsgs: [GroupMessage] }`, whose
+ * threadId is the group's id. It needs no listener, so one group may be read while another request
+ * is open.
+ */
+export async function readGroupPage(getGroupChatHistory, groupId) {
+	const answer = await getGroupChatHistory(groupId, GROUP_HISTORY_COUNT);
+	const messages = Array.isArray(answer?.groupMsgs) ? answer.groupMsgs : [];
+	return pageFor(messages, groupId);
+}

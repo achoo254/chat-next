@@ -22,6 +22,10 @@
 //   {"cmd":"undo","id":"<req id>","to":"<uid digits>","msgId":"<digits>","cliMsgId":"<digits>"}
 //                                            (protocol 10) recall one message the owner sent to one person, for
 //                                            everyone (src/undo.mjs); answered by `undone` or `send_error`
+//   (protocol 13) send, send_media, react, undo and history take "group":true: `to` (history: `peer`) is
+//                                            then the id of a group the account is in, not of a person
+//   {"cmd":"group_info","id":"<req id>","groups":["<group id digits>",..]}  (protocol 13) the name and photo
+//                                            of up to 50 groups (src/group-info.mjs); `group_info` or `group_info_error`
 //   {"cmd":"stop"}                           stop listening and exit
 // stdout : one JSON event per line, and nothing else (the library's own logging is off).
 //   {"ev":"ready","protocol":7}
@@ -34,6 +38,8 @@
 //                                     message the owner sent; peerAvatar (protocol 6) the https URL of their
 //                                     photo; peerSeen (protocol 11) when they were last online, ms, 0 when unknown;
 //                                     the phone number of their profile is not passed on (protocol 12)
+//    | for a group (protocol 13): "groupId","groupName","groupAvatar" (looked up, "" when unknown), and
+//     peerAvatar/peerSeen of the sender when the owner did not send it; dName is the sender's name
 //   {"ev":"event","name":"typing"|"reaction"|"undo"|"seen"|"delivered"|..,"payload":..}
 //   {"ev":"listener","state":"connected"|"disconnected"|"closed","code":..}
 //   {"ev":"sent","id":..,"msgId":"<digits>","ts":<ms>}    ts is this process's clock when Zalo answered
@@ -44,11 +50,13 @@
 //   {"ev":"history","id":..,"count":<page size>,"oldestTs":<ms>,"messages":[{self,msgType,textHash,msgId,ts}]}
 //     textHash: SHA-256 hex of a text message's text (src/history.mjs), null for any other message
 //   {"ev":"history_error","id":..,"code":"listener_down"|"busy"|"timeout"|"failed"}
+//   {"ev":"group_info","id":..,"groups":{"<id>":{"name":..,"about":..,"avatar":..}}} | {"ev":"group_info_error","id":..}
 //   {"ev":"error","code":"..","message":".."}          sanitised: never a raw server response. A failed
 //     login's code says why (src/login-failure.mjs): session_rejected, zalo_unavailable,
 //     network_error, bad_session, login_failed; message is only the error's class name.
-// Never called: sendSeenEvent, sendDeliveredEvent, sendTypingEvent, addReaction, findUser,
-// getMultiUsersByPhones. Nothing is sent to a group.
+// Never called: sendSeenEvent, sendDeliveredEvent, sendTypingEvent, findUser, getMultiUsersByPhones,
+// nor anything that joins, leaves or changes a group. A group gets only what a person gets: a text,
+// photo or file the owner typed, a reaction, a recall.
 // stderr : operational lines only: `host <name>` once per Zalo host connected to (the firewall's
 //          learning run reads them), `blocked ...` for a refused connection. No message text,
 //          cookie, imei, name, phone number or id is ever written here. `lookup ok|empty|failed` says only how a
@@ -62,7 +70,8 @@ import readline from "node:readline";
 import { setTimeout } from "node:timers";
 import { LoginQRCallbackEventType, ThreadType, Zalo } from "zca-js";
 import { installEgressGuard } from "./egress-guard.mjs";
-import { createHistory, HistoryError } from "./history.mjs";
+import { createGroupLookup, isGroupId, MAX_GROUPS_PER_READ, readGroups } from "./group-info.mjs";
+import { createHistory, HistoryError, readGroupPage } from "./history.mjs";
 import { createPeerLookup } from "./peer-profile.mjs";
 import { BadSessionError, loginFailureReason } from "./login-failure.mjs";
 import { BAD_REQUEST, isRequestId, isUserId, NOT_LOGGED_IN, sendFailure, sendText } from "./send.mjs";
@@ -81,7 +90,8 @@ import { createUploads, fileOf, guardUploads, sendMedia, sendMediaFailure } from
 // 10: undo recalls a message the owner sent.
 // 11: a 1-1 message carries when the other person was last online (peerSeen, ms; 0 when unknown).
 // 12: a 1-1 message no longer carries the other person's phone number (peerPhone is gone).
-const PROTOCOL = 12;
+// 13: group messages carry the group's id, name and photo; commands take "group"; group_info.
+const PROTOCOL = 13;
 
 /** How long a history request waits for its page. */
 const HISTORY_TIMEOUT_MS = 10_000;
@@ -138,6 +148,13 @@ function announce(loggedIn) {
 
 /** Lookups of the other person of a 1-1 message (src/peer-profile.mjs); stderr says only how each ended. */
 let lookupPeer = null;
+/** Lookups of the name and photo of a group (src/group-info.mjs); stderr says only how each ended. */
+let lookupGroup = null;
+
+/** The thread type a command names: a group with "group":true, else a person. */
+function threadOf(command) {
+	return command.group === true ? ThreadType.Group : ThreadType.User;
+}
 
 /** Keeps the logged-in API; its uploads get a time limit (src/send-media.mjs). */
 function useApi(loggedIn) {
@@ -153,17 +170,27 @@ function listen(loggedIn) {
 		getLastOnline: (uid) => loggedIn.lastOnline(uid),
 		log: (outcome) => process.stderr.write(`lookup ${outcome}\n`),
 	});
+	lookupGroup = createGroupLookup({
+		getGroupInfo: (id) => loggedIn.getGroupInfo(id),
+		log: (outcome) => process.stderr.write(`group lookup ${outcome}\n`),
+	});
 	api.listener.on("message", async (message) => {
 		const data = message.data ?? {};
 		const isGroup = message.type === ThreadType.Group;
 		const self = Boolean(message.isSelf);
-		const peerUid = String(self ? (data.idTo ?? "") : (data.uidFrom ?? ""));
-		const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", seen: 0 };
+		// In a group the person looked up is the sender (never the owner); in a 1-1 chat the other person.
+		const peerUid = String(isGroup ? (self ? "" : (data.uidFrom ?? "")) : self ? (data.idTo ?? "") : (data.uidFrom ?? ""));
+		const groupId = isGroup ? String(message.threadId ?? "") : "";
+		const [peer, group] = await Promise.all([
+			/^[0-9]{1,20}$/.test(peerUid) ? lookupPeer(peerUid) : { name: "", avatar: "", seen: 0 },
+			isGroupId(groupId) ? lookupGroup(groupId) : { name: "", avatar: "" },
+		]);
 		emit({
 			ev: "message",
 			thread: isGroup ? "group" : "user",
+			...(isGroup ? { groupId, groupName: group.name, groupAvatar: group.avatar } : {}),
 			self,
-			peerName: self ? peer.name : "",
+			peerName: self && !isGroup ? peer.name : "",
 			peerAvatar: peer.avatar,
 			peerSeen: peer.seen,
 			msgType: data.msgType,
@@ -237,7 +264,7 @@ async function send(command) {
 		return emit({ ev: "send_error", id, code: BAD_REQUEST });
 	}
 	try {
-		const { msgId, ts } = await sendText(api, command.to, command.text);
+		const { msgId, ts } = await sendText(api, command.to, command.text, threadOf(command));
 		emit({ ev: "sent", id, msgId, ts });
 	} catch (error) {
 		emit({ ev: "send_error", id, ...sendFailure(error) });
@@ -254,7 +281,7 @@ async function sendFile(command) {
 		return emit({ ev: "send_error", id, code: BAD_REQUEST });
 	}
 	try {
-		const { msgId, ts } = await sendMedia(api, command.to, file, data);
+		const { msgId, ts } = await sendMedia(api, command.to, file, data, threadOf(command));
 		emit({ ev: "sent", id, msgId, ts });
 	} catch (error) {
 		emit({ ev: "send_error", id, ...sendMediaFailure(error) });
@@ -269,7 +296,7 @@ async function react(command) {
 		return emit({ ev: "send_error", id, code: BAD_REQUEST });
 	}
 	try {
-		await sendReaction(api, command.to, command.msgId, command.cliMsgId, command.icon);
+		await sendReaction(api, command.to, command.msgId, command.cliMsgId, command.icon, threadOf(command));
 		emit({ ev: "reacted", id });
 	} catch (error) {
 		emit({ ev: "send_error", id, ...sendFailure(error) });
@@ -284,22 +311,37 @@ async function undo(command) {
 		return emit({ ev: "send_error", id, code: BAD_REQUEST });
 	}
 	try {
-		await sendUndo(api, command.to, command.msgId, command.cliMsgId);
+		await sendUndo(api, command.to, command.msgId, command.cliMsgId, threadOf(command));
 		emit({ ev: "undone", id });
 	} catch (error) {
 		emit({ ev: "send_error", id, ...sendFailure(error) });
 	}
 }
 
-/** Reads the newest page of 1-1 messages for one person. */
+/** Reads the newest page of 1-1 messages for one person, or of one group with "group":true. */
 async function readHistory(command) {
 	const id = command.id;
 	if (history === null) return emit({ ev: "history_error", id, code: "listener_down" });
 	if (!isUserId(command.peer)) return emit({ ev: "history_error", id, code: "failed" });
 	try {
-		emit({ ev: "history", id, ...(await history.read(command.peer)) });
+		const page = command.group === true ? await readGroupPage((g, n) => api.getGroupChatHistory(g, n), command.peer) : await history.read(command.peer);
+		emit({ ev: "history", id, ...page });
 	} catch (error) {
 		emit({ ev: "history_error", id, code: error instanceof HistoryError ? error.code : "failed" });
+	}
+}
+
+/** Reads the name and photo of a few groups; the answer never carries more than what it asked for. */
+async function groupInfo(command) {
+	const id = command.id;
+	const groups = command.groups;
+	if (api === null || !Array.isArray(groups) || groups.length === 0 || groups.length > MAX_GROUPS_PER_READ || !groups.every(isGroupId)) {
+		return emit({ ev: "group_info_error", id });
+	}
+	try {
+		emit({ ev: "group_info", id, groups: await readGroups((ids) => api.getGroupInfo(ids), groups) });
+	} catch {
+		emit({ ev: "group_info_error", id });
 	}
 }
 
@@ -326,7 +368,9 @@ async function handle(line) {
 			case "send_media":
 			case "react":
 			case "undo":
+			case "group_info":
 				if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
+				if (command.cmd === "group_info") return await groupInfo(command);
 				if (command.cmd === "send") return await send(command);
 				if (command.cmd === "react") return await react(command);
 				if (command.cmd === "undo") return await undo(command);

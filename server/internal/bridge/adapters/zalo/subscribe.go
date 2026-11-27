@@ -26,7 +26,7 @@ type listening struct {
 }
 
 // Subscribe implements bridge.Adapter: it starts a sidecar with the stored
-// session and delivers 1-1 messages until ctx ends or the sidecar stops. Every
+// session and delivers 1-1 and group messages until ctx ends or the sidecar stops. Every
 // stop is an error the engine retries with its backoff (one sidecar per
 // call), except a session Zalo keeps refusing over time (ErrSessionRevoked,
 // see session_refusals.go) and a session that logs in as another Zalo account
@@ -74,7 +74,6 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, out chan<- bridge.Event) error {
 	heard := a.heardFor(st.account)
 	own := a.sendStateFor(st.account).log
-	groupsIgnored := 0
 	// A login Zalo never answers must not hold the account forever.
 	connectTimer := time.NewTimer(a.timing.connect)
 	defer connectTimer.Stop()
@@ -99,11 +98,6 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 		}
 		switch ev.Ev {
 		case evMessage:
-			if ev.Thread == threadGroup {
-				groupsIgnored++
-				a.logger.Debug("zalo group message ignored", "ignored_since_connect", groupsIgnored)
-				continue
-			}
 			if err := a.deliver(ctx, heard, own, ev, out); err != nil {
 				return err
 			}
@@ -134,7 +128,7 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 	}
 }
 
-// deliverUndo hands the engine the recall of a 1-1 message, so Chat removes
+// deliverUndo hands the engine the recall of a 1-1 or group message, so Chat removes
 // the copy it holds; a recall of a message Chat has not copied yet is kept as a
 // tombstone by the engine.
 func (a *Adapter) deliverUndo(ctx context.Context, heard *heardAccount, ev wireEvent, out chan<- bridge.Event) error {
@@ -152,7 +146,8 @@ func (a *Adapter) deliverUndo(ctx context.Context, heard *heardAccount, ev wireE
 	}
 }
 
-// deliverReaction hands the engine the reactions Zalo reports for 1-1 messages.
+// deliverReaction hands the engine the reactions Zalo reports for 1-1 and group
+// messages (mapReactions finds the member of a group reaction itself).
 func (a *Adapter) deliverReaction(ctx context.Context, heard *heardAccount, ownerUID string, ev wireEvent, out chan<- bridge.Event) error {
 	var probe struct {
 		ThreadID looseString `json:"threadId"`

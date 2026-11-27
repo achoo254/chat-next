@@ -29,13 +29,17 @@ const (
 	threadGroup = "group"
 )
 
-// errNotPrivate marks a message of a thread the adapter does not publish.
-var errNotPrivate = errors.New("zalo: not a 1-1 message")
+// errNotPrivate marks a payload of a thread the adapter does not publish.
+var errNotPrivate = errors.New("zalo: not a 1-1 or group message")
 
-// mapMessage turns a 1-1 message event into the bridge message and its
-// conversation. The conversation id is the other person's Zalo id: for the
-// owner's own message (self) it is the recipient, otherwise the sender.
+// mapMessage turns a message event into the bridge message and its conversation.
+// A group message is mapped by mapGroupMessage. Of a 1-1 message the conversation
+// id is the other person's Zalo id: for the owner's own message (self) it is the
+// recipient, otherwise the sender.
 func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversation, error) {
+	if ev.Thread == threadGroup {
+		return mapGroupMessage(ev, now)
+	}
 	if ev.Thread != threadUser {
 		return bridge.Message{}, bridge.Conversation{}, errNotPrivate
 	}
@@ -82,14 +86,20 @@ type undoPayload struct {
 	} `json:"data"`
 }
 
-// mapUndo turns a recall of a 1-1 message into the conversation (the other
-// person's Zalo id) and the id of the message to remove.
+// mapUndo turns a recall into the conversation (the other person's Zalo id, or
+// the group's conversation) and the id of the message to remove.
 func mapUndo(raw json.RawMessage) (conv, id string, err error) {
 	var p undoPayload
-	if err := json.Unmarshal(raw, &p); err != nil || p.IsGroup {
+	if err := json.Unmarshal(raw, &p); err != nil {
 		return "", "", errNotPrivate
 	}
 	conv, id = string(p.ThreadID), string(p.Data.Content.GlobalMsgID)
+	if p.IsGroup {
+		if !accountUID.MatchString(conv) {
+			return "", "", errors.New("zalo: recall without a valid group")
+		}
+		conv = groupConv(conv)
+	}
 	if !zaloID.MatchString(conv) || !zaloID.MatchString(id) {
 		return "", "", errors.New("zalo: recall without valid ids")
 	}

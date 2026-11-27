@@ -18,7 +18,10 @@ export function isMessageId(value) {
 	return typeof value === "string" && /^[0-9]{1,30}$/.test(value);
 }
 
-/** Sets (or, with icon "", removes) the owner's reaction to the message `msgId` of the person `to`. */
-export async function sendReaction(api, to, msgId, cliMsgId, icon) {
-	await api.addReaction(icon, { data: { msgId, cliMsgId }, threadId: to, type: ThreadType.User });
+/**
+ * Sets (or, with icon "", removes) the owner's reaction to the message `msgId` of the person `to`, or of
+ * the group `to` with `type` ThreadType.Group (POST <zpwServiceMap.reaction[0]>/api/group/reaction).
+ */
+export async function sendReaction(api, to, msgId, cliMsgId, icon, type = ThreadType.User) {
+	await api.addReaction(icon, { data: { msgId, cliMsgId }, threadId: to, type });
 }

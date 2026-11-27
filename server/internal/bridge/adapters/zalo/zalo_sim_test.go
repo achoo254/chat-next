@@ -38,6 +38,17 @@ type zaloSim struct {
 	reactFail   string            // the next react is answered with this send_error code
 	undos       []command         // undo commands, in order
 	undoFail    string            // the next undo is answered with this send_error code
+	sendCmds    []command         // send commands, in order
+	groupInfos  []command         // group_info commands, in order
+	groups      map[string]string // name of each group Zalo knows, by group id
+}
+
+// simKey is the conversation a command names: the person's id, or the group's conversation.
+func simKey(to string, group bool) string {
+	if group {
+		return groupConv(to)
+	}
+	return to
 }
 
 type simMessage struct {
@@ -139,6 +150,18 @@ func (z *zaloSim) script(p *fakeProcess) {
 			} else {
 				p.emit(fmt.Sprintf(`{"ev":"undone","id":%q}`, c.ID))
 			}
+		case cmdGroupInfo:
+			z.mu.Lock()
+			z.groupInfos = append(z.groupInfos, c)
+			found := map[string]groupWire{}
+			for _, id := range c.Groups {
+				if name, ok := z.groups[id]; ok {
+					found[id] = groupWire{Name: name, About: "mô tả " + name, Avatar: "https://s120-ava-grp-talk.zadn.vn/" + id + ".jpg"}
+				}
+			}
+			z.mu.Unlock()
+			body, _ := json.Marshal(map[string]any{"ev": evGroupInfo, "id": c.ID, "groups": found})
+			p.emit(string(body))
 		case cmdReact:
 			z.mu.Lock()
 			z.reacts = append(z.reacts, c)
@@ -157,6 +180,7 @@ func (z *zaloSim) script(p *fakeProcess) {
 func (z *zaloSim) send(p *fakeProcess, c command) {
 	z.mu.Lock()
 	z.sendTimes = append(z.sendTimes, time.Now())
+	z.sendCmds = append(z.sendCmds, c)
 	if z.failNext != "" {
 		code := z.failNext
 		z.failNext = ""
@@ -170,7 +194,7 @@ func (z *zaloSim) send(p *fakeProcess, c command) {
 		return
 	}
 	z.nextID++
-	m := simMessage{id: fmt.Sprint(z.nextID), peer: c.To, self: true, text: c.Text, at: time.Now()}
+	m := simMessage{id: fmt.Sprint(z.nextID), peer: simKey(c.To, c.Group), self: true, text: c.Text, at: time.Now()}
 	z.messages = append(z.messages, m)
 	answer := z.dropAnswers == 0
 	if !answer {
@@ -180,8 +204,13 @@ func (z *zaloSim) send(p *fakeProcess, c command) {
 	z.mu.Unlock()
 	if echo { // the listener's echo often comes before the HTTP answer
 		content, _ := json.Marshal(m.text)
-		p.emit(fmt.Sprintf(`{"ev":"message","thread":"user","self":true,"msgType":"webchat","content":%s,"msgId":%q,"uidFrom":%q,"idTo":%q,"ts":%d}`,
-			content, m.id, simOwner, m.peer, m.at.UnixMilli()))
+		if c.Group {
+			p.emit(fmt.Sprintf(`{"ev":"message","thread":"group","groupId":%q,"groupName":"Nhóm","self":true,"msgType":"webchat","content":%s,"msgId":%q,"uidFrom":%q,"idTo":%q,"ts":%d}`,
+				c.To, content, m.id, simOwner, c.To, m.at.UnixMilli()))
+		} else {
+			p.emit(fmt.Sprintf(`{"ev":"message","thread":"user","self":true,"msgType":"webchat","content":%s,"msgId":%q,"uidFrom":%q,"idTo":%q,"ts":%d}`,
+				content, m.id, simOwner, m.peer, m.at.UnixMilli()))
+		}
 	}
 	if answer {
 		p.emit(fmt.Sprintf(`{"ev":"sent","id":%q,"msgId":%q,"ts":%d}`, c.ID, m.id, m.at.UnixMilli()))
@@ -196,7 +225,16 @@ func (z *zaloSim) history(p *fakeProcess, c command) {
 		p.emit(fmt.Sprintf(`{"ev":"history_error","id":%q,"code":"listener_down"}`, c.ID))
 		return
 	}
+	key := simKey(c.Peer, c.Group)
 	page := z.messages[max(0, len(z.messages)-z.pageSize):]
+	if c.Group { // a group's page is the group's own
+		page = nil
+		for _, m := range z.messages {
+			if m.peer == key {
+				page = append(page, m)
+			}
+		}
+	}
 	type out struct {
 		Self     bool   `json:"self"`
 		MsgType  string `json:"msgType"`
@@ -210,9 +248,9 @@ func (z *zaloSim) history(p *fakeProcess, c command) {
 		if oldest == 0 || m.at.UnixMilli() < oldest {
 			oldest = m.at.UnixMilli()
 		}
-		if m.peer == c.Peer && m.file != nil {
+		if m.peer == key && m.file != nil {
 			mine = append(mine, out{Self: m.self, MsgType: "share.file", MsgID: m.id, TS: m.at.UnixMilli()})
-		} else if m.peer == c.Peer {
+		} else if m.peer == key {
 			h := hashText(m.text)
 			mine = append(mine, out{Self: m.self, MsgType: msgTypeText, TextHash: hex.EncodeToString(h[:]), MsgID: m.id, TS: m.at.UnixMilli()})
 		}
@@ -301,7 +339,7 @@ func (z *zaloSim) sendMedia(p *fakeProcess, c command) {
 		return
 	}
 	z.nextID++
-	m := simMessage{id: fmt.Sprint(z.nextID), peer: c.To, self: true, text: c.Name, at: time.Now(), file: append([]byte{}, data...)}
+	m := simMessage{id: fmt.Sprint(z.nextID), peer: simKey(c.To, c.Group), self: true, text: c.Name, at: time.Now(), file: append([]byte{}, data...)}
 	z.messages = append(z.messages, m)
 	answer := z.dropAnswers == 0
 	if !answer {

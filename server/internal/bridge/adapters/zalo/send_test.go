@@ -231,7 +231,7 @@ func TestSendRefusesWhatZaloSendingDoesNotTake(t *testing.T) {
 		"bad utf8": out(1, "\xff"),
 		"media":    media,
 		"topic":    topic,
-		"group id": {Conversation: "g500", Text: "x", RandomID: 1},
+		"not a chat": {Conversation: "gabc", Text: "x", RandomID: 1},
 	} {
 		if _, err := send(t, a, m); !errors.Is(err, bridge.ErrNotAllowed) {
 			t.Errorf("%s: err = %v, want ErrNotAllowed", name, err)

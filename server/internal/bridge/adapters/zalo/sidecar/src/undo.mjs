@@ -6,7 +6,10 @@
 // like a send's (send.mjs); nothing here is logged.
 import { ThreadType } from "zca-js";
 
-/** Recalls the message `msgId` (client id `cliMsgId`, "0" when unknown) the owner sent to the person `to`. */
-export async function sendUndo(api, to, msgId, cliMsgId) {
-	await api.undo({ msgId, cliMsgId }, to, ThreadType.User);
+/**
+ * Recalls the message `msgId` (client id `cliMsgId`, "0" when unknown) the owner sent to the person `to`,
+ * or to the group `to` with `type` ThreadType.Group (POST <zpwServiceMap.group[0]>/api/group/undomsg).
+ */
+export async function sendUndo(api, to, msgId, cliMsgId, type = ThreadType.User) {
+	await api.undo({ msgId, cliMsgId }, to, type);
 }

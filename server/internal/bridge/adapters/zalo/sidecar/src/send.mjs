@@ -49,9 +49,12 @@ class NoMessageIdError extends Error {
 	}
 }
 
-/** Sends `text` to the user `to` and returns the id Zalo gave the message and when it answered. */
-export async function sendText(api, to, text) {
-	const result = await api.sendMessage({ msg: text }, to, ThreadType.User);
+/**
+ * Sends `text` to the user (or, with `type` ThreadType.Group, the group) `to` and returns the id Zalo
+ * gave the message and when it answered. To a group the request is POST <zpwServiceMap.group[0]>/api/group/sendmsg.
+ */
+export async function sendText(api, to, text, type = ThreadType.User) {
+	const result = await api.sendMessage({ msg: text }, to, type);
 	const id = result?.message?.msgId;
 	const msgId = typeof id === "number" || typeof id === "string" ? String(id) : "";
 	if (!/^[0-9]{1,30}$/.test(msgId)) throw new NoMessageIdError();

@@ -66,9 +66,8 @@ func (h *heardAccount) knows(conv string) bool {
 	return h.convs[conv] != nil
 }
 
-// record keeps a message and its conversation. A conversation heard only
-// through the owner's own messages keeps a stand-in title until the other
-// side writes and gives a name.
+// record keeps a message and its conversation. A conversation titled by a
+// stand-in (standIn) takes the first real one a later message gives.
 func (h *heardAccount) record(conv bridge.Conversation, m bridge.Message) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -80,7 +79,7 @@ func (h *heardAccount) record(conv bridge.Conversation, m bridge.Message) {
 		}
 		c = &heardConversation{conv: conv}
 		h.convs[conv.ID] = c
-	} else if c.conv.Peer != nil && c.conv.Peer.NameUnknown && conv.Peer != nil && !conv.Peer.NameUnknown {
+	} else if standIn(c.conv) && !standIn(conv) {
 		c.conv = conv
 	}
 	c.lastSeen = now
@@ -152,14 +151,14 @@ func (h *heardAccount) evictOldestMessage() {
 }
 
 // conversations lists what was heard, the most recently active first. A conversation
-// whose other side has no name yet is left out, so Chat never shows a bare Zalo id as
+// titled by a stand-in (standIn) is left out, so Chat never shows a bare Zalo id as
 // the title: its messages stay kept, and it is listed once a message gives the name.
 func (h *heardAccount) conversations() []bridge.Conversation {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	list := make([]*heardConversation, 0, len(h.convs))
 	for _, c := range h.convs {
-		if c.conv.Peer != nil && c.conv.Peer.NameUnknown {
+		if standIn(c.conv) {
 			continue
 		}
 		list = append(list, c)
@@ -192,6 +191,15 @@ func (h *heardAccount) takeRecent(conv string, limit int) []bridge.Message {
 	h.messages -= len(c.recent)
 	c.recent, c.consumed = nil, true
 	return out
+}
+
+// standIn reports whether a conversation is titled by a stand-in: a 1-1 chat whose
+// other side has no name yet, or a group whose name the sidecar could not look up.
+func standIn(c bridge.Conversation) bool {
+	if c.Kind == bridge.ConvGroup {
+		return c.Title == ""
+	}
+	return c.Peer != nil && c.Peer.NameUnknown
 }
 
 // truncateUTF8 cuts s to at most n bytes without splitting a character.

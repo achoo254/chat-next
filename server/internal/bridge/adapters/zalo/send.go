@@ -69,12 +69,13 @@ func (a *Adapter) EditMessage(context.Context, bridge.Account, bridge.EditReques
 }
 
 // DeleteMessages implements bridge.Sender: it recalls, for everyone, messages the
-// owner sent to one person, through the account's listening sidecar (src/undo.mjs).
+// owner sent to one person or into a group, through the account's listening sidecar (src/undo.mjs).
 // The engine only asks for messages the owner sent. Recalling a message already
 // recalled is not told apart from a refusal: Zalo's answer decides.
 func (a *Adapter) DeleteMessages(ctx context.Context, acct bridge.Account, d bridge.Delete) error {
-	if !accountUID.MatchString(d.Conversation) || len(d.IDs) == 0 {
-		return fmt.Errorf("%w: not messages of a Zalo 1-1 chat", bridge.ErrNotAllowed)
+	to, group, ok := target(d.Conversation)
+	if !ok || len(d.IDs) == 0 {
+		return fmt.Errorf("%w: not messages of a Zalo chat", bridge.ErrNotAllowed)
 	}
 	for _, id := range d.IDs {
 		if !messageID.MatchString(id) {
@@ -97,7 +98,7 @@ func (a *Adapter) DeleteMessages(ctx context.Context, acct bridge.Account, d bri
 		if cli == "" {
 			cli = a.clientIDFromHistory(ctx, side, d.Conversation, id)
 		}
-		ev, err := side.request(ctx, command{Cmd: cmdUndo, ID: a.nextRequestID(), To: d.Conversation, MsgID: id, CliMsgID: cli}, a.timing.sendAnswer)
+		ev, err := side.request(ctx, command{Cmd: cmdUndo, ID: a.nextRequestID(), To: to, Group: group, MsgID: id, CliMsgID: cli}, a.timing.sendAnswer)
 		if err != nil {
 			return fmt.Errorf("zalo: whether the message was recalled is not known: %w", err)
 		}
@@ -143,7 +144,9 @@ func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge
 		if err != nil {
 			return bridge.SentRef{}, fmt.Errorf("zalo: cannot check that the owner talks with this person: %w", err)
 		}
-		if len(p.messages) == 0 {
+		// A group's page is read from the group itself, which Zalo answers only to a member;
+		// a person's is cut out of the page of every 1-1 chat, so it must hold one of theirs.
+		if _, group, _ := target(m.Conversation); !group && len(p.messages) == 0 {
 			return bridge.SentRef{}, fmt.Errorf("%w: Chat sends on Zalo only to people the account has recently talked with", bridge.ErrNotAllowed)
 		}
 		st.peers.add(m.Conversation)
@@ -165,8 +168,8 @@ func checkOutgoing(m bridge.OutMessage) error {
 	switch {
 	case m.Topic != "":
 		return fmt.Errorf("%w: Zalo chats have no topics", bridge.ErrNotAllowed)
-	case !accountUID.MatchString(m.Conversation):
-		return fmt.Errorf("%w: not a Zalo 1-1 chat", bridge.ErrNotAllowed)
+	case !isTarget(m.Conversation):
+		return fmt.Errorf("%w: not a Zalo 1-1 chat or group", bridge.ErrNotAllowed)
 	case m.Text == "" && len(m.Media) == 0:
 		return fmt.Errorf("%w: an empty message cannot be sent to Zalo", bridge.ErrNotAllowed)
 	case !utf8.ValidString(m.Text):
@@ -220,9 +223,10 @@ func (a *Adapter) sendNow(ctx context.Context, st *sendState, side *sidecar, m b
 	if err := a.waitGap(ctx, st); err != nil {
 		return bridge.SentRef{}, err
 	}
+	to, group, _ := target(m.Conversation) // checkOutgoing refused any other conversation
 	st.log.tried(m.RandomID, m.Conversation, text)
 	st.lastSend = a.now()
-	ev, err := side.request(ctx, command{Cmd: cmdSend, ID: a.nextRequestID(), To: m.Conversation, Text: m.Text}, a.timing.sendAnswer)
+	ev, err := side.request(ctx, command{Cmd: cmdSend, ID: a.nextRequestID(), To: to, Group: group, Text: m.Text}, a.timing.sendAnswer)
 	return a.answered(st, m.RandomID, ev, err)
 }
 
@@ -291,16 +295,22 @@ func sendError(code, zaloCode string) (nothingCreated bool, err error) {
 	return false, fmt.Errorf("zalo: whether the message went out is not known (%s)", code)
 }
 
-// historyPage is the newest page of 1-1 messages, cut down to one person.
+// historyPage is the newest page of a conversation: of every 1-1 chat cut down to
+// one person, or of one group.
 type historyPage struct {
 	count    int       // messages in the whole page
 	oldest   time.Time // of the whole page; zero when unknown
 	messages []historyMessage
 }
 
-// readHistory reads the newest page through the account's sidecar.
-func (a *Adapter) readHistory(ctx context.Context, side *sidecar, peer string) (historyPage, error) {
-	ev, err := side.request(ctx, command{Cmd: cmdHistory, ID: a.nextRequestID(), Peer: peer}, a.timing.historyAnswer)
+// readHistory reads the newest page of a conversation through the account's
+// sidecar: the page of every 1-1 chat cut down to the person, or the group's own.
+func (a *Adapter) readHistory(ctx context.Context, side *sidecar, conv string) (historyPage, error) {
+	to, group, ok := target(conv)
+	if !ok {
+		return historyPage{}, errors.New("zalo: history of a conversation that is not a Zalo chat")
+	}
+	ev, err := side.request(ctx, command{Cmd: cmdHistory, ID: a.nextRequestID(), Peer: to, Group: group}, a.timing.historyAnswer)
 	if err != nil {
 		return historyPage{}, err
 	}

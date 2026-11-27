@@ -71,7 +71,7 @@ Lịch sử: bản 2 (21/11/2026) thêm `account` vì đăng nhập QR phải b�
 
 Chữ, chỉ chat 1-1 (`src/send.mjs`, có test chạy `zca-js` thật với `fetch` giả); ảnh và tệp ở [Gửi ảnh và tệp](#gửi-ảnh-và-tệp). `api.sendMessage({ msg }, to, ThreadType.User)` của `zca-js` 2.3.0 gửi đúng **một** yêu cầu `POST <zpwServiceMap.chat[0]>/api/message/sms`; host lấy từ bản đồ dịch vụ Zalo trả lúc đăng nhập (`zpw_service_map_v3`), không cố định trong mã. Bộ chặn đi ra không phải mở thêm: host đó phải thuộc `*.zalo.me`, nếu bản đồ trỏ ra ngoài thì lần gửi bị chặn và báo `network_error` (có test). Tường lửa thì khác: `hosts.conf` hiện chưa có host dịch vụ chat (tên dự kiến dạng `tt-chat<N>-wpa.chat.zalo.me`), nên lần gửi thật đầu tiên cần học tên đó (log `zalo-sandbox-blocked`, dòng `host` trên stderr) rồi thêm vào danh sách.
 
-- Không gọi `sendSeenEvent`, `sendDeliveredEvent`, `sendTypingEvent`, `addReaction`, `findUser`, `getMultiUsersByPhones` (test đọc `src/entry.mjs`). Không gửi vào nhóm.
+- Không gọi `sendSeenEvent`, `sendDeliveredEvent`, `sendTypingEvent`, `addReaction`, `findUser`, `getMultiUsersByPhones` (test đọc `src/entry.mjs`). Nhóm: xem [Nhóm](#nhóm-phiên-bản-13).
 - `zca-js` tự đặt mã gửi `clientId: Date.now()` và không trả lại, nên `sent` không có `cliMsgId`; `ts` là đồng hồ của tiến trình phụ lúc Zalo trả lời.
 - **Mã `send_error`:** chắc chắn không tạo tin: `rate_limited` (HTTP 429), `session_rejected` (HTTP 401/403), `refused` (Zalo trả mã lỗi riêng, kèm `zaloCode` dạng số, không kèm thông báo), `bad_request`, `not_logged_in`. Chưa rõ tin có được tạo không: `network_error`, `zalo_unavailable` (HTTP lỗi khác), `unclear` (gồm trả lời không có `msgId`). Mã riêng của Zalo cho «bị chặn», «quá nhanh» **chưa quan sát** trên tài khoản thật; khi gặp, ghi `zaloCode` vào đây.
 - **Lịch sử:** `zca-js` 2.3.0 chỉ có `listener.requestOldMessages(ThreadType.User, null)`: xin qua websocket trang tin cũ mới nhất của **mọi** chat 1-1 (không lọc theo người), trang về sau dưới dạng sự kiện `old_messages` không mang mã yêu cầu. Nên mỗi lúc chỉ một yêu cầu (`busy`), chờ 10 giây (`timeout`), cần kênh nghe đang nối (`listener_down`); trang được cắt còn tin của một người (tối đa 50 tin mới nhất, mỗi tin chỉ mang băm SHA-256 của chữ, không mang chữ) và `oldestTs` của cả trang cho biết trang phủ về tới đâu. Cỡ trang do Zalo quyết; chưa đo trên tài khoản thật.
@@ -95,6 +95,19 @@ Một ảnh hay một tệp mỗi lần, chỉ chat 1-1 (`src/send-media.mjs`, c
 ## Thu hồi tin từ Chat
 
 `undo` gọi `api.undo({ msgId, cliMsgId }, threadId, ThreadType.User)` của `zca-js` 2.3.0: một yêu cầu POST tới `<zpwServiceMap.chat[0]>/api/message/undo`, cùng host với gửi tin nên tường lửa không cần thêm gì. Hai id đi dạng chuỗi số (id tin có thể lớn hơn số nguyên chính xác của JavaScript). `cliMsgId` lấy như với reaction: id đã nghe lúc tin tới (tin chính chủ gửi từ Chat cũng được nghe lại qua kênh nghe), không có thì trong trang lịch sử, không có nữa thì `0`. Zalo từ chối (quá hạn thu hồi, mã riêng) thành `ErrNotAllowed`. Khi thu hồi thành công, kênh nghe báo lại sự kiện `undo` của chính chủ; engine đã xoá tin đó nên không làm gì thêm.
+
+## Nhóm (phiên bản 13)
+
+- **Tin nhóm:** sự kiện `message` có `thread: "group"` mang thêm `groupId` (là `threadId` của `GroupMessage` trong `zca-js`), `groupName` và `groupAvatar`. Tên và ảnh tra bằng `getGroupInfo` (`src/group-info.mjs`), một lần mỗi nhóm trong 6 giờ, 10 phút sau lần tra rỗng hay lỗi; tin chờ tra tối đa 3 giây rồi đi không kèm tên. `peerAvatar` và `peerSeen` là của người gửi; tin của chủ thì không tra. stderr chỉ ghi `group lookup ok|empty|failed`.
+- **Lệnh:** `send`, `send_media`, `react`, `undo` và `history` nhận `"group": true`; khi đó `to` (hay `peer`) là mã nhóm. Mỗi lệnh gửi đúng một yêu cầu như bản 1-1, chỉ khác host và đường dẫn (có test chạy `zca-js` thật với `fetch` giả, `test/group.test.mjs`):
+  - chữ: `POST <group>/api/group/sendmsg`;
+  - ảnh và tệp: `<file>/api/group/…`;
+  - thu hồi: `POST <group>/api/group/undomsg`;
+  - reaction: `POST <reaction>/api/group/reaction`;
+  - lịch sử: `GET <group>/api/group/history` (`getGroupChatHistory`, 50 tin, không qua websocket).
+- **`group_info`** `{"id","groups":[mã,…]}` (tối đa 50) trả `group_info` `{"id","groups":{mã:{name,about,avatar}}}` từ một lần `POST <group>/api/group/getmg-v2`; nhóm Zalo không nói gì thì vắng mặt. Lỗi trả `group_info_error`.
+- **Không gọi:** mọi API tạo, rời, giải tán nhóm, thêm hay xoá thành viên, đổi tên, ảnh hay cài đặt nhóm, link mời, đã xem, đang gõ.
+- **Tường lửa:** host `group` của bản đồ dịch vụ là `tt-group-wpa.chat.zalo.me`, `group_poll` là `tt-group-cm.chat.zalo.me` (tra DNS trên máy chủ 27/11/2026). Cả hai được thêm vào `hosts.conf`; một phần địa chỉ của chúng trùng với host chat nên trước đó có thể đi lọt một phần.
 
 ## Rủi ro đã biết
 

@@ -50,6 +50,8 @@ type reactionPayload struct {
 	IsSelf   bool        `json:"isSelf"`
 	IsGroup  bool        `json:"isGroup"`
 	Data     struct {
+		UIDFrom looseString `json:"uidFrom"` // who reacted (the owner's id when IsSelf)
+		DName   string      `json:"dName"`
 		Content struct {
 			Icon     string `json:"rIcon"`
 			Messages []struct {
@@ -59,21 +61,39 @@ type reactionPayload struct {
 	} `json:"data"`
 }
 
-// mapReactions turns a reaction to 1-1 messages into one bridge.Reactions per
-// message. peer is the other person, owner the account's own participant.
+// mapReactions turns a reaction to messages into one bridge.Reactions per
+// message. peer is the other person of a 1-1 chat, owner the account's own
+// participant.
 //
 // Zalo reports one person's change, not everyone's reactions, so each entry
-// says only what it knows. The other person's: they are the only other person
-// of a 1-1 chat, so their list is complete and the owner's reaction is left
+// says only what it knows. In a 1-1 chat the other person's: they are the only
+// other person, so their list is complete and the owner's reaction is left
 // alone. The owner's (made on the phone): it sets theirs and leaves the other
 // person's; the owner taking a reaction back is not carried over, because no
 // entry can say "the owner has none" without also dropping the other person's.
+// In a group a member's reaction is added to what Chat has (the list is never
+// complete there), and a member or the owner taking one back is not carried over
+// for the same reason.
 func mapReactions(raw json.RawMessage, peer, owner bridge.Participant) (conv string, out []bridge.Reactions, err error) {
 	var p reactionPayload
-	if err := json.Unmarshal(raw, &p); err != nil || p.IsGroup {
+	if err := json.Unmarshal(raw, &p); err != nil {
 		return "", nil, errNotPrivate
 	}
 	conv = string(p.ThreadID)
+	if p.IsGroup {
+		if !accountUID.MatchString(conv) {
+			return "", nil, errors.New("zalo: reaction without a valid group")
+		}
+		conv = groupConv(conv)
+		from := string(p.Data.UIDFrom)
+		if !p.IsSelf && !zaloID.MatchString(from) {
+			return "", nil, errors.New("zalo: group reaction without a valid member")
+		}
+		peer = bridge.Participant{ID: from, Name: "Zalo " + from, NameUnknown: true}
+		if p.Data.DName != "" {
+			peer.Name, peer.NameUnknown = p.Data.DName, false
+		}
+	}
 	if !zaloID.MatchString(conv) {
 		return "", nil, errors.New("zalo: reaction without a valid conversation")
 	}
@@ -88,10 +108,12 @@ func mapReactions(raw json.RawMessage, peer, owner bridge.Participant) (conv str
 		}
 		r := bridge.Reactions{Conversation: conv, ID: id}
 		switch {
-		case p.IsSelf && emoji == "":
+		case emoji == "" && (p.IsSelf || p.IsGroup):
 			continue
 		case p.IsSelf:
 			r.List, r.OwnerKnown = []bridge.Reaction{{From: owner, Emoji: emoji}}, true
+		case p.IsGroup:
+			r.List = []bridge.Reaction{{From: peer, Emoji: emoji}}
 		case emoji == "":
 			r.Complete = true
 		default:
@@ -118,7 +140,7 @@ var _ bridge.ReactionWriter = (*Adapter)(nil)
 var messageID = regexp.MustCompile(`^[0-9]{1,30}$`)
 
 // SetReaction implements bridge.ReactionWriter: the owner's reaction to a
-// message of a 1-1 chat, through the account's listening sidecar. Zalo takes
+// message of a 1-1 chat or a group, through the account's listening sidecar. Zalo takes
 // only its own set of reactions (zaloReactions); any other emoji is refused for
 // good. An empty emoji takes the reaction back. Zalo wants the client id of the
 // message too: the one heard live, else the one in the newest history page,
@@ -131,8 +153,9 @@ func (a *Adapter) SetReaction(ctx context.Context, acct bridge.Account, conv, id
 			return fmt.Errorf("%w: Zalo does not take this emoji as a reaction", bridge.ErrNotAllowed)
 		}
 	}
-	if !accountUID.MatchString(conv) || !messageID.MatchString(id) {
-		return fmt.Errorf("%w: not a message of a Zalo 1-1 chat", bridge.ErrNotAllowed)
+	to, group, ok := target(conv)
+	if !ok || !messageID.MatchString(id) {
+		return fmt.Errorf("%w: not a message of a Zalo chat", bridge.ErrNotAllowed)
 	}
 	st := a.sendStateFor(acct.ID)
 	select {
@@ -149,7 +172,7 @@ func (a *Adapter) SetReaction(ctx context.Context, acct bridge.Account, conv, id
 	if cli == "" {
 		cli = a.clientIDFromHistory(ctx, side, conv, id)
 	}
-	ev, err := side.request(ctx, command{Cmd: cmdReact, ID: a.nextRequestID(), To: conv, MsgID: id, CliMsgID: cli, Icon: &code}, a.timing.sendAnswer)
+	ev, err := side.request(ctx, command{Cmd: cmdReact, ID: a.nextRequestID(), To: to, Group: group, MsgID: id, CliMsgID: cli, Icon: &code}, a.timing.sendAnswer)
 	if err != nil {
 		return fmt.Errorf("zalo: whether the reaction was set is not known: %w", err)
 	}

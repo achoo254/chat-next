@@ -29143,6 +29143,119 @@ function installEgressGuard({ onHost = () => {
   };
 }
 
+// src/peer-profile.mjs
+var import_node_timers = require("node:timers");
+var PEER_TTL_MS = 6 * 60 * 60 * 1e3;
+var PEER_MISS_TTL_MS = 10 * 60 * 1e3;
+var PEER_WAIT_MS = 3e3;
+var NO_PROFILE = Object.freeze({ name: "", avatar: "", seen: 0 });
+function peerProfile(info, uid) {
+  for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
+    const profile = group?.[uid] ?? group?.[`${uid}_0`];
+    if (profile === void 0 || profile === null) continue;
+    const name = String(profile.displayName || profile.zaloName || "");
+    const avatar = typeof profile.avatar === "string" && profile.avatar.startsWith("https://") ? profile.avatar : "";
+    if (name !== "" || avatar !== "") return { name, avatar };
+  }
+  return NO_PROFILE;
+}
+function lastOnlineMs(answer, now = Date.now()) {
+  const at = answer?.lastOnline;
+  return typeof at === "number" && Number.isFinite(at) && at > 0 && at <= now + 6e4 ? Math.floor(at) : 0;
+}
+function createCachedLookup({ read, empty, isEmpty, ttlMs, missTtlMs, log = () => {
+}, now = Date.now, waitMs = PEER_WAIT_MS }) {
+  const kept = /* @__PURE__ */ new Map();
+  const running = /* @__PURE__ */ new Map();
+  function start(id) {
+    const lookup = (async () => {
+      try {
+        const found = await read(id);
+        const miss = isEmpty(found);
+        log(miss ? "empty" : "ok");
+        kept.set(id, { value: found, until: now() + (miss ? missTtlMs : ttlMs) });
+        return found;
+      } catch {
+        log("failed");
+        kept.set(id, { value: empty, until: now() + missTtlMs });
+        return empty;
+      } finally {
+        running.delete(id);
+      }
+    })();
+    running.set(id, lookup);
+    return lookup;
+  }
+  return async function lookup(id) {
+    const have = kept.get(id);
+    if (have !== void 0 && now() < have.until) return have.value;
+    const pending = running.get(id) ?? start(id);
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = (0, import_node_timers.setTimeout)(() => resolve(empty), waitMs);
+    });
+    try {
+      return await Promise.race([pending, late]);
+    } finally {
+      (0, import_node_timers.clearTimeout)(timer);
+    }
+  };
+}
+function createPeerLookup({ getUserInfo: getUserInfo2, getLastOnline = async () => null, log = () => {
+}, now = Date.now, waitMs = PEER_WAIT_MS }) {
+  return createCachedLookup({
+    // The last-online call may fail or be refused without the profile being lost.
+    read: async (uid) => {
+      const [info, online] = await Promise.all([getUserInfo2(uid), Promise.resolve(getLastOnline(uid)).catch(() => null)]);
+      return Object.freeze({ ...peerProfile(info, uid), seen: lastOnlineMs(online, now()) });
+    },
+    empty: NO_PROFILE,
+    isEmpty: (p) => p.name === "" && p.avatar === "" && p.seen === 0,
+    ttlMs: PEER_TTL_MS,
+    missTtlMs: PEER_MISS_TTL_MS,
+    log,
+    now,
+    waitMs
+  });
+}
+
+// src/group-info.mjs
+var MAX_GROUPS_PER_READ = 50;
+var NO_GROUP = Object.freeze({ name: "", about: "", avatar: "" });
+function isGroupId(value) {
+  return typeof value === "string" && /^[0-9]{1,20}$/.test(value);
+}
+function groupProfile(info, id) {
+  const group = info?.gridInfoMap?.[id];
+  if (group === void 0 || group === null) return NO_GROUP;
+  const name = typeof group.name === "string" ? group.name : "";
+  const about = typeof group.desc === "string" ? group.desc : "";
+  const photo = [group.fullAvt, group.avt].find((url) => typeof url === "string" && url.startsWith("https://")) ?? "";
+  return Object.freeze({ name, about, avatar: photo });
+}
+async function readGroups(getGroupInfo, ids) {
+  const info = await getGroupInfo(ids);
+  const out = {};
+  for (const id of ids) {
+    const group = groupProfile(info, id);
+    if (group.name !== "" || group.avatar !== "") out[id] = group;
+  }
+  return out;
+}
+function createGroupLookup({ getGroupInfo, log = () => {
+}, now, waitMs }) {
+  return createCachedLookup({
+    read: async (id) => groupProfile(await getGroupInfo(id), id),
+    empty: NO_GROUP,
+    isEmpty: (g) => g.name === "" && g.avatar === "",
+    ttlMs: PEER_TTL_MS,
+    missTtlMs: PEER_MISS_TTL_MS,
+    log,
+    now,
+    waitMs
+  });
+}
+
 // src/history.mjs
 var import_node_crypto3 = require("node:crypto");
 var MAX_HISTORY_MESSAGES = 50;
@@ -29205,65 +29318,11 @@ function pageFor(messages2, peer) {
   own.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
   return { count: messages2.length, oldestTs, messages: own.slice(-MAX_HISTORY_MESSAGES) };
 }
-
-// src/peer-profile.mjs
-var import_node_timers = require("node:timers");
-var PEER_TTL_MS = 6 * 60 * 60 * 1e3;
-var PEER_MISS_TTL_MS = 10 * 60 * 1e3;
-var PEER_WAIT_MS = 3e3;
-var NO_PROFILE = Object.freeze({ name: "", avatar: "", seen: 0 });
-function peerProfile(info, uid) {
-  for (const group of [info?.changed_profiles, info?.unchanged_profiles]) {
-    const profile = group?.[uid] ?? group?.[`${uid}_0`];
-    if (profile === void 0 || profile === null) continue;
-    const name = String(profile.displayName || profile.zaloName || "");
-    const avatar = typeof profile.avatar === "string" && profile.avatar.startsWith("https://") ? profile.avatar : "";
-    if (name !== "" || avatar !== "") return { name, avatar };
-  }
-  return NO_PROFILE;
-}
-function lastOnlineMs(answer, now = Date.now()) {
-  const at = answer?.lastOnline;
-  return typeof at === "number" && Number.isFinite(at) && at > 0 && at <= now + 6e4 ? Math.floor(at) : 0;
-}
-function createPeerLookup({ getUserInfo: getUserInfo2, getLastOnline = async () => null, log = () => {
-}, now = Date.now, waitMs = PEER_WAIT_MS }) {
-  const kept = /* @__PURE__ */ new Map();
-  const running = /* @__PURE__ */ new Map();
-  function start(uid) {
-    const lookup = (async () => {
-      try {
-        const [info, online] = await Promise.all([getUserInfo2(uid), Promise.resolve(getLastOnline(uid)).catch(() => null)]);
-        const found = { ...peerProfile(info, uid), seen: lastOnlineMs(online, now()) };
-        const empty = found.name === "" && found.avatar === "" && found.seen === 0;
-        log(empty ? "empty" : "ok");
-        kept.set(uid, { ...found, until: now() + (empty ? PEER_MISS_TTL_MS : PEER_TTL_MS) });
-        return found;
-      } catch {
-        log("failed");
-        kept.set(uid, { ...NO_PROFILE, until: now() + PEER_MISS_TTL_MS });
-        return NO_PROFILE;
-      } finally {
-        running.delete(uid);
-      }
-    })();
-    running.set(uid, lookup);
-    return lookup;
-  }
-  return async function lookup(uid) {
-    const have = kept.get(uid);
-    if (have !== void 0 && now() < have.until) return { name: have.name, avatar: have.avatar, seen: have.seen };
-    const pending = running.get(uid) ?? start(uid);
-    let timer;
-    const late = new Promise((resolve) => {
-      timer = (0, import_node_timers.setTimeout)(() => resolve(NO_PROFILE), waitMs);
-    });
-    try {
-      return await Promise.race([pending, late]);
-    } finally {
-      (0, import_node_timers.clearTimeout)(timer);
-    }
-  };
+var GROUP_HISTORY_COUNT = 50;
+async function readGroupPage(getGroupChatHistory, groupId) {
+  const answer = await getGroupChatHistory(groupId, GROUP_HISTORY_COUNT);
+  const messages2 = Array.isArray(answer?.groupMsgs) ? answer.groupMsgs : [];
+  return pageFor(messages2, groupId);
 }
 
 // src/login-failure.mjs
@@ -29325,8 +29384,8 @@ var NoMessageIdError = class extends Error {
     this.name = "NoMessageIdError";
   }
 };
-async function sendText(api2, to, text) {
-  const result = await api2.sendMessage({ msg: text }, to, ThreadType.User);
+async function sendText(api2, to, text, type = ThreadType.User) {
+  const result = await api2.sendMessage({ msg: text }, to, type);
   const id = result?.message?.msgId;
   const msgId = typeof id === "number" || typeof id === "string" ? String(id) : "";
   if (!/^[0-9]{1,30}$/.test(msgId)) throw new NoMessageIdError();
@@ -29351,8 +29410,8 @@ function sendFailure(error) {
 }
 
 // src/undo.mjs
-async function sendUndo(api2, to, msgId, cliMsgId) {
-  await api2.undo({ msgId, cliMsgId }, to, ThreadType.User);
+async function sendUndo(api2, to, msgId, cliMsgId, type = ThreadType.User) {
+  await api2.undo({ msgId, cliMsgId }, to, type);
 }
 
 // src/reaction.mjs
@@ -29363,8 +29422,8 @@ function isReactionCode(value) {
 function isMessageId(value) {
   return typeof value === "string" && /^[0-9]{1,30}$/.test(value);
 }
-async function sendReaction(api2, to, msgId, cliMsgId, icon) {
-  await api2.addReaction(icon, { data: { msgId, cliMsgId }, threadId: to, type: ThreadType.User });
+async function sendReaction(api2, to, msgId, cliMsgId, icon, type = ThreadType.User) {
+  await api2.addReaction(icon, { data: { msgId, cliMsgId }, threadId: to, type });
 }
 
 // src/send-media.mjs
@@ -29485,9 +29544,9 @@ var NoMessageIdError2 = class extends Error {
     this.name = "NoMessageIdError";
   }
 };
-async function sendMedia(api2, to, file, data) {
+async function sendMedia(api2, to, file, data, type = ThreadType.User) {
   const attachment = { data, filename: file.name, metadata: { totalSize: data.length, width: file.width, height: file.height } };
-  const result = await api2.sendMessage({ msg: file.text, attachments: [attachment] }, to, ThreadType.User);
+  const result = await api2.sendMessage({ msg: file.text, attachments: [attachment] }, to, type);
   const id = result?.attachment?.[0]?.msgId;
   const msgId = typeof id === "number" || typeof id === "string" ? String(id) : "";
   if (!/^[0-9]{1,30}$/.test(msgId)) throw new NoMessageIdError2();
@@ -29499,7 +29558,7 @@ function sendMediaFailure(error) {
 }
 
 // src/entry.mjs
-var PROTOCOL = 12;
+var PROTOCOL = 13;
 var HISTORY_TIMEOUT_MS = 1e4;
 installEgressGuard({
   onHost: (host) => process.stderr.write(`host ${host}
@@ -29539,6 +29598,10 @@ function announce(loggedIn) {
   return true;
 }
 var lookupPeer = null;
+var lookupGroup = null;
+function threadOf(command) {
+  return command.group === true ? ThreadType.Group : ThreadType.User;
+}
 function useApi(loggedIn) {
   guardUploads(loggedIn);
   api = loggedIn;
@@ -29551,17 +29614,27 @@ function listen(loggedIn) {
     log: (outcome) => process.stderr.write(`lookup ${outcome}
 `)
   });
+  lookupGroup = createGroupLookup({
+    getGroupInfo: (id) => loggedIn.getGroupInfo(id),
+    log: (outcome) => process.stderr.write(`group lookup ${outcome}
+`)
+  });
   api.listener.on("message", async (message) => {
     const data = message.data ?? {};
     const isGroup = message.type === ThreadType.Group;
     const self2 = Boolean(message.isSelf);
-    const peerUid = String(self2 ? data.idTo ?? "" : data.uidFrom ?? "");
-    const peer = !isGroup && /^[0-9]{1,20}$/.test(peerUid) ? await lookupPeer(peerUid) : { name: "", avatar: "", seen: 0 };
+    const peerUid = String(isGroup ? self2 ? "" : data.uidFrom ?? "" : self2 ? data.idTo ?? "" : data.uidFrom ?? "");
+    const groupId = isGroup ? String(message.threadId ?? "") : "";
+    const [peer, group] = await Promise.all([
+      /^[0-9]{1,20}$/.test(peerUid) ? lookupPeer(peerUid) : { name: "", avatar: "", seen: 0 },
+      isGroupId(groupId) ? lookupGroup(groupId) : { name: "", avatar: "" }
+    ]);
     emit({
       ev: "message",
       thread: isGroup ? "group" : "user",
+      ...isGroup ? { groupId, groupName: group.name, groupAvatar: group.avatar } : {},
       self: self2,
-      peerName: self2 ? peer.name : "",
+      peerName: self2 && !isGroup ? peer.name : "",
       peerAvatar: peer.avatar,
       peerSeen: peer.seen,
       msgType: data.msgType,
@@ -29630,7 +29703,7 @@ async function send(command) {
     return emit({ ev: "send_error", id, code: BAD_REQUEST });
   }
   try {
-    const { msgId, ts } = await sendText(api, command.to, command.text);
+    const { msgId, ts } = await sendText(api, command.to, command.text, threadOf(command));
     emit({ ev: "sent", id, msgId, ts });
   } catch (error) {
     emit({ ev: "send_error", id, ...sendFailure(error) });
@@ -29645,7 +29718,7 @@ async function sendFile(command) {
     return emit({ ev: "send_error", id, code: BAD_REQUEST });
   }
   try {
-    const { msgId, ts } = await sendMedia(api, command.to, file, data);
+    const { msgId, ts } = await sendMedia(api, command.to, file, data, threadOf(command));
     emit({ ev: "sent", id, msgId, ts });
   } catch (error) {
     emit({ ev: "send_error", id, ...sendMediaFailure(error) });
@@ -29658,7 +29731,7 @@ async function react(command) {
     return emit({ ev: "send_error", id, code: BAD_REQUEST });
   }
   try {
-    await sendReaction(api, command.to, command.msgId, command.cliMsgId, command.icon);
+    await sendReaction(api, command.to, command.msgId, command.cliMsgId, command.icon, threadOf(command));
     emit({ ev: "reacted", id });
   } catch (error) {
     emit({ ev: "send_error", id, ...sendFailure(error) });
@@ -29671,7 +29744,7 @@ async function undo(command) {
     return emit({ ev: "send_error", id, code: BAD_REQUEST });
   }
   try {
-    await sendUndo(api, command.to, command.msgId, command.cliMsgId);
+    await sendUndo(api, command.to, command.msgId, command.cliMsgId, threadOf(command));
     emit({ ev: "undone", id });
   } catch (error) {
     emit({ ev: "send_error", id, ...sendFailure(error) });
@@ -29682,9 +29755,22 @@ async function readHistory(command) {
   if (history === null) return emit({ ev: "history_error", id, code: "listener_down" });
   if (!isUserId(command.peer)) return emit({ ev: "history_error", id, code: "failed" });
   try {
-    emit({ ev: "history", id, ...await history.read(command.peer) });
+    const page = command.group === true ? await readGroupPage((g, n) => api.getGroupChatHistory(g, n), command.peer) : await history.read(command.peer);
+    emit({ ev: "history", id, ...page });
   } catch (error) {
     emit({ ev: "history_error", id, code: error instanceof HistoryError ? error.code : "failed" });
+  }
+}
+async function groupInfo(command) {
+  const id = command.id;
+  const groups = command.groups;
+  if (api === null || !Array.isArray(groups) || groups.length === 0 || groups.length > MAX_GROUPS_PER_READ || !groups.every(isGroupId)) {
+    return emit({ ev: "group_info_error", id });
+  }
+  try {
+    emit({ ev: "group_info", id, groups: await readGroups((ids) => api.getGroupInfo(ids), groups) });
+  } catch {
+    emit({ ev: "group_info_error", id });
   }
 }
 async function handle(line) {
@@ -29709,7 +29795,9 @@ async function handle(line) {
       case "send_media":
       case "react":
       case "undo":
+      case "group_info":
         if (!isRequestId(command.id)) return fail("bad_command", new Error("bad id"));
+        if (command.cmd === "group_info") return await groupInfo(command);
         if (command.cmd === "send") return await send(command);
         if (command.cmd === "react") return await react(command);
         if (command.cmd === "undo") return await undo(command);

@@ -220,9 +220,10 @@ func (a *Adapter) sendFileNow(ctx context.Context, st *sendState, side *sidecar,
 	if err := a.waitGap(ctx, st); err != nil {
 		return bridge.SentRef{}, err
 	}
+	to, group, _ := target(conv) // checkOutgoing refused any other conversation
 	st.log.tried(rid, conv, noText)
 	st.lastSend = a.now()
-	ev, err := side.request(ctx, command{Cmd: cmdSendMedia, ID: id, To: conv, Text: caption,
+	ev, err := side.request(ctx, command{Cmd: cmdSendMedia, ID: id, To: to, Group: group, Text: caption,
 		Kind: f.kind, Name: f.name, Size: f.size, Width: f.width, Height: f.height}, a.timing.mediaAnswer)
 	return a.answered(st, rid, ev, err)
 }

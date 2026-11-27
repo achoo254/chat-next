@@ -57,13 +57,14 @@ func runSubscribe(t *testing.T, a *Adapter, acct bridge.Account) ([]bridge.Event
 	return got, err
 }
 
-func TestSubscribeDeliversMessagesOnceAndIgnoresGroups(t *testing.T) {
+func TestSubscribeDeliversMessagesOnceWithGroups(t *testing.T) {
 	lines := []string{
 		accountLine,
 		connectedLine,
 		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"1","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000","ttl":0}`,
 		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"1","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000","ttl":0}`,
-		`{"ev":"message","thread":"group","self":false,"msgType":"webchat","content":"nhóm","msgId":"1002","uidFrom":"501","idTo":"900","dName":"Minh","ts":"1763700000001"}`,
+		`{"ev":"message","thread":"group","groupId":"900","groupName":"Nhà mình","groupAvatar":"https://s120-ava-grp-talk.zadn.vn/g.jpg","self":false,"msgType":"webchat","content":"nhóm","msgId":"1002","uidFrom":"501","idTo":"900","dName":"Minh","ts":"1763700000001"}`,
+		`{"ev":"message","thread":"group","self":false,"msgType":"webchat","content":"không mã nhóm","msgId":"1004","uidFrom":"501","idTo":"900","dName":"Minh","ts":"1763700000001"}`,
 		`{"ev":"message","thread":"user","self":true,"msgType":"chat.sticker","content":{"id":1,"catId":2,"type":7},"msgId":"1003","uidFrom":"999","idTo":"500","ts":1763700000002}`,
 		`{"ev":"event","name":"typing","payload":{"uid":"500"}}`,
 		`not json at all`,
@@ -75,10 +76,13 @@ func TestSubscribeDeliversMessagesOnceAndIgnoresGroups(t *testing.T) {
 	if err == nil || errors.Is(err, bridge.ErrSessionRevoked) || !strings.Contains(err.Error(), "1006") {
 		t.Fatalf("err = %v, want a retryable listener close", err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("events = %d, want 2 (one repeat and one group message dropped)", len(got))
+	if len(got) != 3 {
+		t.Fatalf("events = %d, want 3 (a repeat and a group message without its group dropped)", len(got))
 	}
-	first, second := got[0].Message, got[1].Message
+	first, group, second := got[0].Message, got[1].Message, got[2].Message
+	if group.Conversation != "g900" || group.Text != "nhóm" || group.From.ID != "501" || group.From.Name != "Minh" || group.From.IsSelf {
+		t.Errorf("group message = %+v", group)
+	}
 	if first.Text != "xin chào" || first.Conversation != "500" || first.From.IsSelf || first.From.Name != "Lan" {
 		t.Errorf("first = %+v", first)
 	}
@@ -86,8 +90,15 @@ func TestSubscribeDeliversMessagesOnceAndIgnoresGroups(t *testing.T) {
 		t.Errorf("second = %+v", second)
 	}
 	convs, _ := a.ListConversations(context.Background(), testAccount)
-	if len(convs) != 1 || convs[0].ID != "500" || convs[0].Title != "Lan" || convs[0].Kind != bridge.ConvPrivate {
+	byID := map[string]bridge.Conversation{}
+	for _, c := range convs {
+		byID[c.ID] = c
+	}
+	if c := byID["500"]; len(convs) != 2 || c.Title != "Lan" || c.Kind != bridge.ConvPrivate {
 		t.Errorf("conversations = %+v", convs)
+	}
+	if g := byID["g900"]; g.Kind != bridge.ConvGroup || g.Title != "Nhà mình" || g.Peer != nil || g.PhotoRef != "avatar:https://s120-ava-grp-talk.zadn.vn/g.jpg" {
+		t.Errorf("group conversation = %+v", g)
 	}
 	// The engine drops messages of a conversation it has not linked yet and
 	// reads them back through Backfill once it lists the conversation.
@@ -276,7 +287,7 @@ func (a *Adapter) subscribed(account string) *subscription {
 	return a.subs[account]
 }
 
-func TestSubscribeRecallRemovesTheMessageAndIgnoresGroups(t *testing.T) {
+func TestSubscribeRecallRemovesTheMessageOfAPersonOrAGroup(t *testing.T) {
 	lines := []string{
 		accountLine,
 		connectedLine,
@@ -289,8 +300,11 @@ func TestSubscribeRecallRemovesTheMessageAndIgnoresGroups(t *testing.T) {
 	r := &fakeRunner{script: scriptedSession(t, lines, false)}
 	a, _ := newTestAdapter(t, r)
 	got, _ := runSubscribe(t, a, testAccount)
-	if len(got) != 2 || got[1].Delete == nil {
-		t.Fatalf("events = %+v, want the message then one delete (group and malformed recalls dropped)", got)
+	if len(got) != 3 || got[1].Delete == nil || got[2].Delete == nil {
+		t.Fatalf("events = %+v, want the message then two deletes (the malformed recall dropped)", got)
+	}
+	if d := got[2].Delete; d.Conversation != "g900" || len(d.IDs) != 1 || d.IDs[0] != "2001" {
+		t.Errorf("group delete = %+v, want message 2001 of group g900", d)
 	}
 	if d := got[1].Delete; d.Conversation != "500" || len(d.IDs) != 1 || d.IDs[0] != "1001" {
 		t.Errorf("delete = %+v, want message 1001 of conversation 500", d)
@@ -300,7 +314,7 @@ func TestSubscribeRecallRemovesTheMessageAndIgnoresGroups(t *testing.T) {
 	}
 }
 
-func TestSubscribeReactionsOfThePersonAndOfTheOwner(t *testing.T) {
+func TestSubscribeReactionsOfThePersonOfTheOwnerAndOfAGroup(t *testing.T) {
 	lines := []string{
 		accountLine,
 		connectedLine,
@@ -311,13 +325,24 @@ func TestSubscribeReactionsOfThePersonAndOfTheOwner(t *testing.T) {
 		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":"","rMsg":[{"gMsgID":1001}]}},"threadId":"500","isSelf":true,"isGroup":false}}`,
 		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":"/-unknown","rMsg":[{"gMsgID":1001}]}},"threadId":"500","isSelf":false,"isGroup":false}}`,
 		`{"ev":"event","name":"reaction","payload":{"data":{"content":{"rIcon":":o","rMsg":[{"gMsgID":2001}]}},"threadId":"900","isGroup":true}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"uidFrom":"501","dName":"Minh","content":{"rIcon":"/-strong","rMsg":[{"gMsgID":2001}]}},"threadId":"900","isGroup":true}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"uidFrom":"501","dName":"Minh","content":{"rIcon":"","rMsg":[{"gMsgID":2001}]}},"threadId":"900","isGroup":true}}`,
+		`{"ev":"event","name":"reaction","payload":{"data":{"uidFrom":"999","content":{"rIcon":"/-heart","rMsg":[{"gMsgID":2001}]}},"threadId":"900","isSelf":true,"isGroup":true}}`,
 		`{"ev":"listener","state":"closed","code":1006}`,
 	}
 	r := &fakeRunner{script: scriptedSession(t, lines, false)}
 	a, _ := newTestAdapter(t, r)
 	got, _ := runSubscribe(t, a, testAccount)
-	if len(got) != 4 {
-		t.Fatalf("events = %d, want the message and three reactions", len(got))
+	if len(got) != 6 {
+		t.Fatalf("events = %d, want the message, three 1-1 reactions and two group reactions", len(got))
+	}
+	member, ownInGroup := got[4].Reactions, got[5].Reactions
+	if member == nil || member.Conversation != "g900" || member.ID != "2001" || member.Complete || member.OwnerKnown ||
+		len(member.List) != 1 || member.List[0].Emoji != "👍" || member.List[0].From.ID != "501" || member.List[0].From.Name != "Minh" {
+		t.Errorf("member reaction = %+v, want Minh's 👍 added to an incomplete list", member)
+	}
+	if ownInGroup == nil || ownInGroup.Conversation != "g900" || !ownInGroup.OwnerKnown || len(ownInGroup.List) != 1 || !ownInGroup.List[0].From.IsSelf {
+		t.Errorf("owner's group reaction = %+v", ownInGroup)
 	}
 	peer, gone, owner := got[1].Reactions, got[2].Reactions, got[3].Reactions
 	if peer == nil || peer.ID != "1001" || peer.Conversation != "500" || !peer.Complete || peer.OwnerKnown ||

@@ -81,10 +81,14 @@ func TestMapMessageLabels(t *testing.T) {
 	}
 }
 
-func TestMapMessageRefusesGroupsAndMissingIDs(t *testing.T) {
-	group := mustEvent(t, `{"ev":"message","thread":"group","msgType":"webchat","content":"x","msgId":"1","uidFrom":"5","idTo":"6"}`)
-	if _, _, err := mapMessage(group, time.Now()); !errors.Is(err, errNotPrivate) {
-		t.Errorf("group: err = %v", err)
+func TestMapMessageRefusesOtherThreadsAndMissingIDs(t *testing.T) {
+	other := mustEvent(t, `{"ev":"message","thread":"community","msgType":"webchat","content":"x","msgId":"1","uidFrom":"5","idTo":"6"}`)
+	if _, _, err := mapMessage(other, time.Now()); !errors.Is(err, errNotPrivate) {
+		t.Errorf("another thread kind: err = %v", err)
+	}
+	noGroup := mustEvent(t, `{"ev":"message","thread":"group","msgType":"webchat","content":"x","msgId":"1","uidFrom":"5","idTo":"6"}`)
+	if _, _, err := mapMessage(noGroup, time.Now()); err == nil {
+		t.Error("a group message without its group id was mapped")
 	}
 	noID := mustEvent(t, `{"ev":"message","thread":"user","msgType":"webchat","content":"x","uidFrom":"5","idTo":"6"}`)
 	if _, _, err := mapMessage(noID, time.Now()); err == nil {

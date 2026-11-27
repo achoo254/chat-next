@@ -3,12 +3,12 @@
 // (sidecar/dist/zalo-sidecar.cjs) over its stdio protocol, one process per
 // login and one per subscribed account.
 //
-// It receives live 1-1 messages after a QR login (text, and photos, files and
-// videos copied from Zalo's CDN, see message_media.go) and lists the
+// It receives live 1-1 and group messages after a QR login (text, and photos,
+// files and videos copied from Zalo's CDN, see message_media.go) and lists the
 // conversations heard since the process started; it sends text, photos and files
-// to one person the account talks with (send.go, send_media.go). Groups are
-// ignored, stickers and voice are a label, and there is no history beyond what
-// this process heard (see Backfill).
+// to one person the account talks with or into a group it is in (send.go,
+// send_media.go, group.go). Stickers and voice are a label, group members are
+// not listed, and there is no history beyond what this process heard (see Backfill).
 package zalo
 
 import (
@@ -111,9 +111,11 @@ func (a *Adapter) Capabilities() bridge.Capabilities {
 }
 
 // Features implements bridge.Featured: messages come in (with photos, files and
-// videos) and go out (text, photos and files). A recall in Zalo removes the copy in Chat, and a message the owner deletes in Chat is recalled in Zalo; reactions go both ways. No edits, topics or pins.
+// videos) and go out (text, photos and files). A recall in Zalo removes the copy in Chat, and a message the owner deletes in Chat is recalled in Zalo; reactions go both ways.
+// A group's name, description and photo come in (GroupInfos). No edits, topics, pins or members.
 func (a *Adapter) Features() map[feature.Feature]feature.Support {
-	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}, feature.Reactions: {In: true, Out: true}}
+	return map[feature.Feature]feature.Support{feature.Messages: {In: true, Out: true}, feature.Reactions: {In: true, Out: true},
+		feature.Info: {In: true}}
 }
 
 // Close stops every login and subscription sidecar.

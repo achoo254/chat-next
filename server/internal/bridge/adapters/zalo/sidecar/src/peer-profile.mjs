@@ -37,45 +37,43 @@ export function lastOnlineMs(answer, now = Date.now()) {
 }
 
 /**
- * Makes `lookup(uid)`: the name, photo URL and last-online time (`seen`, ms, 0 when unknown) of a person, each "" when unknown; it never
- * rejects. One getUserInfo per person every PEER_TTL_MS (PEER_MISS_TTL_MS after an empty or
- * failed answer), shared by the messages that arrive while it runs, so they still go out in
- * order. A message waits at most `waitMs`; the lookup goes on and serves the next message.
- * `log` is told only "ok", "empty" or "failed", never the name, photo or id.
+ * Makes `lookup(id)` over `read(id)`, which resolves to a profile object: one read per id every
+ * `ttlMs` (`missTtlMs` after an empty or failed answer, `isEmpty` saying which is empty), shared by
+ * the messages that arrive while it runs, so they still go out in order. A message waits at most
+ * `waitMs` and then gets `empty`; the read goes on and serves the next message. `lookup` never
+ * rejects. `log` is told only "ok", "empty" or "failed", never what was read or the id.
  */
-export function createPeerLookup({ getUserInfo, getLastOnline = async () => null, log = () => {}, now = Date.now, waitMs = PEER_WAIT_MS }) {
-	const kept = new Map(); // uid -> { name, avatar, seen, until }
-	const running = new Map(); // uid -> Promise of the profile
+export function createCachedLookup({ read, empty, isEmpty, ttlMs, missTtlMs, log = () => {}, now = Date.now, waitMs = PEER_WAIT_MS }) {
+	const kept = new Map(); // id -> { value, until }
+	const running = new Map(); // id -> Promise of the value
 
-	function start(uid) {
+	function start(id) {
 		const lookup = (async () => {
 			try {
-				// The last-online call may fail or be refused without the profile being lost.
-				const [info, online] = await Promise.all([getUserInfo(uid), Promise.resolve(getLastOnline(uid)).catch(() => null)]);
-				const found = { ...peerProfile(info, uid), seen: lastOnlineMs(online, now()) };
-				const empty = found.name === "" && found.avatar === "" && found.seen === 0;
-				log(empty ? "empty" : "ok");
-				kept.set(uid, { ...found, until: now() + (empty ? PEER_MISS_TTL_MS : PEER_TTL_MS) });
+				const found = await read(id);
+				const miss = isEmpty(found);
+				log(miss ? "empty" : "ok");
+				kept.set(id, { value: found, until: now() + (miss ? missTtlMs : ttlMs) });
 				return found;
 			} catch {
 				log("failed");
-				kept.set(uid, { ...NO_PROFILE, until: now() + PEER_MISS_TTL_MS });
-				return NO_PROFILE;
+				kept.set(id, { value: empty, until: now() + missTtlMs });
+				return empty;
 			} finally {
-				running.delete(uid);
+				running.delete(id);
 			}
 		})();
-		running.set(uid, lookup);
+		running.set(id, lookup);
 		return lookup;
 	}
 
-	return async function lookup(uid) {
-		const have = kept.get(uid);
-		if (have !== undefined && now() < have.until) return { name: have.name, avatar: have.avatar, seen: have.seen };
-		const pending = running.get(uid) ?? start(uid);
+	return async function lookup(id) {
+		const have = kept.get(id);
+		if (have !== undefined && now() < have.until) return have.value;
+		const pending = running.get(id) ?? start(id);
 		let timer;
 		const late = new Promise((resolve) => {
-			timer = setTimeout(() => resolve(NO_PROFILE), waitMs);
+			timer = setTimeout(() => resolve(empty), waitMs);
 		});
 		try {
 			return await Promise.race([pending, late]);
@@ -83,4 +81,26 @@ export function createPeerLookup({ getUserInfo, getLastOnline = async () => null
 			clearTimeout(timer);
 		}
 	};
+}
+
+/**
+ * Makes `lookup(uid)`: the name, photo URL and last-online time (`seen`, ms, 0 when unknown) of a
+ * person, each "" when unknown; it never rejects. One getUserInfo per person every PEER_TTL_MS
+ * (PEER_MISS_TTL_MS after an empty or failed answer); see createCachedLookup.
+ */
+export function createPeerLookup({ getUserInfo, getLastOnline = async () => null, log = () => {}, now = Date.now, waitMs = PEER_WAIT_MS }) {
+	return createCachedLookup({
+		// The last-online call may fail or be refused without the profile being lost.
+		read: async (uid) => {
+			const [info, online] = await Promise.all([getUserInfo(uid), Promise.resolve(getLastOnline(uid)).catch(() => null)]);
+			return Object.freeze({ ...peerProfile(info, uid), seen: lastOnlineMs(online, now()) });
+		},
+		empty: NO_PROFILE,
+		isEmpty: (p) => p.name === "" && p.avatar === "" && p.seen === 0,
+		ttlMs: PEER_TTL_MS,
+		missTtlMs: PEER_MISS_TTL_MS,
+		log,
+		now,
+		waitMs,
+	});
 }
