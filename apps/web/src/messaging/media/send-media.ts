@@ -50,6 +50,43 @@ async function jpegThumb(source: CanvasImageSource, width: number, height: numbe
 }
 
 /**
+ * Length of a video that does not say it (a WebM made by MediaRecorder,
+ * such as a screen recording): seeking past its end makes the browser read
+ * to the end and report the real length. 0 when it does not in time.
+ */
+async function seekDuration(video: HTMLVideoElement): Promise<number> {
+	const found = new Promise<number>((resolve) => {
+		const timer = setTimeout(() => resolve(0), PROBE_TIMEOUT_MS);
+		const check = () => {
+			if (!Number.isFinite(video.duration)) return;
+			clearTimeout(timer);
+			video.removeEventListener("durationchange", check);
+			resolve(video.duration);
+		};
+		video.addEventListener("durationchange", check);
+	});
+	video.currentTime = Number.MAX_SAFE_INTEGER;
+	const seconds = await found;
+	// The thumbnail is taken from the first frame.
+	if (seconds > 0) {
+		const back = new Promise<void>((resolve) => {
+			const timer = setTimeout(resolve, PROBE_TIMEOUT_MS);
+			video.addEventListener(
+				"seeked",
+				() => {
+					clearTimeout(timer);
+					resolve();
+				},
+				{ once: true },
+			);
+		});
+		video.currentTime = 0;
+		await back;
+	}
+	return seconds;
+}
+
+/**
  * Size, duration and a first-frame thumbnail of a video, read by the
  * browser; empty when it cannot play the file (it still sends, unmeasured).
  */
@@ -75,7 +112,8 @@ export async function measureVideo(file: File): Promise<Partial<Pick<MediaInput,
 		if (!(await loaded)) return {};
 		const width = video.videoWidth;
 		const height = video.videoHeight;
-		const duration = Number.isFinite(video.duration) ? Math.round(video.duration * 1000) : 0;
+		const seconds = Number.isFinite(video.duration) ? video.duration : await seekDuration(video);
+		const duration = Math.round(seconds * 1000);
 		const inlineThumb = await jpegThumb(video, width, height).catch(() => undefined);
 		return { width, height, duration, ...(inlineThumb === undefined ? {} : { inlineThumb }) };
 	} finally {

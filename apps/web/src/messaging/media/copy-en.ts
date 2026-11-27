@@ -100,6 +100,17 @@ export const enMedia: MediaCopy = {
 		tooShort: "The voice message is too short. Record a little longer.",
 		level: "Sound level",
 	},
+	screenRecorder: {
+		record: "Record screen",
+		recording: "Recording the screen",
+		asking: "Waiting for you to pick a screen…",
+		hint: "Stop to put the video in the tray",
+		stop: "Stop recording",
+		cancel: "Cancel screen recording",
+		cancelled: "Screen recording cancelled",
+		failed: "Could not record the screen, try again.",
+		maxReached: "Recorded the 30-minute limit, the video is in the tray",
+	},
 	shared: {
 		section: "Photos, files, links",
 		photos: "Photos and videos",

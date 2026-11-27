@@ -101,6 +101,17 @@ export const viMedia = {
 		tooShort: "Tin thoại quá ngắn, giữ ghi âm lâu hơn một chút.",
 		level: "Mức âm thanh",
 	},
+	screenRecorder: {
+		record: "Quay màn hình",
+		recording: "Đang quay màn hình",
+		asking: "Đang chờ chọn màn hình để quay…",
+		hint: "Dừng để đưa video vào khay gửi",
+		stop: "Dừng quay",
+		cancel: "Huỷ quay màn hình",
+		cancelled: "Đã huỷ quay màn hình",
+		failed: "Không quay được màn hình, thử lại.",
+		maxReached: "Đã quay đủ 30 phút, video đã vào khay gửi",
+	},
 	shared: {
 		section: "Ảnh, file, link",
 		photos: "Ảnh và video",

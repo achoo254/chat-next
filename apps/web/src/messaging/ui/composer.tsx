@@ -6,8 +6,10 @@
 // Sending is optimistic: the core shows the message at once with a clock.
 // Dropping the link preview sends the message with no_link_preview, so the
 // server attaches none. The paper clip (shown when the server takes media)
-// picks photos and videos or any file; pasted images and files dropped on
-// the chat join them in the tray above the text, which becomes the caption
+// picks photos and videos or any file, or — where the browser can share the
+// screen — takes a screenshot or records the screen (media/screen-*.ts);
+// those, pasted images and files dropped on the chat join them in the tray
+// above the text, which becomes the caption
 // (mockups/media.html#attach). With nothing typed the send button turns
 // into the microphone, which records a voice message. In a private chat with
 // a bot the bot layer (bots/bot-chat.tsx, loaded with the first bot chat)
@@ -31,6 +33,7 @@ import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
+import { canRecordScreen, canShareScreen, refusedShare, requestScreen } from "../media/screen-share.ts";
 import { sizeLimitLabel } from "../media/size-limit-label.ts";
 import { openAiPanel, useCell, useIntent, useUi } from "./ui-context.tsx";
 
@@ -43,6 +46,7 @@ const PreviewBar = lazy(() => bars().then((m) => ({ default: m.PreviewBar })));
 // Files waiting to be sent and the voice recorder load with the first use.
 const AttachTray = lazy(() => import("../media/attach-tray.tsx"));
 const VoiceRecorder = lazy(() => import("../media/voice-recorder.tsx"));
+const ScreenRecorder = lazy(() => import("../media/screen-recorder.tsx"));
 const BotLayer = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotLayer })));
 // The draft is "@bot_username query": inline mode of that bot.
 const InlineResults = lazy(() => import("../bots/inline-results.tsx"));
@@ -126,6 +130,8 @@ export function Composer({
 	const files = useCell(attachments(chatId, topicId));
 	const [attachOpen, setAttachOpen] = useState(false);
 	const [recording, setRecording] = useState(false);
+	// The screen share being recorded, asked for in the attach menu's click.
+	const [screenShare, setScreenShare] = useState<Promise<MediaStream> | null>(null);
 	const pickMedia = useRef<HTMLInputElement>(null);
 	const pickFiles = useRef<HTMLInputElement>(null);
 	const attachButton = useRef<HTMLButtonElement>(null);
@@ -391,6 +397,39 @@ export function Composer({
 		input?.click();
 	};
 
+	// The browser shares the screen only from inside the click: ask first, load the capture code after.
+	const takeScreenshot = () => {
+		setAttachOpen(false);
+		const shared = requestScreen(false);
+		void Promise.all([shared, import("../media/screen-capture.ts")])
+			.then(([stream, capture]) => capture.screenshotFile(stream))
+			.then(
+				(file) => {
+					addAttachments(chatId, topicId, [file]);
+					area.current?.focus();
+				},
+				(err: unknown) => {
+					// A share that came through stops even when the capture code did not load (stopping twice is harmless).
+					void shared.then(
+						(stream) => {
+							for (const track of stream.getTracks()) track.stop();
+						},
+						() => undefined,
+					);
+					// Closing the picker is not an error.
+					if (!refusedShare(err)) toasts.show(copy.composer.screenshotFailed);
+				},
+			);
+	};
+
+	const recordScreen = () => {
+		setAttachOpen(false);
+		const shared = requestScreen(true);
+		// Without this the rejection of a closed picker would be reported unhandled until the recorder loads.
+		shared.catch(() => undefined);
+		setScreenShare(shared);
+	};
+
 	const onKeyDown = (event: KeyboardEvent) => {
 		if (event.key === "Escape" && intent !== null) {
 			event.preventDefault();
@@ -427,6 +466,23 @@ export function Composer({
 	const empty = text.trim() === "" && !withFiles;
 	// With nothing to send the send button becomes the microphone (where recording works).
 	const showMic = mediaOn && empty && !editing && canRecord();
+	if (screenShare !== null) {
+		return (
+			<div className="composer-wrap">
+				<Suspense fallback={null}>
+					<ScreenRecorder
+						stream={screenShare}
+						chatId={chatId}
+						topicId={topicId}
+						onClose={() => {
+							setScreenShare(null);
+							area.current?.focus();
+						}}
+					/>
+				</Suspense>
+			</div>
+		);
+	}
 	if (recording) {
 		return (
 			<div className="composer-wrap">
@@ -536,6 +592,8 @@ export function Composer({
 									limit={sizeLimitLabel(limits.uploadSizeMax, locale)}
 									onMedia={() => openPicker(pickMedia.current)}
 									onFiles={() => openPicker(pickFiles.current)}
+									onScreenshot={canShareScreen() ? takeScreenshot : undefined}
+									onRecordScreen={canRecordScreen() ? recordScreen : undefined}
 									onClose={() => {
 										setAttachOpen(false);
 										attachButton.current?.focus();

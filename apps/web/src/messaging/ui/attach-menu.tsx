@@ -1,5 +1,6 @@
 // The composer's attach menu (mockups/media.html #attach): photos and
-// videos, or any file up to the server's limit. Loaded when first opened.
+// videos, any file up to the server's limit, and — where the browser can
+// share the screen — a screenshot or a screen recording. Loaded when first opened.
 import type { RefObject } from "react";
 import { Icon } from "../../components/screen-icons.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
@@ -11,10 +12,14 @@ interface AttachMenuProps {
 	limit: string;
 	onMedia: () => void;
 	onFiles: () => void;
+	/** Shown where the browser can share the screen. */
+	onScreenshot?: (() => void) | undefined;
+	/** Shown where the browser can also record it. */
+	onRecordScreen?: (() => void) | undefined;
 	onClose: () => void;
 }
 
-export default function AttachMenu({ boundary, limit, onMedia, onFiles, onClose }: AttachMenuProps) {
+export default function AttachMenu({ boundary, limit, onMedia, onFiles, onScreenshot, onRecordScreen, onClose }: AttachMenuProps) {
 	const copy = useScreensCopy();
 	return (
 		<PopupMenu className="attach-menu" label={copy.composer.attachMenu} boundary={boundary} onClose={onClose}>
@@ -27,6 +32,18 @@ export default function AttachMenu({ boundary, limit, onMedia, onFiles, onClose 
 				{copy.composer.attachFile}
 				<small>{copy.composer.attachMax(limit)}</small>
 			</button>
+			{onScreenshot !== undefined && (
+				<button type="button" role="menuitem" onClick={onScreenshot}>
+					<Icon name="camera" />
+					{copy.composer.attachScreenshot}
+				</button>
+			)}
+			{onRecordScreen !== undefined && (
+				<button type="button" role="menuitem" onClick={onRecordScreen}>
+					<Icon name="screen-record" />
+					{copy.composer.attachRecordScreen}
+				</button>
+			)}
 		</PopupMenu>
 	);
 }

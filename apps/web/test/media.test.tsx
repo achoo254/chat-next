@@ -71,6 +71,9 @@ describe("attaching", () => {
 		const menu = await screen.findByRole("menu", { name: "Đính kèm" }, LONG);
 		expect(within(menu).getByRole("menuitem", { name: "Ảnh hoặc video" })).toBeTruthy();
 		expect(within(menu).getByRole("menuitem", { name: /File.*tối đa 2 GB/ })).toBeTruthy();
+		// jsdom cannot share the screen: no screenshot or screen recording.
+		expect(within(menu).queryByRole("menuitem", { name: "Chụp màn hình" })).toBeNull();
+		expect(within(menu).queryByRole("menuitem", { name: "Quay màn hình" })).toBeNull();
 		await userEvent.keyboard("{Escape}");
 		expect(screen.queryByRole("menu", { name: "Đính kèm" })).toBeNull();
 	});
@@ -422,5 +425,135 @@ describe("voice recording", () => {
 		);
 		await userEvent.click(screen.getByRole("button", { name: "Huỷ ghi âm" }));
 		expect(await screen.findByRole("textbox", { name: /Tin nhắn tới/ }, LONG)).toBeTruthy();
+	});
+});
+
+describe("screen capture", () => {
+	interface FakeTrack extends EventTarget {
+		stopped: boolean;
+		stop(): void;
+	}
+
+	function fakeTrack(): FakeTrack {
+		return Object.assign(new EventTarget(), {
+			stopped: false,
+			stop(this: FakeTrack) {
+				this.stopped = true;
+			},
+		});
+	}
+
+	/** A shared screen with one video track. */
+	function fakeShare() {
+		const track = fakeTrack();
+		const stream = { getTracks: () => [track], getVideoTracks: () => [track] } as unknown as MediaStream;
+		return { track, stream };
+	}
+
+	function stubScreen(getDisplayMedia: () => Promise<MediaStream>) {
+		class FakeRecorder extends EventTarget {
+			static isTypeSupported(type: string) {
+				return type.startsWith("video/webm");
+			}
+			state: "inactive" | "recording" = "inactive";
+			readonly mimeType: string;
+			constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
+				super();
+				this.mimeType = options?.mimeType ?? "video/webm";
+			}
+			start() {
+				this.state = "recording";
+			}
+			stop() {
+				this.state = "inactive";
+				this.dispatchEvent(Object.assign(new Event("dataavailable"), { data: new Blob([bytes(5000).slice()], { type: "video/webm" }) }));
+				this.dispatchEvent(new Event("stop"));
+			}
+		}
+		vi.stubGlobal("MediaRecorder", FakeRecorder);
+		Object.defineProperty(navigator, "mediaDevices", { value: { getDisplayMedia }, configurable: true });
+	}
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		Reflect.deleteProperty(navigator, "mediaDevices");
+	});
+
+	async function attachMenuItem(name: string) {
+		await userEvent.click(await screen.findByRole("button", { name: "Đính kèm" }, LONG));
+		const menu = await screen.findByRole("menu", { name: "Đính kèm" }, LONG);
+		await userEvent.click(within(menu).getByRole("menuitem", { name }));
+	}
+
+	it("puts a screenshot of the shared screen in the tray and stops sharing", async () => {
+		const { track, stream } = fakeShare();
+		stubScreen(() => Promise.resolve(stream));
+		vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+		vi.spyOn(HTMLMediaElement.prototype, "readyState", "get").mockReturnValue(HTMLMediaElement.HAVE_ENOUGH_DATA);
+		vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(1280);
+		vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(720);
+		const drawImage = vi.fn();
+		vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+		vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((done) => done(new Blob([bytes(900).slice()], { type: "image/png" })));
+		const { f, chat } = setup(true);
+		await open(f, chat);
+		await attachMenuItem("Chụp màn hình");
+		const tray = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
+		expect(within(tray).getByText(/^screenshot-\d{8}-\d{6}\.png$/)).toBeTruthy();
+		expect(drawImage).toHaveBeenCalled();
+		expect(track.stopped).toBe(true);
+	});
+
+	it("says nothing when the screen picker is closed", async () => {
+		stubScreen(() => Promise.reject(Object.assign(new Error("closed"), { name: "NotAllowedError" })));
+		const { f, chat } = setup(true);
+		await open(f, chat);
+		await attachMenuItem("Chụp màn hình");
+		await attachMenuItem("Quay màn hình");
+		// The recorder closes itself and the composer is back.
+		expect(await screen.findByRole("textbox", { name: /Tin nhắn tới/ }, LONG)).toBeTruthy();
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.queryByRole("group", { name: "File sắp gửi" })).toBeNull();
+	});
+
+	it("records the screen and puts the video in the tray on stop, then sends it", async () => {
+		const { track, stream } = fakeShare();
+		stubScreen(() => Promise.resolve(stream));
+		const { f, chat } = setup(true);
+		await open(f, chat);
+		await attachMenuItem("Quay màn hình");
+		const recorder = await screen.findByRole("group", { name: "Quay màn hình" }, LONG);
+		const stop = within(recorder).getByRole("button", { name: "Dừng quay" });
+		await waitFor(() => expect((stop as HTMLButtonElement).disabled).toBe(false), LONG);
+		await userEvent.click(stop);
+		const tray = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
+		expect(within(tray).getByText(/^screen-recording-\d{8}-\d{6}\.webm$/)).toBeTruthy();
+		expect(track.stopped).toBe(true);
+		await userEvent.click(screen.getByRole("button", { name: "Gửi" }));
+		await waitFor(() => expect(f.uploadRequests).toHaveLength(1), LONG);
+		expect(f.uploadRequests[0]).toMatchObject({ kind: MediaKind.VIDEO, mimeType: "video/webm" });
+	});
+
+	it("keeps the recording when the browser's stop sharing ends it, and throws it away on cancel", async () => {
+		const first = fakeShare();
+		const second = fakeShare();
+		const shares = [first.stream, second.stream];
+		stubScreen(() => Promise.resolve(shares.shift() ?? second.stream));
+		const { f, chat } = setup(true);
+		await open(f, chat);
+		await attachMenuItem("Quay màn hình");
+		const recorder = await screen.findByRole("group", { name: "Quay màn hình" }, LONG);
+		await waitFor(() => expect(within(recorder).getByRole("timer")).toBeTruthy(), LONG);
+		first.track.dispatchEvent(new Event("ended"));
+		const tray = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
+		expect(within(tray).getAllByText(/^screen-recording-/)).toHaveLength(1);
+
+		await attachMenuItem("Quay màn hình");
+		const again = await screen.findByRole("group", { name: "Quay màn hình" }, LONG);
+		await waitFor(() => expect(within(again).getByRole("timer")).toBeTruthy(), LONG);
+		await userEvent.click(within(again).getByRole("button", { name: "Huỷ quay màn hình" }));
+		expect(second.track.stopped).toBe(true);
+		const trayAfter = await screen.findByRole("group", { name: "File sắp gửi" }, LONG);
+		expect(within(trayAfter).getAllByText(/^screen-recording-/)).toHaveLength(1);
 	});
 });

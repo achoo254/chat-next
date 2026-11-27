@@ -101,6 +101,17 @@ export const zhCNMedia: MediaCopy = {
 		tooShort: "语音消息太短，请多录一会儿。",
 		level: "音量",
 	},
+	screenRecorder: {
+		record: "录屏",
+		recording: "正在录屏",
+		asking: "正在等待选择要录制的屏幕…",
+		hint: "停止后视频会放入待发送列表",
+		stop: "停止录屏",
+		cancel: "取消录屏",
+		cancelled: "已取消录屏",
+		failed: "录屏失败，请重试。",
+		maxReached: "已录满 30 分钟，视频已放入待发送列表",
+	},
 	shared: {
 		section: "照片、文件、链接",
 		photos: "照片和视频",
