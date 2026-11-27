@@ -79,6 +79,13 @@ Người dùng muốn chụp ảnh màn hình có chọn vùng và chú thích n
 - **27/11/2026**: đại ca chốt làm theo plan native và **giữ bản chụp/quay trên web** (đã lên prod 27/11, `chat-next` từ `c2d9f9e0` tới `84ec252b`: menu Đính kèm, ⌥S/⌥R, chọn vùng trên trang, quay vùng ở Chrome/Edge) làm dự phòng cho máy chưa cài `tunelo`.
 - Phase 1 bước 1–4 (lõi): [ADR 0031](../../../docs/adr/0031-screen-capture.md) chốt công nghệ (ảnh đóng băng + cửa sổ phủ, winit/softbuffer/tiny-skia/xcap/global-hotkey/arboard/fontdue; IPC qua stdin/stdout thay named pipe), [giao thức](../../../docs/capture-wire.md), `apps/capture` (lớp phủ, 5 công cụ, 4 màu, hoàn tác, chữ, làm mờ mosaic thật, xuất PNG, clipboard, lưu Pictures, phím tắt toàn cục), job CI `capture-windows`. Chưa kiểm bằng mắt trên Windows (hoandat-pc offline).
 
+- **27/11/2026 chiều**: đại ca đang dùng **Mac**, nên nghiệm thu và xử lý macOS trước (lớp phủ trên thanh menu, không icon Dock, bộ gõ Telex/VNI,
+  toạ độ Retina); giữ phím tắt mặc định **⌃⌥A**, người dùng tự đổi bằng `tunelo config capture-hotkey`. Nút trong ô soạn tin gọi `tunelo-capture`
+  của "máy này" (đại ca chọn: **trình duyệt nhớ máy**, tự chọn khi chỉ một máy cùng hệ điều hành online có capture, nhiều máy thì hỏi một lần);
+  ảnh về khay qua `CaptureRequest`/`CaptureResult` (proto 203, 204, `MachineInfo.capture` 28), chia mảnh 1 MiB. Gói phát hành có
+  `tunelo-capture` cho macOS (ký Developer ID `com.hoandat.tunelo.capture`, notarize) và Windows; `tunelo update` và script cài đặt nó cạnh
+  `tunelo`. Dry run workflow phát hành xanh. Còn: phát hành 3.31.0, cập nhật máy, nghiệm thu trên Mac; chọn chat khi Gửi bằng phím tắt; MCP; lịch sử mã hoá.
+
 ## Câu hỏi còn mở
 
 Không còn câu hỏi cho đại ca. Còn một quyết định kỹ thuật: công nghệ vẽ overlay (egui hay Win32 + Direct2D) do phase 1 bước 1 (spike) chốt và ghi vào ADR.
