@@ -34,6 +34,8 @@ import type { LinkPreview } from "../data/pending-backend.ts";
 import { useConnection, useMediaLimits, useMessage, useServices } from "../data/services.tsx";
 import { addAttachments, attachments, sendAsFiles } from "../media/media-state.ts";
 import { canRecordScreen, canShareScreen, requestScreen, screenKey } from "../media/screen-share.ts";
+import type { CaptureTarget } from "../../machines/native-capture.ts";
+import { useHubSlot } from "../../machines/link/connection-provider.tsx";
 import { sizeLimitLabel } from "../media/size-limit-label.ts";
 import { openAiPanel, useCell, useIntent, useUi } from "./ui-context.tsx";
 
@@ -141,7 +143,7 @@ export function Composer({
 	const attachAnchor = useRef<HTMLDivElement>(null);
 	// Media is off on the server (upload_size_max 0) or the chat does not allow it: no clip, no mic.
 	const mediaOn = media && limits !== null && limits.uploadSizeMax > 0 && !disabled;
-	const { source, remote, backend, drafts, store, toasts } = useServices();
+	const { source, remote, backend, drafts, store, toasts, transport } = useServices();
 	const ui = useUi();
 	const connection = useConnection();
 	const intent = useIntent(chatId);
@@ -400,8 +402,63 @@ export function Composer({
 		input?.click();
 	};
 
-	// The browser shares the screen only from inside the click: ask first, load the capture code after.
+	// Where a screenshot goes: tunelo-capture on this computer (machines/native-capture.ts) or the browser's own.
+	// Found when the attach menu opens; a failure of the machine's falls back to the browser for this chat.
+	const [captureTarget, setCaptureTarget] = useState<CaptureTarget | null>(null);
+	const [nativeBusy, setNativeBusy] = useState(false);
+	const slot = useHubSlot();
+	useEffect(() => {
+		if (!attachOpen || !canShareScreen() || captureTarget?.kind === "web") return;
+		let live = true;
+		import("../../machines/native-capture.ts")
+			.then((m) => m.resolveCaptureTarget(m.hubOf(slot, transport, "")))
+			.then(
+				(target) => {
+					if (live) setCaptureTarget(target);
+				},
+				() => undefined,
+			);
+		return () => {
+			live = false;
+		};
+	}, [attachOpen, slot, transport, captureTarget?.kind]);
+
+	/** The screenshot on a machine: its overlay, then the picture into this chat's tray. */
+	const nativeScreenshot = (ref: string) => {
+		setAttachOpen(false);
+		if (nativeBusy) return;
+		setNativeBusy(true);
+		import("../../machines/native-capture.ts")
+			.then((m) => m.captureOn(m.hubOf(slot, transport, ""), ref))
+			.then(
+				(file) => {
+					if (file !== null) addAttachments(chatId, topicId, [file]);
+					area.current?.focus();
+				},
+				() => {
+					// The next screenshot of this chat uses the browser's own.
+					setCaptureTarget({ kind: "web" });
+					toasts.show(copy.composer.nativeShotFailed);
+				},
+			)
+			.finally(() => setNativeBusy(false));
+	};
+
+	const pickCaptureMachine = (ref: string | "web") => {
+		void import("../../machines/native-capture.ts").then((m) => m.rememberCaptureMachine(ref));
+		if (ref === "web") {
+			setCaptureTarget({ kind: "web" });
+			webScreenshot();
+		} else nativeScreenshot(ref);
+	};
+
 	const takeScreenshot = () => {
+		if (captureTarget?.kind === "native") return nativeScreenshot(captureTarget.machine.ref);
+		webScreenshot();
+	};
+
+	// The browser shares the screen only from inside the click: ask first, load the capture code after.
+	const webScreenshot = () => {
 		setAttachOpen(false);
 		if (screenshot !== null) return;
 		const shared = requestScreen(false);
@@ -608,7 +665,10 @@ export function Composer({
 									limit={sizeLimitLabel(limits.uploadSizeMax, locale)}
 									onMedia={() => openPicker(pickMedia.current)}
 									onFiles={() => openPicker(pickFiles.current)}
-									onScreenshot={canShareScreen() ? takeScreenshot : undefined}
+									onScreenshot={canShareScreen() && captureTarget?.kind !== "choose" ? takeScreenshot : undefined}
+									screenshotOn={captureTarget?.kind === "native" ? captureTarget.machine.name : undefined}
+									screenshotChoices={captureTarget?.kind === "choose" ? captureTarget.machines : undefined}
+									onPickScreenshot={pickCaptureMachine}
 									onRecordScreen={canRecordScreen() ? recordScreen : undefined}
 									onClose={() => {
 										setAttachOpen(false);

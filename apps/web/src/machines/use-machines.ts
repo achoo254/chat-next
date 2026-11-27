@@ -24,23 +24,26 @@ import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const DIRECTORY_REFRESH_MS = 60_000;
 
+/** A hub of links to the account's machines (made once per signed-in app, in its slot). */
+export function createHub(transport: ReturnType<typeof useServices>["transport"], localName: string): LinkHub {
+	const hub = new LinkHub({
+		// A 401 also reaches the client core, which ends the session; nothing to add here.
+		directory: createMachinesDirectory(transport, () => undefined),
+		keys: deviceKeyStore(),
+		identity: deviceIdentity({ userAgent: navigator.userAgent, native: IS_NATIVE, standalone: isStandalone(), appName: brand.appName }),
+		socket: browserSocket,
+		localName,
+	});
+	countNeeds(hub);
+	return hub;
+}
+
 /** The hub of links, made the first time a machines screen opens. */
 export function useHub(): LinkHub {
 	const slot = useHubSlot();
 	const { transport } = useServices();
 	const t = useMachinesCopy();
-	return slot.get(() => {
-		const hub = new LinkHub({
-			// A 401 also reaches the client core, which ends the session; nothing to add here.
-			directory: createMachinesDirectory(transport, () => undefined),
-			keys: deviceKeyStore(),
-			identity: deviceIdentity({ userAgent: navigator.userAgent, native: IS_NATIVE, standalone: isStandalone(), appName: brand.appName }),
-			socket: browserSocket,
-			localName: t.local.name,
-		});
-		countNeeds(hub);
-		return hub;
-	});
+	return slot.get(() => createHub(transport, t.local.name));
 }
 
 /** Waiting sessions of every machine the hub has a link to, for the navigation badge. */
