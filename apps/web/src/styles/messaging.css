@@ -505,6 +505,8 @@ a.lp:hover { background: color-mix(in srgb, var(--c-primary-solid) 12%, transpar
 /* Attach menu (R3), opening upwards from the paper clip. */
 .menu-anchor .menu.attach-menu { position: absolute; left: 0; top: auto; right: auto; bottom: calc(100% + var(--space-2)); z-index: 50; }
 .attach-menu small { margin-left: auto; padding-left: var(--space-4); font-size: 0.75rem; color: var(--c-text-muted); }
+/* One line per item: the size limit and the shortcuts widen the menu instead of wrapping the names. */
+.attach-menu button { white-space: nowrap; }
 /* Files dragged over a chat: the drop zone covers the conversation. */
 .drop-zone { position: absolute; inset: var(--space-3); z-index: 5; display: grid; place-items: center; align-content: center; gap: var(--space-2); padding: var(--space-4); text-align: center; border-radius: var(--radius-lg); border: 2px dashed var(--c-primary); background: color-mix(in srgb, var(--c-surface) 92%, var(--c-primary-solid)); color: var(--c-text); pointer-events: none; }
 .drop-zone .icon { width: 36px; height: 36px; color: var(--c-primary); }
