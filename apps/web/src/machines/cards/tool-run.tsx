@@ -6,7 +6,7 @@
 // behind "Kết quả". A Localman request the AI sent shows as its own card
 // (localman-result.tsx), and the Knowledge Base documents a kb tool answered
 // with as source chips (kb-sources.tsx).
-import { useLayoutEffect, useRef, useState } from "react";
+import { useContext, useLayoutEffect, useRef, useState } from "react";
 import type { Item } from "@achoo254/chat-proto/remote/remote";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { MachineIcon } from "../machine-icons.tsx";
@@ -16,7 +16,7 @@ import { useMachinesCopy } from "../use-machines-copy.ts";
 import { approvalOutcome, toolIcon } from "./approval.tsx";
 import { isKbDocumentsTool, kbSources, KbSourceChips } from "./kb-sources.tsx";
 import { isLocalmanSend, LocalmanResultCard, parseLocalmanResult } from "./localman-result.tsx";
-import { toolStep } from "./tool-step.ts";
+import { PlainStepsContext, toolStep } from "./tool-step.ts";
 
 interface ToolRunCardProps {
 	runs: readonly ToolRun[];
@@ -25,11 +25,11 @@ interface ToolRunCardProps {
 	onFetchFull: (itemId: string) => Promise<void>;
 	/** The turn is still going: a call without a result is running. */
 	live: boolean;
-	/** The Chat app's AI panel: calls read as plain steps, folded under one line even when alone. */
-	plain?: boolean | undefined;
 }
 
-export function ToolRunCard({ runs, full, onFetchFull, live, plain = false }: ToolRunCardProps) {
+export function ToolRunCard({ runs, full, onFetchFull, live }: ToolRunCardProps) {
+	// The Chat app's AI panel: calls read as plain steps, folded under one line even when alone.
+	const plain = useContext(PlainStepsContext);
 	const t = useMachinesCopy();
 	const running = live ? runs.find((r) => r.call !== null && r.result === null) : undefined;
 	const rows = runs.map((run) => (

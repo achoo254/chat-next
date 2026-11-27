@@ -507,6 +507,7 @@ export const zhCNMachines: MachinesCopy = {
 		minutes: (m, s) => `${m} 分 ${s} 秒`,
 		hours: (h, m) => `${h} 小时 ${m} 分`,
 		turnTools: (n) => `${n} 个工具`,
+		turnSteps: (n) => `${n} 步`,
 		turnFiles: (n) => `${n} 个文件`,
 		turnDetails: "本轮详情",
 		turnModel: "模型",

@@ -531,6 +531,7 @@ export const viMachines = {
 		minutes: (m: number, s: number) => `${m} phút ${s} giây`,
 		hours: (h: number, m: number) => `${h} giờ ${m} phút`,
 		turnTools: (n: number) => `${n} tool`,
+		turnSteps: (n: number) => `${n} bước`,
 		turnFiles: (n: number) => `${n} file`,
 		turnDetails: "Chi tiết lượt",
 		turnModel: "Model",

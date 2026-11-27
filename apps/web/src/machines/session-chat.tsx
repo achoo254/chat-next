@@ -37,6 +37,7 @@ import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { UseTextContext, type UseText } from "./cards/use-text-context.ts";
 import { splitAsked, type AskedParts } from "./chat-question.ts";
+import { PlainStepsContext } from "./cards/tool-step.ts";
 import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
 import { PageHead } from "./page-head.tsx";
 import { ProjectConfigHint } from "./project-config.tsx";
@@ -467,6 +468,7 @@ export function SessionChat({ machine, threadId, mode, embed }: { machine: strin
 							<p>{t.chat.notFound}</p>
 						</div>
 					) : (
+						<PlainStepsContext value={embed !== undefined}>
 						<UseTextContext value={onUseText ?? null}>
 						<Transcript
 							blocks={blocks}
@@ -490,6 +492,7 @@ export function SessionChat({ machine, threadId, mode, embed }: { machine: strin
 							embedded={embed !== undefined}
 						/>
 						</UseTextContext>
+						</PlainStepsContext>
 					)}
 					{suggestion !== undefined && (
 						<LimitBar
@@ -1152,7 +1155,7 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, on
 				</div>
 			);
 		case "tools":
-			return <ToolRunCard runs={block.runs} full={state.full} onFetchFull={fetchFull} live={running} plain={embedded} />;
+			return <ToolRunCard runs={block.runs} full={state.full} onFetchFull={fetchFull} live={running} />;
 		case "diff": {
 			const full = state.full.get(block.id);
 			return <DiffCard diff={block.diff} full={full?.body.case === "diff" ? full.body.value : null} onFetchFull={() => fetchFull(block.id)} />;

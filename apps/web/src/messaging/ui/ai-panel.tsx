@@ -29,7 +29,7 @@ import { useDialog, useServices } from "../data/services.tsx";
 import { DialogHead, Modal, useDomId } from "./parts.tsx";
 import { AI_PHONE_QUERY, settleAiRequest, useUi, type AiPanelRequest, type AiQuote, type Ui } from "./ui-context.tsx";
 import { hasLocalmanRequest } from "./ai-localman-hints.ts";
-import { plainText } from "./ai-plain-text.ts";
+import { draftText } from "./ai-plain-text.ts";
 import { useChatAi, type ChatAi } from "./use-chat-ai.ts";
 
 const AiPanelSession = lazy(() => import("./ai-panel-session.tsx"));
@@ -243,7 +243,8 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 	// Resolves true once the text is in the composer (the reply's button says so), false when the user kept their own.
 	// `plain`: the text is plain already (a result card's short copy), not the AI's markdown.
 	const offerText = (markdown: string, plain = false): Promise<boolean> => {
-		const text = plain ? markdown : plainText(markdown);
+		// The reply's draft only (set apart as a quote), not the summary or note around it.
+		const text = plain ? markdown : draftText(markdown);
 		// An edit in progress is not in the draft: putting the text in would end it, so the user is asked first too.
 		const editing = ui.intents.cell(chat.id).get()?.mode === "edit";
 		const current = drafts.get(chat.id, topicId);
@@ -255,8 +256,11 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 	};
 	const fill = (text: string) => {
 		putInComposer(drafts, ui, { chatId: chat.id, topicId, replyToSeq: replyTo }, text);
-		// On a phone the sheet covers the conversation: it gives way to the composer.
-		if (phone) onClose();
+		// On a phone the sheet covers the conversation: it gives way to the composer, not to the chat's info.
+		if (phone) {
+			onClose();
+			ui.toggleInfo(false);
+		}
 	};
 	const sessionShown = !hidden && ai.status === "ready" && !ai.outdated && threadId !== "";
 	const embed: SessionEmbed = {

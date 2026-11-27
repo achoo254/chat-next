@@ -5,9 +5,11 @@
 // is not charged it). A session with automatic Advisor whose AI ended a
 // turn without asking it for next steps gets a quiet line under it.
 import { TurnState, type TurnItem } from "@achoo254/chat-proto/remote/remote";
+import { useContext } from "react";
 import type { MachinesCopy } from "../copy-vi.ts";
 import { MachineIcon } from "../machine-icons.tsx";
 import { AdvisorMissedLine } from "./advisor-verdict.tsx";
+import { PlainStepsContext } from "./tool-step.ts";
 
 /** 45,2 giây · 1 phút 17 giây · 1 giờ 3 phút. */
 export function durationText(ms: number, t: MachinesCopy, locale: string): string {
@@ -20,11 +22,11 @@ export function durationText(ms: number, t: MachinesCopy, locale: string): strin
 }
 
 /** The turn's line: its outcome, how long it took, and the tools and files of it. */
-export function turnText(turn: TurnItem, tools: number, files: number, t: MachinesCopy, locale: string): string {
+export function turnText(turn: TurnItem, tools: number, files: number, t: MachinesCopy, locale: string, plain = false): string {
 	if (turn.state === TurnState.INTERRUPTED) return t.transcript.turnInterrupted;
 	if (turn.state !== TurnState.COMPLETED) return t.transcript.turnFailed;
 	const parts = [durationText(Number(turn.durationMs), t, locale)];
-	if (tools > 0) parts.push(t.transcript.turnTools(tools));
+	if (tools > 0) parts.push(plain ? t.transcript.turnSteps(tools) : t.transcript.turnTools(tools));
 	if (files > 0) parts.push(t.transcript.turnFiles(files));
 	return t.transcript.turnDone(parts.join(" · "));
 }
@@ -56,9 +58,11 @@ export function TurnLine(props: TurnLineProps) {
 }
 
 function TurnSummary({ turn, tools, files, t, locale }: TurnLineProps) {
-	const text = turnText(turn, tools, files, t, locale);
+	// The Chat app's AI panel: steps, not tools, and no tokens or cost to open.
+	const plain = useContext(PlainStepsContext);
+	const text = turnText(turn, tools, files, t, locale, plain);
 	const failed = turn.state === TurnState.FAILED;
-	if (!hasTurnDetails(turn)) return <div className={failed ? "mx-line error" : "mx-line"}>{text}</div>;
+	if (plain || !hasTurnDetails(turn)) return <div className={failed ? "mx-line error" : "mx-line"}>{text}</div>;
 	const n = (v: bigint | number) => Number(v).toLocaleString(locale);
 	const rows: [string, string][] = [];
 	if (turn.model !== "") rows.push([t.transcript.turnModel, turn.model]);

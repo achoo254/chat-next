@@ -30,6 +30,8 @@ export function chatContext(chat: Pick<Chat, "id" | "externalApp">, title: strin
 		`Ứng dụng: ${chat.externalApp ?? brand.appName}`,
 		`chat_id: ${chat.id}`,
 		"Dùng các tool chat của tunelo (get_messages, search_messages, get_chat…) để đọc hội thoại này. Gợi ý trả lời chỉ là bản nháp. Chỉ gửi tin khi người dùng yêu cầu rõ ràng, và luôn qua tool gửi có thẻ duyệt.",
+		// «Đưa vào ô soạn tin» takes the quoted draft only (ai-plain-text.ts draftText).
+		"Khi soạn tin trả lời cho người dùng gửi, đặt đúng nội dung tin đó trong khối trích dẫn markdown (mỗi dòng bắt đầu bằng \"> \"), và không dùng khối trích dẫn cho việc khác.",
 		"Tệp trong thư mục của phiên này gửi được vào hội thoại bằng chat_send_file, sau khi người dùng duyệt thẻ.",
 		// Zalo takes only what the user types or attaches in the composer: no tool can post there.
 		...(chat.externalApp === "zalo"

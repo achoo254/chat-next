@@ -15,7 +15,7 @@ import { App } from "../src/app.tsx";
 import { aiQuestion } from "../src/messaging/ui/composer.tsx";
 import { placeName } from "../src/machines/use-machines.ts";
 import { hasLocalmanRequest } from "../src/messaging/ui/ai-localman-hints.ts";
-import { plainText } from "../src/messaging/ui/ai-plain-text.ts";
+import { draftText, plainText } from "../src/messaging/ui/ai-plain-text.ts";
 import { chatContext, chatThread, pickTarget } from "../src/messaging/ui/use-chat-ai.ts";
 import { splitAsked, wrapChatContext, wrapQuotedMessages } from "../src/machines/chat-question.ts";
 import { toolStep } from "../src/machines/cards/tool-step.ts";
@@ -503,6 +503,12 @@ describe("helpers", () => {
 		expect(splitAsked(wrapQuotedMessages("chỉ tin"))).toEqual({ context: "", quote: "chỉ tin", question: "" });
 		// Typed elsewhere, or sent before the tags: shown as it is.
 		expect(splitAsked("Hội thoại: Lan\n\ncâu hỏi")).toBeNull();
+	});
+
+	it("puts only the reply's quoted draft into the chat's composer, the whole reply when it quotes none", () => {
+		const reply = "**Tóm tắt:** nhóm hẹn đá bóng.\n\n> Ok anh em, chốt **sân sau** nhé.\n> Mấy giờ ạ?\n\nZalo không cho gửi thay bạn.";
+		expect(draftText(reply)).toBe("Ok anh em, chốt sân sau nhé.\nMấy giờ ạ?");
+		expect(draftText("Dạ, mai họp lúc **9 giờ**.")).toBe("Dạ, mai họp lúc 9 giờ.");
 	});
 
 	it("names tool calls as plain steps for the AI panel", () => {

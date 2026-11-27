@@ -1,7 +1,11 @@
 // A tool call as a plain step, for the Chat app's AI panel: "Tìm tin trong
 // chat" instead of "mcp__tunelo__chat_search_messages". The AI Agent screens
 // keep the tools' own names.
+import { createContext } from "react";
 import type { MachinesCopy } from "../copy-vi.ts";
+
+/** True inside the Chat app's AI panel: tool calls, the activity line and the turn's line read as plain steps. */
+export const PlainStepsContext = createContext(false);
 
 type StepCopy = MachinesCopy["transcript"]["step"];
 type StepKey = Exclude<keyof StepCopy, "other">;

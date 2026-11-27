@@ -510,6 +510,7 @@ export const enMachines: MachinesCopy = {
 		minutes: (m, s) => `${m} min ${s} s`,
 		hours: (h, m) => `${h} h ${m} min`,
 		turnTools: (n) => (n === 1 ? "1 tool" : `${n} tools`),
+		turnSteps: (n) => (n === 1 ? "1 step" : `${n} steps`),
 		turnFiles: (n) => (n === 1 ? "1 file" : `${n} files`),
 		turnDetails: "Turn details",
 		turnModel: "Model",

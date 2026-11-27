@@ -13,6 +13,20 @@ export function plainText(markdown: string): string {
 		.trim();
 }
 
+/**
+ * The text a reply offers for the chat's composer: the draft it sets apart as a quote ("> …", as the chat's
+ * context asks the AI to), so a summary or a note around it stays out of the message; the whole reply when it
+ * quotes nothing.
+ */
+export function draftText(markdown: string): string {
+	const quotes = Lexer.lex(markdown, { gfm: true }).filter((token): token is Tokens.Blockquote => token.type === "blockquote");
+	if (quotes.length === 0) return plainText(markdown);
+	return quotes
+		.map((quote) => blocks(quote.tokens).join("\n"))
+		.join("\n\n")
+		.trim();
+}
+
 function blocks(tokens: readonly Token[]): string[] {
 	return tokens.flatMap((token) => {
 		const text = block(token);
