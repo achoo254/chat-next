@@ -16,7 +16,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { arch, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { gunzipSync, inflateRawSync } from "node:zlib";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { blake2b } from "@noble/hashes/blake2.js";
@@ -639,13 +639,24 @@ async function downloadVerified(
   return { agent, host, hostSig, ...(capture === undefined ? {} : { capture }) };
 }
 
+/** Where the screenshot overlay goes: next to tunelo. */
+function captureTarget(r: Resolved): string {
+  return join(dirname(r.execPath), r.captureAsset?.endsWith(".exe") ? "tunelo-capture.exe" : "tunelo-capture");
+}
+
+/** False only where the release has an overlay for this platform and this machine lacks it. */
+function capturePresent(r: Resolved, env: NodeJS.ProcessEnv): boolean {
+  if (r.captureAsset === undefined || env.TUNELO_CAPTURE_BIN) return true;
+  return existsSync(captureTarget(r)) || existsSync(join(r.configDir, "capture", "bin", "current", basename(captureTarget(r))));
+}
+
 /**
  * Puts the verified screenshot overlay next to tunelo. A running one (tunelo's
  * child) is renamed aside first, as Windows will not overwrite a running file;
  * tunelo starts the new one when it restarts.
  */
 function installCapture(r: Resolved, bytes: Uint8Array): void {
-  const target = join(dirname(r.execPath), r.captureAsset?.endsWith(".exe") ? "tunelo-capture.exe" : "tunelo-capture");
+  const target = captureTarget(r);
   const incoming = `${target}.new`;
   writeChecked(incoming, bytes, 0o755);
   if (!existsSync(target)) {
@@ -657,12 +668,14 @@ function installCapture(r: Resolved, bytes: Uint8Array): void {
 }
 
 /**
- * The running release's own terminal process, when this machine has none
- * (the file was removed). Returns true when it installed it.
+ * The running release's own files this machine lacks: its terminal process
+ * (the file was removed) and its screenshot overlay (an update run by a
+ * tunelo before 3.31.0 did not know it). Returns true when it installed one.
  */
-async function repairTermHost(
+async function repairRelease(
   r: Resolved,
   releases: readonly Release[],
+  missing: { host: boolean; capture: boolean },
   log: (l: string) => void,
   onProgress?: DownloadProgress,
   onPhase?: (phase: "verifying" | "installing") => void,
@@ -670,18 +683,41 @@ async function repairTermHost(
   const release = releases.find((x) => x.tag_name === `tunelo-v${r.currentVersion}`);
   // Not published (a development build).
   if (!release?.assets.some((a) => a.name === r.archive)) return false;
-  log(`the terminal process of tunelo ${r.currentVersion} is missing; installing it again`);
+  if (missing.host) log(`the terminal process of tunelo ${r.currentVersion} is missing; installing it again`);
+  if (missing.capture) log(`the screenshot overlay of tunelo ${r.currentVersion} is missing; installing it`);
   const verified = await downloadVerified(r, release, r.currentVersion, log, onProgress, onPhase);
   onPhase?.("installing");
-  keepTermHostVersion(r, r.currentVersion, verified.host, verified.hostSig);
-  pointTermHostAt(r, r.currentVersion);
-  return true;
+  let installed = false;
+  if (missing.host) {
+    keepTermHostVersion(r, r.currentVersion, verified.host, verified.hostSig);
+    pointTermHostAt(r, r.currentVersion);
+    installed = true;
+  }
+  if (missing.capture && verified.capture !== undefined) {
+    installCapture(r, verified.capture);
+    installed = true;
+  }
+  return installed;
+}
+
+/**
+ * Run by tunelo itself when it starts: installs the running release's
+ * screenshot overlay when this machine lacks it, so an update made by an
+ * older tunelo still ends with one. Returns true when it installed it.
+ */
+export async function installMissingCapture(log: (l: string) => void, env: UpdateEnv = {}): Promise<boolean> {
+  const r = await resolveEnv(env);
+  if (capturePresent(r, env.processEnv ?? process.env)) return false;
+  return withUpdateLock(r, async () => {
+    if (capturePresent(r, env.processEnv ?? process.env)) return false;
+    return repairRelease(r, await listReleases(r.fetch), { host: false, capture: true }, log);
+  });
 }
 
 /**
  * Returns the version whose files were installed, or null when nothing
  * changed. That is a newer release, or this release itself when only its
- * terminal process was missing; either way the caller restarts tunelo so it
+ * terminal process or screenshot overlay was missing; either way the caller restarts tunelo so it
  * finds the new files.
  */
 export async function update(
@@ -695,8 +731,9 @@ export async function update(
     const releases = await listReleases(r.fetch);
     const found = newestRelease(releases);
     if (!found || !newer(found.version, r.currentVersion)) {
-      if (termHostPresent(r, env.processEnv ?? process.env)) return null;
-      return (await repairTermHost(r, releases, log, onProgress, onPhase)) ? r.currentVersion : null;
+      const missing = { host: !termHostPresent(r, env.processEnv ?? process.env), capture: !capturePresent(r, env.processEnv ?? process.env) };
+      if (!missing.host && !missing.capture) return null;
+      return (await repairRelease(r, releases, missing, log, onProgress, onPhase)) ? r.currentVersion : null;
     }
     const { release, version } = found;
     const verified = await downloadVerified(r, release, version, log, onProgress, onPhase);

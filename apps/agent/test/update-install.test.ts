@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TERM_HOST_BINARY, switchStagedTermHost } from "../src/terminal/host-supervisor.ts";
-import { type UpdateEnv, archiveName, assetName, rollback, signedComment, termHostAssetName, update } from "../src/update.ts";
+import { type UpdateEnv, archiveName, assetName, installMissingCapture, rollback, signedComment, termHostAssetName, update } from "../src/update.ts";
 import { type TestSigner, testSigner } from "./support/minisign-sign.ts";
 
 // Packing the zip needs the zip tool, which Windows lacks.
@@ -333,6 +333,42 @@ describe("tunelo update", () => {
     expect(text(join(hostDir(), "versions", "3.0.0", TERM_HOST_BINARY))).toBe("tunelo-term-host 3.0.0");
     // Present now: nothing more to do.
     expect(await update(quiet, undefined, undefined, env([release(signer, "3.0.0")]))).toBeNull();
+  });
+
+  it("installs the running release's missing screenshot overlay, which an update by an older tunelo left out", async () => {
+    const name = "tunelo-capture-darwin-arm64";
+    const body = bytes("tunelo-capture 3.0.0");
+    const own = release(signer, "3.0.0", {
+      edit: (inner) => {
+        inner.set(name, body);
+        inner.set(`${name}.minisig`, bytes(signer.sign(body, signedComment("3.0.0", name))));
+      },
+    });
+    writeFileSync(join(root, "bin", TERM_HOST_BINARY), hostBytes("3.0.0"));
+    const overlay = join(dirname(exe()), "tunelo-capture");
+
+    // tunelo starting finds none and fetches it from its own release.
+    expect(await installMissingCapture(quiet, env([own]))).toBe(true);
+    expect(text(overlay)).toBe("tunelo-capture 3.0.0");
+    expect(text(exe())).toBe("tunelo agent 3.0.0");
+    expect(existsSync(hostDir())).toBe(false);
+    // Present now: nothing to fetch, by either path.
+    expect(await installMissingCapture(quiet, env([own]))).toBe(false);
+    expect(await update(quiet, undefined, undefined, env([own]))).toBeNull();
+
+    // `tunelo update` on the newest release puts it back too.
+    rmSync(overlay);
+    expect(await update(quiet, undefined, undefined, env([own]))).toBe("3.0.0");
+    expect(text(overlay)).toBe("tunelo-capture 3.0.0");
+  });
+
+  it("fetches no overlay on Linux, for a release without one, or when one is named by the environment", async () => {
+    writeFileSync(join(root, "bin", TERM_HOST_BINARY), hostBytes("3.0.0"));
+    const fail = (() => Promise.reject(new Error("no request expected"))) as typeof fetch;
+    expect(await installMissingCapture(quiet, env([], { os: "linux", cpu: "x64", fetch: fail }))).toBe(false);
+    expect(await installMissingCapture(quiet, env([], { processEnv: { TUNELO_CAPTURE_BIN: "/elsewhere" }, fetch: fail }))).toBe(false);
+    expect(await installMissingCapture(quiet, env([release(signer, "3.0.0")]))).toBe(false);
+    expect(existsSync(join(dirname(exe()), "tunelo-capture"))).toBe(false);
   });
 
   it("leaves the machine untouched when the missing terminal process does not verify", async () => {

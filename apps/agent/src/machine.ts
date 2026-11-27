@@ -36,6 +36,7 @@ import type { TermHostUnit } from "./terminal/host-supervisor.ts";
 import { ControlError } from "./terminal/host-link.ts";
 import { TerminalService, aiTerminalsOf } from "./terminal/terminal-service.ts";
 import { AgentUpdater } from "./agent-updater.ts";
+import { installMissingCapture } from "./update.ts";
 import { createSensitiveCheck } from "./safety/sensitive-paths.ts";
 import { ForwardDenyList } from "./tunnels/forward-deny-ports.ts";
 import { LocalForward } from "./tunnels/forward.ts";
@@ -530,6 +531,13 @@ export class Machine {
     this.updater.start();
     this.terminal.start();
     this.capture.start();
+    // An update made by a tunelo before 3.31.0 left no overlay: fetch this release's own, then start it.
+    if (this.updater.info().supported) {
+      void installMissingCapture(this.log).then(
+        (installed) => installed && this.capture.start(),
+        (err: unknown) => this.log(`capture: could not install the screenshot overlay (${(err as Error).message})`),
+      );
+    }
     this.unwatchCapture = watchCaptureSettings(this.config.dir, (settings) => {
       if (settings.enabled === false) return this.capture.close();
       this.capture.start();
