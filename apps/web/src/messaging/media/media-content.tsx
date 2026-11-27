@@ -12,7 +12,7 @@ import { useI18n } from "../../i18n/i18n.tsx";
 import { inlineThumbUrl } from "../data/format.ts";
 import { useConnection, useItem, useServices } from "../data/services.tsx";
 import { AnimatedSticker } from "./animated-sticker.tsx";
-import { boxStyle, isVisual, mediaBox } from "./box.ts";
+import { boxStyle, isSticker, isVisual, mediaBox } from "./box.ts";
 import { downloadMedia } from "./download.ts";
 import { VideoFrame, FRAME_MAX_BYTES } from "./video-frame.tsx";
 import { fileExt, formatBytes, isAnimatedSticker, isVideoSticker, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
@@ -286,6 +286,19 @@ function VideoSticker({ chatId, seq, media, label }: { chatId: number; seq: numb
 	);
 }
 
+/** A still sticker: the image as it is, no box or frame around it. */
+function StillSticker({ chatId, seq, media }: { chatId: number; seq: number; media: MediaRef }) {
+	const copy = useMediaCopy();
+	const [ref, near] = useNearViewport();
+	const { state } = useMediaFile(mediaRequest(chatId, seq, media, undefined), near);
+	if (state.status === "gone") return <Gone compact />;
+	return (
+		<div ref={ref} className="sticker-pic" role="img" aria-label={copy.media.stillSticker}>
+			{state.status === "ok" && <img src={state.url} alt="" decoding="async" />}
+		</div>
+	);
+}
+
 /** The file of one message, by kind. */
 export function MessageMedia({ message }: { message: StoredMessage }) {
 	const copy = useMediaCopy();
@@ -293,6 +306,7 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 	if (media === undefined) return null;
 	switch (media.kind) {
 		case "photo":
+			if (isSticker(media)) return <StillSticker chatId={message.chatId} seq={message.seq} media={media} />;
 			return <PictureView chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 		case "video":
 			if (isVideoSticker(media)) return <VideoSticker chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;

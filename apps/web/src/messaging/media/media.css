@@ -43,6 +43,9 @@ button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, trans
 .animated-sticker { width: min(180px, 100%); aspect-ratio: 1; }
 .animated-sticker canvas { display: block; width: 100%; height: 100%; }
 .video-sticker { width: min(180px, 100%); aspect-ratio: 1; }
+/* Still sticker (.webp/.png): the image whole, no card around it. */
+.sticker-pic { width: min(180px, 100%); aspect-ratio: 1; }
+.sticker-pic img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .video-sticker-clip { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 /* ---------- File cards ---------- */

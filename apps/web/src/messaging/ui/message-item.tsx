@@ -28,7 +28,7 @@ import { useMemberRank } from "./member-ranks.ts";
 import { jumboCount } from "./emoji-text.tsx";
 import { useSelection } from "./selection.ts";
 import { ChatSearchContext, pointAnchor, useIntent, useUi, type MenuAnchor } from "./ui-context.tsx";
-import { albumBox, boxStyle, isVisual, mediaBox } from "../media/box.ts";
+import { albumBox, boxStyle, isSticker, isVisual, mediaBox } from "../media/box.ts";
 
 // Photos, files, voice and uploads render with the media chunk, loaded the
 // first time a chat shows one; until then their box is reserved (box.ts).
@@ -548,6 +548,15 @@ export function MessageBubble({
 	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
+	// A sticker alone is drawn bare, without the bubble, as Telegram does.
+	const sticker =
+		!album &&
+		message.media !== undefined &&
+		isSticker(message.media) &&
+		message.text === "" &&
+		message.replyToSeq === 0 &&
+		message.forward === null &&
+		message.buttons.length === 0;
 	// One to three emoji alone are drawn big without the bubble, as Telegram does (emoji-text.tsx).
 	const jumbo =
 		integration || hasMedia || preview !== null || message.buttons.length > 0 || message.forward !== null ? 0 : jumboCount(message.text);
@@ -700,7 +709,9 @@ export function MessageBubble({
 						integration
 							? `bubble integration${alert === null ? "" : ` ${alert.status}`}`
 							: hasMedia
-								? "bubble media"
+								? sticker
+									? "bubble media sticker"
+									: "bubble media"
 								: jumbo > 0
 									? `bubble jumbo j${jumbo}`
 									: "bubble"

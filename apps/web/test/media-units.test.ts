@@ -3,7 +3,7 @@
 // fixed picture boxes, album rows of the message list and shared media.
 import type { StoredMessage } from "@achoo254/chat-core";
 import { describe, expect, it } from "vitest";
-import { albumBox, mediaBox } from "../src/messaging/media/box.ts";
+import { albumBox, isSticker, mediaBox } from "../src/messaging/media/box.ts";
 import {
 	encodeWaveform,
 	fileExt,
@@ -161,5 +161,18 @@ describe("isVideoSticker", () => {
 		expect(isVideoSticker({ kind: "video", mimeType: "video/mp4", fileName: "sticker.mp4" })).toBe(false);
 		expect(isVideoSticker({ kind: "video", mimeType: "video/webm", fileName: "holiday.webm" })).toBe(false);
 		expect(isVideoSticker({ kind: "document", mimeType: "video/webm", fileName: "sticker.webm" })).toBe(false);
+	});
+});
+
+describe("isSticker", () => {
+	it("tells a sticker the bridge copied from a photo, video or file", () => {
+		expect(isSticker({ kind: "photo", mimeType: "image/webp", fileName: "sticker.webp" })).toBe(true);
+		expect(isSticker({ kind: "photo", mimeType: "image/png", fileName: "sticker.png" })).toBe(true);
+		expect(isSticker({ kind: "video", mimeType: "video/webm", fileName: "sticker.webm" })).toBe(true);
+		expect(isSticker({ kind: "document", mimeType: "application/x-tgsticker", fileName: "sticker.tgs" })).toBe(true);
+		expect(isSticker({ kind: "photo", mimeType: "image/jpeg", fileName: "sticker.jpg" })).toBe(false);
+		expect(isSticker({ kind: "photo", mimeType: "image/webp", fileName: "holiday.webp" })).toBe(false);
+		expect(isSticker({ kind: "video", mimeType: "video/mp4", fileName: "sticker.mp4" })).toBe(false);
+		expect(isSticker({ kind: "document", mimeType: "image/webp", fileName: "sticker.webp" })).toBe(false);
 	});
 });

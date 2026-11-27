@@ -32,6 +32,26 @@ export function isVisual(media: Pick<MediaRef, "kind">): boolean {
 }
 
 /**
+ * A sticker the bridge copied from another app: Chat Bridge stores it as
+ * sticker.webp or sticker.png (still), sticker.webm (video) or sticker.tgs
+ * (animated). It is drawn bare, without a bubble, as Telegram does.
+ */
+export function isSticker(media: Pick<MediaRef, "kind" | "mimeType" | "fileName">): boolean {
+	const name = media.fileName.toLowerCase();
+	if (!name.startsWith("sticker.")) return false;
+	switch (media.kind) {
+		case "photo":
+			return media.mimeType === "image/webp" || media.mimeType === "image/png";
+		case "video":
+			return media.mimeType === "video/webm";
+		case "document":
+			return name.endsWith(".tgs");
+		default:
+			return false;
+	}
+}
+
+/**
  * Inline style of a picture box: a fixed width that shrinks with the
  * bubble on narrow screens, the height following the aspect ratio.
  */
