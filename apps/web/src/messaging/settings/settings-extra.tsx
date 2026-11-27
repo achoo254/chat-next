@@ -7,7 +7,7 @@ import { LanguageSwitch, ThemeSwitch } from "@achoo254/app-shell";
 import "@achoo254/app-shell/app-shell.css";
 import { Fragment, lazy, useState } from "react";
 import { brand } from "../../brand.ts";
-import { FONT_MAX, FONT_MIN, LEGACY_THEME_KEY, setFontSize, storedFontSize } from "../../appearance.ts";
+import { FONT_MAX, FONT_MIN, LEGACY_THEME_KEY, SCALE_MAX, SCALE_MIN, SCALE_STEP, setFontSize, setUiScale, storedFontSize, storedUiScale } from "../../appearance.ts";
 import { useLoader } from "../../components/delayed-loader.tsx";
 import { useLoad } from "../../components/preload.ts";
 import { isPictureInPictureSupported } from "../../compact/compact-window-store.ts";
@@ -442,7 +442,9 @@ function AppearanceSettings() {
 	const copy = useScreensCopy();
 	const { locale, followStoredLocale } = useI18n();
 	const [size, pickSize] = useState(storedFontSize);
+	const [scale, pickScale] = useState(storedUiScale);
 	const id = useDomId("font");
+	const scaleId = useDomId("scale");
 	const t = copy.appearance;
 	return (
 		<div className="set-body">
@@ -454,6 +456,36 @@ function AppearanceSettings() {
 					<LanguageSwitch locale={locale} locales={LOCALES} domain={brand.domain} onLocaleChange={followStoredLocale} />
 					<ThemeSwitch locale={locale} domain={brand.domain} legacyThemeKey={LEGACY_THEME_KEY} />
 				</div>
+			</div>
+			<div className="card pad">
+				<div className="size-head">
+					<label htmlFor={scaleId}>{t.uiScale}</label>
+					<output htmlFor={scaleId} className="mono">
+						{t.percent(scale)}
+					</output>
+				</div>
+				<div className="size-row">
+					<span className="a-small" aria-hidden="true">
+						A
+					</span>
+					<input
+						id={scaleId}
+						type="range"
+						min={SCALE_MIN}
+						max={SCALE_MAX}
+						step={SCALE_STEP}
+						value={scale}
+						onChange={(event) => {
+							const next = Number(event.target.value);
+							setUiScale(next);
+							pickScale(next);
+						}}
+					/>
+					<span className="a-big" aria-hidden="true">
+						A
+					</span>
+				</div>
+				<p className="note">{t.uiScaleHint}</p>
 			</div>
 			<div className="card pad">
 				<div className="size-head">

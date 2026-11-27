@@ -2,14 +2,19 @@
    page styles of auth.html, chat.html, settings.html). Colours come only from
    tokens.css; this file holds layout sizes and derived mixes, never literals. */
 
-/* Layout tokens derived from the ecosystem scale. */
+/* Layout tokens derived from the ecosystem scale. Sizes are in rem so the
+   interface-size setting (appearance.ts, the root font size) scales them with the
+   text; the shared spacing and radius tokens are restated in rem for the same reason. */
 :root {
-	--rail-w: 64px;
+	--space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.5rem;
+	--space-6: 2rem; --space-7: 3rem; --space-8: 4rem; --space-9: 6rem;
+	--radius-xs: 0.25rem; --radius-sm: 0.5rem; --radius-md: 0.75rem; --radius-lg: 1rem; --radius-xl: 1.5rem;
+	--rail-w: 4rem;
 	/* Grows with wide screens so names and previews show in full. */
-	--list-w: clamp(300px, 24vw, 380px);
-	--set-nav-w: 248px;
-	--avatar: 40px;
-	--avatar-sm: 32px;
+	--list-w: clamp(18.75rem, 24vw, 23.75rem);
+	--set-nav-w: 15.5rem;
+	--avatar: 2.5rem;
+	--avatar-sm: 2rem;
 	--c-hover: color-mix(in srgb, var(--c-text) 5%, transparent);
 	--c-selected: color-mix(in srgb, var(--c-primary-solid) 12%, var(--c-surface));
 }
@@ -43,8 +48,8 @@ button { cursor: pointer; }
 }
 /* While the editor loads, the box shows its placeholder the same way. */
 .plain-text-box[aria-busy="true"]:empty::before { content: attr(aria-placeholder); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-muted); }
-.icon { width: 20px; height: 20px; flex: none; stroke: currentColor; stroke-width: var(--icon-stroke); fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.icon-sm { width: 16px; height: 16px; }
+.icon { width: 1.25rem; height: 1.25rem; flex: none; stroke: currentColor; stroke-width: var(--icon-stroke); fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.icon-sm { width: 1rem; height: 1rem; }
 /* An icon the image model drew (machines/ai-mark.tsx): its alpha is a mask over the text color. */
 .ai-mark { display: inline-block; flex: none; width: 22px; height: 22px; background-color: currentColor; -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat; }
 .ai-mark-sm { width: 18px; height: 18px; }

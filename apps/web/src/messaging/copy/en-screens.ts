@@ -443,6 +443,9 @@ export const enScreens: ScreensCopy = {
 	appearance: {
 		languageAndTheme: "Language and theme",
 		sharedHint: `Other ${brand.domain} apps in this browser follow this choice too`,
+		uiScale: "Interface size",
+		uiScaleHint: "Scales the list, messages and buttons together; applies to this device only",
+		percent: (n: number) => `${n}%`,
 		fontSize: "Message text size",
 		px: (n: number) => `${n} px`,
 		previewName: "Quang Huy",

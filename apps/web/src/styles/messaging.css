@@ -5,11 +5,11 @@
 
 :root {
 	/* Grows with wide screens so values in the info column show in full. */
-	--info-w: clamp(320px, 26vw, 420px);
-	--bubble-max: 560px;
-	--avatar-xs: 24px;
-	--avatar-lg: 72px;
-	--chat-row-h: 64px;
+	--info-w: clamp(20rem, 26vw, 26.25rem);
+	--bubble-max: 35rem;
+	--avatar-xs: 1.5rem;
+	--avatar-lg: 4.5rem;
+	--chat-row-h: 4rem;
 	--c-mark: color-mix(in srgb, var(--c-warning) 26%, transparent);
 	/* Bubbles have no outline (Telegram, Zalo): others' sit one step off the conversation
 	   background (greyer in light, lighter in dark); yours are the brand violet darkened
@@ -125,7 +125,7 @@
 	/* The iOS app draws under the status bar and home indicator (viewport-fit=cover): keep the chat clear of them. */
 	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-.app.folders, .app-frame.folders { --rail-w: 76px; }
+.app.folders, .app-frame.folders { --rail-w: 4.75rem; }
 /* Settings and admin pages keep the chat screen's folder rail (screens/shell.tsx);
    the icon rail is only their top bar on narrow screens, where the folder rail hides. */
 .app-frame.folders { position: relative; }

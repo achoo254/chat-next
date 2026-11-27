@@ -445,6 +445,9 @@ export const viScreens = {
 	appearance: {
 		languageAndTheme: "Ngôn ngữ và giao diện",
 		sharedHint: `Các app khác của ${brand.domain} mở trên trình duyệt này cũng theo lựa chọn này`,
+		uiScale: "Cỡ giao diện",
+		uiScaleHint: "Phóng to hoặc thu nhỏ cả danh sách, tin nhắn và nút bấm; chỉ đổi trên thiết bị này",
+		percent: (n: number) => `${n}%`,
 		fontSize: "Cỡ chữ tin nhắn",
 		px: (n: number) => `${n} px`,
 		previewName: "Quang Huy",

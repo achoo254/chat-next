@@ -443,6 +443,9 @@ export const zhCNScreens: ScreensCopy = {
 	appearance: {
 		languageAndTheme: "语言和主题",
 		sharedHint: `此浏览器中的其他 ${brand.domain} 应用也会采用此设置`,
+		uiScale: "界面大小",
+		uiScaleHint: "同时缩放列表、消息和按钮；仅对此设备生效",
+		percent: (n: number) => `${n}%`,
 		fontSize: "消息文字大小",
 		px: (n: number) => `${n} px`,
 		previewName: "Quang Huy",
