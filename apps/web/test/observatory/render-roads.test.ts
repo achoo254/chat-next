@@ -8,8 +8,6 @@ import { describe, expect, it } from "vitest";
 import { roadOf } from "../../src/machines/observatory/render/prop-map.ts";
 import {
 	CORNER_RADIUS,
-	failureShare,
-	MIN_FAILURE_PX,
 	pathLength,
 	pathPoint,
 	pathSlice,
@@ -119,7 +117,7 @@ describe("walking and slicing a track", () => {
 	});
 });
 
-describe("a road's width and red share", () => {
+describe("a road's width", () => {
 	it("grows with the calls, slowly, and stays within a body that fits beside its neighbours", () => {
 		const widths = [0, 1, 4, 10, 140, 10_000].map(roadWidth);
 		for (let i = 1; i < widths.length; i++) expect(widths[i]).toBeGreaterThanOrEqual(widths[i - 1] ?? 0);
@@ -127,19 +125,6 @@ describe("a road's width and red share", () => {
 		expect(Math.max(...widths)).toBeLessThanOrEqual(10);
 		expect(roadWidth(140) - roadWidth(4)).toBeGreaterThan(2.5);
 		expect(roadWidth(-5)).toBe(roadWidth(0));
-	});
-
-	it("is the failure rate of the road, with no red at all when nothing failed", () => {
-		expect(failureShare(0, 50, 400)).toBe(0);
-		expect(failureShare(3, 0, 400)).toBe(0);
-		expect(failureShare(15, 60, 400)).toBeCloseTo(0.25, 5);
-		expect(failureShare(5, 5, 400)).toBe(1);
-		expect(failureShare(2, 1, 400)).toBe(1);
-	});
-
-	it("one failure among many calls is still at least the minimum length, and a short road is red all through", () => {
-		expect(failureShare(1, 500, 400) * 400).toBeCloseTo(MIN_FAILURE_PX, 5);
-		expect(failureShare(1, 500, 10)).toBe(1);
 	});
 });
 
@@ -237,7 +222,7 @@ describe("the layout of the roads", () => {
 	});
 });
 
-describe("one track for the body, the packets and the red stretch", () => {
+describe("one track for the body and the packets", () => {
 	it("the road a packet travels is the rounded track of the hand-set route, with the same two ends", () => {
 		for (const id of ROADS) {
 			const { route, road } = INTERIOR.places[id];
@@ -252,12 +237,4 @@ describe("one track for the body, the packets and the red stretch", () => {
 		expect(roadOf(INTERIOR, "monitoring")).toHaveLength(1);
 	});
 
-	it("the red stretch ends where the road ends and is as long as its share of the track", () => {
-		for (const id of ROADS) {
-			const road = INTERIOR.places[id].road;
-			const red = pathSlice(road, 1 - failureShare(3, 20, pathLength(road)), 1);
-			expect(near(red.at(-1) ?? NOWHERE, road.at(-1) ?? [-2, -2])).toBe(true);
-			expect(pathLength(red)).toBeCloseTo(0.15 * pathLength(road), 3);
-		}
-	});
 });

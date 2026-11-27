@@ -3,7 +3,7 @@
 // a dark board with a faint grid and copper traces; the model as a neural
 // lattice (sparks fly while it thinks, it stays calm while tools run);
 // subagents circling it; a trace from the model (or the subagent that makes
-// the call) to each module, its width by calls, its red share by failures,
+// the call) to each module, its width by calls, red all along once a call failed,
 // dashes flowing while a call runs (amber once past the session's p95 of its
 // kind), its label the runtime or the calls, p95 and failures; the modules
 // (files, terminal, testing, Git · CI/CD pipeline, MCP slots, the space
@@ -22,7 +22,7 @@ import type { StepStatus } from "../pipeline-model.ts";
 import type { MoveFrame } from "./animation-director.ts";
 import { clamp01, INK, rgba } from "./ink.ts";
 import { pathPoint, type SceneLook, type Tone } from "./prop-map.ts";
-import { failureShare, pathLength, pathSlice, roadWidth } from "./road-geometry.ts";
+import { roadWidth } from "./road-geometry.ts";
 import { MODEL_TITLE_WIDTH, PIPELINE_CELL, PLACE_IDS, pipelineCell, type PlaceId, type Point, type Rect, type SceneTable } from "./scene-table.ts";
 import {
 	cornerTicks,
@@ -465,10 +465,9 @@ export class InteriorPainter {
 				c.lineWidth = Math.max(0.8, Math.min(1.8, w * 0.28));
 				c.stroke();
 			}
-			// The failures: the end of the same track, as long as the failure rate (and never too short to see).
-			const share = n > 0 ? failureShare(road.failures, n, pathLength(r)) : 0;
-			if (share > 0) {
-				this.poly(pathSlice(r, 1 - share, 1));
+			// A road with failed calls is red along its whole length: a short red end at the module read as a glitch.
+			if (road.failures > 0 && n > 0) {
+				this.poly(r);
 				c.strokeStyle = rgba(INK.err, 0.92);
 				c.lineWidth = Math.max(2, Math.min(4, w * 0.62));
 				c.stroke();

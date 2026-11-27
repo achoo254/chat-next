@@ -1,6 +1,6 @@
 // The geometry of a road (a trace from the model to a module): one sampled
 // track with rounded corners, which the road's body, the packets that travel
-// it and its red stretch of failures all follow, so they can never drift apart.
+// it all follow, so they can never drift apart.
 // The scene table keeps the hand-set corners of each route; `roundCorners`
 // turns them into the track. Pure: no drawing, no state.
 import type { Point } from "./scene-table.ts";
@@ -9,9 +9,6 @@ import type { Point } from "./scene-table.ts";
 export const CORNER_RADIUS = 24;
 /** Points sampled along each rounded corner. */
 export const CORNER_STEPS = 7;
-/** A share of failures is drawn at least this long, so one failure among many calls is still seen. */
-export const MIN_FAILURE_PX = 16;
-
 const legLength = (a: Point, b: Point): number => Math.hypot(b[0] - a[0], b[1] - a[1]);
 
 /** The length of a path of straight legs. */
@@ -100,8 +97,3 @@ export function roadWidth(calls: number): number {
 	return 1.5 + Math.min(8.5, Math.log2(1 + Math.max(0, calls)) * 1.75);
 }
 
-/** The share of a road (0 to 1) drawn red: its failure rate, but never shorter than MIN_FAILURE_PX once a call has failed; 0 with none. */
-export function failureShare(failures: number, calls: number, length: number): number {
-	if (failures <= 0 || calls <= 0 || length <= 0) return 0;
-	return Math.min(1, Math.max(failures / calls, MIN_FAILURE_PX / length));
-}
