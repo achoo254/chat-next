@@ -133,7 +133,12 @@ interface TransformApi {
 /** Whether this browser can record only a region of the shared screen. */
 export function canCropRecording(): boolean {
 	const api = globalThis as TransformApi;
-	return typeof api.MediaStreamTrackProcessor === "function" && typeof api.MediaStreamTrackGenerator === "function" && typeof VideoFrame === "function";
+	return (
+		typeof api.MediaStreamTrackProcessor === "function" &&
+		typeof api.MediaStreamTrackGenerator === "function" &&
+		typeof VideoFrame === "function" &&
+		typeof OffscreenCanvas === "function"
+	);
 }
 
 /**
@@ -146,13 +151,18 @@ export function croppedTrack(track: MediaStreamTrack, region: Rect): MediaStream
 	if (api.MediaStreamTrackProcessor === undefined || api.MediaStreamTrackGenerator === undefined) throw new Error("cropping a recording is not supported");
 	const processor = new api.MediaStreamTrackProcessor({ track });
 	const generator = new api.MediaStreamTrackGenerator({ kind: "video" });
+	// The region is drawn onto its own canvas: encoders (Chrome's MP4) ignore a frame's visibleRect and record black.
+	const canvas = new OffscreenCanvas(region.width, region.height);
+	const context = canvas.getContext("2d");
+	if (context === null) throw new Error("no 2d canvas");
 	const crop = new TransformStream<VideoFrame, VideoFrame>({
 		transform(frame, controller) {
 			try {
-				const shown = frame.visibleRect ?? { x: 0, y: 0, width: frame.codedWidth, height: frame.codedHeight };
 				// A window shared and then resized: keep the region inside the frame.
-				const inside = evenRect(region, shown.width, shown.height);
-				controller.enqueue(new VideoFrame(frame, { visibleRect: { x: shown.x + inside.x, y: shown.y + inside.y, width: inside.width, height: inside.height } }));
+				const inside = evenRect(region, frame.displayWidth, frame.displayHeight);
+				context.clearRect(0, 0, canvas.width, canvas.height);
+				context.drawImage(frame, inside.x, inside.y, inside.width, inside.height, 0, 0, inside.width, inside.height);
+				controller.enqueue(new VideoFrame(canvas, { timestamp: frame.timestamp }));
 			} finally {
 				frame.close();
 			}
