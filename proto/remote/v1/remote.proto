@@ -388,6 +388,13 @@ message Frame {
     // B → A: the answer, and unasked to every connected device when a
     // subscription, its state or its counters change.
     ChatInboxState chat_inbox_state = 202;
+    // A → B: a screenshot of this machine's screens, picked and marked by the
+    // user on the machine (tunelo-capture, ADR 0031). Answered with Ack once
+    // the overlay is up; the picture comes later as CaptureResult.
+    CaptureRequest capture_request = 203;
+    // B → A: unasked, to the device that asked only: the picture in pieces,
+    // or that the user closed the overlay.
+    CaptureResult capture_result = 204;
   }
 }
 
@@ -2467,6 +2474,48 @@ message MachineInfo {
   // The tunelo service process and the ports it uses now; unset from a
   // tunelo released before it (3.29.0 and older).
   AgentRuntime runtime = 27;
+  // Screenshots taken on this machine (tunelo-capture); unset from a tunelo
+  // without it, where the composer falls back to the browser's own capture.
+  CaptureInfo capture = 28;
+}
+
+// --- screenshots (tunelo-capture, ADR 0031) ------------------------------------
+
+message CaptureInfo {
+  // tunelo-capture runs and can show its overlay on this machine's screens.
+  bool available = 1;
+  // The global shortcut that opens it, as "Ctrl+Alt+A"; empty when none.
+  string hotkey = 2;
+}
+
+message CaptureRequest {
+  // Chosen by A (8-64 letters, digits, "-", "_"); CaptureResult carries it.
+  string request_id = 1;
+}
+
+enum CaptureOutcome {
+  CAPTURE_OUTCOME_UNSPECIFIED = 0;
+  // A picture: data in pieces until last.
+  CAPTURE_OUTCOME_CAPTURED = 1;
+  // The user closed the overlay; no data.
+  CAPTURE_OUTCOME_CANCELLED = 2;
+  // It could not be taken (message says why); no data.
+  CAPTURE_OUTCOME_FAILED = 3;
+}
+
+message CaptureResult {
+  string request_id = 1;
+  CaptureOutcome outcome = 2;
+  // First piece only: the file name and type ("image/png") and the whole size.
+  string name = 3;
+  string mime_type = 4;
+  uint64 size = 5;
+  uint64 offset = 6;
+  // At most 1 MiB a piece.
+  bytes data = 7;
+  // The last piece (or the only frame of a cancel or a failure).
+  bool last = 8;
+  string message = 9;
 }
 
 // The tunelo service process that answers this MachineInfo.

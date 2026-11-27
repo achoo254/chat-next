@@ -4,6 +4,7 @@
 // coding CLI installed here, end-to-end encrypted; it also opens tunnels to
 // localhost (http, tcp, kill, watch). `tunelo login` connects the machine,
 // `tunelo logout` takes it out of the account, `tunelo uninstall` removes it.
+import { registerCaptureHotkeyCommand } from "./commands/capture-hotkey.ts";
 import { Command } from "commander";
 import { registerAdvisorCommand } from "./advisor/cli-advisor-command.ts";
 import { configureGroupedHelp } from "./cli-help.ts";
@@ -319,6 +320,7 @@ export function buildProgram(): Command {
   const configCommand = registerConfigCommand(program);
   registerLocalForwardCommand(configCommand, exits);
   registerMcpLocalWritesCommand(configCommand, exits);
+  registerCaptureHotkeyCommand(configCommand, exits);
   return program;
 }
 

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { type MessageInitShape, create } from "@bufbuild/protobuf";
 import {
   ErrorCode,
+  CaptureOutcome,
   ErrorReason,
   type Frame,
   FrameSchema,
@@ -58,6 +59,7 @@ import { type UsageApi, type UsageFrame, handleUsage } from "./usage-link.ts";
 import { LedgerUnreadable } from "../usage/ledger.ts";
 import type { ObservatoryEventSink, ObservatoryHub } from "../observatory/hub/observatory-hub.ts";
 import type { ChatInbox } from "../chat-inbox/chat-inbox.ts";
+import type { CaptureService } from "../capture/capture-service.ts";
 import { chatInboxStateBody } from "../chat-inbox/inbox-wire.ts";
 import { CLAUDE_PROVIDER_ID } from "../providers/claude/accounts/paths.ts";
 import { ReportRangeError } from "../usage/report.ts";
@@ -117,7 +119,12 @@ export type LinkContext = {
   observatory?: Pick<ObservatoryHub, "listSessions" | "watch" | "unwatch" | "forget" | "earlier" | "content" | "station">;
   /** Chats whose new messages go into their AI session (ChatInboxList and the requests beside it); absent where the machine has none (tests). */
   chatInbox?: Pick<ChatInbox, "list" | "set" | "remove">;
+  /** Screenshots of the machine's screens (tunelo-capture, ADR 0031); absent where the machine has none (tests). */
+  capture?: Pick<CaptureService, "request" | "forget">;
 };
+
+/** A capture's id as the device chose it (CaptureRequest). */
+const CAPTURE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** The class and reason of each refusal of Advisor's key store. */
 const ADVISOR_KEY_REFUSALS: Record<AdvisorKeyError["kind"], { code: ErrorCode; reason: ErrorReason }> = {
@@ -264,6 +271,8 @@ export class Connection {
   private terminal: TerminalConnection | undefined;
   private workspaceLink: WorkspaceLink | undefined;
   /** Where this connection gets the events of the Observatory sessions it watches. */
+  /** Captures this device asked for and has not got yet. */
+  private readonly captures = new Set<string>();
   private readonly observatorySink: ObservatoryEventSink = (events) => {
     if ((this.socket.buffered?.() ?? 0) > OBSERVATORY_BUFFERED_MAX) return;
     this.send("", { case: "observatoryEvents", value: events });
@@ -326,6 +335,7 @@ export class Connection {
     if (this.terminal) this.ctx.terminal?.forget(this.terminal);
     this.workspaceLink?.close();
     this.ctx.observatory?.forget(this.observatorySink);
+    this.ctx.capture?.forget(this.captures);
     this.socket.close(code, reason);
   }
 
@@ -495,6 +505,32 @@ export class Connection {
   /** This device follows the thread now (it subscribed on this link). */
   follows(threadId: string): boolean {
     return this.state === "open" && this.subscribed.has(threadId);
+  }
+
+  /**
+   * The composer asks for a screenshot: answered once the overlay is up on the
+   * machine; the picture (or the cancel) comes after to this device only.
+   */
+  private async captureFrame(id: string, requestId: string): Promise<void> {
+    const capture = this.ctx.capture;
+    if (!capture) return this.send(id, { case: "error", value: refusal("screenshots are not available on this machine", ErrorReason.UNSUPPORTED_REQUEST) });
+    if (!CAPTURE_ID.test(requestId)) return this.send(id, { case: "error", value: refusal("not a capture id", ErrorReason.UNSUPPORTED_REQUEST) });
+    this.captures.add(requestId);
+    const outcomes = { captured: CaptureOutcome.CAPTURED, cancelled: CaptureOutcome.CANCELLED, failed: CaptureOutcome.FAILED } as const;
+    try {
+      await capture.request(requestId, (piece) => {
+        if (piece.last) this.captures.delete(requestId);
+        const value =
+          piece.outcome === "captured"
+            ? { requestId, outcome: outcomes.captured, name: piece.name, mimeType: piece.mimeType, size: BigInt(piece.size), offset: BigInt(piece.offset), data: piece.data, last: piece.last }
+            : { requestId, outcome: outcomes[piece.outcome], last: true, message: piece.outcome === "failed" ? piece.message : "" };
+        this.send("", { case: "captureResult", value });
+      });
+      this.send(id, { case: "ack", value: {} });
+    } catch (err) {
+      this.captures.delete(requestId);
+      this.send(id, { case: "error", value: refusal(err instanceof Error ? err.message : String(err), ErrorReason.UNSUPPORTED_REQUEST) });
+    }
   }
 
   /** An event every device gets unasked (the machine's profile and where each session stands). */
@@ -982,6 +1018,8 @@ export class Connection {
         case "observatoryContent":
         case "observatoryStation":
           return this.observatoryFrame(id, b);
+        case "captureRequest":
+          return this.captureFrame(id, b.value.requestId);
         case "chatInboxList":
         case "chatInboxSet":
         case "chatInboxRemove": {

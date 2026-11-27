@@ -2651,6 +2651,7 @@ dependencies = [
  "arboard",
  "fontdue",
  "global-hotkey",
+ "objc2-app-kit 0.2.2",
  "serde",
  "serde_json",
  "softbuffer",

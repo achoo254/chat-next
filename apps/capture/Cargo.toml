@@ -25,6 +25,10 @@ xcap = "0.9"
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 global-hotkey = "0.10"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# The overlay goes above the menu bar: AppKit's window level, which winit does not expose.
+objc2-app-kit = { version = "0.2", default-features = false, features = ["std", "NSResponder", "NSView", "NSWindow"] }
+
 [profile.release]
 lto = true
 codegen-units = 1

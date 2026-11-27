@@ -30,6 +30,7 @@ tunelo-capture --out <thư mục ảnh> [--lang vi|en|zh-CN] [--hotkey "Ctrl+Alt
 | Sự kiện | Trường | Khi nào |
 |---|---|---|
 | `ready` | `version` (của tunelo-capture), `wire` (số phiên bản giao thức, hiện là 1), `hotkey` (đã đăng ký, rỗng nếu không) | Ngay khi khởi chạy. |
+| `opened` | `id` (rỗng nếu do phím tắt) | Lớp phủ đã hiện trên các màn hình (sau `capture_interactive` hoặc phím tắt). |
 | `captured` | `id` (rỗng nếu do phím tắt), `origin`, `action`: `main` \| `ask_ai` \| `copy` \| `save`, `file`, `width`, `height` | Có ảnh. Ảnh luôn đã nằm trong clipboard; `save` thì `file` nằm trong thư mục Pictures. |
 | `cancelled` | `id` | Người dùng đóng lớp phủ (Esc, chuột phải, nút ×). |
 | `displays` | `id`, `displays`: `[{index, name, width, height, primary}]` | Trả lời `list_displays`. |

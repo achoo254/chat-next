@@ -52,6 +52,8 @@ pub struct Overlay {
     drag: Drag,
     /// The text being typed with the Text tool, at a region point.
     typing: Option<((f32, f32), String)>,
+    /// Letters the input method is still composing (Telex "a" before "aa" makes "â").
+    preedit: String,
     words: &'static Words,
     slots: Vec<Slot>,
     bar_w: f32,
@@ -81,6 +83,7 @@ impl Overlay {
             color: 0,
             drag: Drag::None,
             typing: None,
+            preedit: String::new(),
             words,
             slots,
             bar_w,
@@ -121,7 +124,12 @@ impl Overlay {
         }
     }
 
+    pub fn set_preedit(&mut self, text: String) {
+        self.preedit = text;
+    }
+
     fn commit_text(&mut self) {
+        self.preedit.clear();
         if let Some((at, text)) = self.typing.take() {
             if !text.trim().is_empty() {
                 self.marks.push(Mark::Text {
@@ -281,7 +289,7 @@ impl Overlay {
                     }
                 }
                 if let Some((at, text)) = &self.typing {
-                    let shown = format!("{text}|");
+                    let shown = format!("{text}{}|", self.preedit);
                     draw_text(&mut picked, font, &shown, at.0, at.1, size, COLORS[self.color]);
                 }
             }

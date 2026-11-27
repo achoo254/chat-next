@@ -30,6 +30,8 @@ import { type MacAccess, MacFolders, hasFullDiskAccess, probeInChild } from "./s
 import { claudeSandboxOn, sandboxApplies, sandboxProfile } from "./safety/mac-sandbox.ts";
 import { defaultClaudeHome } from "./providers/claude/accounts/paths.ts";
 import { isCompiled, selfCommand, supervised, termHostUnit } from "./service.ts";
+import { CaptureService } from "./capture/capture-service.ts";
+import { hotkeyOf, readCaptureSettings, watchCaptureSettings } from "./capture/capture-settings.ts";
 import type { TermHostUnit } from "./terminal/host-supervisor.ts";
 import { ControlError } from "./terminal/host-link.ts";
 import { TerminalService, aiTerminalsOf } from "./terminal/terminal-service.ts";
@@ -135,6 +137,8 @@ export class Machine {
   readonly advisorKeys: AdvisorKeyStore;
   readonly browser: RemoteBrowser;
   readonly screenShare: ScreenShare;
+  readonly capture: CaptureService;
+  private unwatchCapture: (() => void) | undefined;
   readonly terminal: TerminalService;
   readonly workspaces: Workspaces;
   /** The usage ledger and its scans of the AIs' transcripts. */
@@ -213,6 +217,15 @@ export class Machine {
     this.advisorKeys = new AdvisorKeyStore({ configDir: dir, audit: this.audit, log: this.log });
     this.browser = opts.browser ?? new RemoteBrowser({ configDir: dir, audit: this.audit, log: this.log });
     this.screenShare = opts.screenShare ?? new ScreenShare({ audit: this.audit, log: this.log });
+    this.capture = new CaptureService({
+      configDir: dir,
+      outDir: join(dataDir, "captures"),
+      hotkey: () => hotkeyOf(readCaptureSettings(dir)),
+      enabled: () => readCaptureSettings(dir).enabled !== false,
+      lang: () => Intl.DateTimeFormat().resolvedOptions().locale,
+      log: this.log,
+    });
+    this.capture.onChange(() => void this.announceInfo());
     this.updater = new AgentUpdater({
       // Only the installed single file replaces itself, and only where something starts it again.
       supported: () => isCompiled() && supervised(dir),
@@ -516,6 +529,12 @@ export class Machine {
     this.stopRotation = startLogRotation(logFile(this.config.dir), this.log);
     this.updater.start();
     this.terminal.start();
+    this.capture.start();
+    this.unwatchCapture = watchCaptureSettings(this.config.dir, (settings) => {
+      if (settings.enabled === false) return this.capture.close();
+      this.capture.start();
+      if (hotkeyOf(settings) !== this.capture.info().hotkey) this.capture.setHotkey(hotkeyOf(settings));
+    });
     for (const s of this.core.sessionIds()) this.usage.launched.add(s.provider, s.sessionId);
     this.usage.start();
     // Never rejects: a part of Observatory that cannot start stays off and its status says why.
@@ -530,6 +549,8 @@ export class Machine {
     this.secrets.close();
     await this.browser.close();
     this.screenShare.stop();
+    this.unwatchCapture?.();
+    this.capture.close();
     this.updater.stop();
     // The terminal process and its shells keep running (they outlive the agent).
     this.terminal.stop();
@@ -701,6 +722,7 @@ export class Machine {
         secrets: this.secrets,
         browser: this.browser,
         screenShare: this.screenShare,
+        capture: this.capture,
         updater: this.updater,
         terminal: this.terminal,
         workspaces: this.workspaces,
@@ -813,6 +835,7 @@ export class Machine {
       gitChanges: true,
       browser: { available: this.browser.available(), running: this.browser.running(), clearable: true, tabs: true },
       screenShare: this.screenShare.supported,
+      capture: this.capture.info(),
       agentUpdate: this.updater.info(),
       terminal: this.terminal.availability(),
       advisor: { available: this.sessionMcpEnabled(), ...this.advisorStatus() },

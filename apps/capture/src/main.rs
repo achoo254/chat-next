@@ -8,6 +8,7 @@
 //! gone) ends the process.
 
 mod overlay;
+mod platform;
 
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
@@ -25,10 +26,10 @@ use tunelo_capture::text::system_font;
 use tunelo_capture::toolbar::{words_for, Words};
 use tunelo_capture::wire::{event_line, parse_command, Action, Command, Display, Event, Origin, WIRE_VERSION};
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, MouseButton, WindowEvent};
+use winit::event::{ElementState, Ime, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::keyboard::{Key as WKey, ModifiersState, NamedKey};
-use winit::window::{CursorIcon, Fullscreen, Window, WindowId, WindowLevel};
+use winit::window::{CursorIcon, Window, WindowId, WindowLevel};
 
 enum UserEvent {
     Command(Command),
@@ -132,12 +133,10 @@ fn hotkey_of(text: &str) -> Result<HotKey, String> {
     let parts: Vec<String> = text
         .split('+')
         .map(|p| p.trim())
-        .map(|p| {
-            if p.len() == 1 && p.chars().all(|c| c.is_ascii_alphabetic()) {
-                format!("Key{}", p.to_ascii_uppercase())
-            } else {
-                p.to_string()
-            }
+        .map(|p| match p.chars().next() {
+            Some(c) if p.len() == 1 && c.is_ascii_alphabetic() => format!("Key{}", c.to_ascii_uppercase()),
+            Some(c) if p.len() == 1 && c.is_ascii_digit() => format!("Digit{c}"),
+            _ => p.to_string(),
         })
         .collect();
     HotKey::from_str(&parts.join("+")).map_err(|e| e.to_string())
@@ -177,18 +176,29 @@ impl App {
         let handles: Vec<_> = event_loop.available_monitors().collect();
         let mut panes = HashMap::new();
         for (monitor, frame) in frames {
-            let (mx, my) = (monitor.x().unwrap_or(0), monitor.y().unwrap_or(0));
-            let handle = handles.iter().find(|h| h.position().x == mx && h.position().y == my).cloned();
+            let place = platform::Place {
+                x: monitor.x().unwrap_or(0),
+                y: monitor.y().unwrap_or(0),
+                width: monitor.width().unwrap_or(frame.width),
+                height: monitor.height().unwrap_or(frame.height),
+            };
+            let handle = handles.iter().find(|h| platform::same_monitor(h, &place)).cloned();
             let scale = handle.as_ref().map_or(1.0, |h| h.scale_factor()) as f32;
-            let attrs = Window::default_attributes()
-                .with_title("tunelo capture")
-                .with_decorations(false)
-                .with_resizable(false)
-                .with_window_level(WindowLevel::AlwaysOnTop)
-                .with_fullscreen(Some(Fullscreen::Borderless(handle)));
+            let attrs = platform::cover(
+                Window::default_attributes()
+                    .with_title("tunelo capture")
+                    .with_decorations(false)
+                    .with_resizable(false)
+                    .with_window_level(WindowLevel::AlwaysOnTop),
+                handle,
+                &place,
+            );
             let Ok(window) = event_loop.create_window(attrs) else { continue };
+            platform::raise(&window);
             let window = Arc::new(window);
             window.set_cursor(CursorIcon::Crosshair);
+            // Typed text comes through the input method (Vietnamese Telex, VNI) where the system uses one.
+            window.set_ime_allowed(true);
             let Ok(context) = softbuffer::Context::new(window.clone()) else { continue };
             let Ok(surface) = softbuffer::Surface::new(&context, window.clone()) else {
                 continue;
@@ -210,6 +220,7 @@ impl App {
         if panes.is_empty() {
             return error(&id, "capture_failed", "no window could be opened");
         }
+        emit(&Event::Opened { id: id.clone() });
         self.session = Some(Session { id, origin, panes });
     }
 
@@ -364,7 +375,8 @@ impl ApplicationHandler<UserEvent> for App {
                     WKey::Named(NamedKey::Backspace) => Some(Key::Backspace),
                     WKey::Character(c) if ctrl && c.eq_ignore_ascii_case("z") => Some(Key::Undo),
                     WKey::Character(c) if ctrl && c.eq_ignore_ascii_case("c") => Some(Key::Copy),
-                    _ if !ctrl => text.as_ref().and_then(|t| t.chars().next()).filter(|c| !c.is_control()).map(Key::Char),
+                    // macOS gives typed text through the input method (WindowEvent::Ime) once it is allowed.
+                    _ if !ctrl && !platform::TEXT_FROM_IME => text.as_ref().and_then(|t| t.chars().next()).filter(|c| !c.is_control()).map(Key::Char),
                     _ => None,
                 };
                 if let (Some(key), Some(session)) = (key, &mut self.session) {
@@ -386,6 +398,21 @@ impl ApplicationHandler<UserEvent> for App {
                         }
                     } else {
                         pane.overlay.released();
+                    }
+                    dirty = true;
+                }
+            }
+            WindowEvent::Ime(ime) => {
+                if let Some(pane) = self.session.as_mut().and_then(|s| s.panes.get_mut(&id)) {
+                    match ime {
+                        Ime::Commit(text) => {
+                            pane.overlay.set_preedit(String::new());
+                            for c in text.chars().filter(|c| !c.is_control()) {
+                                pane.overlay.outcome_for_key(Key::Char(c));
+                            }
+                        }
+                        Ime::Preedit(text, _) => pane.overlay.set_preedit(text),
+                        Ime::Enabled | Ime::Disabled => {}
                     }
                     dirty = true;
                 }
@@ -428,7 +455,9 @@ fn main() {
         std::process::exit(2);
     };
     let words = words_for(&arg(&args, "--lang").unwrap_or_default());
-    let event_loop = match EventLoop::<UserEvent>::with_user_event().build() {
+    let mut builder = EventLoop::<UserEvent>::with_user_event();
+    platform::background_app(&mut builder);
+    let event_loop = match builder.build() {
         Ok(l) => l,
         Err(e) => {
             error("", "no_display", e.to_string());
@@ -484,5 +513,18 @@ fn main() {
     });
     if let Err(e) = event_loop.run_app(&mut app) {
         error("", "capture_failed", e.to_string());
+    }
+}
+
+#[cfg(test)]
+mod hotkey_tests {
+    use super::hotkey_of;
+
+    #[test]
+    fn the_shortcuts_tunelo_writes_are_understood() {
+        for text in ["Ctrl+Alt+A", "Ctrl+Shift+4", "Super+Shift+S", "Ctrl+Alt+F2"] {
+            assert!(hotkey_of(text).is_ok(), "{text}");
+        }
+        assert!(hotkey_of("Ctrl+Alt+").is_err());
     }
 }

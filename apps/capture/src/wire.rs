@@ -76,6 +76,10 @@ pub enum Event {
         wire: u32,
         hotkey: String,
     },
+    /// The overlay is up for `capture_interactive` `id` (empty for the shortcut's).
+    Opened {
+        id: String,
+    },
     /// A picture: `id` answers a command, empty for one taken with the shortcut.
     Captured {
         id: String,
