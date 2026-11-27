@@ -3,7 +3,7 @@
 # Windows-only parts on Windows); the web perf gate (startup bundle size and UI timings
 # in Chromium, see apps/web/test/perf); Go format, vet, race tests and
 # golangci-lint; protobuf lint, breaking-change check and up-to-date
-# generated code.
+# generated code. tunelo-capture's Rust is checked on Windows.
 # The Vietnamese fold and entity helpers run in both languages against the
 # shared vectors under spec/, which keeps TS and Go in step.
 name: ci
@@ -70,6 +70,31 @@ jobs:
       # The agent with its workspace packages, and the root for vitest.
       - run: pnpm install --frozen-lockfile --filter "@achoo254/tunelo-agent..." --filter .
       - run: pnpm --filter @achoo254/tunelo-agent exec vitest run test/os-integration.test.ts
+
+  # tunelo-capture (apps/capture, Rust): format, clippy and tests, then a
+  # release build, on Windows where it ships first (ADR 0031). The overlay
+  # itself needs a screen and is checked by hand on a real machine.
+  capture-windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    env:
+      RUST_TOOLCHAIN: "1.96.0"
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/capture
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: apps/capture
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal -c clippy -c rustfmt
+          rustup override set "$RUST_TOOLCHAIN"
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo build --locked --release --bin tunelo-capture
 
   # Budgets live in apps/web/test/perf/budgets.ts; `pnpm perf` runs the same locally.
   web-perf:

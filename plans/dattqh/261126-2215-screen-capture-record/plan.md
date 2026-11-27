@@ -1,7 +1,7 @@
 ---
 title: "Chụp ảnh và quay màn hình trong Chat, có MCP cho AI"
 description: "tunelo-capture (Rust) chụp ảnh kèm chọn vùng và chú thích kiểu Zalo, quay vùng chọn kiểu Bandicam; nút trong ô soạn tin Chat; tool MCP của tunelo cho AI."
-status: pending
+status: in-progress
 priority: P2
 effort: "L + L (hai phase)"
 tags: [tunelo, capture, mcp, composer, windows]
@@ -73,6 +73,11 @@ Người dùng muốn chụp ảnh màn hình có chọn vùng và chú thích n
 | Phần mềm diệt virus nghi file không ký | Ký minisign như hiện có, kiểm Windows Defender; phát hành trước, ký Authenticode sau (đại ca chốt); ghi cách xử lý cảnh báo SmartScreen vào README |
 | `tunelo` bản cũ + web mới (lệch giao thức) | Cờ khả năng trong heartbeat; web ẩn nút hoặc báo cần cập nhật |
 | AI bị prompt injection để chụp màn hình | Chính sách duyệt từng lần, audit log, thông báo trên máy (đã chốt) |
+
+## Tiến độ
+
+- **27/11/2026**: đại ca chốt làm theo plan native và **giữ bản chụp/quay trên web** (đã lên prod 27/11, `chat-next` từ `c2d9f9e0` tới `84ec252b`: menu Đính kèm, ⌥S/⌥R, chọn vùng trên trang, quay vùng ở Chrome/Edge) làm dự phòng cho máy chưa cài `tunelo`.
+- Phase 1 bước 1–4 (lõi): [ADR 0031](../../../docs/adr/0031-screen-capture.md) chốt công nghệ (ảnh đóng băng + cửa sổ phủ, winit/softbuffer/tiny-skia/xcap/global-hotkey/arboard/fontdue; IPC qua stdin/stdout thay named pipe), [giao thức](../../../docs/capture-wire.md), `apps/capture` (lớp phủ, 5 công cụ, 4 màu, hoàn tác, chữ, làm mờ mosaic thật, xuất PNG, clipboard, lưu Pictures, phím tắt toàn cục), job CI `capture-windows`. Chưa kiểm bằng mắt trên Windows (hoandat-pc offline).
 
 ## Câu hỏi còn mở
 

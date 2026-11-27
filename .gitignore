@@ -31,9 +31,10 @@ apps/mobile/www/
 # Leftovers of an interrupted `bun build --compile`.
 *.bun-build
 
-# Cargo output of the terminal daemon.
+# Cargo output of the Rust apps (terminal daemon, STUN, capture).
 apps/term-host/target/
 apps/stun/target/
+apps/capture/target/
 
 # Per-agent working memory written by coding agents
 **/.claude/agent-memory/
