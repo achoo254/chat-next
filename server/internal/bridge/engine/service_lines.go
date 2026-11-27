@@ -86,6 +86,9 @@ func (r *runner) serviceAction(ctx context.Context, it *chat.ImportTx, l *chatLi
 
 // forwardHeader is Chat's "forwarded from" for a message the other app shows as
 // forwarded: the author's puppet when the app names a person, else only the name.
+// When the app sent the author without a name (Telegram updates in short form
+// carry no users), the stand-in name is left out so clients show the puppet's
+// own name, which is the real one once the person has been seen anywhere.
 func (r *runner) forwardHeader(ctx context.Context, f *bridge.ForwardInfo) (*appv1.ForwardHeader, error) {
 	h := &appv1.ForwardHeader{FromName: f.Name, Date: f.Date.Unix()}
 	if f.From != nil {
@@ -94,6 +97,9 @@ func (r *runner) forwardHeader(ctx context.Context, f *bridge.ForwardInfo) (*app
 			return nil, err
 		}
 		h.FromUserId = id
+		if f.From.NameUnknown && f.Name == f.From.Name {
+			h.FromName = ""
+		}
 	}
 	return h, nil
 }

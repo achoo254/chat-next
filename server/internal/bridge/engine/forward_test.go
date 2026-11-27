@@ -60,6 +60,31 @@ func TestAForwardedMessageOfTheOtherAppKeepsItsForwardedFrom(t *testing.T) {
 	}
 }
 
+func TestAForwardFromAPersonTheUpdateDidNotNameShowsThePuppetsName(t *testing.T) {
+	e := newEnv(t)
+	chatID := e.twoWay()
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "backfill not done" })
+	unnamed := bridge.Participant{ID: minh.ID, Name: "Telegram " + minh.ID, NameUnknown: true}
+	m := e.msg("m3", lan, "tin chuyển tiếp", 3)
+	m.Forward = &bridge.ForwardInfo{From: &unnamed, Name: unnamed.Name, Date: time.Now().Add(-48 * time.Hour)}
+	e.fake.Push(bridge.Event{Message: &m})
+	e.waitTexts(chatID, []string{"tin 1", "tin 2", "tin chuyển tiếp"})
+	if got := e.forwardOf(chatID, e.seqOf(chatID, "m3")); got != minh.ID {
+		t.Fatalf("forwarded from = %q, want the puppet of Minh", got)
+	}
+	var raw []byte
+	if err := e.st.Pool().QueryRow(context.Background(), `SELECT content FROM messages WHERE chat_id = $1 AND seq = $2`, chatID, e.seqOf(chatID, "m3")).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var msg appv1.Message
+	if err := proto.Unmarshal(raw, &msg); err != nil {
+		t.Fatal(err)
+	}
+	if name := msg.GetForwardFrom().GetFromName(); name != "" {
+		t.Fatalf("forward header carries the stand-in name %q", name)
+	}
+}
+
 func TestForwardingBetweenTwoSyncedChatsIsANativeForward(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
