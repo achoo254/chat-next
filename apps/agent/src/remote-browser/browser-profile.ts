@@ -157,14 +157,15 @@ function waitForPort(dir: string, child: ChildProcess, ms: number): Promise<Brow
 }
 
 /**
- * Starts the profile browser and waits for its debugging port. With a
- * screen it shows a window; when that fails (no one is signed in to the
- * machine's desktop) it starts headless.
+ * Starts the profile browser and waits for its debugging port. It runs
+ * headless by default: the page is shown inside the app, so no window opens
+ * on the machine. `TUNELO_BROWSER_HEADLESS=0` tries a window first and falls
+ * back to headless when that fails (no one is signed in to the desktop).
  */
 export async function launchBrowser(dir: string, exe: string): Promise<BrowserEndpoint> {
 	mkdirSync(dir, { recursive: true, mode: 0o700 });
 	if (process.platform !== "win32") chmodSync(dir, 0o700);
-	for (const headless of process.env.TUNELO_BROWSER_HEADLESS === "1" ? [true] : [false, true]) {
+	for (const headless of process.env.TUNELO_BROWSER_HEADLESS === "0" ? [false, true] : [true]) {
 		rmSync(join(dir, "DevToolsActivePort"), { force: true });
 		const child = spawn(exe, browserArgs(dir, headless), { stdio: "ignore", detached: process.platform !== "win32", windowsHide: true });
 		child.on("error", () => undefined);
