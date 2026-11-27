@@ -1067,9 +1067,10 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 :is(.ai-panel, .ai-sheet) .mx-status-row > .mx-usage { flex: none; }
 /* The panel's header names the conversation; the title gives way to its buttons. */
 /* The title keeps room for a few letters of the conversation's name; the machine's list gives way first. */
-.ai-head { gap: var(--space-1); }
-.ai-head h2 { flex: 1 1 4rem; min-width: 4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-head .ai-machine { flex: 0 1 9rem; min-width: 6rem; max-width: 9rem; }
+.ai-head { gap: var(--space-1); min-width: 0; }
+.ai-head h2 { flex: 1 1 3.5rem; min-width: 3.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-head .ai-machine { flex: 0 1 8rem; min-width: 5.5rem; max-width: 8rem; }
+.ai-head .icon-btn { flex: none; width: 2.25rem; height: 2.25rem; }
 /* The composer keeps the conversation in view on a short screen. */
 :is(.ai-panel, .ai-sheet) .mx-field { max-height: min(200px, 25dvh); }
 /* A question's chat context and quoted messages: one muted line each above the bubble, opened on a tap. */
