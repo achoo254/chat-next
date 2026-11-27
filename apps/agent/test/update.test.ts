@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { archiveName, assetName, newestRelease, signedComment, termHostAssetName, trustedComment, unpackArchive, verifyMinisign } from "../src/update.ts";
+import { archiveName, assetName, captureAssetName, newestRelease, signedComment, termHostAssetName, trustedComment, unpackArchive, verifyMinisign } from "../src/update.ts";
 
 // The release script needs sh, tar and zip, which Windows lacks.
 const posix = process.platform !== "win32";
@@ -65,7 +65,9 @@ describe("release archives", () => {
     try {
       const dist = join(root, "dist");
       mkdirSync(dist);
-      const names = PLATFORMS.flatMap(([os, cpu]) => [assetName(os, cpu), termHostAssetName(os, cpu)]);
+      // tunelo-capture is built for macOS and Windows only.
+      const filesOf = (os: NodeJS.Platform, cpu: NodeJS.Architecture) => [assetName(os, cpu), termHostAssetName(os, cpu), captureAssetName(os, cpu)].filter((n): n is string => n !== undefined);
+      const names = PLATFORMS.flatMap(([os, cpu]) => filesOf(os, cpu));
       for (const name of names) {
         writeFileSync(join(dist, name), `${name} body`);
         writeFileSync(join(dist, `${name}.minisig`), `${name} signature`);
@@ -79,7 +81,7 @@ describe("release archives", () => {
         const archive = archiveName(os, cpu);
         expect(sums).toContain(`  ${archive}`);
         const files = unpackArchive(archive, new Uint8Array(readFileSync(join(root, "out", archive))));
-        const want = [assetName(os, cpu), termHostAssetName(os, cpu)];
+        const want = filesOf(os, cpu);
         expect([...files.keys()].sort()).toEqual([...want, ...want.map((n) => `${n}.minisig`)].sort());
         for (const name of want) {
           expect(new TextDecoder().decode(files.get(name))).toBe(`${name} body`);

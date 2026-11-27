@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TERM_HOST_BINARY, switchStagedTermHost } from "../src/terminal/host-supervisor.ts";
 import { type UpdateEnv, archiveName, assetName, rollback, signedComment, termHostAssetName, update } from "../src/update.ts";
@@ -197,6 +197,32 @@ describe("tunelo update", () => {
     expect(installed).toBe("3.0.1");
     expect(text(exe())).toBe("tunelo agent 3.0.1");
     expect(text(current())).toBe("tunelo-term-host 3.0.1");
+  });
+
+  it("puts the screenshot overlay next to tunelo when the release has it, its signature checked like the others", async () => {
+    const name = "tunelo-capture-darwin-arm64";
+    const body = bytes("tunelo-capture 3.0.1");
+    const withCapture = release(signer, "3.0.1", {
+      edit: (inner) => {
+        inner.set(name, body);
+        inner.set(`${name}.minisig`, bytes(signer.sign(body, signedComment("3.0.1", name))));
+      },
+    });
+    expect(await update(quiet, undefined, undefined, env([withCapture]))).toBe("3.0.1");
+    expect(text(join(dirname(exe()), "tunelo-capture"))).toBe("tunelo-capture 3.0.1");
+  });
+
+  it("installs nothing when the overlay's signature does not hold", async () => {
+    const name = "tunelo-capture-darwin-arm64";
+    const tampered = release(signer, "3.0.1", {
+      edit: (inner) => {
+        inner.set(name, bytes("not what was signed"));
+        inner.set(`${name}.minisig`, bytes(signer.sign(bytes("tunelo-capture 3.0.1"), signedComment("3.0.1", name))));
+      },
+    });
+    await expect(update(quiet, undefined, undefined, env([tampered]))).rejects.toThrow(/signature/);
+    expect(text(exe())).not.toBe("tunelo agent 3.0.1");
+    expect(existsSync(join(dirname(exe()), "tunelo-capture"))).toBe(false);
   });
 
   it("never updates to a test release (tunelo-v<version>-rc.<n>), even one not marked prerelease", async () => {

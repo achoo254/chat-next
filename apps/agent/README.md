@@ -313,6 +313,23 @@ Chỉ có trên macOS. Cho các hộp thoại của hệ điều hành mà trìn
 - `request_takeover(…, os_dialog: true)`: Claude báo hộp thoại hệ điều hành đang chờ; thẻ trên web đưa "Điều khiển toàn màn hình"
   lên đầu.
 
+## Chụp màn hình (`tunelo-capture`, 3.31.0)
+
+`tunelo-capture` (Rust, [`apps/capture`](../capture), [ADR 0031](../../docs/adr/0031-screen-capture.md)) chạy như tiến trình con của
+`tunelo` trên macOS và Windows, cài cạnh `tunelo` (gói phát hành, `tunelo update`, script cài). `tunelo` nói chuyện với nó qua stdin/stdout
+([giao thức](../../docs/capture-wire.md)) và tự chạy lại khi nó thoát.
+
+- **Phím tắt toàn cục** mặc định `Ctrl+Alt+A` (⌃⌥A trên Mac): chụp đóng băng mọi màn hình, kéo chọn vùng, chú thích (khung, mũi tên, bút, chữ,
+  làm mờ), ảnh vào clipboard. Đổi bằng `tunelo config capture-hotkey <phím>` (ví dụ `⌘⇧4`, `ctrl+shift+s`); `off` tắt, `default` về mặc định,
+  không đối số thì in phím hiện tại. `tunelo` đang chạy nhận thay đổi trong vài giây (tệp `capture.json` trong thư mục cấu hình).
+- **Nút Chụp màn hình trong ô soạn tin của Chat** gọi `tunelo-capture` của máy đang dùng (trình duyệt nhớ máy; tự chọn khi chỉ một máy cùng hệ
+  điều hành đang online), ảnh về khay của chat qua kết nối mã hoá. Máy không có `tunelo-capture` thì Chat dùng chụp của trình duyệt.
+- **macOS**: lần chụp đầu macOS hỏi quyền **Ghi màn hình** cho `tunelo` (Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Ghi màn hình và âm thanh
+  hệ thống). Binary ký Developer ID với identifier `com.hoandat.tunelo.capture` (ghim trong `macos/designated-requirements.txt`), nên quyền giữ
+  nguyên qua các bản cập nhật. Gõ tiếng Việt bằng bộ gõ của macOS (Telex, VNI) trong công cụ Chữ.
+- **Windows**: bản chưa ký Authenticode; lần đầu SmartScreen/Defender có thể cảnh báo, chọn "Run anyway"/cho phép như với `tunelo.exe`.
+- Tắt hẳn: ghi `{"enabled": false}` vào `capture.json` trong thư mục cấu hình của `tunelo`.
+
 ## Bảng phải của workspace: Explorer và Source Control (2.7.0)
 
 Thiết bị xem tệp và git của một workspace (một dự án của máy) qua kênh mã hoá đầu cuối: các yêu cầu `Ws*` trong

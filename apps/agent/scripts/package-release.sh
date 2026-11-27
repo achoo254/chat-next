@@ -7,7 +7,8 @@
 #   tunelo-windows-x64.zip
 #
 # Each holds tunelo and tunelo-term-host of that platform under their release
-# names (tunelo-darwin-arm64, tunelo-term-host-darwin-arm64, …) and, with
+# names (tunelo-darwin-arm64, tunelo-term-host-darwin-arm64, …), on macOS and
+# Windows also tunelo-capture (tunelo-capture-darwin-arm64, …), and, with
 # --signed, the .minisig of each next to it. Then writes SHA256SUMS of the
 # archives into the output folder.
 #
@@ -31,6 +32,13 @@ files_of() {
 	case "$1" in windows-*) ext=".exe" ;; esac
 	names="tunelo-$1$ext tunelo-term-host-$1$ext"
 	if [ "$signed" = "--signed" ]; then names="$names tunelo-$1$ext.minisig tunelo-term-host-$1$ext.minisig"; fi
+	# The screenshot overlay is built for macOS and Windows only (ADR 0031).
+	case "$1" in
+	darwin-* | windows-*)
+		names="$names tunelo-capture-$1$ext"
+		if [ "$signed" = "--signed" ]; then names="$names tunelo-capture-$1$ext.minisig"; fi
+		;;
+	esac
 	printf '%s\n' "$names"
 }
 
@@ -55,7 +63,9 @@ for platform in $PLATFORMS; do
 	rm -f "$out/$archive"
 	# shellcheck disable=SC2046 # the file names have no spaces
 	set -- $(files_of "$platform")
-	chmod 0755 "$dist/$1" "$dist/$2"
+	for f in "$@"; do
+		case "$f" in *.minisig) ;; *) chmod 0755 "$dist/$f" ;; esac
+	done
 	case "$platform" in
 	windows-*) (cd "$dist" && zip -q -X "$out/$archive" "$@") ;;
 	*) tar -C "$dist" --format=ustar -czf "$out/$archive" "$@" ;;

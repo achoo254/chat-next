@@ -3,8 +3,9 @@
 // after `$NAME` as part of the name, so "$VERSION…" stops the script with
 // "unbound variable". Every variable before non-ASCII text must use ${NAME}.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const script = readFileSync(resolve(process.cwd(), "public/agent/install.sh"), "latin1");
@@ -60,5 +61,46 @@ describe("install.sh picks the build for the system", () => {
 		const r = pickAsset("Linux", "x86_64", 'SHA256_LINUX_X64=""');
 		expect(r.status).toBe(1);
 		expect(r.err).toMatch(/has no Linux build yet/);
+	});
+
+	describe("the screenshot overlay (tunelo-capture)", () => {
+		/** Runs fetch_capture on an archive holding `names`; prints what it unpacked. */
+		function fetchCapture(names: string[]): { status: number | null; out: string } {
+			const tmp = mkdtempSync(join(tmpdir(), "install-capture-"));
+			try {
+				const files = join(tmp, "files");
+				mkdirSync(files);
+				for (const n of names) writeFileSync(join(files, n), n);
+				spawnSync("tar", ["-czf", join(tmp, "tunelo-darwin-arm64.tar.gz"), "-C", files, ...names]);
+				mkdirSync(join(tmp, "unpacked"));
+				const code = [
+					"lang=en",
+					fn("say"),
+					fn("die"),
+					fn("fetch_capture"),
+					// No minisign here: the signature check is the script's own, tested by the release.
+					"check_signature() { :; }",
+					`tmp="${tmp}"; archive=tunelo-darwin-arm64.tar.gz; asset=tunelo-darwin-arm64; unpacked="${tmp}/unpacked"`,
+					'fetch_capture; printf "%s|" "$capture_asset"; ls "$unpacked"',
+				].join("\n");
+				const r = spawnSync("sh", ["-c", code], { encoding: "utf8", env: { ...process.env, PATH: "/usr/bin:/bin" } });
+				return { status: r.status, out: r.stdout };
+			} finally {
+				rmSync(tmp, { recursive: true, force: true });
+			}
+		}
+
+		it("is unpacked when the release has it", () => {
+			const r = fetchCapture(["tunelo-darwin-arm64", "tunelo-capture-darwin-arm64", "tunelo-capture-darwin-arm64.minisig"]);
+			expect(r.status).toBe(0);
+			expect(r.out.split("|")[0]).toBe("tunelo-capture-darwin-arm64");
+			expect(r.out).toContain("tunelo-capture-darwin-arm64.minisig");
+		});
+
+		it("is left out without an error when the release came before it", () => {
+			const r = fetchCapture(["tunelo-darwin-arm64"]);
+			expect(r.status).toBe(0);
+			expect(r.out).toBe("|");
+		});
 	});
 });

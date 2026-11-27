@@ -8,7 +8,10 @@
 // version) and is staged in `<config>/term-host/bin/next/`, where the agent's
 // supervisor (terminal/host-supervisor.ts) switches to it once no terminal
 // runs; then tunelo's own file is swapped (the previous one kept as
-// `<file>.old`) and the service restarts itself. `tunelo update --rollback`
+// `<file>.old`) and the service restarts itself. On macOS and Windows the
+// archive also holds tunelo-capture (the screenshot overlay, ADR 0031): its
+// signature is checked too and it goes next to tunelo; a failure there is
+// logged and leaves the update done. `tunelo update --rollback`
 // puts the previous release back the same way, from that release's archive.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -81,6 +84,12 @@ export function assetName(os = platform(), cpu = arch()): string {
 /** The release file of the terminal process for the same platform as `assetName`. */
 export function termHostAssetName(os = platform(), cpu = arch()): string {
   return assetName(os, cpu).replace(/^tunelo-/, "tunelo-term-host-");
+}
+
+/** The screenshot overlay's release file for the same platform; none where it is not built (Linux). */
+export function captureAssetName(os = platform(), cpu = arch()): string | undefined {
+  if (os !== "darwin" && os !== "win32") return undefined;
+  return assetName(os, cpu).replace(/^tunelo-/, "tunelo-capture-");
 }
 
 /**
@@ -247,7 +256,9 @@ type Resolved = {
   currentVersion: string;
   agentAsset: string;
   hostAsset: string;
-  /** The release archive holding both. */
+  /** The screenshot overlay's file in the archive (macOS, Windows). */
+  captureAsset: string | undefined;
+  /** The release archive holding them. */
   archive: string;
   /** The terminal process's file name on this OS. */
   hostBinary: string;
@@ -274,6 +285,7 @@ async function resolveEnv(env: UpdateEnv): Promise<Resolved> {
     currentVersion: env.currentVersion ?? AGENT_VERSION,
     agentAsset: assetName(env.os, env.cpu),
     hostAsset: termHostAssetName(env.os, env.cpu),
+    captureAsset: captureAssetName(env.os, env.cpu),
     archive: archiveName(env.os, env.cpu),
     hostBinary: TERM_HOST_BINARY,
     binDir: join(termHostDir(dir), "bin"),
@@ -572,7 +584,7 @@ function swapAgent(exe: string, incoming: string, aside: string): void {
   }
 }
 
-type Verified = { agent: Uint8Array; host: Uint8Array; hostSig: string };
+type Verified = { agent: Uint8Array; host: Uint8Array; hostSig: string; capture?: Uint8Array };
 
 /** One file of an unpacked release archive; throws when the archive lacks it. */
 function archiveEntry(files: Map<string, Uint8Array>, r: Resolved, version: string, name: string): Uint8Array {
@@ -619,7 +631,29 @@ async function downloadVerified(
   const hostSig = decode(archiveEntry(files, r, version, `${r.hostAsset}.minisig`));
   checkSignature(agent, decode(archiveEntry(files, r, version, `${r.agentAsset}.minisig`)), version, r.agentAsset, r.pubkey);
   checkSignature(host, hostSig, version, r.hostAsset, r.pubkey);
-  return { agent, host, hostSig };
+  // A release before tunelo-capture (or a platform without it) has none: nothing to install for it.
+  const capture = r.captureAsset === undefined ? undefined : files.get(r.captureAsset);
+  if (capture !== undefined && r.captureAsset !== undefined) {
+    checkSignature(capture, decode(archiveEntry(files, r, version, `${r.captureAsset}.minisig`)), version, r.captureAsset, r.pubkey);
+  }
+  return { agent, host, hostSig, ...(capture === undefined ? {} : { capture }) };
+}
+
+/**
+ * Puts the verified screenshot overlay next to tunelo. A running one (tunelo's
+ * child) is renamed aside first, as Windows will not overwrite a running file;
+ * tunelo starts the new one when it restarts.
+ */
+function installCapture(r: Resolved, bytes: Uint8Array): void {
+  const target = join(dirname(r.execPath), r.captureAsset?.endsWith(".exe") ? "tunelo-capture.exe" : "tunelo-capture");
+  const incoming = `${target}.new`;
+  writeChecked(incoming, bytes, 0o755);
+  if (!existsSync(target)) {
+    renameSync(incoming, target);
+    return;
+  }
+  removeIfUnlocked(`${target}.old`);
+  swapAgent(target, incoming, existsSync(`${target}.old`) ? `${target}.old-${Date.now()}` : `${target}.old`);
 }
 
 /**
@@ -686,6 +720,14 @@ export async function update(
       // The terminal process goes back to the release of the running tunelo.
       unpointTermHost(r, pointed, r.currentVersion, log);
       throw err;
+    }
+    if (verified.capture !== undefined) {
+      try {
+        installCapture(r, verified.capture);
+      } catch (err) {
+        // tunelo itself is updated; screenshots keep the previous overlay (or none).
+        log(`could not install the screenshot overlay (${(err as Error).message})`);
+      }
     }
     try {
       writeRollbackRecord(r, { from: r.currentVersion, to: version });

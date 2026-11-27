@@ -1,5 +1,6 @@
 # Releases tunelo, the background agent (apps/agent), on a tag tunelo-v<semver>, with
-# tunelo-term-host, the process that keeps the machine's terminals (apps/term-host, Rust):
+# tunelo-term-host, the process that keeps the machine's terminals (apps/term-host, Rust),
+# and tunelo-capture, its screenshot overlay (apps/capture, Rust; macOS and Windows only, ADR 0031):
 # tests; single-file builds of tunelo for macOS (arm64, x64), Windows x64 and
 # Linux (x64, arm64; glibc), cross-compiled by Bun on Linux; native Rust builds
 # of tunelo-term-host for the same five platforms; the macOS files signed with
@@ -204,8 +205,54 @@ jobs:
 
   # A stable signature: macOS ties Full Disk Access to the team and identifier
   # instead of to each build's hash. Signed before the checksums and minisign.
+  # tunelo-capture (screenshots, ADR 0031): macOS and Windows only for now; its
+  # Linux build waits for the overlay's X11/Wayland work.
+  build-capture:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, suffix: darwin-arm64, os: macos-15 }
+          - { target: x86_64-apple-darwin, suffix: darwin-x64, os: macos-15 }
+          - { target: x86_64-pc-windows-msvc, suffix: windows-x64.exe, os: windows-2022 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      ASSET: ${{ needs.test.outputs.prefix }}-capture-${{ matrix.suffix }}
+      CARGO_TERM_COLOR: never
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: "-C target-feature=+crt-static"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          sparse-checkout: apps/capture
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target "${{ matrix.target }}"
+          rustup override set "$RUST_TOOLCHAIN" --path apps/capture
+      - name: Build
+        working-directory: apps/capture
+        run: cargo build --locked --release --target "${{ matrix.target }}" --bin tunelo-capture
+      - name: Collect
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          ext=""
+          case "${{ matrix.target }}" in *windows*) ext=".exe" ;; esac
+          cp "apps/capture/target/${{ matrix.target }}/release/tunelo-capture$ext" "dist/$ASSET"
+          ls -l "dist/$ASSET"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.ASSET }}
+          path: dist/${{ env.ASSET }}
+
   sign-macos:
-    needs: [test, build, build-term-host]
+    needs: [test, build, build-term-host, build-capture]
     if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
     # The signing secrets live in this environment, which only runs for release tags (tunelo-v*), never for a branch.
@@ -218,7 +265,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           sparse-checkout: apps/agent/macos
-      # tunelo-darwin-* and tunelo-term-host-darwin-*.
+      # tunelo-darwin-*, tunelo-term-host-darwin-* and tunelo-capture-darwin-*.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: ${{ needs.test.outputs.prefix }}-*darwin-*
@@ -259,6 +306,10 @@ jobs:
           for f in dist/"$PREFIX"-term-host-darwin-*; do
             sign "$f" com.hoandat.tunelo.term-host
           done
+          # Its Screen Recording permission follows the same designated requirement across updates.
+          for f in dist/"$PREFIX"-capture-darwin-*; do
+            sign "$f" com.hoandat.tunelo.capture
+          done
           # macOS keeps the Full Disk Access a user granted only while the program's designated requirement
           # (identifier, Apple anchor, team) stays the same across updates. The values are pinned in
           # apps/agent/macos/designated-requirements.txt; a change (another certificate, identifier or way
@@ -276,6 +327,7 @@ jobs:
           }
           for f in dist/"$PREFIX"-darwin-*; do check_requirement "$f" tunelo; done
           for f in dist/"$PREFIX"-term-host-darwin-*; do check_requirement "$f" term-host; done
+          for f in dist/"$PREFIX"-capture-darwin-*; do check_requirement "$f" capture; done
           # Runs under the hardened runtime (Bun's JIT needs the entitlements).
           "dist/$PREFIX-darwin-arm64" --version
       - name: Notarize
@@ -325,10 +377,20 @@ jobs:
           name: ${{ needs.test.outputs.prefix }}-term-host-darwin-x64
           path: dist/${{ needs.test.outputs.prefix }}-term-host-darwin-x64
           overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.test.outputs.prefix }}-capture-darwin-arm64
+          path: dist/${{ needs.test.outputs.prefix }}-capture-darwin-arm64
+          overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ needs.test.outputs.prefix }}-capture-darwin-x64
+          path: dist/${{ needs.test.outputs.prefix }}-capture-darwin-x64
+          overwrite: true
 
   release:
     # Dry run only (workflow_dispatch): archives and checksums of the unsigned files, no secret, no environment.
-    needs: [test, build, build-term-host]
+    needs: [test, build, build-term-host, build-capture]
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -355,7 +417,7 @@ jobs:
           path: out/
 
   publish:
-    needs: [test, build, build-term-host, sign-macos]
+    needs: [test, build, build-term-host, build-capture, sign-macos]
     if: github.event_name != 'workflow_dispatch'
     # Holds the minisign key: only for release tags (tunelo-v*).
     environment: release
@@ -399,6 +461,7 @@ jobs:
             archives="$archives $PREFIX-$p.tar.gz"
           done
           files="$files $PREFIX-windows-x64.exe $PREFIX-term-host-windows-x64.exe"
+          files="$files $PREFIX-capture-darwin-arm64 $PREFIX-capture-darwin-x64 $PREFIX-capture-windows-x64.exe"
           archives="$archives $PREFIX-windows-x64.zip"
           # shellcheck disable=SC2086 # the file names have no spaces
           sign dist $files
@@ -430,4 +493,4 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then flags="$flags --prerelease"; fi
           # shellcheck disable=SC2086
           gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "$PREFIX $VERSION" $flags \
-            --notes "Background agent of My machines and its terminal process, one archive per platform. Install from the web page; verify with SHA256SUMS and the .minisig files."
+            --notes "Background agent of My machines, its terminal process and (macOS, Windows) its screenshot overlay, one archive per platform. Install from the web page; verify with SHA256SUMS and the .minisig files."

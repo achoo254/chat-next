@@ -179,6 +179,13 @@
 		}
 		# A running terminal process keeps running from its renamed file; open shells stay.
 		Install-File $hostFile (Join-Path $dir 'tunelo-term-host.exe')
+		# The screenshot overlay (ADR 0031), when the release has it; checked like the others.
+		$captureFile = Join-Path $unpacked 'tunelo-capture-windows-x64.exe'
+		if (Test-Path -LiteralPath $captureFile) {
+			$minisign = Get-Command minisign -ErrorAction SilentlyContinue
+			if ($minisign) { Test-Signature $minisign.Source $captureFile }
+			Install-File $captureFile (Join-Path $dir 'tunelo-capture.exe')
+		}
 		# Put tunelo on the user's PATH (no admin); new terminals see it.
 		$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 		if (-not (($userPath -split ';') -contains $dir)) {

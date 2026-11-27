@@ -112,6 +112,19 @@ fetch_release() {
 	fi
 }
 
+# The screenshot overlay (macOS, ADR 0031), when the release has it: unpacked
+# and checked like the others; a release before it installs without it.
+fetch_capture() {
+	capture_asset="tunelo-capture-${asset#tunelo-}"
+	if ! tar -tzf "${tmp}/${archive}" | grep -qx "$capture_asset"; then
+		capture_asset=""
+		return 0
+	fi
+	tar -xzf "${tmp}/${archive}" -C "$unpacked" "$capture_asset" "${capture_asset}.minisig" ||
+		die "không giải nén được ${archive}; đã huỷ cài đặt." "could not unpack ${archive}; nothing was installed." "无法解压 ${archive}；未安装任何内容。"
+	if command -v minisign >/dev/null 2>&1; then check_signature "${unpacked}/${capture_asset}"; fi
+}
+
 # A terminal process `tunelo update` put into the config folder comes before
 # the one next to tunelo: stage the new one there too (with its signature,
 # which names its version); tunelo switches to it once no terminal is open.
@@ -168,6 +181,7 @@ main() {
 	trap 'exit 130' INT TERM
 	say "Đang tải tunelo ${TUNELO_VERSION}…" "Downloading tunelo ${TUNELO_VERSION}…" "正在下载 tunelo ${TUNELO_VERSION}…"
 	fetch_release
+	fetch_capture
 
 	bin_dir="$HOME/.local/bin"
 	bin="$bin_dir/tunelo"
@@ -183,6 +197,12 @@ main() {
 	cp "${unpacked}/${host_asset}" "${bin_dir}/tunelo-term-host.new"
 	mv -f "${bin_dir}/tunelo-term-host.new" "${bin_dir}/tunelo-term-host"
 	stage_term_host
+	# tunelo starts the overlay from next to itself; a running one keeps its old file until tunelo restarts.
+	if [ -n "$capture_asset" ]; then
+		chmod 0755 "${unpacked}/${capture_asset}"
+		cp "${unpacked}/${capture_asset}" "${bin_dir}/tunelo-capture.new"
+		mv -f "${bin_dir}/tunelo-capture.new" "${bin_dir}/tunelo-capture"
+	fi
 
 	# Put tunelo on PATH for new terminals: zsh is the macOS default shell;
 	# Linux login shells read ~/.profile, interactive bash ~/.bashrc.
