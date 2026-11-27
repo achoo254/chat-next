@@ -42,6 +42,8 @@ button.round-btn:hover { background: color-mix(in srgb, var(--c-text) 70%, trans
 /* Animated sticker (.tgs): a square the animation fits into, no card around it. */
 .animated-sticker { width: min(180px, 100%); aspect-ratio: 1; }
 .animated-sticker canvas { display: block; width: 100%; height: 100%; }
+.video-sticker { width: min(180px, 100%); aspect-ratio: 1; }
+.video-sticker-clip { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 /* ---------- File cards ---------- */
 /* The card fills its bubble, so the download button sits at the bubble's right edge. Its own

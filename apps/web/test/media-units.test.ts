@@ -10,6 +10,7 @@ import {
 	formatBytes,
 	formatDuration,
 	formatProgress,
+	isVideoSticker,
 	percent,
 	planSends,
 	sendKind,
@@ -150,5 +151,15 @@ describe("shared media", () => {
 		expect(shared.photos.map((m) => m.seq)).toEqual([5, 1]);
 		expect(shared.files.map((m) => m.seq)).toEqual([2]);
 		expect(shared.links).toEqual([{ url, title: "Wiki vận hành", host: "wiki.hoandat.com", seq: 4, fromId: 2 }]);
+	});
+});
+
+describe("isVideoSticker", () => {
+	it("tells a stored video sticker from an ordinary video", () => {
+		expect(isVideoSticker({ kind: "video", mimeType: "video/webm", fileName: "sticker.webm" })).toBe(true);
+		expect(isVideoSticker({ kind: "video", mimeType: "video/webm", fileName: "Sticker.WEBM" })).toBe(true);
+		expect(isVideoSticker({ kind: "video", mimeType: "video/mp4", fileName: "sticker.mp4" })).toBe(false);
+		expect(isVideoSticker({ kind: "video", mimeType: "video/webm", fileName: "holiday.webm" })).toBe(false);
+		expect(isVideoSticker({ kind: "document", mimeType: "video/webm", fileName: "sticker.webm" })).toBe(false);
 	});
 });

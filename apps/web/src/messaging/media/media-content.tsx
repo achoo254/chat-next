@@ -14,7 +14,8 @@ import { useConnection, useItem, useServices } from "../data/services.tsx";
 import { AnimatedSticker } from "./animated-sticker.tsx";
 import { boxStyle, isVisual, mediaBox } from "./box.ts";
 import { downloadMedia } from "./download.ts";
-import { fileExt, formatBytes, isAnimatedSticker, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
+import { VideoFrame, FRAME_MAX_BYTES } from "./video-frame.tsx";
+import { fileExt, formatBytes, isAnimatedSticker, isVideoSticker, formatDuration, formatProgress, percent, waveformBars } from "./media-format.ts";
 import { MediaIcon } from "./media-icons.tsx";
 import { viewer } from "./media-state.ts";
 import { useMediaFile, useNearViewport, usePendingFileUrl, useUploadProgress } from "./use-media.ts";
@@ -86,6 +87,9 @@ export function PictureView({ chatId, seq, media, size: wantedSize, cell = false
 	return (
 		<div ref={ref} className={video ? "media-pic video" : "media-pic"} style={style}>
 			<PictureLayers thumb={inlineThumbUrl(media.inlineThumb)} url={state.status === "ok" ? state.url : null} />
+			{video && size === undefined && media.size <= FRAME_MAX_BYTES && (
+				<VideoFrame chatId={chatId} seq={seq} media={media} enabled={near} loop={false} className="pic-full" />
+			)}
 			<button type="button" className="pic-open" aria-label={video ? copy.media.playVideo(media.duration) : label} onClick={() => viewer.set({ chatId, seq })}>
 				{video && (
 					<span className="round-btn" aria-hidden="true">
@@ -269,6 +273,19 @@ function VoicePlayer({ chatId, seq, media }: { chatId: number; seq: number; medi
 
 // ------------------------------------------------------------- messages
 
+/** A video sticker: the clip loops in place with no frame; one that cannot play shows as a video. */
+function VideoSticker({ chatId, seq, media, label }: { chatId: number; seq: number; media: MediaRef; label: string }) {
+	const copy = useMediaCopy();
+	const [ref, near] = useNearViewport();
+	const [failed, setFailed] = useState(false);
+	if (failed) return <PictureView chatId={chatId} seq={seq} media={media} label={label} />;
+	return (
+		<div ref={ref} className="video-sticker" role="img" aria-label={copy.media.sticker}>
+			<VideoFrame chatId={chatId} seq={seq} media={media} enabled={near} loop className="video-sticker-clip" onFailed={() => setFailed(true)} />
+		</div>
+	);
+}
+
 /** The file of one message, by kind. */
 export function MessageMedia({ message }: { message: StoredMessage }) {
 	const copy = useMediaCopy();
@@ -276,7 +293,9 @@ export function MessageMedia({ message }: { message: StoredMessage }) {
 	if (media === undefined) return null;
 	switch (media.kind) {
 		case "photo":
+			return <PictureView chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 		case "video":
+			if (isVideoSticker(media)) return <VideoSticker chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 			return <PictureView chatId={message.chatId} seq={message.seq} media={media} label={copy.media.open} />;
 		case "voice":
 		case "audio":

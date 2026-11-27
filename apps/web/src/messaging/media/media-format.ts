@@ -60,6 +60,11 @@ export function isAnimatedSticker(media: { readonly kind: string; readonly fileN
 	return media.kind === "document" && media.fileName.toLowerCase().endsWith(".tgs");
 }
 
+/** A Telegram video sticker: a WebM clip the bridge stores as sticker.webm; it plays in place, without a player. */
+export function isVideoSticker(media: { readonly kind: string; readonly mimeType: string; readonly fileName: string }): boolean {
+	return media.kind === "video" && media.mimeType === "video/webm" && media.fileName.toLowerCase().startsWith("sticker.");
+}
+
 /** Raster images the browser shows and the server accepts as photos. */
 const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
