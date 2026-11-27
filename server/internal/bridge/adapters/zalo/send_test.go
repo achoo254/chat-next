@@ -226,11 +226,11 @@ func TestSendRefusesWhatZaloSendingDoesNotTake(t *testing.T) {
 	topic := out(1, "x")
 	topic.Topic = "5"
 	for name, m := range map[string]bridge.OutMessage{
-		"empty":    out(1, ""),
-		"too long": out(1, strings.Repeat("ê", maxTextRunes+1)),
-		"bad utf8": out(1, "\xff"),
-		"media":    media,
-		"topic":    topic,
+		"empty":      out(1, ""),
+		"too long":   out(1, strings.Repeat("ê", maxTextRunes+1)),
+		"bad utf8":   out(1, "\xff"),
+		"media":      media,
+		"topic":      topic,
 		"not a chat": {Conversation: "gabc", Text: "x", RandomID: 1},
 	} {
 		if _, err := send(t, a, m); !errors.Is(err, bridge.ErrNotAllowed) {
