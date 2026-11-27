@@ -91,6 +91,7 @@ export const zhCNMachines: MachinesCopy = {
 			empty: "最近 30 天没有需要改进的习惯。",
 			count: (n) => `${n} 个会话 / 30 天`,
 			weeks: "最近 5 周",
+			week: (ago, n) => `${ago === 0 ? "本周" : `${ago} 周前`}：${n} 个会话`,
 			up: "上升",
 			down: "下降",
 			flat: "平稳",

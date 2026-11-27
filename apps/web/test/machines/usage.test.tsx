@@ -411,6 +411,18 @@ describe("the Hiệu quả page", () => {
 		const outcome = within(page()).getByRole("region", { name: u.outcome.title });
 		expect(outcome.textContent).toContain(u.outcome.commits);
 		expect(outcome.textContent).toContain("50%");
+		// The chart and the habit trend say their numbers in a tip; the arrow keys pick the point.
+		const chart = within(page()).getByRole("region", { name: u.chart.title });
+		within(chart).getByRole("img").focus();
+		await userEvent.keyboard("{ArrowLeft}");
+		const [, m, d] = today.split("-");
+		expect(within(chart).getByRole("status").textContent).toMatch(new RegExp(`^${Number(d)}/${Number(m)}: `));
+		const trend = within(habits).getAllByRole("img", { name: new RegExp(`^${u.habits.weeks}`) })[0];
+		trend?.focus();
+		await userEvent.keyboard("{ArrowLeft}");
+		expect(within(habits).getByRole("status").textContent).toBe(u.habits.week(0, trend?.getAttribute("aria-label")?.split(", ").at(-1) ?? ""));
+		await userEvent.keyboard("{Escape}");
+		expect(within(habits).queryByRole("status")).toBeNull();
 	});
 
 	it("is opened from the project's menu, on the project's repository", async () => {

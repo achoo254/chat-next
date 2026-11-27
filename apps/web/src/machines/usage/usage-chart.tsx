@@ -2,10 +2,12 @@
 // band per repository or model (usage-insights.ts seriesOf), in calls,
 // context tokens or (from tunelo 3.30.0) cost. Drawn as plain SVG: one chart
 // is not worth a charting library. Each bar's total is its title, and the
-// legend names the bands.
+// legend names the bands. Hovering (or touching, or arrowing to) a day shows
+// its total and each band's share in a tip (chart-tip.tsx).
 import type { UsageReport } from "@achoo254/chat-proto/remote/remote";
 import { useState } from "react";
 import { useMachinesCopy } from "../use-machines-copy.ts";
+import { ChartTip, useChartHover } from "./chart-tip.tsx";
 import { count, tokens, usd } from "./usage-format.ts";
 import { type ChartMetric, type GroupBy, OTHER, seriesOf } from "./usage-insights.ts";
 
@@ -40,6 +42,11 @@ export function UsageChart({ report, repoKey, today, rich }: ChartProps) {
 		const [, m = "", d = ""] = day.split("-");
 		return `${Number(d)}/${Number(m)}`;
 	};
+	const hover = useChartHover(s.days.length, (f) => {
+		const i = Math.floor((f * W - PAD_LEFT) / bw);
+		return i >= 0 && i < s.days.length ? i : null;
+	});
+	const hi = hover.index;
 	const metrics: { key: ChartMetric; label: string }[] = [
 		...(rich ? [{ key: "cost" as const, label: c.cost }] : []),
 		{ key: "context", label: c.context },
@@ -62,7 +69,9 @@ export function UsageChart({ report, repoKey, today, rich }: ChartProps) {
 				)}
 				<Segmented label={c.title} value={metric} options={metrics} onChange={setMetric} />
 			</div>
-			<svg className="mx-usage-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={c.label(metrics.find((m) => m.key === metric)?.label ?? "")}>
+			<div className="mx-usage-plot">
+			<svg className="mx-usage-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={c.label(metrics.find((m) => m.key === metric)?.label ?? "")} {...hover.svgProps}>
+				{hi !== null && <rect className="mx-usage-hover" x={PAD_LEFT + hi * bw} y={PAD_TOP} width={bw} height={plotH} />}
 				{[0, 0.5, 1].map((f) => {
 					const y = PAD_TOP + plotH * (1 - f);
 					return (
@@ -78,7 +87,6 @@ export function UsageChart({ report, repoKey, today, rich }: ChartProps) {
 					let y = H - PAD_BOTTOM;
 					return (
 						<g key={day}>
-							<title>{c.dayTotal(dayLabel(day), fmt(totals[i] ?? 0))}</title>
 							{(s.values[i] ?? []).map((v, g) => {
 								const h = (v / max) * plotH;
 								y -= h;
@@ -93,6 +101,23 @@ export function UsageChart({ report, repoKey, today, rich }: ChartProps) {
 					);
 				})}
 			</svg>
+			{hi !== null && (
+				<ChartTip fraction={(PAD_LEFT + (hi + 0.5) * bw) / W}>
+					<b>{c.dayTotal(dayLabel(s.days[hi] ?? ""), fmt(totals[hi] ?? 0))}</b>
+					{s.groups.length > 1 &&
+						s.groups.map((g, gi) => {
+							const v = s.values[hi]?.[gi] ?? 0;
+							return v > 0 ? (
+								<span key={g} className="mx-usage-tip-row">
+									<i className={`mx-usage-c${gi}`} aria-hidden="true" />
+									<span className="mx-usage-tip-name">{name(g)}</span>
+									<span>{fmt(v)}</span>
+								</span>
+							) : null;
+						})}
+				</ChartTip>
+			)}
+			</div>
 			<ul className="mx-usage-legend">
 				{s.groups.map((g, i) => (
 					<li key={g}>

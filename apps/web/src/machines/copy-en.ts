@@ -91,6 +91,7 @@ export const enMachines: MachinesCopy = {
 			empty: "No habit to fix in the last 30 days.",
 			count: (n) => `${n} sessions / 30 days`,
 			weeks: "Last 5 weeks",
+			week: (ago, n) => `${ago === 0 ? "This week" : ago === 1 ? "1 week ago" : `${ago} weeks ago`}: ${n} sessions`,
 			up: "rising",
 			down: "falling",
 			flat: "steady",

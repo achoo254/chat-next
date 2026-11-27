@@ -42,6 +42,14 @@
 .mx-usage-c2 { fill: var(--c-success); background: var(--c-success); }
 .mx-usage-c3 { fill: var(--c-warning); background: var(--c-warning); }
 .mx-usage-c4 { fill: var(--c-text-muted); background: var(--c-text-muted); }
+.mx-usage-plot { position: relative; }
+.mx-usage-plot > svg { touch-action: pan-y; cursor: crosshair; }
+.mx-usage-plot > svg:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+.mx-usage-hover { fill: var(--c-hover); }
+.mx-usage-tip { position: absolute; bottom: calc(100% + 4px); z-index: 5; display: grid; gap: 2px; min-width: max-content; max-width: 280px; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--c-text); color: var(--c-surface); font-size: 0.75rem; line-height: 1.4; font-variant-numeric: tabular-nums; box-shadow: var(--shadow-md); pointer-events: none; }
+.mx-usage-tip-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.mx-usage-tip-row i { width: 10px; height: 10px; border-radius: 3px; }
+.mx-usage-tip-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mx-usage-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; padding: 0; list-style: none; font-size: 0.8125rem; color: var(--c-text-muted); }
 .mx-usage-legend li { display: inline-flex; align-items: center; gap: var(--space-1); overflow-wrap: anywhere; }
 .mx-usage-legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
@@ -71,6 +79,8 @@
 .mx-usage-excess { color: var(--c-warning-text); font-weight: 500; }
 .mx-usage-spark { margin: 0; display: grid; gap: 2px; }
 .mx-usage-spark svg { width: 100%; height: 28px; }
+.mx-usage-spark-cursor { stroke: var(--c-border-subtle); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.mx-usage-spark-dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--c-primary); box-shadow: 0 0 0 2px var(--c-surface); pointer-events: none; }
 .mx-usage-spark polyline { fill: none; stroke: var(--c-primary); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .mx-usage-top { display: grid; margin: 0; padding: 0; list-style: none; }
 .mx-usage-top li { display: grid; gap: 2px; padding: var(--space-2) 0; border-top: 1px dashed var(--c-border-subtle); }

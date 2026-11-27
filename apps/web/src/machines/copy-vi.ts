@@ -97,6 +97,7 @@ export const viMachines = {
 			empty: "Không có thói quen nào cần sửa trong 30 ngày.",
 			count: (n: string) => `${n} phiên / 30 ngày`,
 			weeks: "5 tuần gần nhất",
+			week: (ago: number, n: string) => `${ago === 0 ? "Tuần này" : `${ago} tuần trước`}: ${n} phiên`,
 			up: "tăng",
 			down: "giảm",
 			flat: "ổn định",
