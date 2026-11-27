@@ -677,6 +677,12 @@ export const enScreens: ScreensCopy = {
 	},
 	aiPanel: {
 		title: "AI",
+		titleFor: (chat: string) => `AI · ${chat}`,
+		newSession: "New session",
+		newSessionHint: "Start a new session; the current one is archived",
+		newSessionFailed: "Could not start a new session. Try again later.",
+		openInAgent: "Open the session in AI Agent",
+		details: "Model, permissions and usage",
 		label: (chat: string) => `AI for the conversation ${chat}`,
 		close: "Close AI",
 		resize: "Resize the AI panel",

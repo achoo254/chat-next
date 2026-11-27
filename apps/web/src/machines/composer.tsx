@@ -58,6 +58,11 @@ interface ComposerProps {
 	onFilled?: ((id: number) => void) | undefined;
 	onSend: (text: string, files: readonly ShownAttachment[]) => Promise<void>;
 	onStop: () => Promise<void>;
+	/**
+	 * A message sent while a turn runs waits on the machine and goes after it (the Chat app's AI panel); without it the
+	 * box holds until the turn ends. The button stops the turn while the box is empty, and sends once it has text.
+	 */
+	queue?: boolean | undefined;
 }
 
 const MENTION_DELAY_MS = 150;
@@ -79,7 +84,7 @@ interface Found {
 	readonly listing: FileListing;
 }
 
-export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, focusKey, fill, onFilled, onSend, onStop }: ComposerProps) {
+export function Composer({ ai, machine, online, running, prompting, commands, listFiles, attach, focusKey, fill, onFilled, onSend, onStop, queue = false }: ComposerProps) {
 	const t = useMachinesCopy();
 	const [text, setText] = useState("");
 	// Text from outside comes into the box once per id (state kept from render, as React allows); the caret follows.
@@ -116,9 +121,10 @@ export function Composer({ ai, machine, online, running, prompting, commands, li
 	const optionId = (i: number) => `${listId}-${i}`;
 	const filesReady = attach !== undefined && attach.items.length > 0 && !attach.busy && !attach.failed;
 	const filesWaiting = attach !== undefined && (attach.busy || attach.failed);
-	// A turn in progress holds the box: stop it or wait, no new message meanwhile.
-	const stopMode = running;
-	const canSend = online && !running && !filesWaiting && (text.trim() !== "" || filesReady);
+	const typed = text.trim() !== "" || filesReady;
+	// A turn in progress holds the box: stop it or wait, no new message meanwhile; a box that queues sends what it has.
+	const stopMode = running && !(queue && typed);
+	const canSend = online && (!running || queue) && !filesWaiting && typed;
 	/** A "/skill" the message starts with, marked in the box as in the sent message. */
 	const highlight = (value: string) => {
 		const length = leadingCommand(value, commands);

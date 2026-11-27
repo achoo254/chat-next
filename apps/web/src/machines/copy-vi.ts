@@ -486,6 +486,26 @@ export const viMachines = {
 		/** The same row while older items of the session are still on the machine (not counted yet). */
 		previousUncounted: "Cuộc trò chuyện trước",
 		ranTools: (n: number) => `Đã chạy ${n} tool`,
+		/** The AI panel of a chat: what folds above the user's question. */
+		askedContext: "Bối cảnh hội thoại",
+		askedQuote: "Tin được hỏi",
+		/** The AI panel of a chat: tool calls as plain steps. */
+		ranSteps: (n: number) => `Đã chạy ${n} bước`,
+		runningStep: (step: string) => `Đang ${step.charAt(0).toLowerCase()}${step.slice(1)}`,
+		step: {
+			chatSearch: "Tìm tin trong chat",
+			chatRead: "Đọc tin nhắn",
+			chatInfo: "Xem thông tin chat",
+			chatList: "Xem danh sách chat",
+			chatSend: "Soạn tin chờ bạn duyệt",
+			chatSendFile: "Gửi tệp chờ bạn duyệt",
+			shell: "Chạy lệnh",
+			readFile: "Đọc tệp",
+			editFile: "Sửa tệp",
+			searchFiles: "Tìm trong tệp",
+			web: "Tra cứu web",
+			other: (name: string) => `Dùng công cụ ${name}`,
+		},
 		runningTool: (name: string) => `Đang chạy ${name}`,
 		runningFor: (time: string) => `Chạy được ${time}`,
 		toolTimeout: (time: string) => `timeout ${time}`,

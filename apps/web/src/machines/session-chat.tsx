@@ -36,6 +36,7 @@ import { MacFolderAccessDialog, TerminalFolderNotice } from "./mac-folder-access
 import { LinkBanner } from "./link-banner.tsx";
 import { MachineIcon } from "./machine-icons.tsx";
 import { UseTextContext, type UseText } from "./cards/use-text-context.ts";
+import { splitAsked, type AskedParts } from "./chat-question.ts";
 import { profileById, sessionProfileId, switchPending, useProfiles } from "./machine-profile.ts";
 import { PageHead } from "./page-head.tsx";
 import { ProjectConfigHint } from "./project-config.tsx";
@@ -93,6 +94,23 @@ function isPending(block: Block): block is Pending {
 
 export type { UseText };
 
+/**
+ * The session inside the Chat app's AI panel (messaging/ui/ai-panel.tsx): only its conversation and composer, no
+ * header, views or workspace; the panel's own header stands for them.
+ */
+export interface SessionEmbed {
+	/** «Đưa vào ô soạn tin» under each of the AI's replies. */
+	readonly onUseText: UseText;
+	/** What the user typed, as the AI reads it: the panel puts the message asked about before it. */
+	readonly compose: (text: string) => string;
+	/** The composed message went: the message asked about is asked already. */
+	readonly onSent: () => void;
+	/** "/clear": the panel opens its chat's next session itself, instead of an empty one with no chat. */
+	readonly onClear: () => void;
+	/** The model, permissions and usage under the composer show (the panel's ⓘ). */
+	readonly statusShown: boolean;
+}
+
 /** How long the reply's button says the text went in. */
 const USED_MS = 2_000;
 
@@ -128,7 +146,8 @@ function UseTextButton({ text, onUseText, t }: { text: string; onUseText: UseTex
  * `onUseText`: each of the AI's text replies offers to put its text somewhere
  * (the Chat app's AI panel: «Đưa vào ô soạn tin»); absent on the AI Agent screens.
  */
-export function SessionChat({ machine, threadId, mode, onUseText }: { machine: string; threadId: string; mode: SessionMode; onUseText?: UseText }) {
+export function SessionChat({ machine, threadId, mode, embed }: { machine: string; threadId: string; mode: SessionMode; embed?: SessionEmbed }) {
+	const onUseText = embed?.onUseText;
 	const t = useMachinesCopy();
 	const hub = useHub();
 	const entry = useEntry(hub, machine);
@@ -146,13 +165,14 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 	const conversations = splitConversations(items);
 	const all = foldTranscript(conversations.current, state.pending.get(threadId) ?? []);
 	const meter = sessionMeter(conversations.current);
-	const blocks = all.filter((b) => !isPending(b));
+	// Advisor's next steps stay on the AI Agent screens: in the AI panel the quote's quick questions stand for them.
+	const blocks = all.filter((b) => !isPending(b) && (embed === undefined || b.kind !== "advisor"));
 	const prompts = all.filter(isPending);
 	// A long session opens on its newest items: until its oldest are in, the earlier conversations are counted in part.
 	const allLoaded = (state.journals.get(threadId)?.earlier ?? "") === "";
 	// An earlier conversation is over: Advisor's next steps there are spent.
 	const previousBlocks = foldTranscript(conversations.previous)
-		.filter((b) => !isPending(b))
+		.filter((b) => !isPending(b) && (embed === undefined || b.kind !== "advisor"))
 		.map((b) => (b.kind === "advisor" ? { ...b, open: false } : b));
 	// A prompt still pending in an earlier conversation shows in the dock: alone it makes no earlier conversation to fold.
 	const previous: PreviousConversation | null =
@@ -240,7 +260,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 	const modes = sessionModes(offered, observeOffered(state.info, provider), mode);
 	// The workspace panel (Explorer, Source Control) of the machine's project holding the folder.
 	const panel = useWorkspacePanel(machine, link, state, dir);
-	const panelShown = panel.prefs.open && panel.workspace !== undefined && thread !== null;
+	const panelShown = embed === undefined && panel.prefs.open && panel.workspace !== undefined && thread !== null;
 	const toTerminal = offered && mode === "chat" && thread !== null
 		? () => openSessionIn(machine, threadId, "terminal")
 		: undefined;
@@ -267,6 +287,16 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 	const takesBack = caps?.chatTakesTerminal === true;
 	const canSend = online && !missing && (!held || takesBack);
 	const send = async (text: string, files: readonly ShownAttachment[]): Promise<void> => {
+		if (embed !== undefined) {
+			// In the AI panel `/clear` starts the chat's next session there; anything else goes with the message asked about.
+			if (text.trim() === "/clear" && files.length === 0) {
+				embed.onClear();
+				return;
+			}
+			await link.send(threadId, embed.compose(text), files);
+			embed.onSent();
+			return;
+		}
 		// `/clear` opens a new, empty session in this folder: go to it.
 		const opened = await link.send(threadId, text, files);
 		if (opened !== undefined) navigate(paths.machineSession(machine, opened.id));
@@ -301,6 +331,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 	return (
 		<div className="mx-chat" ref={chatRef} data-mode={mode} {...drop.handlers}>
 			{drop.dragging && <DropZone ai={ai} maxBytes={limits?.fileMaxBytes ?? 0} supported={limits !== null} />}
+			{embed === undefined && (
 			<PageHead
 				back={paths.machines()}
 				backLabel={t.backToMachines}
@@ -375,6 +406,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 					{...(endTerminal !== undefined && online ? { endTerminal } : {})}
 				/>
 			</PageHead>
+			)}
 			<LinkBanner machine={machine} name={machineName} status={state.status} />
 			<MacFolderAccessDialog link={link} state={state} />
 			{mode === "terminal" && <TerminalFolderNotice machine={machine} state={state} />}
@@ -455,6 +487,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 							sendLocked={!canSend}
 							commands={threadInfo?.commands}
 							onUseText={onUseText}
+							embedded={embed !== undefined}
 						/>
 						</UseTextContext>
 					)}
@@ -474,10 +507,10 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 					)}
 					{held && <TerminalHeldBar machine={machine} link={link} thread={thread} ai={ai} takesBack={takesBack} />}
 					<div className="mx-compose-box">
-					{!missing && !advisorThread && (
+					{!missing && !advisorThread && (embed === undefined || embed.statusShown) && (
 						<ContextHint meter={meter} scope={`${machine}/${threadId}`} canCompact={caps?.compaction === true && canSend && !running} onCompact={() => void send("/compact", [])} />
 					)}
-					{!missing && !advisorThread && (
+					{!missing && !advisorThread && (embed === undefined || embed.statusShown) && (
 						<StatusBar
 							ai={ai}
 							dir={dir}
@@ -519,6 +552,7 @@ export function SessionChat({ machine, threadId, mode, onUseText }: { machine: s
 						fill={fill}
 						onFilled={(id) => advisorStore.takeFill(machine, threadId, id)}
 						onSend={send}
+						queue={embed !== undefined}
 						onStop={async () => {
 							await link.request({ case: "threadInterrupt", value: { threadId } });
 						}}
@@ -773,6 +807,8 @@ interface TranscriptProps {
 	commands?: readonly SlashCommand[] | undefined;
 	/** Offers each finished text reply of the AI to the caller (a button under it); none when absent. */
 	onUseText?: UseText | undefined;
+	/** In the Chat app's AI panel: the context and quote of a question fold away, tools read as plain steps. */
+	embedded?: boolean | undefined;
 }
 
 /**
@@ -816,7 +852,7 @@ const EARLIER_PX = 600;
 /** The messages of the session, then the activity line while a turn runs (its clock ticks there, not here). */
 const NO_COMMANDS: readonly SlashCommand[] = [];
 
-export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false, commands = NO_COMMANDS, onUseText }: TranscriptProps) {
+export function Transcript({ blocks, previous = null, state, running, startedAt, waiting, fetchFull, link, threadId, thread, live, older = false, loadOlder, breakId, onSend, sendLocked = false, commands = NO_COMMANDS, onUseText, embedded = false }: TranscriptProps) {
 	const t = useMachinesCopy();
 	const scroller = useRef<HTMLDivElement>(null);
 	const stick = useRef(true);
@@ -986,6 +1022,7 @@ export function Transcript({ blocks, previous = null, state, running, startedAt,
 							sendLocked={sendLocked}
 							commands={commands}
 							onUseText={onUseText}
+							embedded={embedded}
 						/>
 					)),
 					previous === null || before < start ? null : (
@@ -1033,6 +1070,32 @@ function PreviousRow({ messages, opened, onToggle, t }: { messages: number | nul
 	);
 }
 
+/**
+ * A question from the Chat app's AI panel: the bubble holds what the user typed; the chat's context and the
+ * messages asked about are one line each above it, opened on a tap.
+ */
+function AskedMessage({ asked, block, link, threadId, t }: { asked: AskedParts; block: Extract<Block, { kind: "user" }>; link: UploadLink; threadId: string; t: MachinesCopy }) {
+	return (
+		<div className="mx-msg mine mx-asked" aria-busy={block.pending}>
+			{asked.context !== "" && (
+				<details className="mx-asked-part">
+					<summary>{t.transcript.askedContext}</summary>
+					<pre>{asked.context}</pre>
+				</details>
+			)}
+			{asked.quote !== "" && (
+				<details className="mx-asked-part">
+					<summary>{t.transcript.askedQuote}</summary>
+					<pre>{asked.quote}</pre>
+				</details>
+			)}
+			{block.attachments.length > 0 && <MessageAttachments link={link} threadId={threadId} files={block.attachments} />}
+			{asked.question !== "" && <div className="bubble">{asked.question}</div>}
+			{block.pending && <span className="sr-only">{t.chat.sending}</span>}
+		</div>
+	);
+}
+
 interface BlockViewProps {
 	block: Block;
 	state: LinkState;
@@ -1046,12 +1109,16 @@ interface BlockViewProps {
 	sendLocked: boolean;
 	commands: readonly SlashCommand[];
 	onUseText: UseText | undefined;
+	embedded: boolean;
 }
 
-function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked, commands, onUseText }: BlockViewProps) {
+function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, onSend, sendLocked, commands, onUseText, embedded }: BlockViewProps) {
 	const { locale } = useI18n();
 	switch (block.kind) {
 		case "user": {
+			// The AI panel's question: its chat context and the messages asked about fold away above the question.
+			const asked = embedded ? splitAsked(block.text) : null;
+			if (asked !== null) return <AskedMessage asked={asked} block={block} link={link} threadId={threadId} t={t} />;
 			// The files sit above the bubble on the user's side; a "/skill" the message starts with stands out.
 			const command = leadingCommand(block.text, commands);
 			return (
@@ -1085,7 +1152,7 @@ function BlockView({ block, state, running, fetchFull, t, link, threadId, ai, on
 				</div>
 			);
 		case "tools":
-			return <ToolRunCard runs={block.runs} full={state.full} onFetchFull={fetchFull} live={running} />;
+			return <ToolRunCard runs={block.runs} full={state.full} onFetchFull={fetchFull} live={running} plain={embedded} />;
 		case "diff": {
 			const full = state.full.get(block.id);
 			return <DiffCard diff={block.diff} full={full?.body.case === "diff" ? full.body.value : null} onFetchFull={() => fetchFull(block.id)} />;

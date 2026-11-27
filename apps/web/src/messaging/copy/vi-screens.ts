@@ -677,6 +677,13 @@ export const viScreens = {
 	},
 	aiPanel: {
 		title: "AI",
+		/** The panel's header: which conversation it follows. */
+		titleFor: (chat: string) => `AI · ${chat}`,
+		newSession: "Phiên mới",
+		newSessionHint: "Bắt đầu phiên mới, phiên cũ vào lưu trữ",
+		newSessionFailed: "Chưa bắt đầu được phiên mới. Thử lại sau.",
+		openInAgent: "Mở phiên trong AI Agent",
+		details: "Model, quyền và hạn mức",
 		/** The panel's name for screen readers. */
 		label: (chat: string) => `AI của hội thoại ${chat}`,
 		close: "Đóng AI",

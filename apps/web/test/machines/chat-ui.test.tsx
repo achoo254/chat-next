@@ -254,6 +254,28 @@ describe("slash commands", () => {
 		return { onSend, field: screen.getByRole("textbox", { name: "Tin nhắn" }) };
 	};
 
+	it("holds a message while a turn runs, unless the box queues it (the Chat app's AI panel)", async () => {
+		const user = userEvent.setup();
+		const onSend = vi.fn(() => Promise.resolve());
+		const onStop = vi.fn(() => Promise.resolve());
+		const view = wrap(<Composer ai="Claude Code" machine="Mac" online running prompting={false} commands={[]} onSend={onSend} onStop={onStop} />);
+		const field = screen.getByRole("textbox", { name: "Tin nhắn" });
+		await user.type(field, "tiếp đi{Enter}");
+		expect(onSend).not.toHaveBeenCalled();
+		expect(screen.getByRole("button", { name: "Dừng" })).toBeTruthy();
+		view.unmount();
+
+		wrap(<Composer ai="Claude Code" machine="Mac" online running prompting={false} commands={[]} onSend={onSend} onStop={onStop} queue />);
+		const queued = screen.getByRole("textbox", { name: "Tin nhắn" });
+		// Empty, the button stops the turn; with text, it sends, and the machine runs it after the turn.
+		expect(screen.getByRole("button", { name: "Dừng" })).toBeTruthy();
+		await user.type(queued, "tiếp đi");
+		expect(screen.queryByRole("button", { name: "Dừng" })).toBeNull();
+		await user.keyboard("{Enter}");
+		expect(onSend).toHaveBeenCalledWith("tiếp đi", []);
+		expect(onStop).not.toHaveBeenCalled();
+	});
+
 	it("shows the picked skill marked in the box", async () => {
 		const user = userEvent.setup();
 		const { field } = composer();

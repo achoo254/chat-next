@@ -676,6 +676,12 @@ export const zhCNScreens: ScreensCopy = {
 	},
 	aiPanel: {
 		title: "AI",
+		titleFor: (chat: string) => `AI · ${chat}`,
+		newSession: "新会话",
+		newSessionHint: "开始新会话，当前会话将归档",
+		newSessionFailed: "暂时无法开始新会话，请稍后再试。",
+		openInAgent: "在 AI Agent 中打开会话",
+		details: "模型、权限和用量",
 		label: (chat: string) => `会话 ${chat} 的 AI`,
 		close: "关闭 AI",
 		resize: "调整 AI 面板宽度",

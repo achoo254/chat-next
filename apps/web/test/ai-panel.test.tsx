@@ -17,6 +17,9 @@ import { placeName } from "../src/machines/use-machines.ts";
 import { hasLocalmanRequest } from "../src/messaging/ui/ai-localman-hints.ts";
 import { plainText } from "../src/messaging/ui/ai-plain-text.ts";
 import { chatContext, chatThread, pickTarget } from "../src/messaging/ui/use-chat-ai.ts";
+import { splitAsked, wrapChatContext, wrapQuotedMessages } from "../src/machines/chat-question.ts";
+import { toolStep } from "../src/machines/cards/tool-step.ts";
+import { viMachines } from "../src/machines/copy-vi.ts";
 import { MemorySqlFactory } from "../../../packages/core/test/support/node-sql.ts";
 import { defaultAnswer, FakeMachine, type Body } from "./machines/fake-machine.ts";
 import { ChatFixture, fixtureConnector } from "./support/fake-chat.ts";
@@ -69,7 +72,8 @@ async function openMenuOf(text: string): Promise<void> {
 }
 
 async function panel(): Promise<HTMLElement> {
-	return screen.findByRole("complementary", { name: "AI" }, LONG);
+	// The panel is named after the conversation it follows: "AI · Lan".
+	return screen.findByRole("complementary", { name: /^AI/ }, LONG);
 }
 
 describe("opening the AI panel", () => {
@@ -91,7 +95,7 @@ describe("opening the AI panel", () => {
 		// The header's AI button shows the panel open, and closes it.
 		const toggle = screen.getByRole("button", { name: "Hỏi AI", pressed: true });
 		await userEvent.click(toggle);
-		await waitFor(() => expect(screen.queryByRole("complementary", { name: "AI" })).toBeNull());
+		await waitFor(() => expect(screen.queryByRole("complementary", { name: /^AI/ })).toBeNull());
 	});
 
 	it("«Hỏi AI» of several selected messages opens the panel about them all", async () => {
@@ -141,6 +145,7 @@ describe("the chat's session on the machine", () => {
 		machine.trusted = [device.publicKey];
 		const created: ThreadCreate[] = [];
 		const sends: ThreadSend[] = [];
+		const archived: string[] = [];
 		let threads: ThreadSummary[] = [];
 		const items = (threadId: string): Body => ({
 			case: "threadItems",
@@ -162,8 +167,8 @@ describe("the chat's session on the machine", () => {
 					return [{ case: "threadListResult", value: { threads, openSessions: 0, maxSessions: 3 } }];
 				case "threadCreate": {
 					created.push(b.value);
-					const thread = { id: "chat-1", title: b.value.chat?.title ?? "", dir: "/Users/me/.tunelo/chats/1", provider: b.value.provider, state: ThreadState.IDLE, chatId: knowsChats ? (b.value.chat?.chatId ?? 0n) : 0n } as ThreadSummary;
-					threads = [thread];
+					const thread = { id: `chat-${created.length}`, title: b.value.chat?.title ?? "", dir: "/Users/me/.tunelo/chats/1", provider: b.value.provider, state: ThreadState.IDLE, chatId: knowsChats ? (b.value.chat?.chatId ?? 0n) : 0n } as ThreadSummary;
+					threads = [...threads, thread];
 					const answer: Body = { case: "threadCreated", value: { thread } };
 					if (!holdCreate) return [answer];
 					held.push(() => machine.send(socket, answer, frame.id));
@@ -173,6 +178,10 @@ describe("the chat's session on the machine", () => {
 					return [items(b.value.threadId)];
 				case "threadSend":
 					sends.push(b.value);
+					return [{ case: "ack", value: {} }];
+				case "threadSetArchived":
+					archived.push(b.value.threadId);
+					threads = threads.map((x) => (x.id === b.value.threadId ? ({ ...x, archived: b.value.archived } as ThreadSummary) : x));
 					return [{ case: "ack", value: {} }];
 				default:
 					return defaultAnswer(frame);
@@ -186,7 +195,7 @@ describe("the chat's session on the machine", () => {
 		const release = () => {
 			for (const answer of held.splice(0)) answer();
 		};
-		return { machine, machines, created, sends, release };
+		return { machine, machines, created, sends, archived, release };
 	}
 
 	function renderWith(fixture: ChatFixture, machines: FakeMachines, path: string) {
@@ -339,30 +348,84 @@ describe("the chat's session on the machine", () => {
 		expect(fixture.server.expectedMessages(chatId, fixture.selfId).some((m) => m.text === "tin cũ của tôi")).toBe(true);
 	});
 
-	it("takes the quote back out of the session's box once a quick question about it is sent", async () => {
-		const { fixture, chatId } = lanChat();
-		const { machines, sends } = await withMachine();
+	/** The chat's session open in the panel, its first question answered; resolves to the panel and the session's box. */
+	async function openSession(fixture: ChatFixture, chatId: number, machines: FakeMachines): Promise<{ shown: HTMLElement; sessionBox: HTMLElement }> {
 		renderWith(fixture, machines, `/c/${chatId}`);
-		// The chat's session exists already.
 		await userEvent.click(await screen.findByRole("button", { name: "Hỏi AI" }, LONG));
-		let shown = await panel();
+		const shown = await panel();
 		const ask = await within(shown).findByRole("textbox", { name: "Hỏi AI về hội thoại này…" }, LONG);
 		await waitFor(() => expect((ask as HTMLTextAreaElement).disabled).toBe(false), LONG);
 		await userEvent.type(ask, "chào{Enter}");
 		const sessionBox = await within(shown).findByRole("textbox", { name: "Tin nhắn" }, { timeout: 15_000 });
+		return { shown, sessionBox };
+	}
+
+	it("sends the message asked about with the user's own question, never through the session's box, once", async () => {
+		const { fixture, chatId, lan } = lanChat();
+		fixture.send(lan, chatId, "tin thứ hai của Lan");
+		const { machines, sends } = await withMachine();
+		const { shown, sessionBox } = await openSession(fixture, chatId, machines);
 
 		await openMenuOf(QUESTION);
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Hỏi AI" }, LONG));
-		shown = await panel();
-		// The quote waits in the session's box for a question of the user's own.
-		await waitFor(() => expect(boxValue(sessionBox)).toContain(QUESTION), LONG);
-		const summarize = within(shown).getByRole("button", { name: "Tóm tắt" });
+		await within(shown).findByRole("region", { name: "Tin đang hỏi" }, LONG);
+		// The quote stays a card: the session's box keeps only what the user types.
+		expect(boxValue(sessionBox)).toBe("");
+		// Another «Hỏi AI» takes its place.
+		await openMenuOf("tin thứ hai của Lan");
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Hỏi AI" }, LONG));
+		await waitFor(() => expect(within(within(shown).getByRole("region", { name: "Tin đang hỏi" })).queryByText(QUESTION)).toBeNull(), LONG);
+		expect(boxValue(sessionBox)).toBe("");
+
+		await userEvent.type(sessionBox, "ý Lan là gì?{Enter}");
+		await waitFor(() => expect(sends.map((x) => x.text).some((text) => text.includes("ý Lan là gì?"))).toBe(true), LONG);
+		const sent = sends.find((x) => x.text.includes("ý Lan là gì?"))?.text ?? "";
+		expect(splitAsked(sent)).toEqual({ context: "", quote: expect.stringContaining("tin thứ hai của Lan"), question: "ý Lan là gì?" });
+		expect(sent).not.toContain(QUESTION);
+		// Asked: the card is gone, and the next question goes alone.
+		await waitFor(() => expect(within(shown).queryByRole("region", { name: "Tin đang hỏi" })).toBeNull(), LONG);
+		await userEvent.type(sessionBox, "còn gì nữa?{Enter}");
+		await waitFor(() => expect(sends.map((x) => x.text)).toContain("còn gì nữa?"), LONG);
+	});
+
+	it("does not ask a quote again once it was asked, when the panel is built again", async () => {
+		const { fixture, chatId } = lanChat();
+		const { machines, sends } = await withMachine();
+		const { shown } = await openSession(fixture, chatId, machines);
+		await openMenuOf(QUESTION);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Hỏi AI" }, LONG));
+		const summarize = await within(shown).findByRole("button", { name: "Tóm tắt" }, LONG);
 		await waitFor(() => expect((summarize as HTMLButtonElement).disabled).toBe(false), LONG);
 		await userEvent.click(summarize);
-		await waitFor(() => expect(sends.map((x) => x.text).some((text) => text.includes(QUESTION) && text.includes("Tóm tắt tin này"))).toBe(true), LONG);
-		// Asked already: nothing of it is left to send again.
-		await waitFor(() => expect(boxValue(sessionBox)).toBe(""), LONG);
-		expect(within(shown).queryByRole("region", { name: "Tin đang hỏi" })).toBeNull();
+		await waitFor(() => expect(sends.some((x) => x.text.includes("Tóm tắt tin này"))).toBe(true), LONG);
+		await waitFor(() => expect(within(shown).queryByRole("region", { name: "Tin đang hỏi" })).toBeNull(), LONG);
+
+		// Closed and opened again (as another chat and back builds it again): no quote comes back.
+		await userEvent.click(within(shown).getByRole("button", { name: "Đóng AI" }));
+		await userEvent.click(screen.getByRole("button", { name: "Hỏi AI" }));
+		const again = await panel();
+		await within(again).findByRole("textbox", { name: "Tin nhắn" }, { timeout: 15_000 });
+		expect(within(again).queryByRole("region", { name: "Tin đang hỏi" })).toBeNull();
+	});
+
+	it("starts the chat's next session in the panel on '/clear' and «Phiên mới», putting the old one away", async () => {
+		const { fixture, chatId } = lanChat();
+		const { machines, sends, archived, created } = await withMachine();
+		const { shown, sessionBox } = await openSession(fixture, chatId, machines);
+		await userEvent.type(sessionBox, "/clear{Enter}");
+		await waitFor(() => expect(archived).toEqual(["chat-1"]), LONG);
+		// Nothing typed into the session, and the screen stays on the chat.
+		expect(sends.map((x) => x.text)).not.toContain("/clear");
+		expect(window.location.pathname).toBe(`/c/${chatId}`);
+		const ask = await within(shown).findByRole("textbox", { name: "Hỏi AI về hội thoại này…" }, LONG);
+		await userEvent.type(ask, "lại từ đầu{Enter}");
+		await waitFor(() => expect(created).toHaveLength(2), LONG);
+		expect(created[1]?.text).toContain(`chat_id: ${chatId}`);
+
+		await within(shown).findByRole("textbox", { name: "Tin nhắn" }, { timeout: 15_000 });
+		await userEvent.click(within(shown).getByRole("button", { name: "Bắt đầu phiên mới, phiên cũ vào lưu trữ" }));
+		await waitFor(() => expect(archived).toEqual(["chat-1", "chat-2"]), LONG);
+		expect(await within(shown).findByRole("textbox", { name: "Hỏi AI về hội thoại này…" }, LONG)).toBeTruthy();
 	});
 
 	it("offers Localman's quick actions on a message with a request, and asks the session to run it", async () => {
@@ -434,6 +497,23 @@ describe("qua AI", () => {
 });
 
 describe("helpers", () => {
+	it("folds a panel question's context and quote away from what the user typed", () => {
+		const text = `${wrapChatContext("Hội thoại: Lan\nchat_id: 7")}\n\n${wrapQuotedMessages("Về tin #3 của Lan:\nxin chào\n\nđoạn hai")}\n\nnghĩa là gì?`;
+		expect(splitAsked(text)).toEqual({ context: "Hội thoại: Lan\nchat_id: 7", quote: "Về tin #3 của Lan:\nxin chào\n\nđoạn hai", question: "nghĩa là gì?" });
+		expect(splitAsked(wrapQuotedMessages("chỉ tin"))).toEqual({ context: "", quote: "chỉ tin", question: "" });
+		// Typed elsewhere, or sent before the tags: shown as it is.
+		expect(splitAsked("Hội thoại: Lan\n\ncâu hỏi")).toBeNull();
+	});
+
+	it("names tool calls as plain steps for the AI panel", () => {
+		const step = viMachines.transcript.step;
+		expect(toolStep("mcp__tunelo__chat_search_messages", step)).toBe("Tìm tin trong chat");
+		expect(toolStep("mcp__tunelo__chat_get_messages", step)).toBe("Đọc tin nhắn");
+		expect(toolStep("Bash", step)).toBe("Chạy lệnh");
+		expect(toolStep("mcp__other__send_message", step)).toBe("Dùng công cụ send message");
+		expect(toolStep("custom_tool", step)).toBe("Dùng công cụ custom tool");
+	});
+
 	it("names a Chat conversation's folder by the app, every other folder by its name", () => {
 		expect(placeName("/Users/me/.tunelo/chat-sessions/48")).toBe("Chat");
 		expect(placeName("C:\\Users\\me\\.tunelo\\chat-sessions\\48\\")).toBe("Chat");

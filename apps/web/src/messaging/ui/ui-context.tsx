@@ -238,10 +238,45 @@ export const ChatSearchContext = createContext<((query: string) => void) | null>
 
 let nextAiRequest = 0;
 
+/** The phone layout of the stylesheet (messaging.css): the AI panel is a sheet instead of a column. */
+export const AI_PHONE_QUERY = "(max-width: 760px)";
+
 /** Opens the AI panel of `chatId`, with a quoted message or a question to send at once. */
 export function openAiPanel(ui: Ui, chatId: number, options: { quote?: AiQuote; ask?: string } = {}): void {
 	nextAiRequest += 1;
 	ui.ai.set({ id: nextAiRequest, chatId, quote: options.quote ?? null, ask: options.ask ?? "" });
+}
+
+/**
+ * The panel used (or dropped) the quote and question of request `id`: the
+ * panel stays open, and a panel built again for the chat (another chat and
+ * back, a phone sheet turned column) does not ask them again.
+ */
+export function settleAiRequest(ui: Ui, id: number, part: { readonly quote?: boolean; readonly ask?: boolean }): void {
+	const current = ui.ai.get();
+	if (current?.id !== id) return;
+	ui.ai.set({ ...current, quote: part.quote === true ? null : current.quote, ask: part.ask === true ? "" : current.ask });
+}
+
+/** Where this device keeps whether the AI panel was open (a computer reopens it after a reload). */
+const AI_OPEN_KEY = "chat:ai-open";
+
+/** The panel open when the page was left: open again, about no chat in particular (no quote, no question). */
+export function rememberedAiPanel(): AiPanelRequest | null {
+	try {
+		return window.localStorage.getItem(AI_OPEN_KEY) === "1" ? { id: 0, chatId: 0, quote: null, ask: "" } : null;
+	} catch {
+		return null;
+	}
+}
+
+export function rememberAiPanel(open: boolean): void {
+	try {
+		if (open) window.localStorage.setItem(AI_OPEN_KEY, "1");
+		else window.localStorage.removeItem(AI_OPEN_KEY);
+	} catch {
+		// Storage off: the panel closes with the page.
+	}
 }
 
 export function useUi(): Ui {

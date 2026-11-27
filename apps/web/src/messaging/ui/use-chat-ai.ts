@@ -13,6 +13,7 @@ import type { ThreadSummary } from "@achoo254/chat-proto/remote/remote";
 import type { Chat } from "@achoo254/chat-core";
 import { brand } from "../../brand.ts";
 import { AGENT_CHAT_THREADS, versionAtLeast } from "../../machines/agent-version.ts";
+import { wrapChatContext } from "../../machines/chat-question.ts";
 import type { LinkState, MachineLink } from "../../machines/link/machine-link.ts";
 import type { Conn } from "../../machines/machine-status.ts";
 import { sessionProvider, useHub, useHubPresence, useMachineViews, useNow, type MachineView } from "../../machines/use-machines.ts";
@@ -23,7 +24,8 @@ import { sessionProvider, useHub, useHubPresence, useMachineViews, useNow, type 
  * not the user, and answers in the language the user writes in.
  */
 export function chatContext(chat: Pick<Chat, "id" | "externalApp">, title: string): string {
-	return [
+	// In its own tag: the panel's transcript folds it away and shows the question alone.
+	return wrapChatContext([
 		`Hội thoại: ${title}`,
 		`Ứng dụng: ${chat.externalApp ?? brand.appName}`,
 		`chat_id: ${chat.id}`,
@@ -33,7 +35,7 @@ export function chatContext(chat: Pick<Chat, "id" | "externalApp">, title: strin
 		...(chat.externalApp === "zalo"
 			? ["Hội thoại này ở Zalo: tool không gửi được tin hay tệp vào đây (Zalo chỉ nhận những gì người dùng tự gõ hoặc đính kèm ở ô soạn tin). Hãy soạn sẵn nội dung và bảo người dùng bấm «Đưa vào ô soạn tin» để tự gửi."]
 			: []),
-	].join("\n");
+	].join("\n"));
 }
 
 /** After the context, when a session is opened before any question (AI Agent › Liên hệ): the AI only says it is ready. */
@@ -97,6 +99,11 @@ export interface ChatAi {
 	readonly provider: string;
 	/** Opens the chat's session with the first question (context first); resolves to the session. */
 	readonly start: (question: string) => Promise<ThreadSummary | null>;
+	/**
+	 * Puts the chat's session away (archived on the machine): the panel shows no session until the next question
+	 * opens one. Resolves false when the machine refused.
+	 */
+	readonly newSession: () => Promise<boolean>;
 }
 
 function statusOf(directoryLoading: boolean, target: MachineView | null): ChatAiStatus {
@@ -135,8 +142,10 @@ export function useChatAi(chat: Pick<Chat, "id" | "externalApp">, title: string,
 	// The session this panel opened, until the machine lists it; and whether the machine named no chat for it.
 	const [created, setCreated] = useState<{ readonly machine: string; readonly thread: ThreadSummary } | null>(null);
 
-	const listed = target === null ? null : chatThread(target.state.threads, chat.id);
-	const own = created !== null && created.machine === targetRef ? created.thread : null;
+	// Sessions put away here: gone at once, before the machine's list says they are archived.
+	const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
+	const listed = target === null ? null : chatThread(target.state.threads.filter((x) => !gone.has(x.id)), chat.id);
+	const own = created !== null && created.machine === targetRef && !gone.has(created.thread.id) ? created.thread : null;
 	// Known only once the machine described itself (status "connecting" until then).
 	const tooOld = target?.state.info != null && !versionAtLeast(target.state.info.agentVersion, AGENT_CHAT_THREADS);
 	const outdated = tooOld || (own !== null && own.chatId === 0n);
@@ -155,5 +164,17 @@ export function useChatAi(chat: Pick<Chat, "id" | "externalApp">, title: string,
 		return opened !== null && opened.chatId !== 0n ? opened : null;
 	};
 
-	return { status: statusOf(loading, target), machines: views, target, pickMachine, thread, outdated, provider, start };
+	const newSession = async (): Promise<boolean> => {
+		if (target === null || thread === null) return false;
+		const id = thread.id;
+		try {
+			await target.link.request({ case: "threadSetArchived", value: { threadId: id, archived: true } });
+		} catch {
+			return false;
+		}
+		setGone((current) => new Set([...current, id]));
+		return true;
+	};
+
+	return { status: statusOf(loading, target), machines: views, target, pickMachine, thread, outdated, provider, start, newSession };
 }

@@ -16,6 +16,7 @@ import { useMachinesCopy } from "../use-machines-copy.ts";
 import { approvalOutcome, toolIcon } from "./approval.tsx";
 import { isKbDocumentsTool, kbSources, KbSourceChips } from "./kb-sources.tsx";
 import { isLocalmanSend, LocalmanResultCard, parseLocalmanResult } from "./localman-result.tsx";
+import { toolStep } from "./tool-step.ts";
 
 interface ToolRunCardProps {
 	runs: readonly ToolRun[];
@@ -24,9 +25,11 @@ interface ToolRunCardProps {
 	onFetchFull: (itemId: string) => Promise<void>;
 	/** The turn is still going: a call without a result is running. */
 	live: boolean;
+	/** The Chat app's AI panel: calls read as plain steps, folded under one line even when alone. */
+	plain?: boolean | undefined;
 }
 
-export function ToolRunCard({ runs, full, onFetchFull, live }: ToolRunCardProps) {
+export function ToolRunCard({ runs, full, onFetchFull, live, plain = false }: ToolRunCardProps) {
 	const t = useMachinesCopy();
 	const running = live ? runs.find((r) => r.call !== null && r.result === null) : undefined;
 	const rows = runs.map((run) => (
@@ -36,9 +39,10 @@ export function ToolRunCard({ runs, full, onFetchFull, live }: ToolRunCardProps)
 			running={run === running}
 			full={run.resultId === null ? null : (full.get(run.resultId) ?? null)}
 			onFetchFull={onFetchFull}
+			plain={plain}
 		/>
 	));
-	if (runs.length === 1) {
+	if (runs.length === 1 && !plain) {
 		return (
 			<div className="mx-tools single">
 				<ul>{rows}</ul>
@@ -55,7 +59,15 @@ export function ToolRunCard({ runs, full, onFetchFull, live }: ToolRunCardProps)
 						<MachineIcon key={icon} name={icon} small />
 					))}
 				</span>
-				<span>{running?.call ? t.transcript.runningTool(running.call.name) : t.transcript.ranTools(runs.length)}</span>
+				<span>
+					{plain
+						? running?.call
+							? t.transcript.runningStep(toolStep(running.call.name, t.transcript.step))
+							: t.transcript.ranSteps(runs.length)
+						: running?.call
+							? t.transcript.runningTool(running.call.name)
+							: t.transcript.ranTools(runs.length)}
+				</span>
 				{running !== undefined && <span className="spin" aria-hidden="true" />}
 			</summary>
 			<ul>{rows}</ul>
@@ -68,9 +80,10 @@ interface RunRowProps {
 	running: boolean;
 	full: Item | null;
 	onFetchFull: (itemId: string) => Promise<void>;
+	plain: boolean;
 }
 
-function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
+function RunRow({ run, running, full, onFetchFull, plain }: RunRowProps) {
 	const t = useMachinesCopy();
 	const { locale } = useI18n();
 	const now = useNow(running);
@@ -78,7 +91,7 @@ function RunRow({ run, running, full, onFetchFull }: RunRowProps) {
 	const [expanded, setExpanded] = useState(false);
 	const [clamped, setClamped] = useState(false);
 	const command = useRef<HTMLSpanElement>(null);
-	const name = run.call?.name ?? t.transcript.subagent;
+	const name = run.call === null ? t.transcript.subagent : plain ? toolStep(run.call.name, t.transcript.step) : run.call.name;
 	const summary = run.call?.summary || run.subagent?.description || "";
 	const result = full?.body.case === "toolResult" ? full.body.value : run.result;
 	const resultId = run.resultId;

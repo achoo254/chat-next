@@ -1065,8 +1065,14 @@ kbd { display: inline-grid; place-items: center; min-width: 28px; height: 28px; 
 /* The session's status line in the panel's narrow column: its items wrap to a second line instead of overlapping. */
 :is(.ai-panel, .ai-sheet) .mx-status-row { flex-wrap: wrap; row-gap: 0; }
 :is(.ai-panel, .ai-sheet) .mx-status-row > .mx-usage { flex: none; }
-/* The session's own back link goes to AI Agent: inside the panel, its close button stands for it. */
-.ai-panel .mx-back, .ai-sheet .mx-back { display: none; }
+/* The panel's header names the conversation; the title gives way to its buttons. */
+.ai-head h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The composer keeps the conversation in view on a short screen. */
+:is(.ai-panel, .ai-sheet) .mx-field { max-height: min(200px, 25dvh); }
+/* A question's chat context and quoted messages: one muted line each above the bubble, opened on a tap. */
+.mx-asked-part { max-width: 85%; font-size: 0.8125rem; color: var(--c-text-muted); }
+.mx-asked-part summary { cursor: pointer; text-align: right; }
+.mx-asked-part pre { max-height: 12em; margin: var(--space-1) 0 0; padding: var(--space-2) var(--space-3); overflow: auto; border-left: 3px solid var(--c-primary); border-radius: var(--radius-sm); background: var(--c-surface-subtle); font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Phone: a sheet near full height, header fixed on top and the composer at the bottom (docs: modal-popup-design). */
 dialog.modal.ai-sheet[open] { display: flex; flex-direction: column; height: 92dvh; padding: 0 0 env(safe-area-inset-bottom); overflow: hidden; }
 .stamp .msg-ai { margin-right: var(--space-1); font-style: italic; }

@@ -5,6 +5,11 @@
 // the bottom, near full height, its header and composer fixed. «Hỏi AI» on a
 // message opens it about that message (sender, time, text and seq) with
 // quick questions; "/ai …" in the chat's composer sends the question here.
+// The message asked about stays a card above the conversation until a
+// question goes with it; another «Hỏi AI» takes its place. Only the session's
+// conversation and composer show here: «Phiên mới» (or "/clear") puts the
+// session away and the next question opens the chat's next one, and the full
+// session (terminal, observing) opens in AI Agent.
 // Each of the AI's replies can go into the chat's composer («Đưa vào ô soạn
 // tin»), replying to the message asked about: the user sends it. Nothing
 // here posts in the chat; the AI posts only through its own tool, which asks
@@ -13,23 +18,22 @@ import { Suspense, lazy, useEffect, useEffectEvent, useLayoutEffect, useRef, use
 import type { Chat } from "@achoo254/chat-core";
 import { Icon } from "../../components/screen-icons.tsx";
 import { AiMark } from "../../machines/ai-mark.tsx";
-import { advisorStore } from "../../advisor/advisor-store.ts";
 import { useI18n } from "../../i18n/i18n.tsx";
+import { wrapQuotedMessages } from "../../machines/chat-question.ts";
+import type { SessionEmbed } from "../../machines/session-chat.tsx";
 import { Link, paths } from "../../router.tsx";
 import { useScreensCopy, type FullCopy } from "../copy/use-screens-copy.ts";
 import { clock, fullDate } from "../data/format.ts";
 import type { Drafts } from "../data/drafts.ts";
 import { useDialog, useServices } from "../data/services.tsx";
 import { DialogHead, Modal, useDomId } from "./parts.tsx";
-import { useUi, type AiPanelRequest, type AiQuote, type Ui } from "./ui-context.tsx";
+import { AI_PHONE_QUERY, settleAiRequest, useUi, type AiPanelRequest, type AiQuote, type Ui } from "./ui-context.tsx";
 import { hasLocalmanRequest } from "./ai-localman-hints.ts";
 import { plainText } from "./ai-plain-text.ts";
 import { useChatAi, type ChatAi } from "./use-chat-ai.ts";
 
 const AiPanelSession = lazy(() => import("./ai-panel-session.tsx"));
 
-/** The phone layout of the stylesheet (messaging.css): a sheet instead of a column. */
-const PHONE_QUERY = "(max-width: 760px)";
 const WIDTH_KEY = "chat:ai-width";
 export const AI_MIN = 320;
 export const AI_MAX = 640;
@@ -62,12 +66,13 @@ export function putInComposer(drafts: Drafts, ui: Ui, target: { readonly chatId:
 export function aboutQuote(copy: FullCopy, quote: AiQuote, locale: string, question: string): string {
 	// Several selected messages: each as one quote, in order.
 	const one = (q: AiQuote) => copy.aiPanel.quoted(q.sender, `${clock(q.date, locale)} ${fullDate(q.date, locale)}`, q.seq, q.text);
-	const quoted = quote.messages === undefined ? one(quote) : quote.messages.map(one).join("\n\n");
+	// In its own tag: the panel's transcript folds it away and shows the question alone.
+	const quoted = wrapQuotedMessages(quote.messages === undefined ? one(quote) : quote.messages.map(one).join("\n\n"));
 	return question === "" ? quoted : `${quoted}\n\n${question}`;
 }
 
 function phoneQuery(): MediaQueryList | null {
-	return typeof window.matchMedia === "function" ? window.matchMedia(PHONE_QUERY) : null;
+	return typeof window.matchMedia === "function" ? window.matchMedia(AI_PHONE_QUERY) : null;
 }
 
 function usePhone(): boolean {
@@ -143,17 +148,25 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 	const [seen, setSeen] = useState(request?.id ?? 0);
 	if (request !== null && request.id !== seen) {
 		setSeen(request.id);
+		// Another «Hỏi AI»: its message takes the place of the one asked about before.
 		if (request.quote !== null) {
 			setQuote(request.quote);
 			setReplyTo(request.quote.seq);
 		}
 		if (request.ask !== "") setWaiting({ id: request.id, text: request.ask });
 	}
+	/** The quote is asked or dropped: gone here, and from the request, so a panel built again does not bring it back. */
+	const dropQuote = () => {
+		setQuote(null);
+		settleAiRequest(ui, seen, { quote: true });
+	};
 	const [busy, setBusy] = useState(false);
+	const [statusShown, setStatusShown] = useState(false);
 	// The text waiting for «Thay» and the answer its reply's button waits for (true: it went into the composer).
 	const [confirm, setConfirm] = useState<{ readonly text: string; readonly done: (filled: boolean) => void } | null>(null);
 	const machine = ai.target?.entry.ref ?? "";
 	const threadId = ai.thread?.id ?? "";
+	const withQuote = (question: string) => (quote === null ? question : aboutQuote(copy, quote, locale, question));
 
 	/** Sends a question: the session's first opens it, the others go to it. */
 	const ask = async (question: string): Promise<boolean> => {
@@ -171,26 +184,6 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 		}
 	};
 
-	// A quote that comes while the session is open waits in its composer, for a question of the user's own:
-	// once per quote and session (the session's composer takes it through Advisor's fill, as "Gửi sang phiên").
-	// What was put there, so a quick question sent about the quote takes it back out (it is asked already).
-	const prefilled = useRef<{ readonly machine: string; readonly threadId: string; readonly text: string } | null>(null);
-	const fillQuote = useEffectEvent((into: string, at: string) => {
-		if (quote === null) return;
-		const text = aboutQuote(copy, quote, locale, "");
-		prefilled.current = { machine: into, threadId: at, text };
-		advisorStore.fill(into, at, text);
-	});
-	const takeBackQuote = () => {
-		const put = prefilled.current;
-		prefilled.current = null;
-		if (put !== null) advisorStore.fill(put.machine, put.threadId, put.text, true);
-	};
-	const quoteSeq = quote?.seq ?? 0;
-	useEffect(() => {
-		if (quoteSeq !== 0 && threadId !== "" && machine !== "") fillQuote(machine, threadId);
-	}, [quoteSeq, threadId, machine]);
-
 	// "/ai …": sent as soon as the machine can take it; back in the box when it fails.
 	// The request being sent: an effect run twice (StrictMode) sends it once.
 	const asking = useRef<number | null>(null);
@@ -198,9 +191,11 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 		if (asking.current === question.id) return;
 		asking.current = question.id;
 		setWaiting((current) => (current?.id === question.id ? null : current));
-		const sent = await ask(quote === null ? question.text : aboutQuote(copy, quote, locale, question.text));
+		// Asked once: a panel built again for the chat does not ask it again.
+		settleAiRequest(ui, question.id, { ask: true });
+		const sent = await ask(withQuote(question.text));
 		asking.current = null;
-		if (sent) setQuote(null);
+		if (sent) dropQuote();
 		else setUnsent(question.text);
 	});
 	// A chat hidden from AI is not asked about at all: the server would refuse the AI every read of it.
@@ -229,9 +224,18 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 	const chip = (kind: Chip) => {
 		if (quote === null) return;
 		void ask(aboutQuote(copy, quote, locale, copy.aiPanel.prompt[kind])).then((sent) => {
-			if (!sent) return;
-			setQuote(null);
-			takeBackQuote();
+			if (sent) dropQuote();
+		});
+	};
+
+	const [starting, setStarting] = useState(false);
+	/** «Phiên mới» and "/clear": the session goes to the archive, the next question opens the chat's next one. */
+	const newSession = () => {
+		if (starting) return;
+		setStarting(true);
+		void ai.newSession().then((done) => {
+			setStarting(false);
+			if (!done) toasts.show(copy.aiPanel.newSessionFailed);
 		});
 	};
 
@@ -254,13 +258,38 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 		// On a phone the sheet covers the conversation: it gives way to the composer.
 		if (phone) onClose();
 	};
+	const sessionShown = !hidden && ai.status === "ready" && !ai.outdated && threadId !== "";
+	const embed: SessionEmbed = {
+		onUseText: offerText,
+		compose: withQuote,
+		onSent: () => {
+			if (quote !== null) dropQuote();
+		},
+		onClear: newSession,
+		statusShown,
+	};
 
 	return (
 		<>
 			<header className="ai-head">
 				<AiMark name="agent" />
-				<h2 id={titleId}>{copy.aiPanel.title}</h2>
+				<h2 id={titleId} title={copy.aiPanel.titleFor(title)}>
+					{copy.aiPanel.titleFor(title)}
+				</h2>
 				<MachinePicker ai={ai} copy={copy} />
+				{sessionShown && (
+					<>
+						<button type="button" className="icon-btn" aria-pressed={statusShown} aria-label={copy.aiPanel.details} title={copy.aiPanel.details} onClick={() => setStatusShown((v) => !v)}>
+							<Icon name="info" />
+						</button>
+						<button type="button" className="icon-btn" aria-label={copy.aiPanel.newSessionHint} title={copy.aiPanel.newSessionHint} disabled={starting} onClick={newSession}>
+							<Icon name="plus" />
+						</button>
+						<Link to={paths.machineSession(machine, threadId)} className="icon-btn" aria-label={copy.aiPanel.openInAgent} title={copy.aiPanel.openInAgent}>
+							<Icon name="external" />
+						</Link>
+					</>
+				)}
 				<button type="button" className="icon-btn" aria-label={copy.aiPanel.close} title={copy.aiPanel.close} onClick={onClose}>
 					<Icon name="x" />
 				</button>
@@ -273,16 +302,14 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 					</button>
 				</div>
 			)}
-			{quote !== null && (
-				<QuoteCard quote={quote} locale={locale} copy={copy} disabled={!canAsk || busy} onChip={chip} onRemove={() => setQuote(null)} />
-			)}
+			{quote !== null && <QuoteCard quote={quote} locale={locale} copy={copy} disabled={!canAsk || busy} onChip={chip} onRemove={dropQuote} />}
 			<div className="ai-body">
 				<Availability ai={ai} copy={copy} />
-				{hidden ? null : ai.status === "ready" && !ai.outdated && threadId !== "" ? (
+				{sessionShown ? (
 					<Suspense fallback={<div className="ai-loading" aria-busy="true" />}>
-						<AiPanelSession key={`${machine}:${threadId}`} machine={machine} threadId={threadId} onUseText={offerText} />
+						<AiPanelSession key={`${machine}:${threadId}`} machine={machine} threadId={threadId} embed={embed} />
 					</Suspense>
-				) : (
+				) : hidden ? null : (
 					<StartComposer
 						key={`${waiting?.id ?? 0}\n${unsent}`}
 						copy={copy}
@@ -290,8 +317,8 @@ function PanelBody({ chat, title, topicId, request, phone, titleId, onClose }: P
 						disabled={!canAsk}
 						busy={busy}
 						onSend={async (question) => {
-							const sent = await ask(quote === null ? question : aboutQuote(copy, quote, locale, question));
-							if (sent) setQuote(null);
+							const sent = await ask(withQuote(question));
+							if (sent) dropQuote();
 							return sent;
 						}}
 					/>
