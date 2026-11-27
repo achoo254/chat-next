@@ -8,6 +8,7 @@ import { generateKeyPair, type KeyPair } from "@achoo254/chat-remote-protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../../src/i18n/i18n.tsx";
 import { BrowserPane } from "../../src/machines/browser/browser-pane.tsx";
+import { closeBrowserTab } from "../../src/machines/browser/takeover-card.tsx";
 import { MachineLink, type Timers } from "../../src/machines/link/machine-link.ts";
 import { defaultAnswer, FakeMachine, until } from "./fake-machine.ts";
 
@@ -36,6 +37,7 @@ beforeEach(async () => {
 			case "browserView":
 			case "browserNavigate":
 			case "browserInput":
+			case "browserTakeoverEnd":
 				return [{ case: "ack", value: {} }];
 			default:
 				return defaultAnswer(frame);
@@ -137,5 +139,17 @@ describe("the browser pane", () => {
 		await waitFor(() => expect(view.container.querySelector("[data-id=browser-view]")).toBeTruthy());
 		view.unmount();
 		l.stop();
+	});
+
+	it("closing the dock's tab asks the machine to close its browser: the device's takeover ends", async () => {
+		const l = await openLink();
+		const view = render(pane(l, true));
+		await waitFor(() => expect(view.container.querySelector("[data-id=browser-view]")).toBeTruthy());
+		view.unmount();
+		closeBrowserTab(l);
+		await until(() => sent("browserTakeoverEnd").length === 1, "end request");
+		const end = sent("browserTakeoverEnd")[0];
+		expect(end?.body.case === "browserTakeoverEnd" && end.body.value.takeoverId).toBe("tab1");
+		await until(() => !l.snapshot().takeovers.has("tab1"), "takeover dropped");
 	});
 });

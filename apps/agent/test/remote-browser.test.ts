@@ -79,8 +79,9 @@ describe("the profile browser", () => {
 		expect(chrome.called("Runtime.addBinding").every((c) => c.params.name === PASSKEY_BINDING)).toBe(true);
 		expect(chrome.called("Page.addScriptToEvaluateOnNewDocument")[0]?.params).toMatchObject({ source: PASSKEY_SCRIPT, runImmediately: true });
 		expect(browser.running()).toBe(true);
+		// tunelo stopping closes the browser with every process of it.
 		await browser.close();
-		expect(chrome.called("Browser.close")).toHaveLength(1);
+		expect(chrome.stopped).toBe(1);
 	});
 
 	it("opens only http and https pages", async () => {
@@ -339,12 +340,43 @@ describe("the browser as a tab of the dock", () => {
 		expect(urls.some((u) => u.startsWith("edge://"))).toBe(false);
 	});
 
-	it("the last tab is not closed but emptied", async () => {
+	it("closing the dock's tab closes the browser and every process of it", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: {} }));
+		const ended = await link.request("e1", { case: "browserTakeoverEnd", value: { takeoverId: t?.takeoverId ?? "" } });
+		expect(ended.body.case).toBe("ack");
+		expect(chrome.stopped).toBe(1);
+		expect(browser.openTakeovers()).toHaveLength(0);
+		await until(() => !browser.running());
+		// Opening it again starts a new one.
+		await link.request("o2", { case: "browserOpen", value: {} });
+		expect(chrome.launched).toBe(2);
+	});
+
+	it("closing the last tab closes the browser", async () => {
 		const { browser } = makeBrowser();
 		const link = await device(browser);
 		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: {} }));
 		await link.request("n1", { case: "browserNavigate", value: { takeoverId: t?.takeoverId ?? "", targetId: "", action: BrowserNavigateAction.CLOSE_TAB, url: "" } });
 		expect(chrome.called("Target.closeTarget")).toHaveLength(0);
+		expect(chrome.stopped).toBe(1);
+		expect(browser.openTakeovers()).toHaveLength(0);
+	});
+
+	it("keeps the browser while Claude waits on the user in it: the last tab is emptied instead", async () => {
+		const { browser } = makeBrowser();
+		const link = await device(browser);
+		const waiting = browser.requestTakeover(session, { reason: "Sign in" });
+		waiting.catch(() => undefined);
+		await until(() => browser.openTakeovers().length === 1);
+		const t = takeoverOf(await link.request("o1", { case: "browserOpen", value: {} }));
+		await link.request("n1", { case: "browserNavigate", value: { takeoverId: t?.takeoverId ?? "", targetId: "", action: BrowserNavigateAction.CLOSE_TAB, url: "" } });
+		expect(chrome.called("Page.navigate").at(-1)?.params.url).toBe("about:blank");
+		await link.request("e1", { case: "browserTakeoverEnd", value: { takeoverId: t?.takeoverId ?? "" } });
+		expect(chrome.stopped).toBe(0);
+		expect(browser.running()).toBe(true);
+		expect(browser.openTakeovers().map((x) => x.threadId)).toEqual([session.threadId]);
 	});
 
 	it("refuses navigation on a takeover that is no longer open", async () => {

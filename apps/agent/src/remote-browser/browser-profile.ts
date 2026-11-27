@@ -9,13 +9,18 @@
  * login keychain (no dialog on a machine nobody sits at); its cookies are
  * only as safe as the folder, which other users cannot read.
  */
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { CdpConnection } from "./cdp-connection.ts";
 
 const START_TIMEOUT_MS = 20_000;
 const STOP_TIMEOUT_MS = 10_000;
+/** After asking the browser to close: how long each signal gets before the next. */
+const SIGNAL_WAIT_MS = 2_000;
+
+/** The pid of the browser this tunelo started, by profile folder (Windows has no lock file naming it). */
+const launched = new Map<string, number>();
 const HTTP_TIMEOUT_MS = 1_500;
 
 /** Where a running profile browser answers. */
@@ -171,28 +176,81 @@ export async function launchBrowser(dir: string, exe: string): Promise<BrowserEn
 		child.on("error", () => undefined);
 		child.unref();
 		const endpoint = await waitForPort(dir, child, START_TIMEOUT_MS);
-		if (endpoint) return endpoint;
+		if (endpoint) {
+			if (child.pid !== undefined) launched.set(dir, child.pid);
+			return endpoint;
+		}
 		if (child.exitCode === null) child.kill();
 	}
 	throw new BrowserUnavailable(`${exe} did not start with a debugging port`);
 }
 
-/** Closes the profile browser if it runs; true when one was closed. */
+/**
+ * Whether any process of the browser lives: on macOS and Linux it was started
+ * as the leader of its own process group (detached), so its renderers, GPU
+ * and other helpers are in that group too.
+ */
+function treeAlive(pid: number): boolean {
+	if (process.platform === "win32") return alive(pid);
+	try {
+		process.kill(-pid, 0);
+		return true;
+	} catch (err) {
+		return (err as NodeJS.ErrnoException).code === "EPERM";
+	}
+}
+
+/** Ends every process of the browser: its whole group, or its tree on Windows. */
+function killTree(pid: number, signal: NodeJS.Signals): void {
+	if (process.platform === "win32") {
+		spawnSync("taskkill", ["/PID", String(pid), "/T", ...(signal === "SIGKILL" ? ["/F"] : [])], { stdio: "ignore", windowsHide: true });
+		return;
+	}
+	for (const target of [-pid, pid]) {
+		try {
+			process.kill(target, signal);
+		} catch {
+			// gone already, or not a group leader (a browser started by something else)
+		}
+	}
+}
+
+async function gone(dir: string, pid: number | undefined, ms: number): Promise<boolean> {
+	for (const end = Date.now() + ms; ; await new Promise((r) => setTimeout(r, 200))) {
+		if (!(pid !== undefined && treeAlive(pid)) && !(await runningBrowser(dir))) return true;
+		if (Date.now() >= end) return false;
+	}
+}
+
+/**
+ * Closes the profile browser and makes sure none of its processes is left:
+ * asked to close first (it saves its profile), then its whole process tree
+ * is ended, politely and then for good. True when there was one to close.
+ */
 export async function stopBrowser(dir: string): Promise<boolean> {
 	const running = await runningBrowser(dir);
-	if (!running) return false;
-	const pid = process.platform === "win32" ? undefined : lockPid(dir);
-	try {
-		const cdp = await CdpConnection.open(running.wsUrl);
-		await cdp.send("Browser.close").catch(() => undefined);
-		cdp.close();
-	} catch {
-		// not answering: the pid below
+	const pid = process.platform === "win32" ? launched.get(dir) : lockPid(dir);
+	if (!running && !(pid !== undefined && treeAlive(pid))) {
+		launched.delete(dir);
+		return false;
 	}
-	for (const end = Date.now() + STOP_TIMEOUT_MS; Date.now() < end; await new Promise((r) => setTimeout(r, 200))) {
-		if (!(await runningBrowser(dir))) return true;
+	if (running) {
+		try {
+			const cdp = await CdpConnection.open(running.wsUrl);
+			await cdp.send("Browser.close").catch(() => undefined);
+			cdp.close();
+		} catch {
+			// not answering: the signals below
+		}
 	}
-	if (pid && alive(pid)) process.kill(pid, "SIGKILL");
+	if (!(await gone(dir, pid, STOP_TIMEOUT_MS)) && pid !== undefined) {
+		killTree(pid, "SIGTERM");
+		if (!(await gone(dir, pid, SIGNAL_WAIT_MS))) {
+			killTree(pid, "SIGKILL");
+			await gone(dir, pid, SIGNAL_WAIT_MS);
+		}
+	}
+	launched.delete(dir);
 	return true;
 }
 

@@ -142,12 +142,7 @@ export class BrowserLink {
 					);
 				return;
 			case "browserTakeoverEnd":
-				try {
-					this.browser.end(b.value.takeoverId, this.device());
-					ack();
-				} catch (err) {
-					this.fail(id, err);
-				}
+				void this.browser.end(b.value.takeoverId, this.device()).then(ack, (err: unknown) => this.fail(id, err));
 				return;
 		}
 	}

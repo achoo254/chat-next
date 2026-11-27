@@ -80,6 +80,7 @@ import { adoptStarted } from "../machines/project-actions.ts";
 import { machineErrorText, needsProjectTrust } from "../machines/machine-errors.ts";
 import { agentChoices, browserAvailability, type AgentChoice, type BrowserAvailability } from "./new-tab-actions.ts";
 import { BrowserPane } from "../machines/browser/browser-pane.tsx";
+import { closeBrowserTab } from "../machines/browser/takeover-card.tsx";
 import { TabSheet } from "./tab-sheet.tsx";
 import "./terminal.css";
 
@@ -411,6 +412,9 @@ export function TerminalDock({
 		const after = sessionsOf(next);
 		setLayout(next);
 		for (const session of before) if (!after.has(session) && !ai.has(session)) closeSessionOnMachine(session);
+		// The last browser tab closed: the machine closes its browser, so it does not run on unseen.
+		const browserIn = (l: typeof layout) => l.tabs.some((x) => panesOf(x.root).some((p) => p.browser === true));
+		if (browserIn(layout) && !browserIn(next)) closeBrowserTab(link);
 	};
 
 	/**

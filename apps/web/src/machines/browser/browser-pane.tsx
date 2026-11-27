@@ -1,8 +1,9 @@
 // The machine's browser as a tab of the dock (tunelo 3.27.0+): asks the machine to open it (it starts
 // when it does not run), then shows its live view embedded. The machine keeps one browser for all
-// devices, with its own tabs inside; closing this dock tab only stops the view, the browser and its
-// pages stay for the next time. When the browser closes on the machine the pane says so and offers
-// to open it again (it never restarts one the user just closed by itself).
+// devices, with its own tabs inside. Closing this dock tab (terminal-dock.tsx), or the browser's last
+// tab, closes the browser on the machine with every process of it, unless the AI waits on the user in
+// it; its sign-ins stay in the profile. When the browser closes on the machine the pane says so and
+// offers to open it again (it never restarts one the user just closed by itself).
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { MachineLink } from "../link/machine-link.ts";
 import { errorText } from "../use-machines.ts";

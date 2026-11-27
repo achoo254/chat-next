@@ -27,6 +27,7 @@ export class FakeChrome {
 	passwordFocused = false;
 	launched = 0;
 	cleared = 0;
+	stopped = 0;
 	private server!: Server;
 	private wss!: WebSocketServer;
 	private socket: WebSocket | undefined;
@@ -56,6 +57,13 @@ export class FakeChrome {
 			this.launched += 1;
 			this.running = true;
 			return this.endpoint();
+		},
+		stop: async () => {
+			const was = this.running;
+			this.stopped += 1;
+			this.running = false;
+			this.socket?.close();
+			return was;
 		},
 		clear: async () => {
 			this.cleared += 1;

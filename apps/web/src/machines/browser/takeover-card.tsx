@@ -191,6 +191,21 @@ export async function openBrowserTab(link: MachineLink, url = ""): Promise<Brows
 	return frame.body.case === "browserTakeover" ? frame.body.value : null;
 }
 
+/**
+ * The dock's browser tab closed on this device: the machine closes its browser with every process of
+ * it (it keeps it while the AI waits on the user in it), so nothing runs on unseen. Every device's own
+ * takeover ends; the AI's ones stay.
+ */
+export function closeBrowserTab(link: MachineLink): void {
+	for (const takeover of link.snapshot().takeovers.values()) {
+		if (takeover.threadId !== "") continue;
+		link.request({ case: "browserTakeoverEnd", value: { takeoverId: takeover.takeoverId } }).then(
+			() => link.dropTakeover(takeover.takeoverId),
+			() => undefined,
+		);
+	}
+}
+
 interface BrowserDockProps {
 	link: MachineLink;
 	takeovers: readonly BrowserTakeover[];
