@@ -32,6 +32,7 @@ import { brand } from "../brand.ts";
 import { aiName, errorText, folderName, isChatThread, providerOf, timeAgo, useHub, useMachineViews, useNow, useWatch, type MachineView } from "./use-machines.ts";
 import { chatTakesTerminal, observeOffered, sessionPath, terminalOffered } from "./session-mode.tsx";
 import { useMachinesCopy } from "./use-machines-copy.ts";
+import { usagePath } from "./usage/usage-paths.ts";
 
 const SESSION_PARAM = /^[A-Za-z0-9_-]{1,64}$/;
 const RECENT = 8;
@@ -134,6 +135,11 @@ export function MachineBoard({ machine }: { machine: string }) {
 				<Link to={paths.machineInfo(machine)} className="btn btn-sm mx-btn-ghost" aria-label={t.agent.info} title={t.agent.info} data-id="machine-settings-btn">
 					<Icon name="settings" small />
 					<span className="hide-narrow">{t.agent.info}</span>
+				</Link>
+				{/* "Hiệu quả" of every repository on this machine (a project's menu opens one repository's). */}
+				<Link to={usagePath(machine, "")} className="btn btn-sm mx-btn-ghost" aria-label={t.usage.open} title={t.usage.open} data-id="machine-usage-btn">
+					<Icon name="database" small />
+					<span className="hide-narrow">{t.usage.open}</span>
 				</Link>
 				{/* The machine's terminal: the tabs this device keeps for it, or one new shell. */}
 				{!isBlocked(conn) &&

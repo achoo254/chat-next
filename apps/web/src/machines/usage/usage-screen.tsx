@@ -13,7 +13,7 @@
 // to update it. Loaded on demand with its own styles.
 import { useEffect, useState } from "react";
 import type { AiAccount, ProviderInfo, UsageReport } from "@achoo254/chat-proto/remote/remote";
-import { paths } from "../../router.tsx";
+import { Link, paths } from "../../router.tsx";
 import { machineErrorText, unsupportedByMachine } from "../machine-errors.ts";
 import { useAccountList } from "../machine-profile.ts";
 import { PageHead } from "../page-head.tsx";
@@ -29,6 +29,7 @@ import { UsageOutcome } from "./usage-outcome.tsx";
 import { QuotaBlock } from "./usage-quota.tsx";
 import { useSessionNames } from "./usage-session-names.ts";
 import { dayOf, reportRange, summarize, type UsageSummary, type UsageTotals } from "./usage-summary.ts";
+import { usagePath } from "./usage-paths.ts";
 import { UsageWhere } from "./usage-where.tsx";
 import "./usage.css";
 
@@ -109,7 +110,14 @@ export function UsageView({ link, online, machine, machineName, ai, repoKey, acc
 		);
 	return (
 		<div className="mx-scroll" role="region" aria-label={u.title}>
-			<PageHead back={paths.machine(machine)} backLabel={t.back} title={u.title} subtitle={u.subtitle(scope, machineName)} />
+			<PageHead back={paths.machine(machine)} backLabel={t.back} title={u.title} subtitle={u.subtitle(scope, machineName)}>
+				{/* One repository's page: the way to every repository of the machine. */}
+				{repoKey !== "" && (
+					<Link to={usagePath(machine, "")} className="btn btn-sm mx-btn-ghost" data-id="usage-all-repos">
+						{u.allRepos}
+					</Link>
+				)}
+			</PageHead>
 			<div className="mx-body mx-usage">{body}</div>
 		</div>
 	);
