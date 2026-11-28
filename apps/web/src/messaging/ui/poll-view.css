@@ -12,13 +12,16 @@
 .poll-dot { border-radius: var(--radius-full); }
 .poll-box { border-radius: var(--radius-xs); }
 .poll-box .icon { width: 14px; height: 14px; }
-.poll-result { position: relative; display: grid; grid-template-columns: 3.5ch minmax(0, 1fr); gap: var(--space-2); align-items: center; padding: var(--space-1) 0 var(--space-2); }
+.poll-result { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: 2px var(--space-2); align-items: center; padding: var(--space-1) 0; }
 .poll-percent { font-size: 0.8125rem; font-weight: 600; text-align: end; }
 .poll-text { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 .poll-text .icon { width: 16px; height: 16px; flex: none; }
-.poll-bar { position: absolute; left: calc(3.5ch + var(--space-2)); bottom: 0; height: 4px; max-width: calc(100% - 3.5ch - var(--space-2)); min-width: 4px;
-	border-radius: var(--radius-full); background: var(--c-primary-solid); transition: width var(--dur-base) var(--ease-standard); }
-.poll-result:not(.chosen):not(.right) .poll-bar { background: var(--c-bar-track, var(--c-border-strong)); }
+/* The count and the latest voters' faces at the end of the line (Telegram's). */
+.poll-count { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; color: var(--c-text-muted); }
+.poll-kind .r-avs { margin-left: var(--space-1); vertical-align: middle; }
+.poll-track { grid-column: 2 / 4; height: 4px; border-radius: var(--radius-full); background: var(--c-bar-track, var(--c-border-subtle)); overflow: hidden; }
+.poll-bar { display: block; height: 100%; min-width: 4px; border-radius: var(--radius-full); background: var(--c-primary-solid); transition: width var(--dur-base) var(--ease-standard); }
+.poll-result:not(.chosen):not(.right) .poll-bar { background: color-mix(in srgb, var(--c-primary-solid) 55%, transparent); }
 .poll-result.right .poll-bar { background: var(--c-success); }
 .poll-result.right .icon { color: var(--c-success-text, var(--c-success)); }
 .poll-result.wrong .poll-bar { background: var(--c-error); }

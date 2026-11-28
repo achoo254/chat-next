@@ -13,6 +13,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// pollRecentMax is how many latest voters of each answer a public poll carries.
+const pollRecentMax = 3
+
 // Limits of a poll, those of Telegram, so a poll of Chat can go there and one
 // from there fits here.
 const (
@@ -41,13 +44,15 @@ type pollsOf struct {
 	counts map[msgKey]map[int32]int32
 	voters map[msgKey]int32
 	mine   map[memberKey]map[int64][]int32 // (chat, viewer) -> seq -> answers
+	// recent: the latest voters of each answer, newest first (pollRecentMax).
+	recent map[msgKey]map[int32][]int64
 }
 
 // loadPolls reads the polls among the messages of keys. A message that is not a
 // poll has no rows and costs nothing but the lookups.
 func loadPolls(ctx context.Context, q querier, keys map[int64][]int64, viewers []int64) (*pollsOf, error) {
 	p := &pollsOf{state: map[msgKey]*pollState{}, counts: map[msgKey]map[int32]int32{}, voters: map[msgKey]int32{},
-		mine: map[memberKey]map[int64][]int32{}}
+		mine: map[memberKey]map[int64][]int32{}, recent: map[msgKey]map[int32][]int64{}}
 	chats, seqs := flattenKeys(keys)
 	if len(chats) == 0 {
 		return p, nil
@@ -136,10 +141,39 @@ func loadPolls(ctx context.Context, q querier, keys map[int64][]int64, viewers [
 			return nil, fmt.Errorf("chat: count poll voters: %w", err)
 		}
 	}
+	pc, ps := flattenKeys(pollKeys(p.state))
+	// The latest voters of each answer, whatever the poll: fill shows them for a public one.
+	rows, err = q.Query(ctx, `
+		SELECT chat_id, seq, option, user_id FROM (
+			SELECT v.chat_id, v.seq, o.option, v.user_id,
+				row_number() OVER (PARTITION BY v.chat_id, v.seq, o.option ORDER BY v.created_at DESC, v.user_id DESC) AS n
+			FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
+			JOIN poll_votes v ON v.chat_id = x.chat_id AND v.seq = x.seq
+			CROSS JOIN LATERAL unnest(v.options) AS o(option)) r
+		WHERE n <= $3 ORDER BY chat_id, seq, option, n`, pc, ps, pollRecentMax)
+	if err != nil {
+		return nil, fmt.Errorf("chat: recent poll voters: %w", err)
+	}
+	for rows.Next() {
+		var k msgKey
+		var option int16
+		var user int64
+		if err := rows.Scan(&k.chatID, &k.seq, &option, &user); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("chat: recent poll voters: %w", err)
+		}
+		if p.recent[k] == nil {
+			p.recent[k] = map[int32][]int64{}
+		}
+		p.recent[k][int32(option)] = append(p.recent[k][int32(option)], user)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("chat: recent poll voters: %w", err)
+	}
 	if len(viewers) == 0 {
 		return p, nil
 	}
-	pc, ps := flattenKeys(pollKeys(p.state))
 	rows, err = q.Query(ctx, `
 		SELECT v.chat_id, v.seq, v.user_id, v.options
 		FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
@@ -218,6 +252,12 @@ func (p *pollsOf) fill(m *appv1.Message, viewer int64) {
 	}
 	poll.Closed = st.closed
 	poll.Chosen = p.mine[memberKey{k.chatID, viewer}][k.seq]
+	poll.RecentVoters = nil
+	if poll.GetPublicVoters() {
+		for i := range n {
+			poll.RecentVoters = append(poll.RecentVoters, &appv1.PollVoterIds{UserIds: p.recent[k][int32(i)]})
+		}
+	}
 	poll.Correct, poll.Explanation = nil, ""
 	if poll.GetQuiz() && (len(poll.Chosen) > 0 || st.closed || (viewer != 0 && viewer == m.GetFromId())) {
 		poll.Correct, poll.Explanation = st.correct, st.explanation

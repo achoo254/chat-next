@@ -10,6 +10,7 @@ import { Icon } from "../../components/icon.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useServices } from "../data/services.tsx";
 import { useUi } from "./ui-context.tsx";
+import { ReactorAvatars } from "./message-item.tsx";
 import "./poll-view.css";
 
 /** Code.FailedPrecondition of @connectrpc/connect (gRPC status 9). */
@@ -70,6 +71,8 @@ export default function PollView({ chatId, seq, poll, mine, inert, stamp }: Poll
 			});
 	};
 	const vote = (options: readonly number[]) => run(remote.votePoll(chatId, seq, options), () => setTicked([]));
+	// The latest faces of the whole poll beside its kind, as Telegram shows them.
+	const faces = results && !poll.resultsHidden ? [...new Set(poll.recentVoters.flat())].slice(0, 3) : [];
 	const kind = poll.closed ? copy.closed : poll.quiz ? copy.quiz : poll.publicVoters ? copy.public : copy.anonymous;
 	const pick = (i: number) => {
 		if (!canVote) return;
@@ -84,6 +87,7 @@ export default function PollView({ chatId, seq, poll, mine, inert, stamp }: Poll
 			<p className="poll-question">{poll.question}</p>
 			<p className="poll-kind">
 				{kind}
+				{faces.length > 0 && <ReactorAvatars ids={faces} more={0} />}
 				{poll.multiple && !results && <> · {copy.multipleHint}</>}
 			</p>
 			<ul className="poll-options" data-id="poll-options">
@@ -106,7 +110,17 @@ export default function PollView({ chatId, seq, poll, mine, inert, stamp }: Poll
 										{text}
 										{mark !== null && <Icon name={mark} />}
 									</span>
-									{!poll.resultsHidden && <span className="poll-bar" aria-hidden="true" style={{ width: `${percent}%` }} />}
+									{!poll.resultsHidden && (
+										<span className="poll-count" aria-hidden="true">
+											{count}
+											{(poll.recentVoters[i]?.length ?? 0) > 0 && <ReactorAvatars ids={poll.recentVoters[i] ?? []} more={0} />}
+										</span>
+									)}
+									{!poll.resultsHidden && (
+										<span className="poll-track" aria-hidden="true">
+											<span className="poll-bar" style={{ width: `${percent}%` }} />
+										</span>
+									)}
 								</div>
 							) : (
 								<button
@@ -136,7 +150,7 @@ export default function PollView({ chatId, seq, poll, mine, inert, stamp }: Poll
 				<span className="poll-voters">{poll.resultsHidden ? copy.hidden : copy.voters(poll.voters)}</span>
 				{poll.publicVoters && results && !poll.resultsHidden && poll.voters > 0 && !inert && (
 					<button type="button" className="btn btn-sm" data-id="poll-show-voters" onClick={() => ui.dialog.set({ kind: "pollVoters", chatId, seq })}>
-						{copy.showVoters}
+						{copy.showVoters(poll.voters)}
 					</button>
 				)}
 				{poll.multiple && !results && !inert && (

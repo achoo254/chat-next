@@ -123,7 +123,7 @@ function messageSignature(message: StoredMessage): string {
 	const preview = message.linkPreview === null ? "" : `${message.linkPreview.title}:${message.linkPreview.photo?.fileId ?? ""}`;
 	const keyboard = message.keyboard?.kind === "keyboard" && message.keyboard.hidden ? 1 : 0;
 	// A vote or the closing of a poll keeps edit_version too.
-	const poll = message.poll === undefined ? "" : JSON.stringify([message.poll.counts, message.poll.chosen, message.poll.closed, message.poll.correct]);
+	const poll = message.poll === undefined ? "" : JSON.stringify([message.poll.counts, message.poll.chosen, message.poll.closed, message.poll.correct, message.poll.recentVoters]);
 	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${message.recalled ? 1 : 0}|${keyboard}|${reactions}|${media}|${preview}|${poll}|${message.text}`;
 }
 

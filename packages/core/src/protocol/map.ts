@@ -462,6 +462,7 @@ export function toPoll(poll: WirePoll): Poll {
 		voters: poll.voters,
 		chosen: [...poll.chosen],
 		resultsHidden: poll.resultsHidden,
+		recentVoters: poll.recentVoters.map((v) => v.userIds.map(id)),
 	};
 }
 

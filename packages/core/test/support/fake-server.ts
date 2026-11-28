@@ -36,6 +36,7 @@ import {
 	MessageActionSchema,
 	MessageSchema,
 	PollSchema,
+	PollVoterIdsSchema,
 	ReadHistoryResponseSchema,
 	ReactionCountSchema,
 	ReplyMarkupSchema,
@@ -373,6 +374,15 @@ export class FakeServer {
 							counts: poll.options.map((_, i) => votes.filter((v) => v.includes(i)).length),
 							voters: votes.length,
 							chosen: [...(record.votes?.get(viewer) ?? [])],
+							recentVoters: poll.publicVoters
+								? poll.options.map((_, i) => create(PollVoterIdsSchema, {
+										userIds: [...(record.votes ?? new Map<number, readonly number[]>()).entries()]
+											.filter(([, v]) => v.includes(i))
+											.map(([user]) => big(user))
+											.reverse()
+											.slice(0, 3),
+									}))
+								: [],
 						}),
 					}),
 			randomId: big(viewer === record.sender ? record.randomId : 0),

@@ -77,9 +77,12 @@ describe("polls", () => {
 		if (box === null) throw new Error("no poll");
 		expect(within(box).getByText("Bình chọn công khai")).toBeTruthy();
 		// Before voting the list is not offered, as Telegram does.
-		expect(within(box).queryByRole("button", { name: "Xem ai đã chọn" })).toBeNull();
+		expect(within(box).queryByRole("button", { name: /Xem phiếu bầu/ })).toBeNull();
 		await userEvent.click(within(box).getByRole("button", { name: "Đi" }));
-		await userEvent.click(await within(box).findByRole("button", { name: "Xem ai đã chọn" }, LONG));
+		// Each answer shows its count with the faces of who chose it, the poll's kind its latest faces.
+		await waitFor(() => expect(box.querySelectorAll(".poll-count .avatar")).toHaveLength(3), LONG);
+		expect(box.querySelectorAll(".poll-kind .avatar")).toHaveLength(3);
+		await userEvent.click(await within(box).findByRole("button", { name: "Xem phiếu bầu (3)" }, LONG));
 		const dialog = await screen.findByRole("dialog", { name: "Ai đã chọn gì" }, LONG);
 		const go = await within(dialog).findByRole("region", { name: "Đi" }, LONG);
 		expect(within(go).getByText("Đi · 2")).toBeTruthy();

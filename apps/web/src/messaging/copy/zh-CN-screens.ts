@@ -988,7 +988,7 @@ export const zhCNScreens: ScreensCopy = {
 		/** A poll of a synced app that does not show its results yet. */
 		hidden: "结果尚未公布",
 		/** Opens who chose each answer of a public poll. */
-		showVoters: "查看投票人",
+		showVoters: (n: number) => `查看投票 (${n})`,
 		voters: (n: number) => (n === 0 ? "还没有人投票" : `${n} 人已投票`),
 		option: (text: string, count: number, percent: number, chosen: boolean) =>
 			`${text}：${count} 票，${percent}%${chosen ? "，你的选择" : ""}`,

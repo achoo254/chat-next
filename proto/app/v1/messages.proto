@@ -240,6 +240,15 @@ message Poll {
   // A poll of a synced app that does not show its results yet (until you
   // vote, or until it closes): counts and voters are then all 0.
   bool results_hidden = 12;
+  // Public poll: up to 3 people who chose each answer most recently, newest
+  // first, one entry per answer, so clients draw their faces; their users come
+  // with the message. Empty for an anonymous poll.
+  repeated PollVoterIds recent_voters = 13;
+}
+
+// People who chose one answer of a poll.
+message PollVoterIds {
+  repeated int64 user_ids = 1 [jstype = JS_NUMBER];
 }
 
 message ActionChatCreated {

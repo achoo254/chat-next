@@ -265,6 +265,23 @@ func TestAPublicPollListsWhoChoseEachAnswerAndAnAnonymousOneRefuses(t *testing.T
 	if ids := usersIn(resp.GetUsers()); !slices.Contains(ids, b) || !slices.Contains(ids, c) {
 		t.Fatalf("users = %v", ids)
 	}
+	// The poll carries the latest voters of each answer, with their users, for faces.
+	hist, err := h.svc.GetHistory(ctx, a, &appv1.GetHistoryRequest{ChatId: chatID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range hist.GetMessages() {
+		if m.GetSeq() != seq {
+			continue
+		}
+		rv := m.GetPoll().GetRecentVoters()
+		if len(rv) != 2 || !slices.Equal(rv[0].GetUserIds(), []int64{c, b}) || !slices.Equal(rv[1].GetUserIds(), []int64{c}) {
+			t.Fatalf("recent voters = %v", rv)
+		}
+	}
+	if ids := usersIn(hist.GetUsers()); !slices.Contains(ids, b) || !slices.Contains(ids, c) {
+		t.Fatalf("history users = %v", ids)
+	}
 	anon := h.poll(a, chatID, &appv1.SendPollRequest{Question: "q", Options: []string{"x", "y"}})
 	if _, err := h.svc.GetPollVoters(ctx, a, &appv1.GetPollVotersRequest{ChatId: chatID, Seq: anon}); codeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("anonymous poll: err = %v", err)

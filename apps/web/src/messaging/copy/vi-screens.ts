@@ -1000,7 +1000,7 @@ export const viScreens = {
 		/** A poll of a synced app that does not show its results yet. */
 		hidden: "Kết quả chưa được công bố",
 		/** Opens who chose each answer of a public poll. */
-		showVoters: "Xem ai đã chọn",
+		showVoters: (n: number) => `Xem phiếu bầu (${n})`,
 		voters: (n: number) => (n === 0 ? "Chưa có ai bình chọn" : `${n} người đã bình chọn`),
 		option: (text: string, count: number, percent: number, chosen: boolean) =>
 			`${text}: ${count} phiếu, ${percent}%${chosen ? ", bạn đã chọn" : ""}`,

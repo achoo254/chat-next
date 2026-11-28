@@ -991,7 +991,7 @@ export const enScreens: ScreensCopy = {
 		/** A poll of a synced app that does not show its results yet. */
 		hidden: "Results are not shown yet",
 		/** Opens who chose each answer of a public poll. */
-		showVoters: "See who voted",
+		showVoters: (n: number) => `View votes (${n})`,
 		voters: (n: number) => (n === 0 ? "No votes yet" : n === 1 ? "1 vote" : `${n} votes`),
 		option: (text: string, count: number, percent: number, chosen: boolean) =>
 			`${text}: ${count} ${count === 1 ? "vote" : "votes"}, ${percent}%${chosen ? ", your choice" : ""}`,

@@ -282,7 +282,7 @@ function ReplyQuote({ chatId, seq }: { chatId: number; seq: number }) {
 }
 
 /** The faces of a pill: up to 3 latest people who reacted, newest first, "+N" for the rest. */
-function ReactorAvatars({ ids, more }: { ids: readonly number[]; more: number }) {
+export function ReactorAvatars({ ids, more }: { ids: readonly number[]; more: number }) {
 	"use no memo";
 	return (
 		<span className="r-avs" aria-hidden="true">

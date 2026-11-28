@@ -46,6 +46,7 @@ describe("polls", () => {
 			voters: 3,
 			chosen: [0],
 			resultsHidden: false,
+			recentVoters: [],
 		});
 		expect(toMessage(create(MessageSchema, { chatId: big(5), seq: big(3), text: "hi" })).poll).toBeUndefined();
 		const update = toUpdate(

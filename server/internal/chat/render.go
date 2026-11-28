@@ -753,6 +753,9 @@ func referencedUsers(m *appv1.Message) []int64 {
 		ids = append(ids, f.GetFromUserId())
 	}
 	ids = append(ids, m.GetViaBotId())
+	for _, v := range m.GetPoll().GetRecentVoters() {
+		ids = append(ids, v.GetUserIds()...)
+	}
 	for _, e := range m.GetEntities() {
 		ids = append(ids, e.GetUserId())
 	}
@@ -1035,6 +1038,7 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 				}
 				polls.fill(rendered, viewer)
 				k.Poll.Poll = rendered.GetPoll()
+				ents.addUsers(viewer, referencedUsers(rendered)...)
 			case *appv1.Update_MemberAdded:
 				ents.addUsers(viewer, k.MemberAdded.GetUserIds()...)
 				ents.addUsers(viewer, k.MemberAdded.GetInviterId())

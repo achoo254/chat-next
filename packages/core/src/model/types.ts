@@ -400,6 +400,8 @@ export interface Poll {
 	readonly chosen: readonly number[];
 	/** A poll of a synced app that does not show its results yet: counts and voters are 0. */
 	readonly resultsHidden: boolean;
+	/** Public poll: up to 3 latest voters of each answer, newest first; empty for an anonymous one. */
+	readonly recentVoters: readonly (readonly number[])[];
 }
 
 export type SessionRevokeReason =

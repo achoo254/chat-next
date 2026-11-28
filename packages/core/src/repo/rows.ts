@@ -152,6 +152,7 @@ function parsePoll(json: string | null): { poll?: Poll } {
 			voters: field(value, "voters"),
 			chosen: numbers(value.chosen),
 			resultsHidden: value.resultsHidden === true,
+			recentVoters: Array.isArray(value.recentVoters) ? value.recentVoters.map(numbers) : [],
 		},
 	};
 }
