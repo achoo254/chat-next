@@ -251,10 +251,12 @@ export function sessionInfoFromWire(info: ObservatorySessionInfo): LiveMapSessio
 /**
  * Requests Claude Code makes on the session's own thread for its side
  * features once a turn ends (the next prompt it suggests, the session's
- * title): no agent, but not the AI working either. The machine leaves them
+ * title), and the summary it writes when it compacts the context (an
+ * auto compaction may run while the person is away, after the turn ended): no
+ * agent, but not the AI working on a turn either. The machine leaves them
  * out the same way (apps/agent observatory store/live-map-reads.ts).
  */
-export const SIDE_REQUESTS: readonly string[] = ["prompt_suggestion", "generate_session_title"];
+export const SIDE_REQUESTS: readonly string[] = ["prompt_suggestion", "generate_session_title", "compact"];
 
 /** A request of the main thread doing the session's work: no agent, and not a side feature. */
 export const isMainRequest = (e: { readonly agentId: string; readonly side: boolean }): boolean => e.agentId === "" && !e.side;

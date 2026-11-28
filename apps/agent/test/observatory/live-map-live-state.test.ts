@@ -83,6 +83,9 @@ describe("the core's state", () => {
     expect(live([prompt(T), event("compact_start", T + 1)]).core).toBe("compacting");
     expect(live([prompt(T), event("compact_start", T + 1), event("compact_end", T + 2)]).core).toBe("thinking");
     expect(live([prompt(T), event("stop", T + 1), event("compact_start", T + 2), event("compact_end", T + 3)]).core).toBe("waiting_user");
+    // An auto compaction while the person is away: its summary request is no work on a turn.
+    const summary = api(T + 3, { model: "claude-opus-5-5", inputTokens: 400_000, outputTokens: 6_000, durationMs: 50_000, querySource: "compact" });
+    expect(live([prompt(T), event("stop", T + 1), event("compact_start", T + 2), summary, event("compact_end", T + 4)]).core).toBe("waiting_user");
     expect(live([prompt(T), tool("t1", T + 1, "FILES")], { endedAt: T + 5 })).toMatchObject({ core: "idle", running: [] });
   });
 
