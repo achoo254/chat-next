@@ -77,6 +77,11 @@ service MessagesService {
   rpc VotePoll(VotePollRequest) returns (VotePollResponse);
   // Closes a poll for good: only its sender may.
   rpc ClosePoll(ClosePollRequest) returns (ClosePollResponse);
+  // Who chose each answer of a public poll, newest first, up to 100 per
+  // answer. For a poll of a synced app, the people that app names. Only
+  // members who see the message; in channels admins only. An anonymous poll
+  // refuses (FAILED_PRECONDITION).
+  rpc GetPollVoters(GetPollVotersRequest) returns (GetPollVotersResponse);
 }
 
 enum EntityType {
@@ -639,6 +644,27 @@ message SendPollResponse {
 message ClosePollResponse {
   Poll poll = 1;
   SyncAck ack = 2;
+}
+
+message GetPollVotersRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+// Who chose one answer of a poll.
+message PollAnswerVoters {
+  // The answer's index.
+  int32 option = 1;
+  // Votes of the answer, as the poll counts them; may be more than user_ids
+  // lists (a synced app that names only some, or over 100).
+  int32 count = 2;
+  repeated int64 user_ids = 3 [jstype = JS_NUMBER];
+}
+
+message GetPollVotersResponse {
+  // One entry per answer, in order.
+  repeated PollAnswerVoters answers = 1;
+  repeated User users = 2;
 }
 
 message VotePollResponse {

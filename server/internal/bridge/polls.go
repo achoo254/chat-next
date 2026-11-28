@@ -32,6 +32,17 @@ type PollResults struct {
 	// Correct and Explanation are a quiz's answer, once the app tells it.
 	Correct     []int
 	Explanation string
+	// VotesKnown says Votes names who chose what (a public poll whose voters the app
+	// lists); VotesComplete that it names everyone who voted. The owner may be among them.
+	VotesKnown    bool
+	VotesComplete bool
+	Votes         []PollVote
+}
+
+// PollVote is the answers of one person to a public poll.
+type PollVote struct {
+	From    Participant
+	Options []int
 }
 
 // OutPoll is a poll Chat sends (OutMessage.Poll).

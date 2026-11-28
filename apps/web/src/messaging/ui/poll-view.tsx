@@ -9,6 +9,7 @@ import type { Poll } from "@achoo254/chat-core";
 import { Icon } from "../../components/icon.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
 import { useServices } from "../data/services.tsx";
+import { useUi } from "./ui-context.tsx";
 import "./poll-view.css";
 
 /** Code.FailedPrecondition of @connectrpc/connect (gRPC status 9). */
@@ -43,6 +44,7 @@ export default function PollView({ chatId, seq, poll, mine, inert, stamp }: Poll
 	"use no memo";
 	const copy = useScreensCopy().pollView;
 	const { remote, toasts } = useServices();
+	const ui = useUi();
 	const [ticked, setTicked] = useState<readonly number[]>([]);
 	// A vote or a closing keeps the buttons off until the poll it changes comes back
 	// (the realtime update), not only until the call answers; a few seconds at most.
@@ -132,6 +134,11 @@ export default function PollView({ chatId, seq, poll, mine, inert, stamp }: Poll
 			)}
 			<div className="poll-foot">
 				<span className="poll-voters">{poll.resultsHidden ? copy.hidden : copy.voters(poll.voters)}</span>
+				{poll.publicVoters && results && !poll.resultsHidden && poll.voters > 0 && !inert && (
+					<button type="button" className="btn btn-sm" data-id="poll-show-voters" onClick={() => ui.dialog.set({ kind: "pollVoters", chatId, seq })}>
+						{copy.showVoters}
+					</button>
+				)}
 				{poll.multiple && !results && !inert && (
 					<button type="button" className="btn btn-sm" data-id="poll-vote" disabled={!canVote || ticked.length === 0} onClick={() => vote(ticked)}>
 						{copy.vote}

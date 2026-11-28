@@ -990,12 +990,22 @@ export const enScreens: ScreensCopy = {
 		closeConfirm: "Click again to stop it",
 		/** A poll of a synced app that does not show its results yet. */
 		hidden: "Results are not shown yet",
+		/** Opens who chose each answer of a public poll. */
+		showVoters: "See who voted",
 		voters: (n: number) => (n === 0 ? "No votes yet" : n === 1 ? "1 vote" : `${n} votes`),
 		option: (text: string, count: number, percent: number, chosen: boolean) =>
 			`${text}: ${count} ${count === 1 ? "vote" : "votes"}, ${percent}%${chosen ? ", your choice" : ""}`,
 		explanation: "Explanation",
 		failed: "Could not vote, try again.",
 		external: "This poll belongs to the synced app: only the owner of the linked account can vote.",
+	},
+	pollVoters: {
+		title: "Who voted for what",
+		none: "Nobody chose this answer",
+		unavailable: "Could not load who voted.",
+		/** Voters the list does not name (a synced app that names only some). */
+		more: (n: number) => `and ${n} more`,
+		answer: (text: string, count: number) => `${text} · ${count}`,
 	},
 	pollForm: {
 		title: "New poll",

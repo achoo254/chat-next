@@ -662,6 +662,14 @@ export class FakeServer {
 		this.pushPoll(chatId, record);
 	}
 
+	/** Who chose each answer of a poll, newest vote first. */
+	pollVoters(chatId: number, seq: number): number[][] {
+		const record = this.record(chatId, seq);
+		const options = record.message.poll?.options ?? [];
+		const votes = [...(record.votes ?? new Map<number, readonly number[]>()).entries()].reverse();
+		return options.map((_, i) => votes.filter(([, v]) => v.includes(i)).map(([user]) => user));
+	}
+
 	/** Closes a poll. */
 	closePoll(chatId: number, seq: number): void {
 		const record = this.record(chatId, seq);

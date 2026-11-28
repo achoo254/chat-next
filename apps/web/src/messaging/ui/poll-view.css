@@ -39,3 +39,6 @@
 .poll-form-option .poll-dot[aria-checked="true"] { border-color: var(--c-success); color: var(--c-success-text, var(--c-success)); }
 .poll-form-option .poll-dot .icon { width: 12px; height: 12px; }
 .poll-form-options > .btn { justify-self: start; display: inline-flex; align-items: center; gap: var(--space-1); }
+/* Who chose what (poll-voters-dialog.tsx). */
+.poll-voters section { display: grid; gap: var(--space-1); }
+.poll-voters-answer { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--c-text-muted); }

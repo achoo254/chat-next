@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"app.local/server/internal/bridge"
@@ -109,8 +110,78 @@ func registerPolls(d tg.UpdateDispatcher, c *conn, emit func(context.Context, br
 		}
 		pr := pollResults(&poll, &u.Results)
 		pr.Conversation, pr.ID = conv, strconv.Itoa(msgID)
+		if in, err := c.inputPeer(ctx, conv); err == nil {
+			c.addVoters(ctx, in, msgID, &poll, &pr)
+		}
 		return emit(ctx, bridge.Event{Poll: &pr})
 	})
+}
+
+// pollVotersMax bounds the voters read of one poll (100 a page).
+const pollVotersMax = 500
+
+// addVoters names who chose what in a public poll (messages.getPollVotes), when
+// Telegram lets the owner see it. A refusal (Telegram shows voters only to who voted,
+// a throttle) leaves the voters unknown: the counts still come.
+func (c *conn) addVoters(ctx context.Context, peer tg.InputPeerClass, msgID int, poll *tg.Poll, pr *bridge.PollResults) {
+	if !poll.PublicVoters || pr.Counts == nil {
+		return
+	}
+	if pr.Voters == 0 {
+		pr.VotesKnown, pr.VotesComplete, pr.Votes = true, true, nil
+		return
+	}
+	byPeer := map[string]*bridge.PollVote{}
+	var order []string
+	complete := true
+	offset := ""
+	for {
+		res, err := c.live.api().MessagesGetPollVotes(ctx, &tg.MessagesGetPollVotesRequest{Peer: peer, ID: msgID, Offset: offset, Limit: 100})
+		if err != nil {
+			return
+		}
+		book := newPeerBook()
+		book.add(res.Users, res.Chats)
+		for _, v := range res.Votes {
+			var from tg.PeerClass
+			var options [][]byte
+			switch t := v.(type) {
+			case *tg.MessagePeerVote:
+				from, options = t.Peer, [][]byte{t.Option}
+			case *tg.MessagePeerVoteMultiple:
+				from, options = t.Peer, t.Options
+			default:
+				complete = false // voted, the answer not said
+				continue
+			}
+			who := book.participantOf(from, c.live.self)
+			vote := byPeer[who.ID]
+			if vote == nil {
+				vote = &bridge.PollVote{From: who}
+				byPeer[who.ID] = vote
+				order = append(order, who.ID)
+			}
+			for _, o := range options {
+				if i := optionIndex(poll, o); i >= 0 && !slices.Contains(vote.Options, i) {
+					vote.Options = append(vote.Options, i)
+				}
+			}
+		}
+		offset = res.NextOffset
+		if offset == "" {
+			break
+		}
+		if len(order) >= pollVotersMax {
+			complete = false
+			break
+		}
+	}
+	for _, id := range order {
+		v := byPeer[id]
+		slices.Sort(v.Options)
+		pr.Votes = append(pr.Votes, *v)
+	}
+	pr.VotesKnown, pr.VotesComplete = true, complete
 }
 
 // messagesByID reads messages of a conversation by id; ids that are gone are left out.
@@ -198,6 +269,7 @@ func (a *Adapter) PollResults(ctx context.Context, acct bridge.Account, conv str
 			}
 			pr := pollResults(&p.Poll, &p.Results)
 			pr.Conversation, pr.ID = conv, strconv.Itoa(m.ID)
+			c.addVoters(ctx, peer, m.ID, &p.Poll, &pr)
 			out = append(out, pr)
 		}
 	}

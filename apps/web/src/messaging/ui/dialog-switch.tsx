@@ -29,6 +29,7 @@ const PinnedListDialog = lazy(() => import("./pinned-dialogs.tsx").then((m) => (
 const AddContactDialog = lazy(() => import("./contact-add.tsx").then((m) => ({ default: m.AddContactDialog })));
 const EditChatDialog = lazy(() => import("./edit-chat-dialog.tsx"));
 const PollDialog = lazy(() => import("./poll-dialog.tsx"));
+const PollVotersDialog = lazy(() => import("./poll-voters-dialog.tsx"));
 const BotAlertDialog = lazy(() => import("../bots/bot-chat.tsx").then((m) => ({ default: m.BotAlertDialog })));
 
 export default function Dialog({ request, close }: { request: DialogRequest; close: () => void }) {
@@ -69,6 +70,8 @@ export default function Dialog({ request, close }: { request: DialogRequest; clo
 			return <ReadByDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "newPoll":
 			return <PollDialog chatId={request.chatId} topicId={request.topicId} onClose={close} />;
+		case "pollVoters":
+			return <PollVotersDialog chatId={request.chatId} seq={request.seq} onClose={close} />;
 		case "addFailed":
 			return (
 				<AddFailedDialog

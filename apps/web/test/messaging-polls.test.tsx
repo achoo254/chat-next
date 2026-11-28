@@ -67,6 +67,28 @@ describe("polls", () => {
 		await within(box).findByLabelText("Biển: 1 phiếu, 100%, bạn đã chọn", {}, LONG);
 	});
 
+	it("lists who chose each answer of a public poll", async () => {
+		const { f, lan, minh, chat } = setup();
+		const { seq } = f.server.sendMessage(lan, chat, "", 0, { poll: { question: "Ai đi?", options: ["Đi", "Không"], publicVoters: true } });
+		f.server.votePoll(lan, chat, seq, [0]);
+		f.server.votePoll(minh, chat, seq, [1]);
+		const log = await open(f, chat);
+		const box = (await within(log).findByText("Ai đi?", {}, LONG)).closest<HTMLElement>(".poll");
+		if (box === null) throw new Error("no poll");
+		expect(within(box).getByText("Bình chọn công khai")).toBeTruthy();
+		// Before voting the list is not offered, as Telegram does.
+		expect(within(box).queryByRole("button", { name: "Xem ai đã chọn" })).toBeNull();
+		await userEvent.click(within(box).getByRole("button", { name: "Đi" }));
+		await userEvent.click(await within(box).findByRole("button", { name: "Xem ai đã chọn" }, LONG));
+		const dialog = await screen.findByRole("dialog", { name: "Ai đã chọn gì" }, LONG);
+		const go = await within(dialog).findByRole("region", { name: "Đi" }, LONG);
+		expect(within(go).getByText("Đi · 2")).toBeTruthy();
+		expect(within(go).getByText("Bạn")).toBeTruthy();
+		expect(within(go).getByText("Lan Anh")).toBeTruthy();
+		const no = within(dialog).getByRole("region", { name: "Không" });
+		expect(within(no).getByText("Minh")).toBeTruthy();
+	});
+
 	it("lets the sender stop their poll with a second click", async () => {
 		const { f, chat } = setup();
 		const { seq } = f.server.sendMessage(f.selfId, chat, "", 0, { poll: { question: "Họp lúc mấy giờ?", options: ["9h", "10h"] } });

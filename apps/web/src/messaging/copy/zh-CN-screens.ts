@@ -987,12 +987,22 @@ export const zhCNScreens: ScreensCopy = {
 		closeConfirm: "再点一次以结束",
 		/** A poll of a synced app that does not show its results yet. */
 		hidden: "结果尚未公布",
+		/** Opens who chose each answer of a public poll. */
+		showVoters: "查看投票人",
 		voters: (n: number) => (n === 0 ? "还没有人投票" : `${n} 人已投票`),
 		option: (text: string, count: number, percent: number, chosen: boolean) =>
 			`${text}：${count} 票，${percent}%${chosen ? "，你的选择" : ""}`,
 		explanation: "解释",
 		failed: "投票失败，请重试。",
 		external: "此投票属于同步的应用：只有关联账号的所有者可以投票。",
+	},
+	pollVoters: {
+		title: "谁选了什么",
+		none: "还没有人选这个答案",
+		unavailable: "无法查看投票人。",
+		/** Voters the list does not name (a synced app that names only some). */
+		more: (n: number) => `以及另外 ${n} 人`,
+		answer: (text: string, count: number) => `${text} · ${count}`,
 	},
 	pollForm: {
 		title: "创建投票",

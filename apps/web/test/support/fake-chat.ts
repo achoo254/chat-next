@@ -985,6 +985,14 @@ export class ChatFixture {
 				this.server.votePoll(this.selfId, chatId, seq, req.options);
 				return {};
 			},
+			getPollVoters: (req) => {
+				const byOption = this.server.pollVoters(num(req.chatId), num(req.seq));
+				const ids = [...new Set(byOption.flat())];
+				return {
+					answers: byOption.map((users, option) => ({ option, count: users.length, userIds: users.map(BigInt) })),
+					users: ids.map((id) => this.wireUser(id)),
+				};
+			},
 			closePoll: (req) => {
 				this.pollsClosed.push({ chatId: num(req.chatId), seq: num(req.seq) });
 				this.server.closePoll(num(req.chatId), num(req.seq));

@@ -238,3 +238,35 @@ func TestSendPollAnswersWithThePollAsTheSenderSeesIt(t *testing.T) {
 		t.Fatalf("poll = %v", p)
 	}
 }
+
+func TestAPublicPollListsWhoChoseEachAnswerAndAnAnonymousOneRefuses(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	a, b, c := h.user("a"), h.user("b"), h.user("c")
+	chatID := h.group(a, b, c)
+	seq := h.poll(a, chatID, &appv1.SendPollRequest{Question: "q", Options: []string{"x", "y"}, Multiple: true, PublicVoters: true})
+	for _, v := range []struct {
+		user int64
+		opts []int32
+	}{{b, []int32{0}}, {c, []int32{0, 1}}} {
+		if _, err := h.svc.VotePoll(ctx, v.user, &appv1.VotePollRequest{ChatId: chatID, Seq: seq, Options: v.opts}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resp, err := h.svc.GetPollVoters(ctx, a, &appv1.GetPollVotersRequest{ChatId: chatID, Seq: seq})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := resp.GetAnswers()
+	if len(got) != 2 || got[0].GetCount() != 2 || !slices.Equal(got[0].GetUserIds(), []int64{c, b}) ||
+		got[1].GetCount() != 1 || !slices.Equal(got[1].GetUserIds(), []int64{c}) {
+		t.Fatalf("answers = %v", got)
+	}
+	if ids := usersIn(resp.GetUsers()); !slices.Contains(ids, b) || !slices.Contains(ids, c) {
+		t.Fatalf("users = %v", ids)
+	}
+	anon := h.poll(a, chatID, &appv1.SendPollRequest{Question: "q", Options: []string{"x", "y"}})
+	if _, err := h.svc.GetPollVoters(ctx, a, &appv1.GetPollVotersRequest{ChatId: chatID, Seq: anon}); codeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("anonymous poll: err = %v", err)
+	}
+}

@@ -172,6 +172,12 @@ func (s *messagesService) ClosePoll(ctx context.Context, req *connect.Request[ap
 	})
 }
 
+func (s *messagesService) GetPollVoters(ctx context.Context, req *connect.Request[appv1.GetPollVotersRequest]) (*connect.Response[appv1.GetPollVotersResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.GetPollVotersRequest) (*appv1.GetPollVotersResponse, error) {
+		return s.chat.GetPollVoters(ctx, me, m)
+	})
+}
+
 func (s *messagesService) GetHistory(ctx context.Context, req *connect.Request[appv1.GetHistoryRequest]) (*connect.Response[appv1.GetHistoryResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetHistoryRequest) (*appv1.GetHistoryResponse, error) {
 		return s.chat.GetHistory(ctx, me, m)

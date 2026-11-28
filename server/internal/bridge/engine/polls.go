@@ -74,8 +74,9 @@ func (r *runner) onPoll(ctx context.Context, ev bridge.Event, pr bridge.PollResu
 // answers and the counts are left as Chat has them. after runs in the same transaction.
 func (r *runner) applyPolls(ctx context.Context, l *chatLink, list []bridge.PollResults, after func(*chat.ImportTx) error) error {
 	type item struct {
-		seq int64
-		pr  bridge.PollResults
+		seq   int64
+		pr    bridge.PollResults
+		votes []chat.ImportedVote
 	}
 	var items []item
 	for _, pr := range list {
@@ -83,16 +84,29 @@ func (r *runner) applyPolls(ctx context.Context, l *chatLink, list []bridge.Poll
 		if err != nil {
 			return err
 		}
-		if have != nil {
-			items = append(items, item{have.Seq, pr})
+		if have == nil {
+			continue
 		}
+		// Who voted there becomes their puppets' votes, like their reactions.
+		x := item{seq: have.Seq, pr: pr}
+		for _, v := range pr.Votes {
+			if v.From.IsSelf {
+				continue // the owner's vote is OwnerKnown's
+			}
+			uid, err := r.e.db.ensurePuppet(ctx, r.account, v.From)
+			if err != nil {
+				return err
+			}
+			x.votes = append(x.votes, chat.ImportedVote{UserID: uid, Options: ints32(v.Options)})
+		}
+		items = append(items, x)
 	}
 	if len(items) == 0 && after == nil {
 		return nil
 	}
 	return r.withLink(ctx, l, func(it *chat.ImportTx) error {
 		for _, x := range items {
-			if err := r.setPoll(ctx, it, x.seq, x.pr); err != nil {
+			if err := r.setPoll(ctx, it, x.seq, x.pr, x.votes); err != nil {
 				return err
 			}
 		}
@@ -104,7 +118,7 @@ func (r *runner) applyPolls(ctx context.Context, l *chatLink, list []bridge.Poll
 }
 
 // setPoll writes one poll's results inside the chat's import transaction.
-func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr bridge.PollResults) error {
+func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr bridge.PollResults, votes []chat.ImportedVote) error {
 	voting, err := pendingOpAt(ctx, it.Tx(), it.ChatID(), seq, "poll_vote")
 	if err != nil {
 		return err
@@ -113,7 +127,9 @@ func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr b
 	if err != nil {
 		return err
 	}
-	_, err = it.SetPoll(ctx, seq, importedPoll(pr), voting, closing)
+	p := importedPoll(pr)
+	p.VotesKnown, p.VotesComplete, p.Votes = pr.VotesKnown, pr.VotesComplete, votes
+	_, err = it.SetPoll(ctx, seq, p, voting, closing)
 	return err
 }
 

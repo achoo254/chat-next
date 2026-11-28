@@ -999,6 +999,8 @@ export const viScreens = {
 		closeConfirm: "Bấm lần nữa để kết thúc",
 		/** A poll of a synced app that does not show its results yet. */
 		hidden: "Kết quả chưa được công bố",
+		/** Opens who chose each answer of a public poll. */
+		showVoters: "Xem ai đã chọn",
 		voters: (n: number) => (n === 0 ? "Chưa có ai bình chọn" : `${n} người đã bình chọn`),
 		option: (text: string, count: number, percent: number, chosen: boolean) =>
 			`${text}: ${count} phiếu, ${percent}%${chosen ? ", bạn đã chọn" : ""}`,
@@ -1006,6 +1008,14 @@ export const viScreens = {
 		failed: "Chưa bình chọn được, thử lại.",
 		/** A poll of a synced chat: only the owner of the linked account votes there, from Chat. */
 		external: "Bình chọn này thuộc app được đồng bộ: chỉ chủ tài khoản liên kết bình chọn được.",
+	},
+	pollVoters: {
+		title: "Ai đã chọn gì",
+		none: "Chưa ai chọn đáp án này",
+		unavailable: "Không xem được danh sách người chọn.",
+		/** Voters the list does not name (a synced app that names only some). */
+		more: (n: number) => `và ${n} người khác`,
+		answer: (text: string, count: number) => `${text} · ${count}`,
 	},
 	pollForm: {
 		title: "Tạo bình chọn",

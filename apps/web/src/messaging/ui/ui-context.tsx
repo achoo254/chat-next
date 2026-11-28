@@ -38,6 +38,8 @@ export type DialogRequest =
 	| { readonly kind: "readBy"; readonly chatId: number; readonly seq: number }
 	/** "Tạo bình chọn" from the composer, posted in its chat and topic. */
 	| { readonly kind: "newPoll"; readonly chatId: number; readonly topicId: number }
+	/** Who chose each answer of a public poll. */
+	| { readonly kind: "pollVoters"; readonly chatId: number; readonly seq: number }
 	/** People the server did not add, each with the reason, and what still works for them. */
 	| {
 			readonly kind: "addFailed";

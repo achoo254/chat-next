@@ -203,3 +203,34 @@ func TestResultsTheOtherAppHidesAreShownAsHiddenNotCountedInChat(t *testing.T) {
 		t.Fatalf("known results changed: %v", p)
 	}
 }
+
+func TestWhoVotedInAPublicPollOfTheOtherAppIsListedInChat(t *testing.T) {
+	e := newEnv(t)
+	conv := e.group("g1")
+	poll := e.msg("p1", lan, "", 1)
+	poll.Poll = &bridge.Poll{Question: "Ai đi?", Options: []string{"Đi", "Không"}, Public: true, Results: bridge.PollResults{Counts: []int{0, 0}}}
+	e.fake.AddHistory("g1", poll, e.msg("m2", lan, "tin 2", 2))
+	chatID := e.enable(conv, 100)
+	e.waitTexts(chatID, []string{"tin 2"})
+	e.eventually(func() bool { return e.backfillDone(chatID) }, func() string { return "backfill not done" })
+	seq := e.seqOf(chatID, "p1")
+	minh := bridge.Participant{ID: "u-minh", Name: "Minh"}
+	voters := func() string {
+		resp, err := e.chat.GetPollVoters(context.Background(), e.owner, &appv1.GetPollVotersRequest{ChatId: chatID, Seq: seq})
+		if err != nil {
+			return err.Error()
+		}
+		var out []string
+		for _, a := range resp.GetAnswers() {
+			out = append(out, fmt.Sprintf("%d:%d", a.GetCount(), len(a.GetUserIds())))
+		}
+		return fmt.Sprint(out)
+	}
+	e.fake.SetPollRemotely("g1", "p1", bridge.PollResults{Counts: []int{2, 1}, Voters: 3, OwnerKnown: true,
+		VotesKnown: true, VotesComplete: true, Votes: []bridge.PollVote{{From: lan, Options: []int{0}}, {From: minh, Options: []int{0}}, {From: self, Options: []int{1}}}}, true)
+	e.eventually(func() bool { return voters() == "[2:2 1:0]" }, func() string { return voters() })
+	// Minh takes the vote back there: Chat drops it.
+	e.fake.SetPollRemotely("g1", "p1", bridge.PollResults{Counts: []int{1, 1}, Voters: 2, OwnerKnown: true,
+		VotesKnown: true, VotesComplete: true, Votes: []bridge.PollVote{{From: lan, Options: []int{0}}}}, true)
+	e.eventually(func() bool { return voters() == "[1:1 1:0]" }, func() string { return voters() })
+}

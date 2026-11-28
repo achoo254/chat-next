@@ -478,6 +478,19 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				await messages.closePoll({ chatId: BigInt(chatId), seq: BigInt(seq) });
 			}),
+		pollVoters: (chatId, seq) =>
+			call(async () => {
+				const response = await messages.getPollVoters({ chatId: BigInt(chatId), seq: BigInt(seq) });
+				const people = peopleOf(response.users);
+				return response.answers.map((answer) => ({
+					option: answer.option,
+					count: answer.count,
+					people: answer.userIds.flatMap((id) => {
+						const person = people.get(assertSafeId(id));
+						return person === undefined ? [] : [person];
+					}),
+				}));
+			}),
 		pin: (chatId, seq, notify = true) =>
 			call(async () => {
 				await messages.pinMessage({ chatId: BigInt(chatId), seq: BigInt(seq), silent: !notify });

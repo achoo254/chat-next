@@ -924,7 +924,7 @@ func (r *runner) applyEdit(ctx context.Context, it *chat.ImportTx, k messageKey,
 		return err
 	}
 	if m.Poll != nil {
-		if err := r.setPoll(ctx, it, have.Seq, m.Poll.Results); err != nil {
+		if err := r.setPoll(ctx, it, have.Seq, m.Poll.Results, nil); err != nil {
 			return err
 		}
 	}

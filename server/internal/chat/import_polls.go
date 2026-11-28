@@ -22,6 +22,18 @@ type ImportedPoll struct {
 	// leaves what Chat knows.
 	Correct     []int32
 	Explanation string
+	// VotesKnown says Votes names who chose what among the people of the other app
+	// (their puppets; the owner's vote is OwnerKnown's); VotesComplete that it names
+	// all of them, so a puppet not listed has no vote. Only a public poll has them.
+	VotesKnown    bool
+	VotesComplete bool
+	Votes         []ImportedVote
+}
+
+// ImportedVote is the answers of one person of the other app (a puppet user).
+type ImportedVote struct {
+	UserID  int64
+	Options []int32
 }
 
 // pollDefinition is the part of a poll that is content: what was asked and how. The
@@ -98,10 +110,52 @@ func (it *ImportTx) SetPoll(ctx context.Context, seq int64, p ImportedPoll, keep
 			changed = changed || moved
 		}
 	}
+	if p.VotesKnown {
+		moved, err := it.setPuppetVotes(ctx, seq, poll, p.Votes, p.VotesComplete)
+		if err != nil {
+			return false, err
+		}
+		changed = changed || moved
+	}
 	if !changed {
 		return false, nil
 	}
 	return true, it.t.tellPoll(ctx, it.c, seq, it.owner)
+}
+
+// setPuppetVotes makes the votes of the other app's people on the poll at seq what it
+// says; with complete, puppets it does not list lose theirs. The owner's and those of
+// users who are not puppets are left as they are. The counts are the app's own
+// (external_counts): these rows only say who voted.
+func (it *ImportTx) setPuppetVotes(ctx context.Context, seq int64, poll *appv1.Poll, votes []ImportedVote, complete bool) (bool, error) {
+	changed := false
+	listed := make([]int64, 0, len(votes))
+	for _, v := range votes {
+		if v.UserID == it.owner {
+			continue
+		}
+		listed = append(listed, v.UserID)
+		options, err := checkAnswers(&appv1.Poll{Options: poll.GetOptions(), Multiple: true}, v.Options)
+		if err != nil || len(options) == 0 {
+			continue // an answer Chat cannot name leaves that person's vote as it is
+		}
+		moved, err := storeVote(ctx, it.t.tx, it.c.ID, seq, v.UserID, options)
+		if err != nil {
+			return false, err
+		}
+		changed = changed || moved
+	}
+	if complete {
+		tag, err := it.t.tx.Exec(ctx, `
+			DELETE FROM poll_votes v WHERE v.chat_id = $1 AND v.seq = $2 AND v.user_id <> $3 AND NOT (v.user_id = ANY($4))
+			AND EXISTS (SELECT 1 FROM users u WHERE u.id = v.user_id AND u.external_source IS NOT NULL)`,
+			it.c.ID, seq, it.owner, listed)
+		if err != nil {
+			return false, fmt.Errorf("chat: drop imported poll votes: %w", err)
+		}
+		changed = changed || tag.RowsAffected() > 0
+	}
+	return changed, nil
 }
 
 func nonNil(xs []int32) []int32 {

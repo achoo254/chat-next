@@ -190,6 +190,14 @@ export interface Reactor {
 	readonly date: number;
 }
 
+/** Who chose one answer of a public poll (GetPollVoters). */
+export interface PollAnswerVoters {
+	readonly option: number;
+	/** Votes of the answer; may be more than `people` (a synced app naming only some). */
+	readonly count: number;
+	readonly people: readonly Person[];
+}
+
 /** SetDialogMute: muted for a number of seconds, until turned back on, or not at all (0). */
 export type MuteFor = number | "forever";
 
@@ -463,6 +471,8 @@ export interface Remote {
 	votePoll(chatId: number, seq: number, options: readonly number[]): Promise<void>;
 	/** Closes a poll the user sent. */
 	closePoll(chatId: number, seq: number): Promise<void>;
+	/** Who chose each answer of a public poll, newest first. */
+	pollVoters(chatId: number, seq: number): Promise<PollAnswerVoters[]>;
 	/** `notify` false pins silently: members see the system line only. */
 	pin(chatId: number, seq: number, notify?: boolean): Promise<void>;
 	unpin(chatId: number, seq: number): Promise<void>;
@@ -571,6 +581,7 @@ const METHODS = [
 	"sendPoll",
 	"votePoll",
 	"closePoll",
+	"pollVoters",
 	"pin",
 	"unpin",
 	"forward",

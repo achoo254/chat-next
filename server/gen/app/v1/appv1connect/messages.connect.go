@@ -105,6 +105,9 @@ const (
 	// MessagesServiceClosePollProcedure is the fully-qualified name of the MessagesService's ClosePoll
 	// RPC.
 	MessagesServiceClosePollProcedure = "/app.v1.MessagesService/ClosePoll"
+	// MessagesServiceGetPollVotersProcedure is the fully-qualified name of the MessagesService's
+	// GetPollVoters RPC.
+	MessagesServiceGetPollVotersProcedure = "/app.v1.MessagesService/GetPollVoters"
 )
 
 // MessagesServiceClient is a client for the app.v1.MessagesService service.
@@ -167,6 +170,11 @@ type MessagesServiceClient interface {
 	VotePoll(context.Context, *connect.Request[v1.VotePollRequest]) (*connect.Response[v1.VotePollResponse], error)
 	// Closes a poll for good: only its sender may.
 	ClosePoll(context.Context, *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error)
+	// Who chose each answer of a public poll, newest first, up to 100 per
+	// answer. For a poll of a synced app, the people that app names. Only
+	// members who see the message; in channels admins only. An anonymous poll
+	// refuses (FAILED_PRECONDITION).
+	GetPollVoters(context.Context, *connect.Request[v1.GetPollVotersRequest]) (*connect.Response[v1.GetPollVotersResponse], error)
 }
 
 // NewMessagesServiceClient constructs a client for the app.v1.MessagesService service. By default,
@@ -324,6 +332,12 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("ClosePoll")),
 			connect.WithClientOptions(opts...),
 		),
+		getPollVoters: connect.NewClient[v1.GetPollVotersRequest, v1.GetPollVotersResponse](
+			httpClient,
+			baseURL+MessagesServiceGetPollVotersProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("GetPollVoters")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -353,6 +367,7 @@ type messagesServiceClient struct {
 	sendPoll            *connect.Client[v1.SendPollRequest, v1.SendPollResponse]
 	votePoll            *connect.Client[v1.VotePollRequest, v1.VotePollResponse]
 	closePoll           *connect.Client[v1.ClosePollRequest, v1.ClosePollResponse]
+	getPollVoters       *connect.Client[v1.GetPollVotersRequest, v1.GetPollVotersResponse]
 }
 
 // SendMessage calls app.v1.MessagesService.SendMessage.
@@ -475,6 +490,11 @@ func (c *messagesServiceClient) ClosePoll(ctx context.Context, req *connect.Requ
 	return c.closePoll.CallUnary(ctx, req)
 }
 
+// GetPollVoters calls app.v1.MessagesService.GetPollVoters.
+func (c *messagesServiceClient) GetPollVoters(ctx context.Context, req *connect.Request[v1.GetPollVotersRequest]) (*connect.Response[v1.GetPollVotersResponse], error) {
+	return c.getPollVoters.CallUnary(ctx, req)
+}
+
 // MessagesServiceHandler is an implementation of the app.v1.MessagesService service.
 type MessagesServiceHandler interface {
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
@@ -535,6 +555,11 @@ type MessagesServiceHandler interface {
 	VotePoll(context.Context, *connect.Request[v1.VotePollRequest]) (*connect.Response[v1.VotePollResponse], error)
 	// Closes a poll for good: only its sender may.
 	ClosePoll(context.Context, *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error)
+	// Who chose each answer of a public poll, newest first, up to 100 per
+	// answer. For a poll of a synced app, the people that app names. Only
+	// members who see the message; in channels admins only. An anonymous poll
+	// refuses (FAILED_PRECONDITION).
+	GetPollVoters(context.Context, *connect.Request[v1.GetPollVotersRequest]) (*connect.Response[v1.GetPollVotersResponse], error)
 }
 
 // NewMessagesServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -688,6 +713,12 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("ClosePoll")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceGetPollVotersHandler := connect.NewUnaryHandler(
+		MessagesServiceGetPollVotersProcedure,
+		svc.GetPollVoters,
+		connect.WithSchema(messagesServiceMethods.ByName("GetPollVoters")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.MessagesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MessagesServiceSendMessageProcedure:
@@ -738,6 +769,8 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServiceVotePollHandler.ServeHTTP(w, r)
 		case MessagesServiceClosePollProcedure:
 			messagesServiceClosePollHandler.ServeHTTP(w, r)
+		case MessagesServiceGetPollVotersProcedure:
+			messagesServiceGetPollVotersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -841,4 +874,8 @@ func (UnimplementedMessagesServiceHandler) VotePoll(context.Context, *connect.Re
 
 func (UnimplementedMessagesServiceHandler) ClosePoll(context.Context, *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.ClosePoll is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) GetPollVoters(context.Context, *connect.Request[v1.GetPollVotersRequest]) (*connect.Response[v1.GetPollVotersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetPollVoters is not implemented"))
 }
