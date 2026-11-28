@@ -438,6 +438,8 @@ impl ApplicationHandler<UserEvent> for App {
         }
         if dirty {
             if let Some(pane) = self.session.as_ref().and_then(|s| s.panes.get(&id)) {
+                pane.window
+                    .set_cursor(if pane.overlay.picking() { CursorIcon::Crosshair } else { CursorIcon::Default });
                 pane.window.request_redraw();
             }
         }

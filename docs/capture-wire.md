@@ -39,6 +39,7 @@ tunelo-capture --out <thư mục ảnh> [--lang vi|en|zh-CN] [--hotkey "Ctrl+Alt
 ## Lớp phủ
 
 - Kéo theo hướng bất kỳ để chọn vùng (nhỏ hơn 6 px là bấm, không phải vùng); kéo ra ngoài vùng là chọn lại, khi chưa vẽ gì.
+- Con trỏ là dấu chữ thập khi chưa có vùng và trong lúc đang kéo (chọn vùng hoặc vẽ); thả chuột ra là về mũi tên thường.
 - Thanh công cụ dưới vùng (biến thể A; lên trên khi không đủ chỗ): Khung, Mũi tên, Bút, Chữ, Làm mờ · 4 màu · Hoàn tác · Sao chép, Lưu, Hỏi AI
   (trừ khi AI tự chụp), nút chính, ×.
 - Phím: Esc bỏ vùng rồi mới đóng; Enter là nút chính (đang gõ chữ thì Enter kết thúc chữ); Ctrl/⌘+Z hoàn tác; Ctrl/⌘+C sao chép.

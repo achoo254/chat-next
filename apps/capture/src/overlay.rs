@@ -227,6 +227,12 @@ impl Overlay {
         }
     }
 
+    /// Whether the pointer is picking or drawing (no region yet, or a press is held):
+    /// the cursor is a crosshair then, and the normal arrow once the press is released.
+    pub fn picking(&self) -> bool {
+        self.region.is_none() || self.drag != Drag::None
+    }
+
     pub fn released(&mut self) {
         if self.drag == Drag::Mark {
             // A click without a drag leaves no mark (except a pen dot).
@@ -502,6 +508,24 @@ mod tests {
         );
         assert_eq!(o.outcome_for_key(Key::Undo), Outcome::Pending);
         assert!(o.marks.is_empty());
+    }
+
+    #[test]
+    fn the_crosshair_is_only_for_picking_and_drawing() {
+        let mut o = overlay(Origin::Chat);
+        assert!(o.picking(), "no region yet");
+        o.press(100.0, 100.0);
+        o.moved(400.0, 300.0);
+        assert!(o.picking(), "dragging the region");
+        o.released();
+        assert!(!o.picking(), "the region is picked");
+        o.press(150.0, 150.0);
+        assert!(o.picking(), "drawing a mark");
+        o.released();
+        assert!(!o.picking());
+        o.marks.clear();
+        assert_eq!(o.outcome_for_key(Key::Escape), Outcome::Pending, "Esc drops the region first");
+        assert!(o.picking(), "picking again after Esc");
     }
 
     #[test]
