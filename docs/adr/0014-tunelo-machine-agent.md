@@ -158,6 +158,26 @@ Từ 2.3.0, thiết bị của tài khoản cập nhật được tunelo của m
 - Tính năng này không cần nâng `MinAgentVersion`: field mới đều tuỳ chọn. `MinAgentVersion` hiện là 3.0.0 vì giao thức 3 (ADR 0013); máy
   2.x không tự cập nhật lên được mà phải chạy lại lệnh cài, vì 3.0.0 chỉ phát hành file nén.
 
+### Dịch vụ của tunelo trên trang máy
+
+Từ 3.32.0, "Cài đặt máy" có khối "Dịch vụ của tunelo" thay cho danh sách cổng: mỗi dịch vụ một dòng với trạng thái, cổng, một câu
+nó dùng để làm gì, phần mở "Vì sao cần, tắt thì sao?", và nguyên nhân kèm cách sửa khi nó không chạy.
+
+- `MachineInfo.runtime` báo mỗi `AgentPort` kèm `state` (đang chạy, đã tắt, cổng bị chiếm, lỗi), `problem` khi lỗi (token Quan sát không
+  đọc được, hết cổng trống trong 47300–47399, không mở được cơ sở dữ liệu Quan sát, lỗi khác), `tunnel_id` của tunnel và `controls`
+  (việc thiết bị được làm với nó). `restartable` và `service_control` cho trang biết máy nhận hai request dưới đây. Máy cũ hơn chỉ có
+  `listening`: trang vẫn hiện trạng thái và giải thích, không có nút.
+- `AgentServiceControl`: Quan sát bật, tắt (giữ trong `observatory.enabled` của cấu hình) và khởi động lại; tunnel của `tunelo http`/
+  `tunelo tcp` chỉ đóng được (mọi cổng của tunnel đóng cùng, terminal của nó in "Tunnel closed from Chat." rồi thoát). Kết nối thiết bị,
+  MCP cho phiên AI và cổng lệnh cục bộ không có nút riêng: tắt kết nối thiết bị là mất đường điều khiển máy, ba dịch vụ này chỉ dừng
+  cùng tunelo. Request chạy không chặn các request khác của thiết bị; xong mới trả `MachineInfo`.
+- `AgentRestart`: tunelo thoát cho trình giám sát khởi động lại, cùng điều kiện như cập nhật từ trang (binary đã build, có trình giám
+  sát). Bị từ chối (`UPDATE_BUSY`) khi đang cập nhật. Phiên terminal chạy trong tiến trình terminal riêng nên không bị ngắt; trang
+  hiện "đang khởi động lại" tới khi tunelo với PID mới trả lời (tối đa 1 phút).
+- `start`, `stop` và xoá dữ liệu của Quan sát chạy lần lượt từng việc, để một lệnh tắt từ thiết bị chen giữa lúc Quan sát đang mở
+  cơ sở dữ liệu không mở nó hai lần.
+- Hai request ghi `agent_restart` và `service_control` (dịch vụ, tunnel, việc làm) vào nhật ký đồng ý.
+
 ## Hệ quả
 
 - Thư mục cấu hình tunelo chỉ có một refresh token hoandat, đã niêm phong. Ngoài `claude-profiles/*/home` (kho riêng của claude),
