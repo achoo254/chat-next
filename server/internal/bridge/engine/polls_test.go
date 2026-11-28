@@ -234,3 +234,18 @@ func TestWhoVotedInAPublicPollOfTheOtherAppIsListedInChat(t *testing.T) {
 		VotesKnown: true, VotesComplete: true, Votes: []bridge.PollVote{{From: lan, Options: []int{0}}}}, true)
 	e.eventually(func() bool { return voters() == "[1:1 1:0]" }, func() string { return voters() })
 }
+
+func TestResultsOlderThanTheOwnersVoteJustSentDoNotUndoIt(t *testing.T) {
+	e := newEnv(t)
+	chatID, seq := e.twoWayWithPoll()
+	e.waitPoll(chatID, seq, "[2 1]/3 chosen=[1] closed=false")
+	e.vote(chatID, seq, 0)
+	e.waitOutbox(chatID, seq, "poll_vote", "sent")
+	// Telegram, a moment after the vote, still tells the results from before it.
+	e.fake.SetPollRemotely("g1", "p1", bridge.PollResults{Counts: []int{2, 1}, Voters: 3, OwnerKnown: true, Chosen: []int{1}}, true)
+	time.Sleep(300 * time.Millisecond)
+	e.waitPoll(chatID, seq, "[3 0]/3 chosen=[0] closed=false")
+	// Once they carry the vote, they count (here with one more voter).
+	e.fake.SetPollRemotely("g1", "p1", bridge.PollResults{Counts: []int{4, 0}, Voters: 4, OwnerKnown: true, Chosen: []int{0}}, true)
+	e.waitPoll(chatID, seq, "[4 0]/4 chosen=[0] closed=false")
+}

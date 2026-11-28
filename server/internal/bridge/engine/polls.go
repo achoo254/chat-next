@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	appv1 "app.local/server/gen/app/v1"
@@ -34,6 +35,14 @@ func importedPoll(r bridge.PollResults) chat.ImportedPoll {
 		Correct: ints32(r.Correct), Explanation: r.Explanation}
 	if r.Counts != nil {
 		out.Counts, out.Voters = ints32(r.Counts), int32(r.Voters)
+	}
+	return out
+}
+
+func widen16(xs []int16) []int32 {
+	out := make([]int32, len(xs))
+	for i, x := range xs {
+		out[i] = int32(x)
 	}
 	return out
 }
@@ -123,6 +132,13 @@ func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr b
 	if err != nil {
 		return err
 	}
+	if !voting {
+		// For a while after the owner's vote went out the other app may still tell the
+		// results before it; they count only once they carry the owner's new answers.
+		if voting, err = staleAfterVote(ctx, it.Tx(), it.ChatID(), seq, r.account.OwnerID, pr); err != nil {
+			return err
+		}
+	}
 	closing, err := pendingOpAt(ctx, it.Tx(), it.ChatID(), seq, "poll_close")
 	if err != nil {
 		return err
@@ -131,6 +147,33 @@ func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr b
 	p.VotesKnown, p.VotesComplete, p.Votes = pr.VotesKnown, pr.VotesComplete, votes
 	_, err = it.SetPoll(ctx, seq, p, voting, closing)
 	return err
+}
+
+// voteSettle is how long after the owner's vote went out results that do not carry
+// it are taken as older than the vote.
+const voteSettle = 3 * time.Minute
+
+// staleAfterVote reports whether pr, read within voteSettle of the owner's vote going
+// out, still shows the owner's answers from before it.
+func staleAfterVote(ctx context.Context, q querier, chatID, seq, owner int64, pr bridge.PollResults) (bool, error) {
+	var recent bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM external_outbox WHERE chat_id = $1 AND seq = $2 AND op = 'poll_vote'
+		AND status = 'sent' AND updated_at > now() - make_interval(secs => $3))`, chatID, seq, voteSettle.Seconds()).Scan(&recent); err != nil {
+		return false, fmt.Errorf("bridge: recent vote: %w", err)
+	}
+	if !recent {
+		return false, nil
+	}
+	var mine []int16
+	if err := q.QueryRow(ctx, `SELECT coalesce((SELECT options FROM poll_votes WHERE chat_id = $1 AND seq = $2 AND user_id = $3), '{}')`,
+		chatID, seq, owner).Scan(&mine); err != nil {
+		return false, fmt.Errorf("bridge: owner's vote: %w", err)
+	}
+	if !pr.OwnerKnown {
+		return true, nil
+	}
+	told := slices.Sorted(slices.Values(pr.Chosen))
+	return !slices.Equal(told, intsOf(widen16(mine))), nil
 }
 
 // pollPolls reads, at each look, the open polls of the chats that have one and where
@@ -283,17 +326,9 @@ func (r *runner) doPollOp(ctx context.Context, h *outboxRow) error {
 		}
 		return r.readPolls(ctx, reader, l, k.chat, k.msg)
 	}
-	if err := db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{}); err != nil {
-		return err
-	}
-	// The vote is in the other app: read the poll back for results that count it. The
-	// timer reads it again when this fails, so the row stays sent.
-	if reader, ok := r.adapter.(bridge.PollReader); ok {
-		if l := r.links[k.chat]; l != nil {
-			if err := r.readPolls(ctx, reader, l, k.chat, k.msg); err != nil {
-				loggerFrom(ctx).Warn("bridge: read poll after vote", "err", err)
-			}
-		}
-	}
-	return nil
+	// No read back here: right after the call the other app may still answer with the
+	// results before it (seen on Telegram for about two minutes), which would undo the
+	// counts Chat already moved. Its answer to the call comes as an event, and the
+	// open polls are read at every look.
+	return db.setOutbox(ctx, []int64{h.ID}, "sent", "", time.Time{})
 }
