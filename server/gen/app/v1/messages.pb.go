@@ -1118,7 +1118,10 @@ type Poll struct {
 	// People who voted.
 	Voters int32 `protobuf:"varint,10,opt,name=voters,proto3" json:"voters,omitempty"`
 	// The caller's answers; empty when the caller did not vote.
-	Chosen        []int32 `protobuf:"varint,11,rep,packed,name=chosen,proto3" json:"chosen,omitempty"`
+	Chosen []int32 `protobuf:"varint,11,rep,packed,name=chosen,proto3" json:"chosen,omitempty"`
+	// A poll of a synced app that does not show its results yet (until you
+	// vote, or until it closes): counts and voters are then all 0.
+	ResultsHidden bool `protobuf:"varint,12,opt,name=results_hidden,json=resultsHidden,proto3" json:"results_hidden,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1228,6 +1231,13 @@ func (x *Poll) GetChosen() []int32 {
 		return x.Chosen
 	}
 	return nil
+}
+
+func (x *Poll) GetResultsHidden() bool {
+	if x != nil {
+		return x.ResultsHidden
+	}
+	return false
 }
 
 type ActionChatCreated struct {
@@ -5630,7 +5640,7 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x05emoji\x18\x01 \x01(\tR\x05emoji\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x05R\x05count\x12\x16\n" +
 	"\x06chosen\x18\x03 \x01(\bR\x06chosen\x12*\n" +
-	"\x0frecent_user_ids\x18\x04 \x03(\x03B\x020\x02R\rrecentUserIds\"\xad\x02\n" +
+	"\x0frecent_user_ids\x18\x04 \x03(\x03B\x020\x02R\rrecentUserIds\"\xd4\x02\n" +
 	"\x04Poll\x12\x1a\n" +
 	"\bquestion\x18\x01 \x01(\tR\bquestion\x12\x18\n" +
 	"\aoptions\x18\x02 \x03(\tR\aoptions\x12\x1a\n" +
@@ -5643,7 +5653,8 @@ const file_app_v1_messages_proto_rawDesc = "" +
 	"\x06counts\x18\t \x03(\x05R\x06counts\x12\x16\n" +
 	"\x06voters\x18\n" +
 	" \x01(\x05R\x06voters\x12\x16\n" +
-	"\x06chosen\x18\v \x03(\x05R\x06chosen\")\n" +
+	"\x06chosen\x18\v \x03(\x05R\x06chosen\x12%\n" +
+	"\x0eresults_hidden\x18\f \x01(\bR\rresultsHidden\")\n" +
 	"\x11ActionChatCreated\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\"3\n" +
 	"\x12ActionMembersAdded\x12\x1d\n" +

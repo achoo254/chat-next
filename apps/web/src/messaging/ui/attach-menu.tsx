@@ -22,10 +22,12 @@ interface AttachMenuProps {
 	onPickScreenshot?: ((ref: string | "web") => void) | undefined;
 	/** Shown where the browser can also record it. */
 	onRecordScreen?: (() => void) | undefined;
+	/** Opens "Tạo bình chọn". */
+	onPoll: () => void;
 	onClose: () => void;
 }
 
-export default function AttachMenu({ boundary, limit, onMedia, onFiles, onScreenshot, screenshotOn, screenshotChoices, onPickScreenshot, onRecordScreen, onClose }: AttachMenuProps) {
+export default function AttachMenu({ boundary, limit, onMedia, onFiles, onScreenshot, screenshotOn, screenshotChoices, onPickScreenshot, onRecordScreen, onPoll, onClose }: AttachMenuProps) {
 	const copy = useScreensCopy();
 	return (
 		<PopupMenu className="attach-menu" label={copy.composer.attachMenu} boundary={boundary} onClose={onClose}>
@@ -70,6 +72,10 @@ export default function AttachMenu({ boundary, limit, onMedia, onFiles, onScreen
 					</small>
 				</button>
 			)}
+			<button type="button" role="menuitem" data-id="attach-poll" onClick={onPoll}>
+				<Icon name="poll" />
+				{copy.composer.attachPoll}
+			</button>
 		</PopupMenu>
 	);
 }

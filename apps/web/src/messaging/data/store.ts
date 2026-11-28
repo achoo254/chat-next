@@ -122,7 +122,9 @@ function messageSignature(message: StoredMessage): string {
 	const media = message.media === undefined ? "" : `${message.media.fileId}:${message.media.sizes.length}:${message.media.waveform.length}:${message.media.inlineThumb.length}`;
 	const preview = message.linkPreview === null ? "" : `${message.linkPreview.title}:${message.linkPreview.photo?.fileId ?? ""}`;
 	const keyboard = message.keyboard?.kind === "keyboard" && message.keyboard.hidden ? 1 : 0;
-	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${message.recalled ? 1 : 0}|${keyboard}|${reactions}|${media}|${preview}|${message.text}`;
+	// A vote or the closing of a poll keeps edit_version too.
+	const poll = message.poll === undefined ? "" : JSON.stringify([message.poll.counts, message.poll.chosen, message.poll.closed, message.poll.correct]);
+	return `${message.seq}|${message.editVersion}|${message.stale ? 1 : 0}|${message.recalled ? 1 : 0}|${keyboard}|${reactions}|${media}|${preview}|${poll}|${message.text}`;
 }
 
 function itemSignature(item: WindowItem): string {

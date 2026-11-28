@@ -285,8 +285,13 @@ func (a *Adapter) ClosePoll(ctx context.Context, acct bridge.Account, conv, id s
 	}
 	closed := p.Poll
 	closed.Closed = true
-	u, err := c.live.api().MessagesEditMessage(ctx, &tg.MessagesEditMessageRequest{
-		Peer: peer, ID: n, Media: &tg.InputMediaPoll{Poll: closed}})
+	media := &tg.InputMediaPoll{Poll: closed}
+	if closed.Quiz {
+		// A quiz is sent again with its answer, which its creator is told.
+		r := pollResults(&p.Poll, &p.Results)
+		media.CorrectAnswers, media.Solution = r.Correct, r.Explanation
+	}
+	u, err := c.live.api().MessagesEditMessage(ctx, &tg.MessagesEditMessageRequest{Peer: peer, ID: n, Media: media})
 	if err != nil {
 		return translatePoll(err)
 	}

@@ -227,6 +227,10 @@ export class ChatFixture {
 	readonly readMentionCalls: number[] = [];
 	readonly blocked = new Set<number>();
 	readonly reactions: { chatId: number; seq: number; emoji: string }[] = [];
+	/** Polls posted, votes and closings, as the client asked for them. */
+	readonly pollsSent: { chatId: number; topicId: number; question: string; options: string[]; multiple: boolean; publicVoters: boolean; quiz: boolean; correct: number }[] = [];
+	readonly pollVotes: { chatId: number; seq: number; options: number[] }[] = [];
+	readonly pollsClosed: { chatId: number; seq: number }[] = [];
 	readonly pins: { chatId: number; seq: number; pinned: boolean }[] = [];
 	readonly forwards: { from: number; seqs: number[]; to: number }[] = [];
 	readonly invites: { chatId: number; expiresAt: number; usageLimit: number }[] = [];
@@ -966,6 +970,25 @@ export class ChatFixture {
 					users: ids.map((id) => this.wireUser(id)),
 					readers: dates === undefined ? [] : ids.map((id) => ({ userId: BigInt(id), readAt: BigInt(dates.get(id) ?? 0) })),
 				};
+			},
+			sendPoll: (req) => {
+				const chatId = num(req.chatId);
+				const poll = { question: req.question, options: [...req.options], multiple: req.multiple, publicVoters: req.publicVoters, quiz: req.quiz };
+				this.pollsSent.push({ chatId, topicId: num(req.topicId), ...poll, correct: req.correct });
+				this.server.sendMessage(this.selfId, chatId, "", num(req.randomId), { poll });
+				return {};
+			},
+			votePoll: (req) => {
+				const chatId = num(req.chatId);
+				const seq = num(req.seq);
+				this.pollVotes.push({ chatId, seq, options: [...req.options] });
+				this.server.votePoll(this.selfId, chatId, seq, req.options);
+				return {};
+			},
+			closePoll: (req) => {
+				this.pollsClosed.push({ chatId: num(req.chatId), seq: num(req.seq) });
+				this.server.closePoll(num(req.chatId), num(req.seq));
+				return {};
 			},
 			setReaction: (req) => {
 				const chatId = num(req.chatId);

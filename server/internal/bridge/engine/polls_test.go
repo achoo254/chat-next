@@ -163,3 +163,43 @@ func TestAPollTheOtherAppRefusesAVoteInIsPutBack(t *testing.T) {
 	e.waitOutbox(chatID, seq, "poll_vote", "failed")
 	e.waitPoll(chatID, seq, "[2 1]/3 chosen=[1] closed=false")
 }
+
+func TestAClosingTheOtherAppRefusesOpensThePollAgain(t *testing.T) {
+	e := newEnv(t)
+	chatID, _ := e.twoWayWithPoll()
+	resp, err := e.chat.SendPoll(context.Background(), e.owner, &appv1.SendPollRequest{ChatId: chatID, Question: "q", Options: []string{"a", "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seq := resp.GetMessage().GetSeq()
+	e.eventually(func() bool { return len(e.fake.Sent()) > 0 }, func() string { return "the poll was not sent" })
+	e.waitOutbox(chatID, seq, "send", "sent")
+	e.fake.FailPin(fmt.Errorf("%w: MESSAGE_EDIT_TIME_EXPIRED", bridge.ErrNotAllowed))
+	if _, err := e.chat.ClosePoll(context.Background(), e.owner, &appv1.ClosePollRequest{ChatId: chatID, Seq: seq}); err != nil {
+		t.Fatal(err)
+	}
+	e.waitOutbox(chatID, seq, "poll_close", "failed")
+	e.eventually(func() bool { p := e.pollIn(chatID, seq); return p != nil && !p.GetClosed() },
+		func() string { return "still closed: " + pollShape(e.pollIn(chatID, seq)) })
+}
+
+func TestResultsTheOtherAppHidesAreShownAsHiddenNotCountedInChat(t *testing.T) {
+	e := newEnv(t)
+	chatID, seq := e.twoWayWithPoll()
+	e.waitPoll(chatID, seq, "[2 1]/3 chosen=[1] closed=false")
+	// A poll that hides its results until it closes: Telegram stops telling the counts.
+	e.fake.SetPollRemotely("g1", "p1", bridge.PollResults{}, true)
+	time.Sleep(200 * time.Millisecond)
+	// Counts already known stay; a poll first seen without them is hidden.
+	conv := e.group("g2")
+	poll := e.msg("p2", lan, "", 1)
+	poll.Poll = &bridge.Poll{Question: "Bí mật?", Options: []string{"Có", "Không"}}
+	e.fake.AddHistory("g2", poll, e.msg("m3", lan, "tin 3", 2))
+	other := e.enable(conv, 100)
+	e.waitTexts(other, []string{"tin 3"})
+	e.eventually(func() bool { p := e.pollIn(other, e.seqOf(other, "p2")); return p != nil && p.GetResultsHidden() },
+		func() string { return "not hidden: " + fmt.Sprint(e.pollIn(other, e.seqOf(other, "p2"))) })
+	if p := e.pollIn(chatID, seq); p.GetResultsHidden() || !slices.Equal(p.GetCounts(), []int32{2, 1}) {
+		t.Fatalf("known results changed: %v", p)
+	}
+}

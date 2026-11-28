@@ -10,6 +10,7 @@ import type {
 	Dialog,
 	Message,
 	NotificationSettings,
+	Poll,
 	ReactionCount,
 	ReplyKeyboard,
 	SyncState,
@@ -143,8 +144,8 @@ export function putMessage(w: WriteBatch, message: Message): void {
 	w.add(
 		`INSERT INTO messages (chat_id, seq, from_id, date, text, entities, media_kind, reply_to_seq, forward,
 			edit_date, edit_version, random_id, grouped_id, via_bot_id, reactions, integration_label, buttons, action,
-			search_text, topic_id, link_preview, recalled, silent, media, reply_keyboard, sent_via_ai, stale)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+			search_text, topic_id, link_preview, recalled, silent, media, reply_keyboard, sent_via_ai, poll, stale)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
 		ON CONFLICT (chat_id, seq) DO UPDATE SET from_id = excluded.from_id, date = excluded.date,
 			text = excluded.text, entities = excluded.entities, media_kind = excluded.media_kind,
 			reply_to_seq = excluded.reply_to_seq, forward = excluded.forward, edit_date = excluded.edit_date,
@@ -154,7 +155,7 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			integration_label = excluded.integration_label, buttons = excluded.buttons, action = excluded.action,
 			search_text = excluded.search_text, topic_id = excluded.topic_id, link_preview = excluded.link_preview,
 			recalled = excluded.recalled, silent = excluded.silent, media = excluded.media,
-			reply_keyboard = excluded.reply_keyboard, sent_via_ai = excluded.sent_via_ai, stale = 0
+			reply_keyboard = excluded.reply_keyboard, sent_via_ai = excluded.sent_via_ai, poll = excluded.poll, stale = 0
 		WHERE messages.stale = 1 OR (excluded.recalled >= messages.recalled
 			AND (excluded.edit_version >= messages.edit_version OR excluded.recalled > messages.recalled))`,
 		[
@@ -184,9 +185,16 @@ export function putMessage(w: WriteBatch, message: Message): void {
 			message.media === undefined ? null : encodeMediaRef(message.media),
 			message.keyboard === undefined ? null : encodeKeyboard(message.keyboard),
 			flag(message.sentViaAi === true),
+			message.poll === undefined ? null : JSON.stringify(message.poll),
 		],
 	);
 	w.emit(EventKeys.history(message.chatId), EventKeys.message(message.chatId, message.seq));
+}
+
+/** The results of a poll (or its closing) as the server tells them now. */
+export function putPoll(w: WriteBatch, chatId: number, seq: number, poll: Poll): void {
+	w.add("UPDATE messages SET poll = ? WHERE chat_id = ? AND seq = ?", [JSON.stringify(poll), chatId, seq]);
+	w.emit(EventKeys.message(chatId, seq));
 }
 
 export function putReactions(w: WriteBatch, chatId: number, seq: number, reactions: readonly ReactionCount[]): void {

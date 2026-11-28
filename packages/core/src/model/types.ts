@@ -377,6 +377,29 @@ export interface Message {
 	readonly silent: boolean;
 	/** The user posted it through an AI tool; only the sender's own copy carries it. */
 	readonly sentViaAi?: boolean;
+	/** A poll instead of text and media; absent otherwise. */
+	readonly poll?: Poll;
+}
+
+/** A poll as the viewer sees it: what was asked, and the results now. */
+export interface Poll {
+	readonly question: string;
+	/** Answers in order; an answer is named by its index. */
+	readonly options: readonly string[];
+	readonly multiple: boolean;
+	readonly publicVoters: boolean;
+	readonly quiz: boolean;
+	/** Quiz: the right answers, once the viewer may know them (voted, sent it, or closed). */
+	readonly correct: readonly number[];
+	readonly explanation: string;
+	readonly closed: boolean;
+	/** Votes of each answer, by index. */
+	readonly counts: readonly number[];
+	readonly voters: number;
+	/** The viewer's answers; empty when they did not vote. */
+	readonly chosen: readonly number[];
+	/** A poll of a synced app that does not show its results yet: counts and voters are 0. */
+	readonly resultsHidden: boolean;
 }
 
 export type SessionRevokeReason =
@@ -435,6 +458,7 @@ export type UpdateBody =
 			readonly seq: number;
 			readonly reactions: readonly ReactionCount[];
 	  }
+	| { readonly kind: "poll"; readonly chatId: number; readonly seq: number; readonly poll: Poll }
 	| {
 			readonly kind: "read";
 			readonly chatId: number;

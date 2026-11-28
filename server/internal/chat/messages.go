@@ -549,6 +549,14 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 	if fetchLater {
 		s.attachPreviewLater(chatID, posted.Seq, posted.EditVersion, url)
 	}
+	if p.poll != nil {
+		// A poll comes back with its results (all 0) and, for its sender, a quiz's answer.
+		msgs, _, err := s.renderMessages(ctx, s.pool, me, []*messageRow{posted})
+		if err != nil {
+			return nil, err
+		}
+		return &appv1.SendMessageResponse{Message: msgs[0], Ack: t.ack(me, chatID)}, nil
+	}
 	msg, err := posted.render(me, nil)
 	if err != nil {
 		return nil, err
@@ -1243,13 +1251,14 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 			if err != nil {
 				return err
 			}
-			// A poll forwarded or copied is a new poll: no votes, open, the quiz answer kept.
+			// A poll forwarded or copied is a new poll: no votes, open. A quiz keeps its
+			// answer, so only who may know it there passes it on (see repostedPoll).
 			if content.GetPoll() != nil {
-				st, err := readPoll(ctx, t.tx, src.ID, src0.Seq, "")
+				st, err := s.repostedPoll(ctx, t.tx, src0, content.GetPoll(), me)
 				if err != nil {
 					return err
 				}
-				if err := insertPoll(ctx, t.tx, toChat, p.Seq, &pollState{correct: st.correct, explanation: st.explanation}); err != nil {
+				if err := insertPoll(ctx, t.tx, toChat, p.Seq, st); err != nil {
 					return err
 				}
 			}

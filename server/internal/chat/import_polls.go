@@ -36,9 +36,11 @@ func pollDefinition(p *appv1.Poll) *appv1.Poll {
 
 // SetPoll makes the poll at seq what the other app says. With keepOwner (Chat has a
 // vote of the owner waiting to go out) the owner's answers and the counts stay as
-// Chat has them, until the other app has the vote. It reports whether anything
-// changed: false when the message is gone, is not a poll, or is already so.
-func (it *ImportTx) SetPoll(ctx context.Context, seq int64, p ImportedPoll, keepOwner bool) (bool, error) {
+// Chat has them, until the other app has the vote; with keepClosed (the owner's
+// closing waits to go out) the poll stays closed. Otherwise the other app decides
+// whether it is closed: a closing it refused opens the poll again. It reports whether
+// anything changed: false when the message is gone, is not a poll, or is already so.
+func (it *ImportTx) SetPoll(ctx context.Context, seq int64, p ImportedPoll, keepOwner, keepClosed bool) (bool, error) {
 	m, err := it.t.s.liveMessage(ctx, it.t.tx, it.c.ID, seq)
 	if isNotFound(err) {
 		return false, nil
@@ -55,7 +57,7 @@ func (it *ImportTx) SetPoll(ctx context.Context, seq int64, p ImportedPoll, keep
 		return false, err
 	}
 	want := *st
-	want.closed = st.closed || p.Closed // a poll closed stays closed
+	want.closed = p.Closed || (keepClosed && st.closed)
 	if len(p.Correct) > 0 {
 		want.correct = p.Correct
 	}
@@ -66,6 +68,10 @@ func (it *ImportTx) SetPoll(ctx context.Context, seq int64, p ImportedPoll, keep
 		counts := make([]int32, len(poll.GetOptions()))
 		copy(counts, p.Counts)
 		want.extCounts, want.extVoters = counts, p.Voters
+	} else if st.extCounts == nil {
+		// Results the other app does not show yet: the poll is still its own, never
+		// counted from the few votes Chat has (results_hidden until it tells them).
+		want.extCounts = []int32{}
 	}
 	changed := want.closed != st.closed || !slices.Equal(want.correct, st.correct) || want.explanation != st.explanation ||
 		(want.extCounts != nil && (st.extCounts == nil || !slices.Equal(want.extCounts, st.extCounts) || want.extVoters != st.extVoters))
@@ -82,15 +88,15 @@ func (it *ImportTx) SetPoll(ctx context.Context, seq int64, p ImportedPoll, keep
 		}
 	}
 	if p.OwnerKnown && !keepOwner {
-		chosen, err := checkAnswers(&appv1.Poll{Options: poll.GetOptions(), Multiple: true}, p.Chosen)
-		if err != nil {
-			chosen = nil // an answer Chat cannot name: the owner's vote is left out, not the poll
+		// An answer Chat cannot name (one added there after the poll came) leaves the
+		// owner's vote as it is rather than dropping it.
+		if chosen, err := checkAnswers(&appv1.Poll{Options: poll.GetOptions(), Multiple: true}, p.Chosen); err == nil {
+			moved, err := storeVote(ctx, it.t.tx, it.c.ID, seq, it.owner, chosen)
+			if err != nil {
+				return false, err
+			}
+			changed = changed || moved
 		}
-		moved, err := storeVote(ctx, it.t.tx, it.c.ID, seq, it.owner, chosen)
-		if err != nil {
-			return false, err
-		}
-		changed = changed || moved
 	}
 	if !changed {
 		return false, nil

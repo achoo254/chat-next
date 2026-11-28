@@ -173,6 +173,8 @@ export const vi = {
 		mediaPreview: "Ảnh, video hoặc file",
 		/** List and quote previews of a message without text, by kind of file. */
 		mediaKind: { photo: "Ảnh", video: "Video", voice: "Tin thoại", audio: "Âm thanh", document: "File", unknown: "File" },
+		/** A poll in list and quote previews. */
+		pollPreview: (question: string) => `📊 ${question}`,
 		integration: (label: string) => `Tích hợp: ${label}`,
 		/** An integration alert edited in place (firing → resolved), instead of "đã sửa". */
 		updated: "đã cập nhật",

@@ -374,6 +374,14 @@ export const MIGRATIONS: readonly Migration[] = [
 			"DELETE FROM sync_state",
 		],
 	},
+	{
+		version: 19,
+		statements: [
+			// A poll (Message.poll) as JSON, results as the user last saw them. No message
+			// stored before carries one, so nothing needs fetching again.
+			"ALTER TABLE messages ADD COLUMN poll TEXT",
+		],
+	},
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.reduce((max, migration) => Math.max(max, migration.version), 0);

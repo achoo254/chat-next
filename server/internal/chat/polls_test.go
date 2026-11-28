@@ -207,3 +207,34 @@ func TestDeletingAPollDropsItsVotes(t *testing.T) {
 		t.Fatalf("%d poll rows left", n)
 	}
 }
+
+func TestAQuizIsPassedOnOnlyByWhoMayKnowItsAnswer(t *testing.T) {
+	h := newHarness(t, nil)
+	ctx := context.Background()
+	a, b := h.user("a"), h.user("b")
+	from, to := h.group(a, b), h.group(a, b)
+	seq := h.poll(a, from, &appv1.SendPollRequest{Question: "q", Options: []string{"x", "y"}, Quiz: true, Correct: 1})
+	req := &appv1.ForwardMessagesRequest{FromChatId: from, Seqs: []int64{seq}, ToChatId: to}
+	if _, err := h.svc.ForwardMessages(ctx, b, req); codeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("b forwards before answering: err = %v", err)
+	}
+	if _, err := h.svc.VotePoll(ctx, b, &appv1.VotePollRequest{ChatId: from, Seq: seq, Options: []int32{0}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.svc.ForwardMessages(ctx, b, req); err != nil {
+		t.Fatalf("b forwards after answering: %v", err)
+	}
+}
+
+func TestSendPollAnswersWithThePollAsTheSenderSeesIt(t *testing.T) {
+	h := newHarness(t, nil)
+	a, b := h.user("a"), h.user("b")
+	chatID := h.group(a, b)
+	resp, err := h.svc.SendPoll(context.Background(), a, &appv1.SendPollRequest{ChatId: chatID, Question: "q", Options: []string{"x", "y"}, Quiz: true, Correct: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := resp.GetMessage().GetPoll(); !slices.Equal(p.GetCounts(), []int32{0, 0}) || !slices.Equal(p.GetCorrect(), []int32{1}) {
+		t.Fatalf("poll = %v", p)
+	}
+}

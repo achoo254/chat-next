@@ -212,6 +212,7 @@ export function joinNames(names: readonly string[], and: string): string {
 export function messagePreview(message: Message, nameOf: NameOf, copy: MessagingCopy, channel: boolean): string {
 	if (message.action !== null) return actionText(message.action, nameOf(message.fromId), nameOf, copy, channel);
 	if (message.recalled) return copy.message.recalled;
+	if (message.poll !== undefined) return copy.message.pollPreview(oneLine(message.poll.question));
 	if (message.text !== "") return oneLine(message.text);
 	if (message.mediaKind !== null) {
 		const name = message.media?.fileName ?? "";
@@ -219,6 +220,12 @@ export function messagePreview(message: Message, nameOf: NameOf, copy: Messaging
 		return message.mediaKind === "document" && name !== "" ? `${kind}: ${name}` : kind;
 	}
 	return copy.message.unsupportedTitle;
+}
+
+/** What a message says when it is quoted to the AI panel: its text, a poll with its answers, or the kind of its file. */
+export function quoteText(message: Message): string {
+	if (message.poll !== undefined) return [`📊 ${message.poll.question}`, ...message.poll.options.map((o) => `- ${o}`)].join("\n");
+	return message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]`;
 }
 
 /** The host a link opens, or "" when it is not a URL. */

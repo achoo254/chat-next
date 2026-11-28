@@ -455,6 +455,29 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 			call(async () => {
 				await messages.setReaction({ chatId: BigInt(chatId), seq: BigInt(seq), emoji });
 			}),
+		sendPoll: (chatId, topicId, draft, randomId) =>
+			call(async () => {
+				await messages.sendPoll({
+					chatId: BigInt(chatId),
+					topicId: BigInt(topicId),
+					question: draft.question,
+					options: [...draft.options],
+					multiple: draft.multiple,
+					publicVoters: draft.publicVoters,
+					quiz: draft.quiz,
+					correct: draft.correct,
+					explanation: draft.explanation,
+					randomId: BigInt(randomId),
+				});
+			}),
+		votePoll: (chatId, seq, options) =>
+			call(async () => {
+				await messages.votePoll({ chatId: BigInt(chatId), seq: BigInt(seq), options: [...options] });
+			}),
+		closePoll: (chatId, seq) =>
+			call(async () => {
+				await messages.closePoll({ chatId: BigInt(chatId), seq: BigInt(seq) });
+			}),
 		pin: (chatId, seq, notify = true) =>
 			call(async () => {
 				await messages.pinMessage({ chatId: BigInt(chatId), seq: BigInt(seq), silent: !notify });

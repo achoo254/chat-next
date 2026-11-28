@@ -163,6 +163,8 @@ export const en: MessagingCopy = {
 		media: "This version of the app cannot show photos, videos and files. Any text that came with it is below.",
 		mediaPreview: "Photo, video or file",
 		mediaKind: { photo: "Photo", video: "Video", voice: "Voice message", audio: "Audio", document: "File", unknown: "File" },
+		/** A poll in list and quote previews. */
+		pollPreview: (question: string) => `📊 ${question}`,
 		integration: (label: string) => `Integration: ${label}`,
 		updated: "updated",
 		alertFiring: "Firing",

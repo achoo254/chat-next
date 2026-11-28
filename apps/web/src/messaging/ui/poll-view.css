@@ -1,0 +1,41 @@
+/* A poll in a message (poll-view.tsx). It sits in the bubble and takes the bubble's colours, so in your own
+   bubble the light text, lines and track colours of .msg.mine .bubble apply here too. */
+.poll { display: grid; gap: var(--space-2); min-width: min(280px, 70vw); }
+.poll-question { font-weight: 600; }
+.poll-kind { font-size: 0.8125rem; color: var(--c-text-muted); }
+.poll-options { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.poll-choice { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 40px; padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--c-border-subtle); border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.poll-choice:hover:not(:disabled) { background: var(--c-hover); border-color: var(--c-border-strong); }
+.poll-choice:disabled { cursor: default; opacity: 0.7; }
+.poll-dot, .poll-box { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border: 2px solid var(--c-border-strong); }
+.poll-dot { border-radius: var(--radius-full); }
+.poll-box { border-radius: var(--radius-xs); }
+.poll-box .icon { width: 14px; height: 14px; }
+.poll-result { position: relative; display: grid; grid-template-columns: 3.5ch minmax(0, 1fr); gap: var(--space-2); align-items: center; padding: var(--space-1) 0 var(--space-2); }
+.poll-percent { font-size: 0.8125rem; font-weight: 600; text-align: end; }
+.poll-text { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.poll-text .icon { width: 16px; height: 16px; flex: none; }
+.poll-bar { position: absolute; left: calc(3.5ch + var(--space-2)); bottom: 0; height: 4px; max-width: calc(100% - 3.5ch - var(--space-2)); min-width: 4px;
+	border-radius: var(--radius-full); background: var(--c-primary-solid); transition: width var(--dur-base) var(--ease-standard); }
+.poll-result:not(.chosen):not(.right) .poll-bar { background: var(--c-bar-track, var(--c-border-strong)); }
+.poll-result.right .poll-bar { background: var(--c-success); }
+.poll-result.right .icon { color: var(--c-success-text, var(--c-success)); }
+.poll-result.wrong .poll-bar { background: var(--c-error); }
+.poll-result.wrong .icon { color: var(--c-error-text, var(--c-error)); }
+.msg.mine .poll-result.right .icon, .msg.mine .poll-result.wrong .icon { color: inherit; }
+.poll-explanation { font-size: 0.875rem; padding: var(--space-2); border-radius: var(--radius-sm); background: var(--c-surface-subtle); }
+.poll-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.poll-voters { flex: 1; font-size: 0.8125rem; color: var(--c-text-muted); }
+@media (prefers-reduced-motion: reduce) {
+	.poll-bar { transition: none; }
+}
+/* "Tạo bình chọn" (poll-dialog.tsx). */
+.poll-form-options { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.poll-form-options legend { padding: 0; margin-bottom: var(--space-1); }
+.poll-form-option { display: flex; align-items: center; gap: var(--space-2); }
+.poll-form-option .input { flex: 1; min-width: 0; }
+.poll-form-option .poll-dot { padding: 0; background: none; cursor: pointer; }
+.poll-form-option .poll-dot[aria-checked="true"] { border-color: var(--c-success); color: var(--c-success-text, var(--c-success)); }
+.poll-form-option .poll-dot .icon { width: 12px; height: 12px; }
+.poll-form-options > .btn { justify-self: start; display: inline-flex; align-items: center; gap: var(--space-1); }

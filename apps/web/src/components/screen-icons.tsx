@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { iconSvg, PATHS as STARTUP_PATHS } from "./icon.tsx";
 
 export const SCREEN_PATHS = {
+	poll: <path d="M5 6h9M5 12h14M5 18h6" />,
 	bulb: <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3" />,
 	shield: <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3" />,
 	laptop: (

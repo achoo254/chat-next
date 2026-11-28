@@ -232,6 +232,9 @@ message Poll {
   int32 voters = 10;
   // The caller's answers; empty when the caller did not vote.
   repeated int32 chosen = 11;
+  // A poll of a synced app that does not show its results yet (until you
+  // vote, or until it closes): counts and voters are then all 0.
+  bool results_hidden = 12;
 }
 
 message ActionChatCreated {

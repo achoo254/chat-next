@@ -16,7 +16,7 @@ import type { Chat, StoredMessage } from "@achoo254/chat-core";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { Glyph, type GlyphName } from "./glyphs.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { isSavedChat } from "../data/format.ts";
+import { isSavedChat, quoteText } from "../data/format.ts";
 import { pinnedLists } from "../data/pinned.ts";
 import { Permission, type Limits } from "../data/remote.ts";
 import { useItem, useServices, useUser } from "../data/services.tsx";
@@ -271,7 +271,7 @@ export default function MenuLayer({ chatId, itemKey, chat, picker, anchor, readO
 						seq: message.seq,
 						sender,
 						date: message.date,
-						text: message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]`,
+						text: quoteText(message),
 						code: message.entities.filter((e) => e.type === "code" || e.type === "pre").map((e) => message.text.slice(e.offset, e.offset + e.length)),
 					},
 				}),

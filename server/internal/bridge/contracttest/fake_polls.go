@@ -101,10 +101,13 @@ func (f *Fake) VotePoll(_ context.Context, _ bridge.Account, conv, id string, op
 	return nil
 }
 
-// ClosePoll implements bridge.PollWriter.
+// ClosePoll implements bridge.PollWriter. It fails like a pin (FailPin).
 func (f *Fake) ClosePoll(_ context.Context, _ bridge.Account, conv, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if err := f.nextPinFailure(); err != nil {
+		return err
+	}
 	f.pollCalls = append(f.pollCalls, reactionKey(conv, id)+":close")
 	if p := f.pollOf(conv, id); p != nil {
 		p.Closed = true

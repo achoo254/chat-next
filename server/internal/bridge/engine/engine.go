@@ -779,7 +779,7 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 	}
 	for i, m := range fresh {
 		if m.Poll != nil {
-			if _, err := it.SetPoll(ctx, seqs[i], importedPoll(m.Poll.Results), false); err != nil {
+			if _, err := it.SetPoll(ctx, seqs[i], importedPoll(m.Poll.Results), false, false); err != nil {
 				return err
 			}
 		}
@@ -917,7 +917,12 @@ func (r *runner) mayImport(ctx context.Context, it *chat.ImportTx, k messageKey,
 // applyEdit rewrites an imported message when m is newer than the stored one.
 func (r *runner) applyEdit(ctx context.Context, it *chat.ImportTx, k messageKey, have *importedMessage, m bridge.Message) error {
 	text, ents := mapContent(m.Text, m.Entities, r.e.chat.MessageLengthMax(), r.userOf)
-	if _, err := it.Edit(ctx, have.Seq, chat.ImportMessage{Text: text, Entities: ents, Buttons: chatButtons(m.Buttons), OwnerMention: ownerMention(m.Mention)}); err != nil {
+	edit := chat.ImportMessage{Text: text, Entities: ents, Buttons: chatButtons(m.Buttons), OwnerMention: ownerMention(m.Mention)}
+	if m.Poll != nil {
+		// Answers added there after the poll came (an open-answer poll) come with the edit.
+		edit.Content = &appv1.Message{Poll: pollContent(m.Poll)}
+	}
+	if _, err := it.Edit(ctx, have.Seq, edit); err != nil {
 		return err
 	}
 	if m.Poll != nil {

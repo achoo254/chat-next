@@ -105,11 +105,15 @@ func (r *runner) applyPolls(ctx context.Context, l *chatLink, list []bridge.Poll
 
 // setPoll writes one poll's results inside the chat's import transaction.
 func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr bridge.PollResults) error {
-	pending, err := pendingOpAt(ctx, it.Tx(), it.ChatID(), seq, "poll_vote")
+	voting, err := pendingOpAt(ctx, it.Tx(), it.ChatID(), seq, "poll_vote")
 	if err != nil {
 		return err
 	}
-	_, err = it.SetPoll(ctx, seq, importedPoll(pr), pending)
+	closing, err := pendingOpAt(ctx, it.Tx(), it.ChatID(), seq, "poll_close")
+	if err != nil {
+		return err
+	}
+	_, err = it.SetPoll(ctx, seq, importedPoll(pr), voting, closing)
 	return err
 }
 

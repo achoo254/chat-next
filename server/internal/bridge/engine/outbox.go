@@ -384,6 +384,10 @@ func (r *runner) doSend(ctx context.Context, sender bridge.Sender, h *outboxRow)
 	if err != nil {
 		return db.setOutbox(ctx, ids, "failed", err.Error(), time.Time{})
 	}
+	// An app that takes no votes takes no polls either: its Sender knows only text and files.
+	if _, ok := r.adapter.(bridge.PollWriter); msg.Poll != nil && !ok {
+		return db.setOutbox(ctx, ids, "failed", "polls_unsupported: this app cannot take polls from Chat", time.Time{})
+	}
 	if err := db.startSending(ctx, ids); err != nil {
 		return err
 	}

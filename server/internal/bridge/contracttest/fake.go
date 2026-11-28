@@ -404,6 +404,15 @@ func (f *Fake) SendMessage(_ context.Context, _ bridge.Account, m bridge.OutMess
 		if i == 0 {
 			msg.Text, msg.Entities = m.Text, m.Entities
 		}
+		if p := m.Poll; p != nil {
+			// The app keeps the poll Chat sent: PollResults and votes find it.
+			results := bridge.PollResults{Conversation: m.Conversation, ID: id, Counts: make([]int, len(p.Options)), OwnerKnown: true}
+			if p.Quiz {
+				results.Correct, results.Explanation = p.Correct, p.Explanation
+			}
+			f.polls[reactionKey(m.Conversation, id)] = &results
+			msg.Poll = &bridge.Poll{Question: p.Question, Options: p.Options, Multiple: p.Multiple, Public: p.Public, Quiz: p.Quiz, Results: results}
+		}
 		echoes = append(echoes, msg)
 	}
 	f.sent = append(f.sent, m)

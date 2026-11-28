@@ -36,6 +36,8 @@ export type DialogRequest =
 	/** `text`: what the message shows for the link ("" when it is the address itself); `fromId`: the sender. */
 	| { readonly kind: "link"; readonly url: string; readonly text: string; readonly fromId: number }
 	| { readonly kind: "readBy"; readonly chatId: number; readonly seq: number }
+	/** "Tạo bình chọn" from the composer, posted in its chat and topic. */
+	| { readonly kind: "newPoll"; readonly chatId: number; readonly topicId: number }
 	/** People the server did not add, each with the reason, and what still works for them. */
 	| {
 			readonly kind: "addFailed";

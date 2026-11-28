@@ -160,6 +160,8 @@ export const zhCN: MessagingCopy = {
 		media: "此版本的应用无法显示照片、视频和文件。随附的文字显示在下方。",
 		mediaPreview: "照片、视频或文件",
 		mediaKind: { photo: "照片", video: "视频", voice: "语音消息", audio: "音频", document: "文件", unknown: "文件" },
+		/** A poll in list and quote previews. */
+		pollPreview: (question: string) => `📊 ${question}`,
 		integration: (label: string) => `集成：${label}`,
 		updated: "已更新",
 		alertFiring: "告警中",

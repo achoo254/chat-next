@@ -35,6 +35,7 @@ import {
 	HistoryDirection,
 	MessageActionSchema,
 	MessageSchema,
+	PollSchema,
 	ReadHistoryResponseSchema,
 	ReactionCountSchema,
 	ReplyMarkupSchema,
@@ -91,6 +92,9 @@ interface MessageRecord {
 	readonly reactors: Map<string, Set<number>>;
 	readonly sender: number;
 	readonly randomId: number;
+	/** A poll's answers, by voter. */
+	votes?: Map<number, readonly number[]>;
+	pollClosed?: boolean;
 }
 
 interface ChatRecord {
@@ -356,8 +360,21 @@ export class FakeServer {
 					recentUserIds: [...users].slice(-3).reverse().map(big),
 				}),
 			);
+		const poll = record.message.poll;
+		const votes = [...(record.votes ?? new Map<number, readonly number[]>()).values()];
 		return create(MessageSchema, {
 			...record.message,
+			...(poll === undefined
+				? {}
+				: {
+						poll: create(PollSchema, {
+							...poll,
+							closed: record.pollClosed === true,
+							counts: poll.options.map((_, i) => votes.filter((v) => v.includes(i)).length),
+							voters: votes.length,
+							chosen: [...(record.votes?.get(viewer) ?? [])],
+						}),
+					}),
 			randomId: big(viewer === record.sender ? record.randomId : 0),
 			// Like the server: only the sender's copy says it went through AI.
 			sentViaAi: record.message.sentViaAi && viewer === record.sender,
@@ -603,6 +620,8 @@ export class FakeServer {
 			readonly replyMarkup?: MessageInitShape<typeof ReplyMarkupSchema>;
 			/** Posted through an AI tool (the real server keeps it in the sender's copy only). */
 			readonly sentViaAi?: boolean;
+			/** A poll: question, answers and flags; the results are the server's. */
+			readonly poll?: MessageInitShape<typeof PollSchema>;
 		} = {},
 	): { seq: number; ack: WireSyncAck } {
 		const chat = this.chat(chatId);
@@ -632,6 +651,29 @@ export class FakeServer {
 		const ack = this.ackFor(from, chatId);
 		if (randomId !== 0) sender.sent.set(randomId, { chatId, seq, ack });
 		return { seq, ack };
+	}
+
+	/** Sets `user`'s answers to a poll (none takes the vote back); members get the poll as each sees it. */
+	votePoll(user: number, chatId: number, seq: number, options: readonly number[]): void {
+		const record = this.record(chatId, seq);
+		record.votes ??= new Map();
+		if (options.length === 0) record.votes.delete(user);
+		else record.votes.set(user, [...options]);
+		this.pushPoll(chatId, record);
+	}
+
+	/** Closes a poll. */
+	closePoll(chatId: number, seq: number): void {
+		const record = this.record(chatId, seq);
+		record.pollClosed = true;
+		this.pushPoll(chatId, record);
+	}
+
+	private pushPoll(chatId: number, record: MessageRecord): void {
+		this.pushChat(chatId, (viewer) => ({
+			case: "poll",
+			value: { chatId: big(chatId), seq: record.message.seq, poll: this.view(record, viewer).poll },
+		}));
 	}
 
 	/** An incoming webhook message: from_id 0 under its label, optionally silent with URL buttons. */

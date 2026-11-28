@@ -29,6 +29,7 @@ import type {
 	Message as WireMessage,
 	MessageAction as WireAction,
 	MessageEntity as WireEntity,
+	Poll as WirePoll,
 	ReactionCount as WireReaction,
 	ReplyMarkup as WireReplyMarkup,
 	SyncAck as WireSyncAck,
@@ -80,6 +81,7 @@ import type {
 	NotificationSettings,
 	NotificationSound,
 	PinnedMessagesPage,
+	Poll,
 	ReactionCount,
 	ReplyKeyboard,
 	SessionRevokeReason,
@@ -446,6 +448,23 @@ export function toWireEntity(entity: MessageEntity): {
 	};
 }
 
+export function toPoll(poll: WirePoll): Poll {
+	return {
+		question: poll.question,
+		options: [...poll.options],
+		multiple: poll.multiple,
+		publicVoters: poll.publicVoters,
+		quiz: poll.quiz,
+		correct: [...poll.correct],
+		explanation: poll.explanation,
+		closed: poll.closed,
+		counts: [...poll.counts],
+		voters: poll.voters,
+		chosen: [...poll.chosen],
+		resultsHidden: poll.resultsHidden,
+	};
+}
+
 function toReaction(reaction: WireReaction): ReactionCount {
 	return {
 		emoji: reaction.emoji,
@@ -535,6 +554,7 @@ export function toMessage(message: WireMessage): Message {
 		recalled: message.recalled,
 		silent: message.silent,
 		...(message.sentViaAi ? { sentViaAi: true } : {}),
+		...(message.poll === undefined ? {} : { poll: toPoll(message.poll) }),
 		...(message.media === undefined ? {} : { media: toMediaRef(message.media) }),
 		...keyboardOf(message.replyMarkup),
 	};
@@ -571,6 +591,10 @@ function toBody(update: WireUpdate): UpdateBody {
 				seq: id(kind.value.seq),
 				reactions: kind.value.reactions.map(toReaction),
 			};
+		case "poll":
+			return kind.value.poll === undefined
+				? { kind: "unknown" }
+				: { kind: "poll", chatId: id(kind.value.chatId), seq: id(kind.value.seq), poll: toPoll(kind.value.poll) };
 		case "read":
 			return {
 				kind: "read",

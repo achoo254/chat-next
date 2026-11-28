@@ -442,9 +442,27 @@ export const Permission = {
 	manageTopics: 32,
 } as const;
 
+/** A poll as the composer's form posts it. */
+export interface PollDraft {
+	readonly question: string;
+	readonly options: readonly string[];
+	readonly multiple: boolean;
+	readonly publicVoters: boolean;
+	readonly quiz: boolean;
+	/** Quiz: the index of the right answer. */
+	readonly correct: number;
+	readonly explanation: string;
+}
+
 export interface Remote {
 	limits(): Promise<Limits>;
 	setReaction(chatId: number, seq: number, emoji: string): Promise<void>;
+	/** Posts a poll; it arrives in the history with the realtime update. The same `randomId` on a retry never posts it twice. */
+	sendPoll(chatId: number, topicId: number, draft: PollDraft, randomId: number): Promise<void>;
+	/** Sets the user's answers to a poll; none takes the vote back. */
+	votePoll(chatId: number, seq: number, options: readonly number[]): Promise<void>;
+	/** Closes a poll the user sent. */
+	closePoll(chatId: number, seq: number): Promise<void>;
 	/** `notify` false pins silently: members see the system line only. */
 	pin(chatId: number, seq: number, notify?: boolean): Promise<void>;
 	unpin(chatId: number, seq: number): Promise<void>;
@@ -550,6 +568,9 @@ export interface Remote {
 const METHODS = [
 	"limits",
 	"setReaction",
+	"sendPoll",
+	"votePoll",
+	"closePoll",
 	"pin",
 	"unpin",
 	"forward",

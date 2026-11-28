@@ -39,6 +39,8 @@ const MessageButtons = lazy(() => import("./message-buttons.tsx"));
 const BridgeStamp = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeStamp })));
 const BridgeFailedRow = lazy(() => bridgeChunk().then((m) => ({ default: m.BridgeFailedRow })));
 const ReactionBar = lazy(() => import("./message-menu.tsx").then((m) => ({ default: m.ReactionBar })));
+// A poll and its voting: loaded with the first poll a chat shows.
+const PollView = lazy(() => import("./poll-view.tsx"));
 const MessageMedia = lazy(() => mediaChunk().then((m) => ({ default: m.MessageMedia })));
 const AlbumMedia = lazy(() => mediaChunk().then((m) => ({ default: m.AlbumMedia })));
 const PendingMediaView = lazy(() => mediaChunk().then((m) => ({ default: m.PendingMediaView })));
@@ -545,7 +547,7 @@ export function MessageBubble({
 	// A synced group shows the sender's tag there ("BJ") as the other app does.
 	const rank = useMemberRank(group && synced && !mine ? chatId : 0, message.fromId);
 	const showSilent = message.silent && !recalled && message.fromId !== store.selfId && !synced;
-	const unsupported = !recalled && message.text === "" && message.mediaKind === null;
+	const unsupported = !recalled && message.text === "" && message.mediaKind === null && message.poll === undefined;
 	const album = albumKeys.length > 1;
 	const hasMedia = message.media !== undefined || album;
 	// A sticker or a GIF alone is drawn bare, without the bubble, as Telegram does.
@@ -742,7 +744,11 @@ export function MessageBubble({
 					{message.replyToSeq !== 0 && <ReplyQuote chatId={chatId} seq={message.replyToSeq} />}
 					{message.mediaKind !== null && !hasMedia && <p className="via">{copy.message.media}</p>}
 					{hasMedia && <MediaSlot chatId={chatId} message={message} albumKeys={albumKeys} />}
-					{alert === null ? (
+					{message.poll !== undefined ? (
+						<Suspense fallback={<p>{stamp}</p>}>
+							<PollView chatId={chatId} seq={message.seq} poll={message.poll} mine={message.fromId === store.selfId} inert={inert} stamp={trailingStamp ? null : stamp} />
+						</Suspense>
+					) : alert === null ? (
 						<RichText text={message.text} entities={message.entities} ctx={ctx} tail={trailingStamp ? undefined : stamp} />
 					) : (
 						<>

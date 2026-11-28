@@ -19,6 +19,7 @@ import type {
 	MessageButton,
 	MessageEntity,
 	NotificationSettings,
+	Poll,
 	ReactionCount,
 	ReplyKeyboard,
 	User,
@@ -128,6 +129,31 @@ function parseReactions(json: string | null): ReactionCount[] {
 			? item.recentUserIds.filter((v): v is number => typeof v === "number")
 			: [],
 	}));
+}
+
+function numbers(value: unknown): number[] {
+	return Array.isArray(value) ? value.filter((v): v is number => typeof v === "number") : [];
+}
+
+function parsePoll(json: string | null): { poll?: Poll } {
+	const value = parseJson(json);
+	if (!isRecord(value)) return {};
+	return {
+		poll: {
+			question: text(value, "question"),
+			options: Array.isArray(value.options) ? value.options.filter((v): v is string => typeof v === "string") : [],
+			multiple: value.multiple === true,
+			publicVoters: value.publicVoters === true,
+			quiz: value.quiz === true,
+			correct: numbers(value.correct),
+			explanation: text(value, "explanation"),
+			closed: value.closed === true,
+			counts: numbers(value.counts),
+			voters: field(value, "voters"),
+			chosen: numbers(value.chosen),
+			resultsHidden: value.resultsHidden === true,
+		},
+	};
 }
 
 function parseForward(json: string | null): ForwardHeader | null {
@@ -275,6 +301,7 @@ export function rowToMessage(row: SqlRow): Message {
 		recalled: bool(row, "recalled"),
 		silent: bool(row, "silent"),
 		...(bool(row, "sent_via_ai") ? { sentViaAi: true } : {}),
+		...parsePoll(optionalStr(row, "poll")),
 		...mediaOf(optionalStr(row, "media")),
 		...parseKeyboard(optionalStr(row, "reply_keyboard"), bool(row, "keyboard_hidden")),
 	};

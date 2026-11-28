@@ -16,6 +16,7 @@ import {
 	putNotificationSettings,
 	putPin,
 	putPinnedOrder,
+	putPoll,
 	putReactions,
 	putRead,
 	putUnreadMark,
@@ -120,6 +121,9 @@ export function applyBody(body: UpdateBody, ctx: ApplyContext): void {
 			return;
 		case "reaction":
 			putReactions(w, body.chatId, body.seq, body.reactions);
+			return;
+		case "poll":
+			putPoll(w, body.chatId, body.seq, body.poll);
 			return;
 		case "read": {
 			putRead(w, body, selfId);

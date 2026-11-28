@@ -7,7 +7,7 @@ import type { StoredMessage } from "@achoo254/chat-core";
 import { Icon, type IconName } from "../../components/screen-icons.tsx";
 import { useI18n } from "../../i18n/i18n.tsx";
 import { useScreensCopy } from "../copy/use-screens-copy.ts";
-import { fullDate, isSavedChat } from "../data/format.ts";
+import { fullDate, isSavedChat, quoteText } from "../data/format.ts";
 import { pinnedLists } from "../data/pinned.ts";
 import { useChat, useServices } from "../data/services.tsx";
 import type { WindowItem } from "../data/store.ts";
@@ -68,7 +68,7 @@ export default function SelectionBar({ selection }: { selection: MessageSelectio
 					seq: message.seq,
 					sender: senderOf(message),
 					date: message.date,
-					text: message.text !== "" ? message.text : `[${message.mediaKind ?? "media"}]`,
+					text: quoteText(message),
 					code: message.entities.filter((e) => e.type === "code" || e.type === "pre").map((e) => message.text.slice(e.offset, e.offset + e.length)),
 				}));
 				const first = quotes[0];

@@ -79,13 +79,74 @@ func loadPolls(ctx context.Context, q querier, keys map[int64][]int64, viewers [
 	if len(p.state) == 0 {
 		return p, nil
 	}
+	// Polls of Chat are counted here; those of another app carry their counts.
+	native := map[int64][]int64{}
+	for k, st := range p.state {
+		if st.extCounts == nil {
+			native[k.chatID] = append(native[k.chatID], k.seq)
+		}
+	}
+	if len(native) > 0 {
+		nc, ns := flattenKeys(native)
+		rows, err = q.Query(ctx, `
+			SELECT v.chat_id, v.seq, o.option, count(*)
+			FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
+			JOIN poll_votes v ON v.chat_id = x.chat_id AND v.seq = x.seq
+			CROSS JOIN LATERAL unnest(v.options) AS o(option)
+			GROUP BY v.chat_id, v.seq, o.option`, nc, ns)
+		if err != nil {
+			return nil, fmt.Errorf("chat: count poll votes: %w", err)
+		}
+		for rows.Next() {
+			var k msgKey
+			var option int16
+			var n int32
+			if err := rows.Scan(&k.chatID, &k.seq, &option, &n); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("chat: count poll votes: %w", err)
+			}
+			if p.counts[k] == nil {
+				p.counts[k] = map[int32]int32{}
+			}
+			p.counts[k][int32(option)] = n
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("chat: count poll votes: %w", err)
+		}
+		rows, err = q.Query(ctx, `
+			SELECT v.chat_id, v.seq, count(*)
+			FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
+			JOIN poll_votes v ON v.chat_id = x.chat_id AND v.seq = x.seq
+			GROUP BY v.chat_id, v.seq`, nc, ns)
+		if err != nil {
+			return nil, fmt.Errorf("chat: count poll voters: %w", err)
+		}
+		for rows.Next() {
+			var k msgKey
+			var n int32
+			if err := rows.Scan(&k.chatID, &k.seq, &n); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("chat: count poll voters: %w", err)
+			}
+			p.voters[k] = n
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("chat: count poll voters: %w", err)
+		}
+	}
+	if len(viewers) == 0 {
+		return p, nil
+	}
 	pc, ps := flattenKeys(pollKeys(p.state))
 	rows, err = q.Query(ctx, `
 		SELECT v.chat_id, v.seq, v.user_id, v.options
 		FROM unnest($1::bigint[], $2::bigint[]) AS x(chat_id, seq)
-		JOIN poll_votes v ON v.chat_id = x.chat_id AND v.seq = x.seq`, pc, ps)
+		JOIN poll_votes v ON v.chat_id = x.chat_id AND v.seq = x.seq
+		WHERE v.user_id = ANY($3)`, pc, ps, viewers)
 	if err != nil {
-		return nil, fmt.Errorf("chat: load poll votes: %w", err)
+		return nil, fmt.Errorf("chat: load own poll votes: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -93,25 +154,16 @@ func loadPolls(ctx context.Context, q querier, keys map[int64][]int64, viewers [
 		var user int64
 		var options []int16
 		if err := rows.Scan(&k.chatID, &k.seq, &user, &options); err != nil {
-			return nil, fmt.Errorf("chat: load poll votes: %w", err)
+			return nil, fmt.Errorf("chat: load own poll votes: %w", err)
 		}
-		if p.counts[k] == nil {
-			p.counts[k] = map[int32]int32{}
+		mk := memberKey{k.chatID, user}
+		if p.mine[mk] == nil {
+			p.mine[mk] = map[int64][]int32{}
 		}
-		for _, o := range options {
-			p.counts[k][int32(o)]++
-		}
-		p.voters[k]++
-		if slices.Contains(viewers, user) {
-			mk := memberKey{k.chatID, user}
-			if p.mine[mk] == nil {
-				p.mine[mk] = map[int64][]int32{}
-			}
-			p.mine[mk][k.seq] = widen(options)
-		}
+		p.mine[mk][k.seq] = widen(options)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("chat: load poll votes: %w", err)
+		return nil, fmt.Errorf("chat: load own poll votes: %w", err)
 	}
 	return p, nil
 }
@@ -157,6 +209,7 @@ func (p *pollsOf) fill(m *appv1.Message, viewer int64) {
 	if st.extCounts != nil {
 		copy(poll.Counts, st.extCounts)
 		poll.Voters = st.extVoters
+		poll.ResultsHidden = len(st.extCounts) == 0
 	} else {
 		for i := range poll.Counts {
 			poll.Counts[i] = p.counts[k][int32(i)]
@@ -494,6 +547,15 @@ func (s *Service) ClosePoll(ctx context.Context, me int64, req *appv1.ClosePollR
 		if st.closed {
 			return nil
 		}
+		if st.extCounts != nil {
+			out, err := t.outboundLink(ctx, chatID, me, feature.Messages)
+			if err != nil {
+				return err
+			}
+			if out == nil {
+				return errPrecondition("poll_external: this poll belongs to the other app of the chat; it closes there while Chat sends to it")
+			}
+		}
 		if _, err := t.tx.Exec(ctx, `UPDATE message_polls SET closed = true WHERE chat_id = $1 AND seq = $2`, chatID, seq); err != nil {
 			return fmt.Errorf("chat: close poll: %w", err)
 		}
@@ -534,6 +596,31 @@ func (s *Service) pollFor(ctx context.Context, me, chatID, seq int64) (*appv1.Po
 		return nil, err
 	}
 	return msgs[0].GetPoll(), nil
+}
+
+// repostedPoll is the state a poll forwarded or copied by me starts with. A quiz
+// carries its answer to the copy, whose sender (me) sees it there: me must already
+// see it here (answered, sent it, or it closed), and the answer must be known (a quiz
+// of another app tells it only to who answered).
+func (s *Service) repostedPoll(ctx context.Context, q querier, src *messageRow, poll *appv1.Poll, me int64) (*pollState, error) {
+	if !poll.GetQuiz() {
+		return &pollState{}, nil
+	}
+	st, err := readPoll(ctx, q, src.ChatID, src.Seq, "")
+	if err != nil {
+		return nil, err
+	}
+	if len(st.correct) == 0 {
+		return nil, errPrecondition("quiz_unknown: the answer of this quiz is not known here, so it cannot be posted again")
+	}
+	mine, err := voteOf(ctx, q, src.ChatID, src.Seq, me)
+	if err != nil {
+		return nil, err
+	}
+	if len(mine) == 0 && !st.closed && src.FromID != me {
+		return nil, errPrecondition("quiz_unanswered: answer the quiz before passing it on")
+	}
+	return &pollState{correct: st.correct, explanation: st.explanation}, nil
 }
 
 // deletePolls removes what polls among seqs of a chat keep beside the message.

@@ -671,6 +671,10 @@ export function Composer({
 									screenshotChoices={captureTarget?.kind === "choose" ? captureTarget.machines : undefined}
 									onPickScreenshot={pickCaptureMachine}
 									onRecordScreen={canRecordScreen() ? recordScreen : undefined}
+									onPoll={() => {
+										setAttachOpen(false);
+										ui.dialog.set({ kind: "newPoll", chatId, topicId });
+									}}
 									onClose={() => {
 										setAttachOpen(false);
 										attachButton.current?.focus();
