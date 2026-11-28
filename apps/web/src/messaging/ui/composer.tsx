@@ -403,12 +403,13 @@ export function Composer({
 	};
 
 	// Where a screenshot goes: tunelo-capture on this computer (machines/native-capture.ts) or the browser's own.
-	// Found when the attach menu opens; a failure of the machine's falls back to the browser for this chat.
+	// Found when the composer shows, so ⌥S / Alt+S reaches the machine before the menu was ever opened, and again
+	// when the attach menu opens; a failure of the machine's falls back to the browser for this chat.
 	const [captureTarget, setCaptureTarget] = useState<CaptureTarget | null>(null);
 	const [nativeBusy, setNativeBusy] = useState(false);
 	const slot = useHubSlot();
 	useEffect(() => {
-		if (!attachOpen || !canShareScreen() || captureTarget?.kind === "web") return;
+		if (!canShareScreen() || captureTarget?.kind === "web") return;
 		let live = true;
 		import("../../machines/native-capture.ts")
 			.then((m) => m.resolveCaptureTarget(m.hubOf(slot, transport, "")))
