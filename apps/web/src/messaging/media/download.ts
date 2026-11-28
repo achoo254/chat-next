@@ -23,12 +23,24 @@ function clickLink(href: string, download: string | null): void {
 	link.remove();
 }
 
-/** A name for a file the sender did not name (photos taken in the app have none). */
-export function downloadName(media: Pick<MediaRef, "fileName" | "kind" | "mimeType">, seq: number): string {
-	if (media.fileName !== "") return media.fileName;
+/**
+ * Names the bridge gives a file the other app did not name (server bridge engine
+ * fileNameOf): every photo copied from Zalo is "photo.jpg", so saving several would
+ * pile up as "photo (1).jpg", "photo (2).jpg"... They count as no name.
+ */
+const PLACEHOLDER_NAME = /^(photo|video|voice|audio|document|sticker|gif)\.[a-z0-9]+$/i;
+
+/**
+ * A name for a saved file. The sender's own name is kept; a file without one (photos
+ * taken in the app, files copied from another app) is named after its chat and
+ * message, so two saved files never share a name.
+ */
+export function downloadName(media: Pick<MediaRef, "fileName" | "kind" | "mimeType">, chatId: number, seq: number): string {
+	if (media.fileName !== "" && !PLACEHOLDER_NAME.test(media.fileName)) return media.fileName;
 	const ext = media.mimeType.split("/")[1]?.replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "") ?? "";
 	const base = media.kind === "photo" ? "anh" : media.kind === "video" ? "video" : "file";
-	return ext === "" ? `${base}-${seq}` : `${base}-${seq}.${ext}`;
+	const name = `${base}-${chatId}-${seq}`;
+	return ext === "" ? name : `${name}.${ext}`;
 }
 
 /**
@@ -41,7 +53,7 @@ export async function downloadMedia(source: ChatSource, chatId: number, seq: num
 		const file = await source.mediaFile(request);
 		if (file.status === "unavailable") return false;
 		const url = URL.createObjectURL(file.blob);
-		clickLink(url, downloadName(media, seq));
+		clickLink(url, downloadName(media, chatId, seq));
 		setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
 		return true;
 	}

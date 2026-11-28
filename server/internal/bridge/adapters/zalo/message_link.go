@@ -3,6 +3,7 @@ package zalo
 import (
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strings"
 	"unicode/utf16"
 
@@ -111,4 +112,69 @@ func oneLine(s string, max int) string {
 		s = truncateUTF8(s, max)
 	}
 	return s
+}
+
+// cardContent shows a card of a type the adapter does not know (Zalo adds kinds of
+// cards, such as a bank account card) by what every card names: its title, the line
+// under it, its link and its picture. ok is false when it names none of the first two.
+func cardContent(content json.RawMessage) (text string, media []bridge.Media, ents []bridge.Entity, ok bool) {
+	var card linkCard
+	if err := json.Unmarshal(content, &card); err != nil {
+		return "", nil, nil, false
+	}
+	title := oneLine(card.Title, linkTitleMax)
+	description := oneLine(card.Description, linkDescriptionMax)
+	if title == "" && description == "" {
+		return "", nil, nil, false
+	}
+	var b captionBuilder
+	titleEntity := bridge.Entity{}
+	if href := strings.TrimSpace(card.Href); len(href) <= linkURLMax {
+		if page, err := url.Parse(href); err == nil && (page.Scheme == "http" || page.Scheme == "https") && page.Host != "" {
+			titleEntity = bridge.Entity{Kind: "link", URL: href}
+		}
+	}
+	b.line(title, titleEntity, true)
+	b.line(description, bridge.Entity{}, false)
+	if thumb := strings.TrimSpace(card.Thumb); mediaAllowed(thumb) {
+		media = []bridge.Media{{Ref: mediaRef + thumb, Kind: "photo"}}
+	}
+	return b.text.String(), media, b.ents, true
+}
+
+// contentShape describes the content of a message without anything it says: the
+// names of its fields, of the fields of its params and its action, so the log of a
+// message type not yet supported shows how to support it.
+func contentShape(content json.RawMessage) (fields, params []string, action string) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(content, &obj); err != nil {
+		return nil, nil, ""
+	}
+	fields = fieldNames(obj)
+	var raw string
+	if json.Unmarshal(obj["action"], &raw) == nil && codeWord.MatchString(strings.ReplaceAll(raw, ".", "_")) {
+		action = raw
+	}
+	paramsRaw := obj["params"]
+	if json.Unmarshal(paramsRaw, &raw) == nil {
+		paramsRaw = json.RawMessage(raw)
+	}
+	var p map[string]json.RawMessage
+	if json.Unmarshal(paramsRaw, &p) == nil {
+		params = fieldNames(p)
+	}
+	return fields, params, action
+}
+
+// fieldNames are the names of an object's fields that read like field names (at
+// most 40), sorted: a name that could carry a value, such as a number, is left out.
+func fieldNames(obj map[string]json.RawMessage) []string {
+	names := make([]string, 0, len(obj))
+	for k := range obj {
+		if codeWord.MatchString(k) && strings.Trim(k, "0123456789") != "" {
+			names = append(names, k)
+		}
+	}
+	slices.Sort(names)
+	return names[:min(len(names), 40)]
 }

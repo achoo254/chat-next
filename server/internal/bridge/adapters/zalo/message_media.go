@@ -78,6 +78,12 @@ func messageContent(ev wireEvent) (string, []bridge.Media, []bridge.Entity) {
 		return text, media, ents
 	}
 	text, media := plainContent(ev)
+	// a text whose content is not a string is not a card
+	if text == labelUnsupported && string(ev.MsgType) != msgTypeText {
+		if text, media, ents, ok := cardContent(ev.Content); ok {
+			return text, media, ents
+		}
+	}
 	return text, media, nil
 }
 

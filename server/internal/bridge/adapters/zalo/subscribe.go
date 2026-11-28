@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -193,6 +194,11 @@ func (a *Adapter) deliver(ctx context.Context, heard *heardAccount, own *sentLog
 	}
 	if !heard.firstSighting(m.ID) {
 		return nil
+	}
+	if m.Text == labelUnsupported {
+		fields, params, action := contentShape(ev.Content)
+		a.logger.Info("zalo message type not supported", "msg_type", safeCode(strings.ReplaceAll(string(ev.MsgType), ".", "_")),
+			"action", action, "fields", fields, "params", params)
 	}
 	heard.record(conv, m)
 	heard.rememberClientID(m.ID, string(ev.CliMsgID))

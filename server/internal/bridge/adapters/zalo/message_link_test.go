@@ -2,6 +2,7 @@ package zalo
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -61,5 +62,29 @@ func TestMapUndoTreatsZeroIdsAsAbsent(t *testing.T) {
 	}
 	if _, err := mapUndo(json.RawMessage(`{"data":{"content":{"globalMsgId":0,"cliMsgId":0}},"threadId":"500"}`)); err == nil {
 		t.Error("a recall of message 0 was accepted")
+	}
+}
+
+func TestCardContentShowsTitleAndLineOfAnUnknownCard(t *testing.T) {
+	ev := wireEvent{Ev: evMessage, Thread: threadUser, MsgType: "chat.webcontent",
+		Content: json.RawMessage(`{"title":"Ngân hàng VPBank","description":"Bấm để chuyển khoản nhanh","action":"zinstant.bankcard","params":"{\"pcItem\":1}"}`),
+		MsgID:   "1001", UIDFrom: "500", IDTo: "0", DName: "Lan", TS: "1763700000000"}
+	m, _, err := mapMessage(ev, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Text != "Ngân hàng VPBank\nBấm để chuyển khoản nhanh" || len(m.Entities) != 1 || m.Entities[0].Kind != "bold" {
+		t.Errorf("card = %q %+v", m.Text, m.Entities)
+	}
+	ev.Content = json.RawMessage(`{"action":"x"}`)
+	if m, _, _ = mapMessage(ev, time.Now()); m.Text != labelUnsupported {
+		t.Errorf("empty card = %q, want the label", m.Text)
+	}
+}
+
+func TestContentShapeNamesFieldsNotValues(t *testing.T) {
+	fields, params, action := contentShape(json.RawMessage(`{"title":"secret","action":"zinstant.bankcard","params":"{\"numAcc\":\"260277488\",\"260277488\":1}"}`))
+	if strings.Join(fields, ",") != "action,params,title" || strings.Join(params, ",") != "numAcc" || action != "zinstant.bankcard" {
+		t.Errorf("shape = %v %v %q", fields, params, action)
 	}
 }
