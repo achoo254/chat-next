@@ -11,6 +11,19 @@ export interface CaptureSettings {
   enabled?: boolean;
   /** The global shortcut, as "Ctrl+Alt+A"; "" turns it off; unset is DEFAULT_HOTKEY. */
   hotkey?: string;
+  /** The overlay's language, the one Chat showed when it last asked for a capture; unset is the system's. */
+  lang?: CaptureLang;
+}
+
+export type CaptureLang = "vi" | "en" | "zh-CN";
+
+/** A language tag a device sent ("vi", "en-US", "zh-CN"…) as one the overlay has; undefined otherwise. */
+export function captureLangOf(tag: string): CaptureLang | undefined {
+  const t = tag.trim().toLowerCase();
+  if (t === "vi" || t.startsWith("vi-")) return "vi";
+  if (t === "en" || t.startsWith("en-")) return "en";
+  if (t === "zh" || t.startsWith("zh-")) return "zh-CN";
+  return undefined;
 }
 
 export const captureSettingsFile = (configDir: string) => join(configDir, "capture.json");
@@ -21,9 +34,11 @@ export function readCaptureSettings(configDir: string): CaptureSettings {
   if (!existsSync(file)) return {};
   try {
     const raw = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+    const lang = typeof raw.lang === "string" ? captureLangOf(raw.lang) : undefined;
     return {
       ...(typeof raw.enabled === "boolean" ? { enabled: raw.enabled } : {}),
       ...(typeof raw.hotkey === "string" ? { hotkey: raw.hotkey } : {}),
+      ...(lang ? { lang } : {}),
     };
   } catch {
     return {};

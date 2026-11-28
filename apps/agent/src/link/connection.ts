@@ -60,6 +60,7 @@ import { LedgerUnreadable } from "../usage/ledger.ts";
 import type { ObservatoryEventSink, ObservatoryHub } from "../observatory/hub/observatory-hub.ts";
 import type { ChatInbox } from "../chat-inbox/chat-inbox.ts";
 import type { CaptureService } from "../capture/capture-service.ts";
+import { captureLangOf } from "../capture/capture-settings.ts";
 import { chatInboxStateBody } from "../chat-inbox/inbox-wire.ts";
 import { CLAUDE_PROVIDER_ID } from "../providers/claude/accounts/paths.ts";
 import { ReportRangeError } from "../usage/report.ts";
@@ -511,7 +512,7 @@ export class Connection {
    * The composer asks for a screenshot: answered once the overlay is up on the
    * machine; the picture (or the cancel) comes after to this device only.
    */
-  private async captureFrame(id: string, requestId: string): Promise<void> {
+  private async captureFrame(id: string, requestId: string, lang: string): Promise<void> {
     const capture = this.ctx.capture;
     if (!capture) return this.send(id, { case: "error", value: refusal("screenshots are not available on this machine", ErrorReason.UNSUPPORTED_REQUEST) });
     if (!CAPTURE_ID.test(requestId)) return this.send(id, { case: "error", value: refusal("not a capture id", ErrorReason.UNSUPPORTED_REQUEST) });
@@ -525,7 +526,7 @@ export class Connection {
             ? { requestId, outcome: outcomes.captured, name: piece.name, mimeType: piece.mimeType, size: BigInt(piece.size), offset: BigInt(piece.offset), data: piece.data, last: piece.last }
             : { requestId, outcome: outcomes[piece.outcome], last: true, message: piece.outcome === "failed" ? piece.message : "" };
         this.send("", { case: "captureResult", value });
-      });
+      }, captureLangOf(lang) ?? "");
       this.send(id, { case: "ack", value: {} });
     } catch (err) {
       this.captures.delete(requestId);
@@ -1019,7 +1020,7 @@ export class Connection {
         case "observatoryStation":
           return this.observatoryFrame(id, b);
         case "captureRequest":
-          return this.captureFrame(id, b.value.requestId);
+          return this.captureFrame(id, b.value.requestId, b.value.lang);
         case "chatInboxList":
         case "chatInboxSet":
         case "chatInboxRemove": {

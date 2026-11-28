@@ -11,7 +11,8 @@ tunelo-capture --out <thư mục ảnh> [--lang vi|en|zh-CN] [--hotkey "Ctrl+Alt
 ```
 
 - `--out`: nơi ghi ảnh (`capture-<ms>.png`); `tunelo` đọc rồi chuyển vào lịch sử mã hoá của nó.
-- `--lang`: ngôn ngữ chữ trên lớp phủ (mặc định tiếng Việt).
+- `--lang`: ngôn ngữ chữ trên lớp phủ (mặc định tiếng Việt). `tunelo` truyền ngôn ngữ Chat dùng lần gần nhất khi xin chụp
+  (`lang` trong `capture.json`), chưa có thì locale của hệ điều hành.
 - `--hotkey`: phím tắt toàn cục mở chụp; chuỗi rỗng là tắt.
 - Đóng stdin (tunelo thoát) thì tiến trình thoát.
 
@@ -23,6 +24,7 @@ tunelo-capture --out <thư mục ảnh> [--lang vi|en|zh-CN] [--hotkey "Ctrl+Alt
 | `capture_screen` | `id`, `display`: số hoặc `null` (màn hình chính) | Chụp nguyên một màn hình, không giao diện. `tunelo` phải hỏi người dùng trước (chính sách MCP). |
 | `list_displays` | `id` | Danh sách màn hình. |
 | `set_hotkey` | `capture` | Đổi phím tắt (`"Ctrl+Alt+A"`; rỗng là tắt). |
+| `set_lang` | `lang`: `vi` \| `en` \| `zh-CN` | Ngôn ngữ lớp phủ từ lần mở sau, kể cả phím tắt. `tunelo` gửi trước `capture_interactive` khi `CaptureRequest` có `lang` (ngôn ngữ Chat đang hiển thị) và lưu vào `capture.json`. |
 | `quit` | | Thoát. |
 
 ## Sự kiện (stdout)

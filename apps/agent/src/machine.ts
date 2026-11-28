@@ -31,7 +31,7 @@ import { claudeSandboxOn, sandboxApplies, sandboxProfile } from "./safety/mac-sa
 import { defaultClaudeHome } from "./providers/claude/accounts/paths.ts";
 import { isCompiled, selfCommand, supervised, termHostUnit } from "./service.ts";
 import { CaptureService } from "./capture/capture-service.ts";
-import { hotkeyOf, readCaptureSettings, watchCaptureSettings } from "./capture/capture-settings.ts";
+import { captureLangOf, hotkeyOf, readCaptureSettings, watchCaptureSettings, writeCaptureSettings } from "./capture/capture-settings.ts";
 import type { TermHostUnit } from "./terminal/host-supervisor.ts";
 import { ControlError } from "./terminal/host-link.ts";
 import { TerminalService, aiTerminalsOf } from "./terminal/terminal-service.ts";
@@ -223,7 +223,13 @@ export class Machine {
       outDir: join(dataDir, "captures"),
       hotkey: () => hotkeyOf(readCaptureSettings(dir)),
       enabled: () => readCaptureSettings(dir).enabled !== false,
-      lang: () => Intl.DateTimeFormat().resolvedOptions().locale,
+      // The language Chat last asked in, else the system's.
+      lang: () => readCaptureSettings(dir).lang ?? Intl.DateTimeFormat().resolvedOptions().locale,
+      rememberLang: (tag) => {
+        const settings = readCaptureSettings(dir);
+        const lang = captureLangOf(tag);
+        if (lang && settings.lang !== lang) writeCaptureSettings(dir, { ...settings, lang });
+      },
       log: this.log,
     });
     this.capture.onChange(() => void this.announceInfo());

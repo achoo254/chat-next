@@ -8,7 +8,7 @@ use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Rect a
 use tunelo_capture::annotate::{Mark, Tool, COLORS};
 use tunelo_capture::compose::{crop, Frame, TEXT_SIZE};
 use tunelo_capture::geometry::{drag_rect, toolbar_rect, Rect};
-use tunelo_capture::text::{draw_text, measure};
+use tunelo_capture::text::{draw_text, measure, Fonts};
 use tunelo_capture::toolbar::{hit, layout, Button, Slot, Words, BAR_H};
 use tunelo_capture::wire::{Action, Origin};
 
@@ -61,7 +61,7 @@ pub struct Overlay {
 }
 
 impl Overlay {
-    pub fn new(frame: Frame, window_size: (u32, u32), scale: f32, origin: Origin, words: &'static Words, font: Option<&fontdue::Font>) -> Self {
+    pub fn new(frame: Frame, window_size: (u32, u32), scale: f32, origin: Origin, words: &'static Words, font: Option<&Fonts>) -> Self {
         let to_frame = (
             frame.width as f32 / window_size.0.max(1) as f32,
             frame.height as f32 / window_size.1.max(1) as f32,
@@ -270,7 +270,7 @@ impl Overlay {
     }
 
     /// The whole window's picture, in frame pixels (RGBA, opaque).
-    pub fn render(&self, font: Option<&fontdue::Font>) -> Pixmap {
+    pub fn render(&self, font: Option<&Fonts>) -> Pixmap {
         let (w, h) = (self.frame.width, self.frame.height);
         let mut out = Pixmap::from_vec(self.dimmed.clone(), tiny_skia::IntSize::from_wh(w.max(1), h.max(1)).expect("frame size")).expect("frame buffer");
         let s = self.scale * self.to_frame.0;
@@ -334,7 +334,7 @@ impl Overlay {
         out
     }
 
-    fn draw_bar(&self, out: &mut Pixmap, bar: Rect, s: f32, font: Option<&fontdue::Font>) {
+    fn draw_bar(&self, out: &mut Pixmap, bar: Rect, s: f32, font: Option<&Fonts>) {
         let (bx, by) = (bar.x as f32, bar.y as f32);
         fill_round(out, (bx, by, bar.w as f32, bar.h as f32), 10.0 * s, BAR_BG, 0.97);
         for slot in &self.slots {
@@ -407,7 +407,7 @@ fn fill_circle(out: &mut Pixmap, cx: f32, cy: f32, r: f32, color: [u8; 3]) {
 }
 
 /// The tools', undo's and close's pictures, drawn as lines `u` wide around the centre.
-fn draw_icon(out: &mut Pixmap, button: Button, cx: f32, cy: f32, u: f32, font: Option<&fontdue::Font>) {
+fn draw_icon(out: &mut Pixmap, button: Button, cx: f32, cy: f32, u: f32, font: Option<&Fonts>) {
     let stroke = Stroke {
         width: (u / 4.0).max(1.5),
         line_cap: tiny_skia::LineCap::Round,

@@ -2491,6 +2491,9 @@ message CaptureInfo {
 message CaptureRequest {
   // Chosen by A (8-64 letters, digits, "-", "_"); CaptureResult carries it.
   string request_id = 1;
+  // The language A shows ("vi", "en", "zh-CN"): the overlay's words follow it,
+  // and the machine keeps it for its shortcut too. Empty: the machine's own.
+  string lang = 2;
 }
 
 enum CaptureOutcome {

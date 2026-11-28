@@ -41,6 +41,10 @@ pub enum Command {
     SetHotkey {
         capture: String,
     },
+    /// The overlay's language from the next capture on ("vi", "en", "zh-CN").
+    SetLang {
+        lang: String,
+    },
     Quit,
 }
 
@@ -155,6 +159,10 @@ mod tests {
         assert_eq!(
             parse_command(r#"{"cmd":"set_hotkey","capture":"Ctrl+Alt+A"}"#),
             Ok(Command::SetHotkey { capture: "Ctrl+Alt+A".into() })
+        );
+        assert_eq!(
+            parse_command(r#"{"cmd":"set_lang","lang":"zh-CN"}"#),
+            Ok(Command::SetLang { lang: "zh-CN".into() })
         );
         assert_eq!(parse_command("{\"cmd\":\"quit\"}\n"), Ok(Command::Quit));
     }

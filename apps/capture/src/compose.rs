@@ -4,7 +4,7 @@
 use crate::annotate::{draw_marks, Mark};
 use crate::geometry::Rect;
 use crate::text::draw_text;
-use fontdue::Font;
+use crate::text::Fonts;
 use tiny_skia::{IntSize, Pixmap};
 
 /// The text size of the Text tool, in pixels of the picture at scale 1.
@@ -38,7 +38,7 @@ pub fn crop(frame: &Frame, region: Rect) -> Option<Pixmap> {
 }
 
 /// The region with its marks (`marks` in the region's pixels), as a PNG.
-pub fn export_png(frame: &Frame, region: Rect, marks: &[Mark], font: Option<&Font>, scale: f32) -> Result<Vec<u8>, String> {
+pub fn export_png(frame: &Frame, region: Rect, marks: &[Mark], font: Option<&Fonts>, scale: f32) -> Result<Vec<u8>, String> {
     let mut pixmap = crop(frame, region).ok_or("the region is outside the frame")?;
     draw_marks(&mut pixmap, marks, scale);
     if let Some(font) = font {

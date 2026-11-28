@@ -22,7 +22,7 @@ use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use overlay::{Key, Outcome, Overlay};
 use tunelo_capture::compose::{export_png, Frame};
-use tunelo_capture::text::system_font;
+use tunelo_capture::text::{system_fonts, Fonts};
 use tunelo_capture::toolbar::{words_for, Words};
 use tunelo_capture::wire::{event_line, parse_command, Action, Command, Display, Event, Origin, WIRE_VERSION};
 use winit::application::ApplicationHandler;
@@ -56,7 +56,7 @@ struct Session {
 struct App {
     out: PathBuf,
     words: &'static Words,
-    font: Option<fontdue::Font>,
+    font: Option<Fonts>,
     hotkeys: Option<GlobalHotKeyManager>,
     hotkey: Option<HotKey>,
     hotkey_text: String,
@@ -346,6 +346,7 @@ impl ApplicationHandler<UserEvent> for App {
             UserEvent::Command(Command::CaptureScreen { id, display }) => self.capture_screen(id, display),
             UserEvent::Command(Command::ListDisplays { id }) => self.list_displays(id),
             UserEvent::Command(Command::SetHotkey { capture }) => self.set_hotkey(&capture),
+            UserEvent::Command(Command::SetLang { lang }) => self.words = words_for(&lang),
             UserEvent::Hotkey => self.start(event_loop, String::new(), Origin::Hotkey),
             UserEvent::Command(Command::Quit) | UserEvent::Eof => event_loop.exit(),
         }
@@ -433,6 +434,9 @@ impl ApplicationHandler<UserEvent> for App {
         }
         if outcome != Outcome::Pending {
             self.finish(id, outcome);
+            if let Some(fonts) = &mut self.font {
+                fonts.release_fallback();
+            }
             event_loop.set_control_flow(ControlFlow::Wait);
             return;
         }
@@ -500,7 +504,7 @@ fn main() {
     let mut app = App {
         out: PathBuf::from(out),
         words,
-        font: system_font(),
+        font: system_fonts(),
         hotkeys,
         hotkey: None,
         hotkey_text: String::new(),

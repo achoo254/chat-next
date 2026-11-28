@@ -16529,7 +16529,10 @@ func (x *CaptureInfo) GetHotkey() string {
 type CaptureRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Chosen by A (8-64 letters, digits, "-", "_"); CaptureResult carries it.
-	RequestId     string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// The language A shows ("vi", "en", "zh-CN"): the overlay's words follow it,
+	// and the machine keeps it for its shortcut too. Empty: the machine's own.
+	Lang          string `protobuf:"bytes,2,opt,name=lang,proto3" json:"lang,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -16567,6 +16570,13 @@ func (*CaptureRequest) Descriptor() ([]byte, []int) {
 func (x *CaptureRequest) GetRequestId() string {
 	if x != nil {
 		return x.RequestId
+	}
+	return ""
+}
+
+func (x *CaptureRequest) GetLang() string {
+	if x != nil {
+		return x.Lang
 	}
 	return ""
 }
@@ -30355,10 +30365,11 @@ const file_remote_v1_remote_proto_rawDesc = "" +
 	"\acapture\x18\x1c \x01(\v2\x16.remote.v1.CaptureInfoR\acaptureJ\x04\b\r\x10\x0eJ\x04\b\x15\x10\x16R\adevicesR\ftotp_enabled\"C\n" +
 	"\vCaptureInfo\x12\x1c\n" +
 	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x16\n" +
-	"\x06hotkey\x18\x02 \x01(\tR\x06hotkey\"/\n" +
+	"\x06hotkey\x18\x02 \x01(\tR\x06hotkey\"C\n" +
 	"\x0eCaptureRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\x82\x02\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
+	"\x04lang\x18\x02 \x01(\tR\x04lang\"\x82\x02\n" +
 	"\rCaptureResult\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x123\n" +

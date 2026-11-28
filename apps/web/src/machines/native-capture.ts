@@ -8,6 +8,7 @@
 // online and has tunelo-capture, that one; several such machines are offered
 // once and the pick is remembered. None: the browser's own capture.
 import { CaptureOutcome } from "@achoo254/chat-proto/remote/remote";
+import { readStoredLocale } from "../i18n/i18n.tsx";
 import type { HubSlot } from "./link/connection-provider.tsx";
 import type { LinkHub } from "./link/link-hub.ts";
 import type { MachineLink } from "./link/machine-link.ts";
@@ -150,7 +151,8 @@ export async function captureOn(hub: LinkHub, ref: string): Promise<File | null>
 					resolve(new File(parts as BlobPart[], meta.name, { type: meta.mime }));
 				}
 			});
-			link.request({ case: "captureRequest", value: { requestId } }).then(
+			// The overlay speaks the language Chat shows, and the machine keeps it for its shortcut.
+			link.request({ case: "captureRequest", value: { requestId, lang: readStoredLocale() } }).then(
 				(frame) => {
 					if (frame.body.case === "error") {
 						stop();

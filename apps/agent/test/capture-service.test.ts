@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { CaptureService, type CapturePiece, PIECE_BYTES } from "../src/capture/capture-service.ts";
-import { normalizeHotkey, readCaptureSettings, writeCaptureSettings } from "../src/capture/capture-settings.ts";
+import { captureLangOf, normalizeHotkey, readCaptureSettings, writeCaptureSettings } from "../src/capture/capture-settings.ts";
 import { runCaptureHotkey, shownHotkey } from "../src/commands/capture-hotkey.ts";
 
 class FakeChild extends EventEmitter {
@@ -51,6 +51,7 @@ function setup() {
   const bin = join(dir, "tunelo-capture");
   writeFileSync(bin, "");
   const children: FakeChild[] = [];
+  const remembered: string[] = [];
   const outDir = join(dir, "out");
   const service = new CaptureService({
     configDir: dir,
@@ -58,6 +59,7 @@ function setup() {
     hotkey: () => "Ctrl+Alt+A",
     enabled: () => true,
     lang: () => "vi",
+    rememberLang: (lang) => remembered.push(lang),
     log: () => undefined,
     env: { TUNELO_CAPTURE_BIN: bin },
     spawnProcess: () => {
@@ -66,7 +68,7 @@ function setup() {
       return child as unknown as ChildProcess;
     },
   });
-  return { service, children, outDir };
+  return { service, children, outDir, remembered };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 10));
@@ -108,6 +110,24 @@ describe("tunelo-capture under tunelo", () => {
     expect(first).toMatchObject({ outcome: "captured", name: "capture-1.png", mimeType: "image/png", size: bytes.length, offset: 0, last: false });
     expect(second).toMatchObject({ outcome: "captured", offset: PIECE_BYTES, last: true });
     expect(existsSync(file)).toBe(false);
+    service.close();
+  });
+
+  it("shows the overlay in the device's language and keeps it for the shortcut", async () => {
+    const { service, children, remembered } = setup();
+    service.start();
+    const child = children[0] as FakeChild;
+    child.say({ event: "ready", version: "0.1.0", wire: 1, hotkey: "" });
+    await until(() => service.info().available);
+    const opened = service.request("req-00005", () => undefined, "zh-CN");
+    await until(() => child.commands.length === 2);
+    expect(child.commands).toEqual([
+      { cmd: "set_lang", lang: "zh-CN" },
+      { cmd: "capture_interactive", id: "req-00005", origin: "chat" },
+    ]);
+    expect(remembered).toEqual(["zh-CN"]);
+    child.say({ event: "opened", id: "req-00005" });
+    await opened;
     service.close();
   });
 
@@ -187,5 +207,26 @@ describe("the screenshot shortcut", () => {
     writeCaptureSettings(dir, { enabled: false });
     expect(readCaptureSettings(dir)).toEqual({ enabled: false });
     expect(JSON.parse(readFileSync(join(dir, "capture.json"), "utf8"))).toEqual({ enabled: false });
+  });
+});
+
+describe("the overlay's language", () => {
+  it("is one the overlay has, from the tag a device sends", () => {
+    expect(captureLangOf("vi")).toBe("vi");
+    expect(captureLangOf("en-US")).toBe("en");
+    expect(captureLangOf("zh-CN")).toBe("zh-CN");
+    expect(captureLangOf("fr")).toBeUndefined();
+    expect(captureLangOf("")).toBeUndefined();
+  });
+
+  it("is kept next to the shortcut, and a broken one is dropped", () => {
+    const dir = mkdtempSync(join(tmpdir(), "capture-lang-"));
+    dirs.push(dir);
+    runCaptureHotkey("ctrl+shift+s", dir, () => undefined, () => undefined);
+    writeCaptureSettings(dir, { ...readCaptureSettings(dir), lang: "en" });
+    runCaptureHotkey("ctrl+alt+a", dir, () => undefined, () => undefined);
+    expect(readCaptureSettings(dir)).toEqual({ hotkey: "Ctrl+Alt+A", lang: "en" });
+    writeFileSync(join(dir, "capture.json"), JSON.stringify({ lang: "klingon" }));
+    expect(readCaptureSettings(dir)).toEqual({});
   });
 });

@@ -67,6 +67,8 @@ export interface CaptureServiceOptions {
   enabled: () => boolean;
   /** The overlay's language ("vi", "en", "zh-CN"). */
   lang: () => string;
+  /** A device asked for a capture in this language: kept, so the shortcut and a restart use it too. */
+  rememberLang?: (lang: string) => void;
   log: (line: string) => void;
   env?: NodeJS.ProcessEnv;
   execPath?: string;
@@ -224,11 +226,13 @@ export class CaptureService {
   /**
    * A device asks for a capture: resolves once the overlay is up, rejects
    * when it cannot open (none, busy, no screen); `send` then gets the picture
-   * or the cancel.
+   * or the cancel. `lang` (the device's language, "" for none) sets the
+   * overlay's words from this capture on.
    */
-  request(id: string, send: (piece: CapturePiece) => void): Promise<void> {
+  request(id: string, send: (piece: CapturePiece) => void, lang = ""): Promise<void> {
     if (!this.running) return Promise.reject(new CaptureUnavailable("screenshots are not available on this machine"));
     if (this.pending.has(id)) return Promise.reject(new CaptureUnavailable("this capture was already asked for"));
+    if (lang !== "" && this.write({ cmd: "set_lang", lang })) this.opts.rememberLang?.(lang);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
