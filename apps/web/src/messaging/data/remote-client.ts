@@ -655,7 +655,8 @@ export function createRemoteClient(transport: Transport, onUnauthenticated: () =
 					tops: response.messages.map((m) => ({
 						seq: assertSafeId(m.seq),
 						fromId: assertSafeId(m.fromId),
-						text: m.text,
+						// A poll has no text: the topic list shows its question, as the chat list does.
+						text: m.poll === undefined ? m.text : `📊 ${m.poll.question}`,
 						date: assertSafeId(m.date),
 					})),
 					nextCursor: response.nextCursor,

@@ -173,8 +173,6 @@ type runner struct {
 	infoTick int
 	// reactionsTick counts the same looks, to read the reactions of the newest messages once in a while.
 	reactionsTick int
-	// pollsTick counts the same looks, to read the open polls once in a while.
-	pollsTick int
 	// pending are the chats waiting for their first import, oldest queued first.
 	pending []*chatLink
 	// stickerQueue are the chats whose label-only stickers are given their picture

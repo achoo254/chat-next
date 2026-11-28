@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	// pollsEvery: results mostly arrive as events; the open polls of each chat are also
-	// read once in this many looks at the state of the chats, for what the other app
-	// did not tell (an app that sends no event, a poll not seen since a restart).
-	pollsEvery = 5
+	// pollsChats bounds the chats whose open polls one look reads. Telegram does not tell
+	// every change of a poll as an event (a vote from the owner's other device often comes
+	// with none), so the open polls are read at each look; few chats have one.
+	pollsChats = 20
 	// pollsRecent is how many of the newest open polls of a chat that read covers.
 	pollsRecent = 20
 	// pollsMaxAge: polls older than this are no longer read on the timer.
@@ -117,19 +117,21 @@ func (r *runner) setPoll(ctx context.Context, it *chat.ImportTx, seq int64, pr b
 	return err
 }
 
-// pollPolls reads the open polls of the chats where messages come in, once in pollsEvery looks.
+// pollPolls reads, at each look, the open polls of the chats that have one and where
+// messages come in. Unlike reactions it does not go round every chat: it asks the
+// database which chats hold an open poll.
 func (r *runner) pollPolls(ctx context.Context) error {
 	reader, ok := r.adapter.(bridge.PollReader)
 	if !ok {
 		return nil
 	}
-	r.pollsTick++
-	if (r.pollsTick-1)%pollsEvery != 0 {
-		return nil
+	convs, err := chatsWithOpenPolls(ctx, r.e.db.pool, r.account.ID)
+	if err != nil {
+		return err
 	}
-	for _, conv := range r.inTurn("polls") {
+	for _, conv := range convs {
 		l := r.links[conv]
-		if !l.BackfillDone {
+		if l == nil || !l.BackfillDone {
 			continue
 		}
 		dir, err := r.e.db.featureDirection(ctx, r.account.ID, l.ExternalChat, feature.Messages)
@@ -167,6 +169,30 @@ func (r *runner) readPolls(ctx context.Context, reader bridge.PollReader, l *cha
 		return r.skipRefused(err, "polls", conv)
 	}
 	return r.applyPolls(ctx, l, list, nil)
+}
+
+// chatsWithOpenPolls lists the conversations of an account with an imported poll still
+// open, posted within pollsMaxAge, the newest polls' chats first.
+func chatsWithOpenPolls(ctx context.Context, q querier, account int64) ([]string, error) {
+	rows, err := q.Query(ctx, `
+		SELECT x.external_chat_id FROM message_polls p
+		JOIN external_messages x ON x.chat_id = p.chat_id AND x.seq = p.seq AND x.account_id = $1
+		JOIN messages m ON m.chat_id = p.chat_id AND m.seq = p.seq AND m.deleted_at IS NULL
+		WHERE NOT p.closed AND m.date > now() - make_interval(secs => $2)
+		GROUP BY x.external_chat_id ORDER BY max(m.date) DESC LIMIT $3`, account, pollsMaxAge.Seconds(), pollsChats)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: chats with open polls: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("bridge: chats with open polls: %w", err)
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
 
 // openPolls lists the external ids of the newest imported polls of a chat still open,
