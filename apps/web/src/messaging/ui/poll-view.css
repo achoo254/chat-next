@@ -12,8 +12,8 @@
 .poll-dot { border-radius: var(--radius-full); }
 .poll-box { border-radius: var(--radius-xs); }
 .poll-box .icon { width: 14px; height: 14px; }
-.poll-result { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: 2px var(--space-2); align-items: center; padding: var(--space-1) 0; }
-.poll-percent { font-size: 0.8125rem; font-weight: 600; text-align: end; }
+.poll-result { display: grid; grid-template-columns: 4.5ch minmax(0, 1fr) auto; gap: 2px var(--space-2); align-items: center; padding: var(--space-1) 0; }
+.poll-percent { font-size: 0.8125rem; font-weight: 600; text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .poll-text { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 .poll-text .icon { width: 16px; height: 16px; flex: none; }
 /* The count and the latest voters' faces at the end of the line (Telegram's). */
