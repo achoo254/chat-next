@@ -68,7 +68,7 @@ export function registerTcpCommand(program: Command, display: Display): void {
 							process.exit(1);
 							return;
 						case "closed":
-							display.showError(`The tunnel was ${event.reason}.`);
+							display.showClosed(event.reason);
 							process.exit(0);
 							return;
 						default:

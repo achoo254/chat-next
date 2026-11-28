@@ -161,6 +161,11 @@ export class Display {
 		console.log(chalk.green("  Account:   ") + chalk.gray(account));
 	}
 
+	/** The tunnel ended on purpose (`tunelo` or Chat closed it): said plainly, not as an error. */
+	showClosed(reason: string): void {
+		console.log(chalk.yellow(`  Tunnel ${reason}.`));
+	}
+
 	showError(message: string): void {
 		console.log(chalk.red(`  Error: ${message}`));
 	}
