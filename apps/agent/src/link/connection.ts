@@ -22,6 +22,7 @@ import {
 import { type KeyPair, type Session, acceptHello, decodePlain, encodeHandshakeError } from "@achoo254/chat-remote-protocol";
 import { AgentError, type AgentCore } from "../core/agent-core.ts";
 import { type AgentUpdater, UpdateBusy, UpdateUnavailable } from "../agent-updater.ts";
+import { type AgentServices, controlService, serviceAuditDetail } from "../agent-services.ts";
 import { AttachmentError } from "../attachments/uploads.ts";
 import { AdvisorKeyError, type AdvisorKeyStore, rememberAdvisorKey } from "../advisor/advisor-key-store.ts";
 import { AdvisorKeyShareError } from "../advisor/advisor-key-share.ts";
@@ -102,6 +103,8 @@ export type LinkContext = {
   macFolders?: MacFolders;
   /** Updates tunelo for a device; absent where the machine has none (tests). */
   updater?: AgentUpdater;
+  /** Restarts tunelo and works its services for a device; absent where the machine has none (tests). */
+  services?: AgentServices;
   /** The machine's terminal; absent where the machine has none (tests). */
   terminal?: TerminalService;
   /** Workspaces' files and git for the right panel; absent where the machine has none (tests). */
@@ -904,6 +907,29 @@ export class Connection {
           this.ctx.audit.write({ device: this.device, action: "agent_update", path: "", detail: updater.info().latestVersion });
           void updater.run();
           return ack();
+        }
+        case "agentRestart": {
+          const services = this.ctx.services;
+          if (!services?.restartable()) return this.send(id, { case: "error", value: refusal("nothing would start tunelo again here", ErrorReason.UNSUPPORTED_REQUEST) });
+          if (this.ctx.updater?.info().updating === true) return this.send(id, { case: "error", value: refusal("tunelo is updating; it restarts by itself when done", ErrorReason.UPDATE_BUSY) });
+          this.ctx.audit.write({ device: this.device, action: "agent_restart", path: "", detail: "" });
+          services.restart();
+          return ack();
+        }
+        case "agentServiceControl": {
+          const services = this.ctx.services;
+          if (!services) return this.send(id, { case: "error", value: refusal("this machine cannot control its services", ErrorReason.UNSUPPORTED_REQUEST) });
+          // Not awaited: a restart of Observatory takes seconds, and this device's other requests go on meanwhile.
+          const req = { kind: b.value.kind, action: b.value.action, tunnelId: b.value.tunnelId };
+          void controlService(services, req).then(
+            async (refused) => {
+              if (refused) return this.send(id, { case: "error", value: refusal(refused.message, refused.reason) });
+              this.ctx.audit.write({ device: this.device, action: "service_control", ...serviceAuditDetail(req) });
+              return this.send(id, { case: "machineInfo", value: await this.ctx.machineInfo() });
+            },
+            (err: unknown) => this.send(id, { case: "error", value: refusal(err instanceof Error ? err.message : String(err), ErrorReason.UNSPECIFIED) }),
+          );
+          return;
         }
         case "auditList": {
           const entries = this.ctx.audit.list(b.value.limit || 100).map((e) => ({ ...e, at: BigInt(e.at) }));

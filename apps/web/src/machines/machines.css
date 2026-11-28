@@ -360,10 +360,36 @@ p.mx-group-note { margin: 0 var(--space-2) var(--space-2) calc(var(--space-2) + 
 .mx-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0; font-size: 0.875rem; }
 .mx-kv dt { color: var(--c-text-muted); }
 .mx-kv dd { margin: 0; }
-.mx-ports { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.mx-ports li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
-.mx-ports .mono { min-width: 5ch; }
-.mx-port-url { overflow-wrap: anywhere; }
+.mx-port-url { overflow-wrap: anywhere; font-size: 0.8125rem; }
+/* tunelo's services (agent-services-panel.tsx): one bordered list, each row state · name · port · actions, then what it is for. */
+.mx-svc { display: grid; gap: var(--space-2); }
+.mx-svc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.mx-svc-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); min-width: 0; }
+.mx-svc-title h4 { margin: 0; font-size: 0.875rem; }
+.mx-svc-count { color: var(--c-text-muted); font-size: 0.8125rem; }
+.mx-svc-count.warn { color: var(--c-warning-text); }
+.mx-svc-list { margin: 0; padding: 0; list-style: none; border: 1px solid var(--c-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.mx-svc-item { display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3); border-left: 3px solid transparent; }
+.mx-svc-item + .mx-svc-item { border-top: 1px solid var(--c-border-subtle); }
+.mx-svc-item.portTaken { border-left-color: var(--c-warning); }
+.mx-svc-item.failed { border-left-color: var(--c-error); background: color-mix(in srgb, var(--c-error) 5%, var(--c-surface)); }
+.mx-svc-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
+.mx-svc-row > .chip { min-width: 11ch; justify-content: flex-start; }
+.mx-svc-name { font-weight: 600; font-size: 0.875rem; }
+.mx-svc-port { color: var(--c-text-muted); font-size: 0.8125rem; }
+.mx-svc-acts { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-left: auto; }
+.mx-svc-purpose { margin: 0; color: var(--c-text-muted); font-size: 0.8125rem; }
+.mx-svc-problem { display: flex; align-items: flex-start; gap: var(--space-1); margin: 0; font-size: 0.8125rem; }
+.mx-svc-problem svg { flex: none; margin-top: 2px; }
+.mx-svc-problem.warn { color: var(--c-warning-text); }
+.mx-svc-problem.error { color: var(--c-error-text); }
+.mx-svc-more { font-size: 0.8125rem; }
+.mx-svc-more summary { width: fit-content; color: var(--c-text-muted); cursor: pointer; }
+.mx-svc-more summary:hover { color: var(--c-text); }
+.mx-svc-more summary:focus-visible { outline: none; box-shadow: var(--shadow-focus-primary); border-radius: var(--radius-xs); }
+.mx-svc-more dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: var(--space-1) 0 0; }
+.mx-svc-more dt { color: var(--c-text-muted); }
+.mx-svc-more dd { margin: 0; }
 .mx-mac-folders { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .mx-mac-folders li { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .mx-mac-folder-name { display: flex; flex-direction: column; min-width: 0; flex: 1 1 12rem; }

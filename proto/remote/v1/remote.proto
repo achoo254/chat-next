@@ -395,6 +395,10 @@ message Frame {
     // B → A: unasked, to the device that asked only: the picture in pieces,
     // or that the user closed the overlay.
     CaptureResult capture_result = 204;
+    // tunelo's own services from a device (tunelo 3.32.0+); see "the tunelo
+    // service process" below. A → B.
+    AgentRestart agent_restart = 205;
+    AgentServiceControl agent_service_control = 206;
   }
 }
 
@@ -2529,6 +2533,12 @@ message AgentRuntime {
   // What the service listens on (on 127.0.0.1) and the machine's ports its
   // tunnels publish, in that order.
   repeated AgentPort ports = 3;
+  // tunelo 3.32.0+: a device may ask for AgentRestart (something starts
+  // tunelo again after it exits: launchd, systemd, the Windows loop).
+  bool restartable = 4;
+  // tunelo 3.32.0+: each port carries its state, and AgentServiceControl
+  // works on the services AgentPort.controls names.
+  bool service_control = 5;
 }
 
 enum AgentPortKind {
@@ -2558,6 +2568,75 @@ message AgentPort {
   bool listening = 3;
   // Tunnels only: the public URLs the server granted, once it has.
   repeated string urls = 4;
+  // tunelo 3.32.0+; UNSPECIFIED from an older one, where listening tells.
+  AgentServiceState state = 5;
+  // Why it does not run when state is FAILED; UNSPECIFIED otherwise.
+  AgentServiceProblem problem = 6;
+  // Tunnels only: the id AgentServiceControl names to close it (every port
+  // of that tunnel closes with it).
+  string tunnel_id = 7;
+  // What AgentServiceControl may do to it now; empty when nothing (the
+  // devices' link and the control endpoint only stop with tunelo).
+  repeated AgentServiceAction controls = 8;
+}
+
+enum AgentServiceState {
+  AGENT_SERVICE_STATE_UNSPECIFIED = 0;
+  AGENT_SERVICE_STATE_RUNNING = 1;
+  // Turned off in tunelo's settings (or from a device). port is the one it
+  // will use, 0 when it has none yet.
+  AGENT_SERVICE_STATE_OFF = 2;
+  // tunelo wants the port but another program holds it; tunelo tries again
+  // now and then and never moves to another port.
+  AGENT_SERVICE_STATE_PORT_TAKEN = 3;
+  // It should run and does not: problem says why. port is 0 when it has none.
+  AGENT_SERVICE_STATE_FAILED = 4;
+}
+
+enum AgentServiceProblem {
+  AGENT_SERVICE_PROBLEM_UNSPECIFIED = 0;
+  // Observatory: the token file cannot be read (`tunelo observatory
+  // rotate-token --replace-unreadable` makes a new one).
+  AGENT_SERVICE_PROBLEM_TOKEN_UNREADABLE = 1;
+  // Observatory: no free port in 47300-47399.
+  AGENT_SERVICE_PROBLEM_NO_FREE_PORT = 2;
+  // Observatory: its database could not be opened.
+  AGENT_SERVICE_PROBLEM_STORE_FAILED = 3;
+  // Anything else; tunelo's log has the detail.
+  AGENT_SERVICE_PROBLEM_OTHER = 4;
+}
+
+enum AgentServiceAction {
+  AGENT_SERVICE_ACTION_UNSPECIFIED = 0;
+  // Turns it on, kept in tunelo's settings.
+  AGENT_SERVICE_ACTION_START = 1;
+  // Turns it off, kept in tunelo's settings; a tunnel closes (its terminal
+  // hears why).
+  AGENT_SERVICE_ACTION_STOP = 2;
+  // Stops and starts it again, settings unchanged.
+  AGENT_SERVICE_ACTION_RESTART = 3;
+}
+
+// A → B: tunelo exits for what supervises it to start it again, as
+// `tunelo restart` does at the machine. Answered with Ack; the link closes
+// shortly after and devices reconnect on their own. Sessions' AI processes
+// end with it, as on an update. ERROR_REASON_UNSUPPORTED_REQUEST unless
+// AgentRuntime.restartable. B writes it to the consent log.
+message AgentRestart {}
+
+// A → B: start, stop or restart one of tunelo's services. Answered with
+// MachineInfo once it is done (B goes on with the device's other requests
+// meanwhile). START of a service already on and STOP of one already off do
+// nothing. ERROR_REASON_UNSUPPORTED_REQUEST for a service or action B cannot
+// control (the devices' link, MCP, control endpoint; starting a tunnel);
+// ERROR_REASON_ITEM_NOT_FOUND for a tunnel that is gone. B writes it to the
+// consent log. AgentRestart is refused with ERROR_REASON_UPDATE_BUSY while
+// tunelo updates itself.
+message AgentServiceControl {
+  AgentPortKind kind = 1;
+  AgentServiceAction action = 2;
+  // Tunnels: AgentPort.tunnel_id.
+  string tunnel_id = 3;
 }
 
 enum TerminalAvailability {

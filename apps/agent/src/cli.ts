@@ -127,6 +127,7 @@ async function runAgent(dir: string, args: string[]): Promise<number> {
   const tunnels = new TunnelService(dir);
   const online = goOnline(machine, port, log);
   machine.heldTunnels = () => tunnels.list();
+  machine.closeHeldTunnel = (id, reason) => tunnels.close(id, reason);
   const stopControl = serveControl({ dir, machine, registration: online.registration, tunnels, mcp }, { onListening: (p) => (machine.controlPort = p) });
   const shutdown = async () => {
     online.stop();

@@ -27,11 +27,14 @@ import { MachineClaudeSessions } from "./observatory/machine-claude-sessions.tsx
 import { PageHead } from "./page-head.tsx";
 import { AgentUpdateSetting } from "./agent-update-setting.tsx";
 import { AgentRuntimeRows } from "./agent-runtime-rows.tsx";
+import { AgentServicesPanel } from "./agent-services-panel.tsx";
 import { connOf } from "./machine-status.ts";
 import { aiName, mcpAiName, useEntry, useHub, useLink, useNow } from "./use-machines.ts";
 import { useMachinesCopy } from "./use-machines-copy.ts";
 
 const AUDIT_FIRST = 20;
+// How long the page says tunelo restarts before giving up on seeing a new one.
+const RESTART_WAIT_MS = 60_000;
 const AUDIT_ALL = 200;
 
 export function MachineDetail({ machine }: { machine: string }) {
@@ -45,8 +48,18 @@ export function MachineDetail({ machine }: { machine: string }) {
 	const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
+	// The pid of the tunelo asked to restart, until another one answers (or a minute passed: nothing restarted it).
+	const [restartingPid, setRestartingPid] = useState<number | null>(null);
 	const now = useNow();
 	const online = state.status.kind === "open";
+	const currentPid = state.info?.runtime?.pid;
+	// Done once a tunelo with another pid answers.
+	const restarting = restartingPid !== null && !(online && currentPid !== undefined && currentPid !== restartingPid);
+	useEffect(() => {
+		if (restartingPid === null) return;
+		const timer = setTimeout(() => setRestartingPid(null), RESTART_WAIT_MS);
+		return () => clearTimeout(timer);
+	}, [restartingPid]);
 	const name = entry?.name ?? "";
 	const local = machine === LOCAL_REF;
 
@@ -185,6 +198,22 @@ export function MachineDetail({ machine }: { machine: string }) {
 						</dd>
 						<AgentRuntimeRows t={t} conn={connOf(entry, state, now)} info={state.info} now={now} />
 					</dl>
+					{restarting && (
+						<p className="mx-wait" role="status" data-id="agent-services-restarting">
+							<span className="spin" aria-hidden="true" />
+							{t.services.restarting}
+						</p>
+					)}
+					{online && state.info !== null && (
+						<AgentServicesPanel
+							link={link}
+							info={state.info}
+							machineName={name}
+							online={online}
+							restarting={restarting}
+							onRestartAsked={() => setRestartingPid(state.info?.runtime?.pid ?? 0)}
+						/>
+					)}
 					<div className="acts">
 						{!local && (
 							<button type="button" className="btn btn-sm" onClick={() => setDialog("rename")}>

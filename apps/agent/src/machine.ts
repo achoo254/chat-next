@@ -43,6 +43,8 @@ import { LocalForward } from "./tunnels/forward.ts";
 import { ForwardSettings } from "./tunnels/forward-settings.ts";
 import { AGENT_VERSION } from "./version.ts";
 import { PROCESS_STARTED_AT, agentRuntimeBody } from "./agent-runtime.ts";
+import type { AgentServices } from "./agent-services.ts";
+import { ObservatorySwitch, observatoryRuntime } from "./observatory/observatory-switch.ts";
 import type { HeldTunnel } from "./tunnels/tunnel-service.ts";
 import { attachmentLimitsBody } from "./attachments/uploads.ts";
 import { Projects } from "./projects/projects.ts";
@@ -153,6 +155,8 @@ export class Machine {
   /** Observatory's part in the Claude sessions and terminals this machine opens. */
   private readonly sessionObserver: ObservatorySessionObserver;
   private readonly updater: AgentUpdater;
+  /** Observatory turned on, off or restarted from a device. */
+  private readonly observatorySwitch: ObservatorySwitch;
   /** Chats whose new messages go into their AI session (chat-inbox/chat-inbox.ts). */
   readonly chatInbox: ChatInbox;
   /** The inbox's client of Chat's MCP, with the machine's sign-in. */
@@ -170,6 +174,8 @@ export class Machine {
   controlPort = 0;
   /** The tunnels the service holds for `tunelo http` / `tunelo tcp` (tunnel-service.ts); none until set. */
   heldTunnels: () => readonly HeldTunnel[] = () => [];
+  /** Closes one of those tunnels for a device; false when none has that id (none until set). */
+  closeHeldTunnel: (id: string, reason: string) => boolean = () => false;
   private stopRotation: (() => void) | undefined;
   private connections = new Set<Connection>();
   private lastPing = 0;
@@ -284,6 +290,7 @@ export class Machine {
       ...(opts.observatory?.openStore ? { openStore: opts.observatory.openStore } : {}),
       isSensitive: this.isSensitive,
     });
+    this.observatorySwitch = new ObservatorySwitch(this.observatory, this.config);
     this.sessionObserver = new ObservatorySessionObserver({ service: this.observatory, dataDir: opts.observatory?.dataDir ?? observatoryDataDirFor(dir), selfCommand: () => selfCommand() });
     const usageCatalogs = (provider: string) => this.providers.find((p) => p.id === provider)?.usage?.models;
     this.usageNotifier = new UsageNotifier({
@@ -738,6 +745,7 @@ export class Machine {
         screenShare: this.screenShare,
         capture: this.capture,
         updater: this.updater,
+        services: this.services(),
         terminal: this.terminal,
         workspaces: this.workspaces,
         commitMessage: (req) =>
@@ -858,11 +866,41 @@ export class Machine {
         startedAt: PROCESS_STARTED_AT,
         linkPort: this.port,
         mcpPort: portOf(this.opts.mcp?.httpUrl),
-        observatory: this.observatory.receiverPort(),
+        observatory: observatoryRuntime(this.observatory.status(), this.config.get().observatory?.otlpPort),
         controlPort: this.controlPort,
         tunnels: this.heldTunnels(),
+        restartable: this.restartable(),
       }),
     });
+  }
+
+  /** Only the installed single file restarts, and only where something starts it again (as an update). */
+  private restartable(): boolean {
+    return isCompiled() && supervised(this.config.dir);
+  }
+
+  /** What a device may do to tunelo and its services (agent-services.ts); each change is announced to every device. */
+  private services(): AgentServices {
+    return {
+      restartable: () => this.restartable(),
+      // Lets the Ack out first, as an update's restart does.
+      restart: () => setTimeout(() => process.exit(0), 500),
+      observatory: {
+        setEnabled: async (on) => {
+          await this.observatorySwitch.setEnabled(on);
+          void this.announceInfo();
+        },
+        restart: async () => {
+          await this.observatorySwitch.restart();
+          void this.announceInfo();
+        },
+      },
+      closeTunnel: (id) => {
+        const closed = this.closeHeldTunnel(id, "closed from Chat");
+        if (closed) void this.announceInfo();
+        return closed;
+      },
+    };
   }
 
   /** Sessions run with tunelo's MCP: the service has one and the machine did not turn it off. */

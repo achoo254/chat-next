@@ -34,25 +34,15 @@ const withRuntime = create(MachineInfoSchema, {
 });
 
 describe("the tunelo service's rows", () => {
-	it("says it runs, with its pid and memory, and lists its ports", () => {
+	it("says it runs, with its pid and memory", () => {
 		show({ kind: "on" }, withRuntime);
 		expect(screen.getByText("Đang chạy")).toBeTruthy();
 		expect(screen.getByText(/PID 4242 · 180 MB/)).toBeTruthy();
-		expect(screen.getByText("51000")).toBeTruthy();
-		expect(screen.getByText("Kết nối thiết bị")).toBeTruthy();
-		expect(screen.getByText("chương trình khác đang giữ")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "https://dev.example.test" })).toBeTruthy();
 	});
 
-	it("says no port is open when the service lists none", () => {
-		show({ kind: "on" }, create(MachineInfoSchema, { runtime: { pid: 1, startedAt: BigInt(NOW), ports: [] } }));
-		expect(screen.getByText("Chưa mở cổng nào.")).toBeTruthy();
-	});
-
-	it("leaves the ports out for a tunelo that does not tell them", () => {
+	it("says it runs for a tunelo that does not tell its process", () => {
 		show({ kind: "on" }, create(MachineInfoSchema, {}));
 		expect(screen.getByText("Đang chạy")).toBeTruthy();
-		expect(screen.queryByText("Cổng đang mở")).toBeNull();
 	});
 
 	it("shows why the machine is not connected, and no stale ports", () => {

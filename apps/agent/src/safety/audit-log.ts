@@ -23,6 +23,8 @@ export type AuditAction =
   | "approve_sensitive"
   | "device_added"
   | "agent_update"
+  | "agent_restart"
+  | "service_control"
   | "revoke"
   | "permission_mode"
   | "profile_add"

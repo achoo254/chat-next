@@ -10,6 +10,7 @@ function showsDetail(action: string): boolean {
 		action === "approve_sensitive" ||
 		action === "browser_control" ||
 		action === "local_forward" ||
+		action === "service_control" ||
 		action === "mcp_local_writes" ||
 		action.startsWith("profile_")
 	);

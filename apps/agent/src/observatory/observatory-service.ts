@@ -203,13 +203,30 @@ export class ObservatoryService {
     });
   }
 
+  /**
+   * start, stop and wipe run one at a time in the order called: a stop asked
+   * (from a device) while the first start still opens the store, or a wipe
+   * while a stop closes it, would otherwise open the store or the receiver twice.
+   */
+  private lifecycle: Promise<void> = Promise.resolve();
+
+  private serial(step: () => Promise<void>): Promise<void> {
+    const next = this.lifecycle.then(step);
+    this.lifecycle = next.catch(() => undefined);
+    return next;
+  }
+
   /** The master switch of the agent's config (unset is on). */
   get enabled(): boolean {
     return this.opts.config.get().observatory?.enabled !== false;
   }
 
   /** Starts every part that can start; resolves when they did (or stayed off), never rejects. */
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    return this.serial(() => this.startNow());
+  }
+
+  private async startNow(): Promise<void> {
     if (this.started) return;
     this.started = true;
     await setAsideBrokenHookState(this.opts.dataDir, this.now()).catch((err: unknown) => this.problems.report("state-file", err));
@@ -244,7 +261,11 @@ export class ObservatoryService {
    * behind, logged), writer (what waits written), store.
    * Never rejects; start() works again after.
    */
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    return this.serial(() => this.stopNow());
+  }
+
+  private async stopNow(): Promise<void> {
     this.hub.stop();
     this.bottlenecks.stop();
     this.ci.stop();
@@ -268,7 +289,11 @@ export class ObservatoryService {
    * whether the wipe worked or not, and the projects without content are
    * written into it again from the config. Throws the wipe's error after that.
    */
-  async wipe(): Promise<void> {
+  wipe(): Promise<void> {
+    return this.serial(() => this.wipeNow());
+  }
+
+  private async wipeNow(): Promise<void> {
     await this.intake.pauseSpool();
     // Its read connection is closed before the files go (Windows cannot delete an open file).
     this.bottlenecks.stop();
@@ -343,14 +368,6 @@ export class ObservatoryService {
     const port = this.receiver.running?.port;
     const [token] = this.receiver.tokenValues();
     return this.receiver.state === "listening" && port !== undefined && token !== undefined ? { port, token } : undefined;
-  }
-
-  /** The receiver's port while it listens or waits for another program to let go of it; undefined otherwise. */
-  receiverPort(): { port: number; listening: boolean } | undefined {
-    const port = this.receiver.running?.port;
-    const state = this.receiver.state;
-    if (port === undefined || (state !== "listening" && state !== "port-taken")) return undefined;
-    return { port, listening: state === "listening" };
   }
 
   /** One hook event of a session the agent runs through the SDK: queued, returns at once, never throws (sdk-hook-feed.ts). */
