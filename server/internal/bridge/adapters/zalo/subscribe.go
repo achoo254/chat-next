@@ -130,18 +130,27 @@ func (a *Adapter) listen(ctx context.Context, st *listening, sub *subscription, 
 
 // deliverUndo hands the engine the recall of a 1-1 or group message, so Chat removes
 // the copy it holds; a recall of a message Chat has not copied yet is kept as a
-// tombstone by the engine.
+// tombstone by the engine. A recall naming only the client id finds the message
+// among those heard; one heard before this process started cannot be found.
 func (a *Adapter) deliverUndo(ctx context.Context, heard *heardAccount, ev wireEvent, out chan<- bridge.Event) error {
-	conv, id, err := mapUndo(ev.Payload)
+	r, err := mapUndo(ev.Payload)
 	if err != nil {
 		a.logger.Debug("zalo recall dropped", "reason", err.Error())
 		return nil
 	}
-	heard.forget(conv, id)
+	id := r.id
+	if id == "" {
+		id = heard.messageByClientID(r.cli)
+	}
+	if id == "" {
+		a.logger.Info("zalo recall of a message not heard here dropped")
+		return nil
+	}
+	heard.forget(r.conv, id)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case out <- bridge.Event{Delete: &bridge.Delete{Conversation: conv, IDs: []string{id}}}:
+	case out <- bridge.Event{Delete: &bridge.Delete{Conversation: r.conv, IDs: []string{id}}}:
 		return nil
 	}
 }

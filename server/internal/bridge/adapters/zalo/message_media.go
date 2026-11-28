@@ -71,9 +71,18 @@ type attachmentParams struct {
 	FileSize looseString `json:"fileSize"`
 }
 
-// messageContent is the text and the files of a message: a text, a file to copy,
-// or the label of content not copied.
-func messageContent(ev wireEvent) (string, []bridge.Media) {
+// messageContent is the text, the files and the entities of a message: a text, a
+// file to copy, a shared link, or the label of content not copied.
+func messageContent(ev wireEvent) (string, []bridge.Media, []bridge.Entity) {
+	if text, media, ents, ok := linkContent(string(ev.MsgType), ev.Content); ok {
+		return text, media, ents
+	}
+	text, media := plainContent(ev)
+	return text, media, nil
+}
+
+// plainContent is the text and the files of a message that is not a shared link.
+func plainContent(ev wireEvent) (string, []bridge.Media) {
 	switch string(ev.MsgType) {
 	case msgTypeText:
 		if text, ok := textContent(ev.Content); ok {

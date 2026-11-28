@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"app.local/server/internal/bridge"
@@ -67,7 +68,7 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 	}
 	conv := bridge.Conversation{ID: peerID, Kind: bridge.ConvPrivate, Title: peer.Name, Peer: &peer}
 	m := bridge.Message{Conversation: peerID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now)}
-	m.Text, m.Media = messageContent(ev)
+	m.Text, m.Media, m.Entities = messageContent(ev)
 	if ev.Self && (!peer.NameUnknown || peer.PhotoKnown || peer.SeenKnown) {
 		m.Peer = &peer
 	}
@@ -75,35 +76,53 @@ func mapMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conversatio
 }
 
 // undoPayload is what the listener reports when a message is recalled: the
-// message that took its place carries the recalled one's id as globalMsgId.
+// message that took its place carries the recalled one's id as globalMsgId and
+// its client id as cliMsgId. A recall made on a phone was seen (28/11/2026) with
+// globalMsgId 0: only the client id names the message then.
 type undoPayload struct {
 	ThreadID looseString `json:"threadId"`
 	IsGroup  bool        `json:"isGroup"`
 	Data     struct {
 		Content struct {
 			GlobalMsgID looseString `json:"globalMsgId"`
+			CliMsgID    looseString `json:"cliMsgId"`
 		} `json:"content"`
 	} `json:"data"`
 }
 
-// mapUndo turns a recall into the conversation (the other person's Zalo id, or
-// the group's conversation) and the id of the message to remove.
-func mapUndo(raw json.RawMessage) (conv, id string, err error) {
+// recall is a recalled message: its conversation (the other person's Zalo id, or
+// the group's conversation), and its id or, when Zalo did not give it, its client id.
+type recall struct {
+	conv, id, cli string
+}
+
+// mapUndo reads a recall. Ids of 0 count as absent.
+func mapUndo(raw json.RawMessage) (recall, error) {
 	var p undoPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
-		return "", "", errNotPrivate
+		return recall{}, errNotPrivate
 	}
-	conv, id = string(p.ThreadID), string(p.Data.Content.GlobalMsgID)
+	conv := string(p.ThreadID)
 	if p.IsGroup {
 		if !accountUID.MatchString(conv) {
-			return "", "", errors.New("zalo: recall without a valid group")
+			return recall{}, errors.New("zalo: recall without a valid group")
 		}
 		conv = groupConv(conv)
 	}
-	if !zaloID.MatchString(conv) || !zaloID.MatchString(id) {
-		return "", "", errors.New("zalo: recall without valid ids")
+	if !zaloID.MatchString(conv) {
+		return recall{}, errors.New("zalo: recall without a valid conversation")
 	}
-	return conv, id, nil
+	r := recall{conv: conv}
+	if id := string(p.Data.Content.GlobalMsgID); messageID.MatchString(id) && strings.Trim(id, "0") != "" {
+		r.id = id
+	}
+	if cli := string(p.Data.Content.CliMsgID); messageID.MatchString(cli) && strings.Trim(cli, "0") != "" {
+		r.cli = cli
+	}
+	if r.id == "" && r.cli == "" {
+		return recall{}, errors.New("zalo: recall without valid ids")
+	}
+	return r, nil
 }
 
 // withSeen gives a participant the time Zalo says they were last online (milliseconds

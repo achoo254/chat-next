@@ -314,6 +314,28 @@ func TestSubscribeRecallRemovesTheMessageOfAPersonOrAGroup(t *testing.T) {
 	}
 }
 
+func TestSubscribeRecallFromAPhoneFindsTheMessageByItsClientID(t *testing.T) {
+	lines := []string{
+		accountLine,
+		connectedLine,
+		`{"ev":"message","thread":"user","self":false,"msgType":"webchat","content":"xin chào","msgId":"1001","cliMsgId":"77","uidFrom":"500","idTo":"0","dName":"Lan","ts":"1763700000000"}`,
+		// as seen on a real account: a recall made on a phone has globalMsgId 0
+		`{"ev":"event","name":"undo","payload":{"data":{"msgId":"1005","content":{"globalMsgId":0,"cliMsgId":77,"deleteMsg":0}},"threadId":"500","isSelf":false,"isGroup":false}}`,
+		// a client id never heard: nothing to remove, and never message 0
+		`{"ev":"event","name":"undo","payload":{"data":{"content":{"globalMsgId":0,"cliMsgId":88}},"threadId":"500","isGroup":false}}`,
+		`{"ev":"listener","state":"closed","code":1006}`,
+	}
+	r := &fakeRunner{script: scriptedSession(t, lines, false)}
+	a, _ := newTestAdapter(t, r)
+	got, _ := runSubscribe(t, a, testAccount)
+	if len(got) != 2 || got[1].Delete == nil {
+		t.Fatalf("events = %+v, want the message then one delete", got)
+	}
+	if d := got[1].Delete; d.Conversation != "500" || len(d.IDs) != 1 || d.IDs[0] != "1001" {
+		t.Errorf("delete = %+v, want message 1001 of conversation 500", d)
+	}
+}
+
 func TestSubscribeReactionsOfThePersonOfTheOwnerAndOfAGroup(t *testing.T) {
 	lines := []string{
 		accountLine,

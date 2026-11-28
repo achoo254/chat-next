@@ -65,7 +65,7 @@ func mapGroupMessage(ev wireEvent, now time.Time) (bridge.Message, bridge.Conver
 		withSeen(&sender, ev.PeerSeen)
 	}
 	m := bridge.Message{Conversation: conv.ID, ID: id, From: sender, Date: parseTimestamp(ev.TS, now)}
-	m.Text, m.Media = messageContent(ev)
+	m.Text, m.Media, m.Entities = messageContent(ev)
 	return m, conv, nil
 }
 

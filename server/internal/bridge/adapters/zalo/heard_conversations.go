@@ -32,6 +32,7 @@ type heardAccount struct {
 	messages int // kept in all conversations
 	seen     *boundedSeenSet
 	cli      *boundedIDMap // client id Zalo gave a message, by message id (reacting needs it)
+	byCli    *boundedIDMap // message id by client id (a recall from a phone names only the client id)
 }
 
 type heardConversation struct {
@@ -49,7 +50,7 @@ type keptMessage struct {
 }
 
 func newHeardAccount(now func() time.Time) *heardAccount {
-	return &heardAccount{now: now, convs: map[string]*heardConversation{}, seen: newBoundedSeenSet(maxSeenMessageIDs), cli: newBoundedIDMap(maxSeenMessageIDs)}
+	return &heardAccount{now: now, convs: map[string]*heardConversation{}, seen: newBoundedSeenSet(maxSeenMessageIDs), cli: newBoundedIDMap(maxSeenMessageIDs), byCli: newBoundedIDMap(maxSeenMessageIDs)}
 }
 
 // firstSighting records a message id and reports whether it is new.
@@ -277,6 +278,7 @@ func (h *heardAccount) rememberClientID(id, cli string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.cli.put(id, cli)
+	h.byCli.put(cli, id)
 }
 
 // clientID is the client id kept for a message, "" when unknown.
@@ -284,4 +286,11 @@ func (h *heardAccount) clientID(id string) string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.cli.vals[id]
+}
+
+// messageByClientID is the id of the message Zalo gave the client id cli, "" when unknown.
+func (h *heardAccount) messageByClientID(cli string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.byCli.vals[cli]
 }
