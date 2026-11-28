@@ -1,11 +1,13 @@
 // Machine config, owned by the running service: the account's trusted
 // devices as Chat last listed them (and when), limits, MCP servers, pinned
-// folders. Written atomically (temp file + rename) with mode 0600; CLI
-// commands go through the control socket so only the service writes it.
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+// folders. Written atomically and durably (temp file flushed to disk, then
+// renamed) with mode 0600; CLI commands go through the control socket so only
+// the service writes it.
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { toBase64Url } from "@achoo254/chat-remote-protocol";
+import { writePrivateFile } from "@tunelo/client";
 import type { ProjectRecord } from "./projects/projects.ts";
 
 /** A device key of the owner's account that Chat lists for this machine (base64url key, Unix ms). */
@@ -145,7 +147,7 @@ export class ConfigStore {
   constructor(readonly dir = configDir()) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     this.file = join(dir, "config.json");
-    const stored = existsSync(this.file) ? (JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>) : {};
+    const stored = readStoredConfig(this.file);
     // Fields of the pairing era (2.x): never read again, dropped at the next write.
     const kept = Object.fromEntries(Object.entries(stored).filter(([field]) => !LEGACY_FIELDS.includes(field)));
     this.data = { ...DEFAULTS, ...(kept as Partial<AgentConfig>) };
@@ -161,9 +163,10 @@ export class ConfigStore {
   update(change: (c: AgentConfig) => void): void {
     const next = structuredClone(this.data);
     change(next);
-    const tmp = `${this.file}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(next, null, 2), { mode: 0o600 });
-    renameSync(tmp, this.file);
+    // The temp file is flushed before the rename: without it, a power loss
+    // right after a write can leave config.json at its full size but all zero
+    // bytes, and every command then failed to start.
+    writePrivateFile(this.file, JSON.stringify(next, null, 2));
     this.data = next;
   }
 
@@ -231,6 +234,26 @@ export class ConfigStore {
     });
     return full;
   }
+}
+
+/**
+ * The stored fields, or none when the file is missing. A file that is not a
+ * JSON object (cut short or zeroed by a crash) is renamed aside to
+ * `config.json.corrupt-<ms>` so the agent starts on defaults instead of every
+ * command failing; the trusted devices come back at the next heartbeat.
+ */
+function readStoredConfig(file: string): Record<string, unknown> {
+  if (!existsSync(file)) return {};
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+  } catch {
+    // Falls through to the quarantine below.
+  }
+  const aside = `${file}.corrupt-${Date.now()}`;
+  renameSync(file, aside);
+  console.error(`tunelo: ${file} was unreadable; moved it to ${aside} and started from defaults`);
+  return {};
 }
 
 /** Text from elsewhere with control characters taken out, trimmed to `max` characters. */
