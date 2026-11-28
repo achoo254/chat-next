@@ -59,6 +59,15 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 			if err := emit(ctx, bridge.Event{Edit: &bridge.Edit{Message: m}}); err != nil {
 				return err
 			}
+			// An edit that only changes the results of a poll (or closes it) keeps the
+			// version: its results come as their own event.
+			if m.Poll != nil {
+				pr := m.Poll.Results
+				pr.Conversation, pr.ID = m.Conversation, m.ID
+				if err := emit(ctx, bridge.Event{Poll: &pr}); err != nil {
+					return err
+				}
+			}
 			// In a private chat or a basic group a change of reactions comes as an
 			// edit of the message that carries them, with nothing else new.
 			if tm, ok := raw.(*tg.Message); ok {
@@ -88,6 +97,7 @@ func (a *Adapter) Subscribe(ctx context.Context, acct bridge.Account, out chan<-
 	registerSeen(d, emit)
 	registerUserStatus(d, emit)
 	registerReactions(d, self, emit)
+	registerPolls(d, c, emit)
 	d.OnReadHistoryOutbox(func(ctx context.Context, _ tg.Entities, u *tg.UpdateReadHistoryOutbox) error {
 		// Only a private chat tells that the other person read: a group
 		// does not say who did.

@@ -96,6 +96,15 @@ const (
 	// MessagesServiceGetMessageReactionsProcedure is the fully-qualified name of the MessagesService's
 	// GetMessageReactions RPC.
 	MessagesServiceGetMessageReactionsProcedure = "/app.v1.MessagesService/GetMessageReactions"
+	// MessagesServiceSendPollProcedure is the fully-qualified name of the MessagesService's SendPoll
+	// RPC.
+	MessagesServiceSendPollProcedure = "/app.v1.MessagesService/SendPoll"
+	// MessagesServiceVotePollProcedure is the fully-qualified name of the MessagesService's VotePoll
+	// RPC.
+	MessagesServiceVotePollProcedure = "/app.v1.MessagesService/VotePoll"
+	// MessagesServiceClosePollProcedure is the fully-qualified name of the MessagesService's ClosePoll
+	// RPC.
+	MessagesServiceClosePollProcedure = "/app.v1.MessagesService/ClosePoll"
 )
 
 // MessagesServiceClient is a client for the app.v1.MessagesService service.
@@ -151,6 +160,13 @@ type MessagesServiceClient interface {
 	// Who reacted to a message, newest first, optionally for one emoji. Only
 	// current members, for messages they can see; in channels admins only.
 	GetMessageReactions(context.Context, *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error)
+	// Posts a poll (Message.poll) under the same rules as SendMessage.
+	SendPoll(context.Context, *connect.Request[v1.SendPollRequest]) (*connect.Response[v1.SendPollResponse], error)
+	// Sets the caller's answer to a poll; no options takes the vote back. A
+	// closed poll, or a quiz already answered, refuses (FAILED_PRECONDITION).
+	VotePoll(context.Context, *connect.Request[v1.VotePollRequest]) (*connect.Response[v1.VotePollResponse], error)
+	// Closes a poll for good: only its sender may.
+	ClosePoll(context.Context, *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error)
 }
 
 // NewMessagesServiceClient constructs a client for the app.v1.MessagesService service. By default,
@@ -290,6 +306,24 @@ func NewMessagesServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(messagesServiceMethods.ByName("GetMessageReactions")),
 			connect.WithClientOptions(opts...),
 		),
+		sendPoll: connect.NewClient[v1.SendPollRequest, v1.SendPollResponse](
+			httpClient,
+			baseURL+MessagesServiceSendPollProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("SendPoll")),
+			connect.WithClientOptions(opts...),
+		),
+		votePoll: connect.NewClient[v1.VotePollRequest, v1.VotePollResponse](
+			httpClient,
+			baseURL+MessagesServiceVotePollProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("VotePoll")),
+			connect.WithClientOptions(opts...),
+		),
+		closePoll: connect.NewClient[v1.ClosePollRequest, v1.ClosePollResponse](
+			httpClient,
+			baseURL+MessagesServiceClosePollProcedure,
+			connect.WithSchema(messagesServiceMethods.ByName("ClosePoll")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -316,6 +350,9 @@ type messagesServiceClient struct {
 	getLinkPreview      *connect.Client[v1.GetLinkPreviewRequest, v1.GetLinkPreviewResponse]
 	getMessageReaders   *connect.Client[v1.GetMessageReadersRequest, v1.GetMessageReadersResponse]
 	getMessageReactions *connect.Client[v1.GetMessageReactionsRequest, v1.GetMessageReactionsResponse]
+	sendPoll            *connect.Client[v1.SendPollRequest, v1.SendPollResponse]
+	votePoll            *connect.Client[v1.VotePollRequest, v1.VotePollResponse]
+	closePoll           *connect.Client[v1.ClosePollRequest, v1.ClosePollResponse]
 }
 
 // SendMessage calls app.v1.MessagesService.SendMessage.
@@ -423,6 +460,21 @@ func (c *messagesServiceClient) GetMessageReactions(ctx context.Context, req *co
 	return c.getMessageReactions.CallUnary(ctx, req)
 }
 
+// SendPoll calls app.v1.MessagesService.SendPoll.
+func (c *messagesServiceClient) SendPoll(ctx context.Context, req *connect.Request[v1.SendPollRequest]) (*connect.Response[v1.SendPollResponse], error) {
+	return c.sendPoll.CallUnary(ctx, req)
+}
+
+// VotePoll calls app.v1.MessagesService.VotePoll.
+func (c *messagesServiceClient) VotePoll(ctx context.Context, req *connect.Request[v1.VotePollRequest]) (*connect.Response[v1.VotePollResponse], error) {
+	return c.votePoll.CallUnary(ctx, req)
+}
+
+// ClosePoll calls app.v1.MessagesService.ClosePoll.
+func (c *messagesServiceClient) ClosePoll(ctx context.Context, req *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error) {
+	return c.closePoll.CallUnary(ctx, req)
+}
+
 // MessagesServiceHandler is an implementation of the app.v1.MessagesService service.
 type MessagesServiceHandler interface {
 	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
@@ -476,6 +528,13 @@ type MessagesServiceHandler interface {
 	// Who reacted to a message, newest first, optionally for one emoji. Only
 	// current members, for messages they can see; in channels admins only.
 	GetMessageReactions(context.Context, *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error)
+	// Posts a poll (Message.poll) under the same rules as SendMessage.
+	SendPoll(context.Context, *connect.Request[v1.SendPollRequest]) (*connect.Response[v1.SendPollResponse], error)
+	// Sets the caller's answer to a poll; no options takes the vote back. A
+	// closed poll, or a quiz already answered, refuses (FAILED_PRECONDITION).
+	VotePoll(context.Context, *connect.Request[v1.VotePollRequest]) (*connect.Response[v1.VotePollResponse], error)
+	// Closes a poll for good: only its sender may.
+	ClosePoll(context.Context, *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error)
 }
 
 // NewMessagesServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -611,6 +670,24 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 		connect.WithSchema(messagesServiceMethods.ByName("GetMessageReactions")),
 		connect.WithHandlerOptions(opts...),
 	)
+	messagesServiceSendPollHandler := connect.NewUnaryHandler(
+		MessagesServiceSendPollProcedure,
+		svc.SendPoll,
+		connect.WithSchema(messagesServiceMethods.ByName("SendPoll")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagesServiceVotePollHandler := connect.NewUnaryHandler(
+		MessagesServiceVotePollProcedure,
+		svc.VotePoll,
+		connect.WithSchema(messagesServiceMethods.ByName("VotePoll")),
+		connect.WithHandlerOptions(opts...),
+	)
+	messagesServiceClosePollHandler := connect.NewUnaryHandler(
+		MessagesServiceClosePollProcedure,
+		svc.ClosePoll,
+		connect.WithSchema(messagesServiceMethods.ByName("ClosePoll")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/app.v1.MessagesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MessagesServiceSendMessageProcedure:
@@ -655,6 +732,12 @@ func NewMessagesServiceHandler(svc MessagesServiceHandler, opts ...connect.Handl
 			messagesServiceGetMessageReadersHandler.ServeHTTP(w, r)
 		case MessagesServiceGetMessageReactionsProcedure:
 			messagesServiceGetMessageReactionsHandler.ServeHTTP(w, r)
+		case MessagesServiceSendPollProcedure:
+			messagesServiceSendPollHandler.ServeHTTP(w, r)
+		case MessagesServiceVotePollProcedure:
+			messagesServiceVotePollHandler.ServeHTTP(w, r)
+		case MessagesServiceClosePollProcedure:
+			messagesServiceClosePollHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -746,4 +829,16 @@ func (UnimplementedMessagesServiceHandler) GetMessageReaders(context.Context, *c
 
 func (UnimplementedMessagesServiceHandler) GetMessageReactions(context.Context, *connect.Request[v1.GetMessageReactionsRequest]) (*connect.Response[v1.GetMessageReactionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.GetMessageReactions is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) SendPoll(context.Context, *connect.Request[v1.SendPollRequest]) (*connect.Response[v1.SendPollResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.SendPoll is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) VotePoll(context.Context, *connect.Request[v1.VotePollRequest]) (*connect.Response[v1.VotePollResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.VotePoll is not implemented"))
+}
+
+func (UnimplementedMessagesServiceHandler) ClosePoll(context.Context, *connect.Request[v1.ClosePollRequest]) (*connect.Response[v1.ClosePollResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("app.v1.MessagesService.ClosePoll is not implemented"))
 }

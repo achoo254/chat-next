@@ -236,6 +236,8 @@ type Message struct {
 	// counts it, and whether the owner saw it there; MentionUnknown when the app does
 	// not say.
 	Mention Mention
+	// Poll is set for a poll; Text and Media are then empty.
+	Poll *Poll
 }
 
 // Mention is how a message mentions the owner, as the other app tells it.
@@ -366,7 +368,9 @@ type Event struct {
 	Read         *Read
 	Reactions    *Reactions
 	Participant  *Participant
-	State        []byte
+	// Poll tells that the results of a poll changed, or that it closed.
+	Poll  *PollResults
+	State []byte
 }
 
 // Cursor says where Backfill resumes. The zero value starts from the newest
@@ -452,6 +456,8 @@ type OutMessage struct {
 	// Media is empty for a text message, one item for a photo or file, and
 	// several for an album. Text then is the caption of the first item.
 	Media []OutMedia
+	// Poll is set for a poll: Text and Media are then empty.
+	Poll *OutPoll
 	// RandomID makes the send idempotent: the engine stores it before the
 	// call and repeats it when a retry follows a crash, so the other app can
 	// answer with the message it already took instead of creating a second.

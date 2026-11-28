@@ -338,6 +338,9 @@ type Outbound struct {
 	TopicID int64
 	// Deleted is true once the message was deleted for everyone.
 	Deleted bool
+	// Poll is set for a poll (its question, answers and flags), with the right
+	// answer of a quiz in Poll.correct and Poll.explanation.
+	Poll *appv1.Poll
 }
 
 // OutboundMessage reads a message for the bridge to send, or nil when there
@@ -364,6 +367,14 @@ func (s *Service) OutboundMessage(ctx context.Context, chatID, seq int64) (*Outb
 		}
 		o.Entities = c.GetEntities()
 		o.FileID = c.GetMedia().GetFileId()
+		if p := c.GetPoll(); p != nil {
+			st, err := readPoll(ctx, s.pool, chatID, seq, "")
+			if err != nil {
+				return nil, err
+			}
+			o.Poll = pollDefinition(p)
+			o.Poll.Correct, o.Poll.Explanation, o.Poll.Closed = st.correct, st.explanation, st.closed
+		}
 	}
 	return &o, nil
 }

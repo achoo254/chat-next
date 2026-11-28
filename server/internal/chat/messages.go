@@ -480,6 +480,9 @@ type textPost struct {
 	action *appv1.MessageAction
 	// consent: see sendMessage.
 	consent string
+	// poll: a poll instead of text (SendPoll), posted with its state.
+	poll      *appv1.Poll
+	pollState *pollState
 }
 
 // postText posts a validated text message as me; a retry with the same
@@ -523,11 +526,16 @@ func (s *Service) postText(ctx context.Context, me int64, p textPost) (*appv1.Se
 		ev := t.event(kindMessageNew, chatID, me)
 		posted, err = t.postMessage(ctx, ev, c, members, newMessage{
 			fromID: me, topicID: topicID, randomID: p.randomID, replyTo: p.replyTo, text: p.text,
-			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup, ViaBotId: p.viaBot, Action: p.action},
+			content: &appv1.Message{Entities: p.ents, LinkPreview: preview, ReplyMarkup: p.markup, ViaBotId: p.viaBot, Action: p.action, Poll: p.poll},
 			viaAI:   sentViaAI(ctx),
 		})
 		if err != nil {
 			return err
+		}
+		if p.poll != nil {
+			if err := insertPoll(ctx, t.tx, chatID, posted.Seq, p.pollState); err != nil {
+				return err
+			}
 		}
 		t.recordRandomID(me, p.randomID, posted.Seq, chatID)
 		return t.queueSend(ctx, chatID, me, posted.Seq)
@@ -832,6 +840,9 @@ func (s *Service) EditMessage(ctx context.Context, me int64, req *appv1.EditMess
 		if content.GetAction() != nil {
 			return errInvalid("service messages cannot be edited")
 		}
+		if content.GetPoll() != nil {
+			return errInvalid("a poll cannot be edited")
+		}
 		if content.GetMedia() != nil {
 			// Captions have their own limit and never get a link preview.
 			if _, _, err := s.validateCaption(text, ents); err != nil {
@@ -978,6 +989,9 @@ func (t *txn) deleteMessages(ctx context.Context, c *chatRow, anyone bool, me in
 	}
 	if _, err := t.tx.Exec(ctx, `DELETE FROM message_reactions WHERE chat_id = $1 AND seq = ANY($2)`, c.ID, done); err != nil {
 		return fmt.Errorf("chat: delete reactions: %w", err)
+	}
+	if err := deletePolls(ctx, t.tx, c.ID, done); err != nil {
+		return err
 	}
 	if c.Forum {
 		if _, err := t.tx.Exec(ctx, `
@@ -1228,6 +1242,16 @@ func (s *Service) repost(ctx context.Context, me, fromChat int64, seqs []int64, 
 			})
 			if err != nil {
 				return err
+			}
+			// A poll forwarded or copied is a new poll: no votes, open, the quiz answer kept.
+			if content.GetPoll() != nil {
+				st, err := readPoll(ctx, t.tx, src.ID, src0.Seq, "")
+				if err != nil {
+					return err
+				}
+				if err := insertPoll(ctx, t.tx, toChat, p.Seq, &pollState{correct: st.correct, explanation: st.explanation}); err != nil {
+					return err
+				}
 			}
 			// A chat linked to another app sends it on; a forward names the message it
 			// forwards, so the app can forward it natively when it has that message too.

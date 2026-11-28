@@ -183,6 +183,7 @@ type Update struct {
 	//	*Update_AgentProjectsChanged
 	//	*Update_AdvisorProfile
 	//	*Update_DialogHiddenFromAi
+	//	*Update_Poll
 	Kind          isUpdate_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -490,6 +491,15 @@ func (x *Update) GetDialogHiddenFromAi() *UpdateDialogHiddenFromAI {
 	return nil
 }
 
+func (x *Update) GetPoll() *UpdatePoll {
+	if x != nil {
+		if x, ok := x.Kind.(*Update_Poll); ok {
+			return x.Poll
+		}
+	}
+	return nil
+}
+
 type isUpdate_Kind interface {
 	isUpdate_Kind()
 }
@@ -591,6 +601,10 @@ type Update_DialogHiddenFromAi struct {
 	DialogHiddenFromAi *UpdateDialogHiddenFromAI `protobuf:"bytes,34,opt,name=dialog_hidden_from_ai,json=dialogHiddenFromAi,proto3,oneof"`
 }
 
+type Update_Poll struct {
+	Poll *UpdatePoll `protobuf:"bytes,35,opt,name=poll,proto3,oneof"`
+}
+
 func (*Update_MessageNew) isUpdate_Kind() {}
 
 func (*Update_MessageEdit) isUpdate_Kind() {}
@@ -638,6 +652,8 @@ func (*Update_AgentProjectsChanged) isUpdate_Kind() {}
 func (*Update_AdvisorProfile) isUpdate_Kind() {}
 
 func (*Update_DialogHiddenFromAi) isUpdate_Kind() {}
+
+func (*Update_Poll) isUpdate_Kind() {}
 
 type UpdateMessageNew struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -916,6 +932,68 @@ func (x *UpdateReaction) GetReactions() []*ReactionCount {
 	return nil
 }
 
+// The results (or the closing) of a poll changed.
+type UpdatePoll struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	Seq    int64                  `protobuf:"varint,2,opt,name=seq,proto3" json:"seq,omitempty"`
+	// The poll as the receiver sees it now.
+	Poll          *Poll `protobuf:"bytes,3,opt,name=poll,proto3" json:"poll,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdatePoll) Reset() {
+	*x = UpdatePoll{}
+	mi := &file_app_v1_updates_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdatePoll) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdatePoll) ProtoMessage() {}
+
+func (x *UpdatePoll) ProtoReflect() protoreflect.Message {
+	mi := &file_app_v1_updates_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdatePoll.ProtoReflect.Descriptor instead.
+func (*UpdatePoll) Descriptor() ([]byte, []int) {
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdatePoll) GetChatId() int64 {
+	if x != nil {
+		return x.ChatId
+	}
+	return 0
+}
+
+func (x *UpdatePoll) GetSeq() int64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *UpdatePoll) GetPoll() *Poll {
+	if x != nil {
+		return x.Poll
+	}
+	return nil
+}
+
 type UpdateRead struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	ChatId int64                  `protobuf:"varint,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
@@ -949,7 +1027,7 @@ type UpdateRead struct {
 
 func (x *UpdateRead) Reset() {
 	*x = UpdateRead{}
-	mi := &file_app_v1_updates_proto_msgTypes[8]
+	mi := &file_app_v1_updates_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -961,7 +1039,7 @@ func (x *UpdateRead) String() string {
 func (*UpdateRead) ProtoMessage() {}
 
 func (x *UpdateRead) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[8]
+	mi := &file_app_v1_updates_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -974,7 +1052,7 @@ func (x *UpdateRead) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRead.ProtoReflect.Descriptor instead.
 func (*UpdateRead) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{8}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateRead) GetChatId() int64 {
@@ -1057,7 +1135,7 @@ type UpdatePin struct {
 
 func (x *UpdatePin) Reset() {
 	*x = UpdatePin{}
-	mi := &file_app_v1_updates_proto_msgTypes[9]
+	mi := &file_app_v1_updates_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1147,7 @@ func (x *UpdatePin) String() string {
 func (*UpdatePin) ProtoMessage() {}
 
 func (x *UpdatePin) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[9]
+	mi := &file_app_v1_updates_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1160,7 @@ func (x *UpdatePin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePin.ProtoReflect.Descriptor instead.
 func (*UpdatePin) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{9}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdatePin) GetChatId() int64 {
@@ -1125,7 +1203,7 @@ type UpdateMemberAdded struct {
 
 func (x *UpdateMemberAdded) Reset() {
 	*x = UpdateMemberAdded{}
-	mi := &file_app_v1_updates_proto_msgTypes[10]
+	mi := &file_app_v1_updates_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1137,7 +1215,7 @@ func (x *UpdateMemberAdded) String() string {
 func (*UpdateMemberAdded) ProtoMessage() {}
 
 func (x *UpdateMemberAdded) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[10]
+	mi := &file_app_v1_updates_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1150,7 +1228,7 @@ func (x *UpdateMemberAdded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMemberAdded.ProtoReflect.Descriptor instead.
 func (*UpdateMemberAdded) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{10}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateMemberAdded) GetChatId() int64 {
@@ -1187,7 +1265,7 @@ type UpdateMemberRemoved struct {
 
 func (x *UpdateMemberRemoved) Reset() {
 	*x = UpdateMemberRemoved{}
-	mi := &file_app_v1_updates_proto_msgTypes[11]
+	mi := &file_app_v1_updates_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1199,7 +1277,7 @@ func (x *UpdateMemberRemoved) String() string {
 func (*UpdateMemberRemoved) ProtoMessage() {}
 
 func (x *UpdateMemberRemoved) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[11]
+	mi := &file_app_v1_updates_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1212,7 +1290,7 @@ func (x *UpdateMemberRemoved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMemberRemoved.ProtoReflect.Descriptor instead.
 func (*UpdateMemberRemoved) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{11}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UpdateMemberRemoved) GetChatId() int64 {
@@ -1248,7 +1326,7 @@ type UpdateMemberPermissions struct {
 
 func (x *UpdateMemberPermissions) Reset() {
 	*x = UpdateMemberPermissions{}
-	mi := &file_app_v1_updates_proto_msgTypes[12]
+	mi := &file_app_v1_updates_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1260,7 +1338,7 @@ func (x *UpdateMemberPermissions) String() string {
 func (*UpdateMemberPermissions) ProtoMessage() {}
 
 func (x *UpdateMemberPermissions) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[12]
+	mi := &file_app_v1_updates_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1273,7 +1351,7 @@ func (x *UpdateMemberPermissions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMemberPermissions.ProtoReflect.Descriptor instead.
 func (*UpdateMemberPermissions) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{12}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateMemberPermissions) GetChatId() int64 {
@@ -1317,7 +1395,7 @@ type UpdateChatModeChanged struct {
 
 func (x *UpdateChatModeChanged) Reset() {
 	*x = UpdateChatModeChanged{}
-	mi := &file_app_v1_updates_proto_msgTypes[13]
+	mi := &file_app_v1_updates_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1329,7 +1407,7 @@ func (x *UpdateChatModeChanged) String() string {
 func (*UpdateChatModeChanged) ProtoMessage() {}
 
 func (x *UpdateChatModeChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[13]
+	mi := &file_app_v1_updates_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1342,7 +1420,7 @@ func (x *UpdateChatModeChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateChatModeChanged.ProtoReflect.Descriptor instead.
 func (*UpdateChatModeChanged) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{13}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UpdateChatModeChanged) GetChatId() int64 {
@@ -1375,7 +1453,7 @@ type UpdateChatUpdated struct {
 
 func (x *UpdateChatUpdated) Reset() {
 	*x = UpdateChatUpdated{}
-	mi := &file_app_v1_updates_proto_msgTypes[14]
+	mi := &file_app_v1_updates_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1387,7 +1465,7 @@ func (x *UpdateChatUpdated) String() string {
 func (*UpdateChatUpdated) ProtoMessage() {}
 
 func (x *UpdateChatUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[14]
+	mi := &file_app_v1_updates_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1400,7 +1478,7 @@ func (x *UpdateChatUpdated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateChatUpdated.ProtoReflect.Descriptor instead.
 func (*UpdateChatUpdated) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{14}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UpdateChatUpdated) GetChat() *Chat {
@@ -1423,7 +1501,7 @@ type UpdateChatActivity struct {
 
 func (x *UpdateChatActivity) Reset() {
 	*x = UpdateChatActivity{}
-	mi := &file_app_v1_updates_proto_msgTypes[15]
+	mi := &file_app_v1_updates_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1435,7 +1513,7 @@ func (x *UpdateChatActivity) String() string {
 func (*UpdateChatActivity) ProtoMessage() {}
 
 func (x *UpdateChatActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[15]
+	mi := &file_app_v1_updates_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1448,7 +1526,7 @@ func (x *UpdateChatActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateChatActivity.ProtoReflect.Descriptor instead.
 func (*UpdateChatActivity) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{15}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UpdateChatActivity) GetChatId() int64 {
@@ -1483,7 +1561,7 @@ type UpdateTopicChanged struct {
 
 func (x *UpdateTopicChanged) Reset() {
 	*x = UpdateTopicChanged{}
-	mi := &file_app_v1_updates_proto_msgTypes[16]
+	mi := &file_app_v1_updates_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1495,7 +1573,7 @@ func (x *UpdateTopicChanged) String() string {
 func (*UpdateTopicChanged) ProtoMessage() {}
 
 func (x *UpdateTopicChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[16]
+	mi := &file_app_v1_updates_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1508,7 +1586,7 @@ func (x *UpdateTopicChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTopicChanged.ProtoReflect.Descriptor instead.
 func (*UpdateTopicChanged) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{16}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *UpdateTopicChanged) GetTopic() *ForumTopic {
@@ -1529,7 +1607,7 @@ type UpdateDialogMute struct {
 
 func (x *UpdateDialogMute) Reset() {
 	*x = UpdateDialogMute{}
-	mi := &file_app_v1_updates_proto_msgTypes[17]
+	mi := &file_app_v1_updates_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1541,7 +1619,7 @@ func (x *UpdateDialogMute) String() string {
 func (*UpdateDialogMute) ProtoMessage() {}
 
 func (x *UpdateDialogMute) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[17]
+	mi := &file_app_v1_updates_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1554,7 +1632,7 @@ func (x *UpdateDialogMute) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDialogMute.ProtoReflect.Descriptor instead.
 func (*UpdateDialogMute) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{17}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpdateDialogMute) GetChatId() int64 {
@@ -1583,7 +1661,7 @@ type UpdateDialogHiddenFromAI struct {
 
 func (x *UpdateDialogHiddenFromAI) Reset() {
 	*x = UpdateDialogHiddenFromAI{}
-	mi := &file_app_v1_updates_proto_msgTypes[18]
+	mi := &file_app_v1_updates_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1595,7 +1673,7 @@ func (x *UpdateDialogHiddenFromAI) String() string {
 func (*UpdateDialogHiddenFromAI) ProtoMessage() {}
 
 func (x *UpdateDialogHiddenFromAI) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[18]
+	mi := &file_app_v1_updates_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1608,7 +1686,7 @@ func (x *UpdateDialogHiddenFromAI) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDialogHiddenFromAI.ProtoReflect.Descriptor instead.
 func (*UpdateDialogHiddenFromAI) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{18}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UpdateDialogHiddenFromAI) GetChatId() int64 {
@@ -1635,7 +1713,7 @@ type UpdatePinnedDialogs struct {
 
 func (x *UpdatePinnedDialogs) Reset() {
 	*x = UpdatePinnedDialogs{}
-	mi := &file_app_v1_updates_proto_msgTypes[19]
+	mi := &file_app_v1_updates_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1647,7 +1725,7 @@ func (x *UpdatePinnedDialogs) String() string {
 func (*UpdatePinnedDialogs) ProtoMessage() {}
 
 func (x *UpdatePinnedDialogs) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[19]
+	mi := &file_app_v1_updates_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1660,7 +1738,7 @@ func (x *UpdatePinnedDialogs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePinnedDialogs.ProtoReflect.Descriptor instead.
 func (*UpdatePinnedDialogs) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{19}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UpdatePinnedDialogs) GetChatIds() []int64 {
@@ -1685,7 +1763,7 @@ type UpdateChatDeleted struct {
 
 func (x *UpdateChatDeleted) Reset() {
 	*x = UpdateChatDeleted{}
-	mi := &file_app_v1_updates_proto_msgTypes[20]
+	mi := &file_app_v1_updates_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1697,7 +1775,7 @@ func (x *UpdateChatDeleted) String() string {
 func (*UpdateChatDeleted) ProtoMessage() {}
 
 func (x *UpdateChatDeleted) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[20]
+	mi := &file_app_v1_updates_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1710,7 +1788,7 @@ func (x *UpdateChatDeleted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateChatDeleted.ProtoReflect.Descriptor instead.
 func (*UpdateChatDeleted) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{20}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateChatDeleted) GetChatId() int64 {
@@ -1739,7 +1817,7 @@ type UpdateDialogUnreadMark struct {
 
 func (x *UpdateDialogUnreadMark) Reset() {
 	*x = UpdateDialogUnreadMark{}
-	mi := &file_app_v1_updates_proto_msgTypes[21]
+	mi := &file_app_v1_updates_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1751,7 +1829,7 @@ func (x *UpdateDialogUnreadMark) String() string {
 func (*UpdateDialogUnreadMark) ProtoMessage() {}
 
 func (x *UpdateDialogUnreadMark) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[21]
+	mi := &file_app_v1_updates_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1764,7 +1842,7 @@ func (x *UpdateDialogUnreadMark) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDialogUnreadMark.ProtoReflect.Descriptor instead.
 func (*UpdateDialogUnreadMark) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{21}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *UpdateDialogUnreadMark) GetChatId() int64 {
@@ -1793,7 +1871,7 @@ type UpdateUserChanged struct {
 
 func (x *UpdateUserChanged) Reset() {
 	*x = UpdateUserChanged{}
-	mi := &file_app_v1_updates_proto_msgTypes[22]
+	mi := &file_app_v1_updates_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1805,7 +1883,7 @@ func (x *UpdateUserChanged) String() string {
 func (*UpdateUserChanged) ProtoMessage() {}
 
 func (x *UpdateUserChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[22]
+	mi := &file_app_v1_updates_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1818,7 +1896,7 @@ func (x *UpdateUserChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserChanged.ProtoReflect.Descriptor instead.
 func (*UpdateUserChanged) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{22}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateUserChanged) GetUserId() int64 {
@@ -1839,7 +1917,7 @@ type UpdateAgentProjectsChanged struct {
 
 func (x *UpdateAgentProjectsChanged) Reset() {
 	*x = UpdateAgentProjectsChanged{}
-	mi := &file_app_v1_updates_proto_msgTypes[23]
+	mi := &file_app_v1_updates_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1851,7 +1929,7 @@ func (x *UpdateAgentProjectsChanged) String() string {
 func (*UpdateAgentProjectsChanged) ProtoMessage() {}
 
 func (x *UpdateAgentProjectsChanged) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[23]
+	mi := &file_app_v1_updates_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1864,7 +1942,7 @@ func (x *UpdateAgentProjectsChanged) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgentProjectsChanged.ProtoReflect.Descriptor instead.
 func (*UpdateAgentProjectsChanged) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{23}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{24}
 }
 
 // The user's Advisor profile after a change (AdvisorService), complete.
@@ -1877,7 +1955,7 @@ type UpdateAdvisorProfile struct {
 
 func (x *UpdateAdvisorProfile) Reset() {
 	*x = UpdateAdvisorProfile{}
-	mi := &file_app_v1_updates_proto_msgTypes[24]
+	mi := &file_app_v1_updates_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1889,7 +1967,7 @@ func (x *UpdateAdvisorProfile) String() string {
 func (*UpdateAdvisorProfile) ProtoMessage() {}
 
 func (x *UpdateAdvisorProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[24]
+	mi := &file_app_v1_updates_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1902,7 +1980,7 @@ func (x *UpdateAdvisorProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAdvisorProfile.ProtoReflect.Descriptor instead.
 func (*UpdateAdvisorProfile) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{24}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *UpdateAdvisorProfile) GetProfile() *AdvisorProfile {
@@ -1922,7 +2000,7 @@ type UpdateNotificationSettings struct {
 
 func (x *UpdateNotificationSettings) Reset() {
 	*x = UpdateNotificationSettings{}
-	mi := &file_app_v1_updates_proto_msgTypes[25]
+	mi := &file_app_v1_updates_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1934,7 +2012,7 @@ func (x *UpdateNotificationSettings) String() string {
 func (*UpdateNotificationSettings) ProtoMessage() {}
 
 func (x *UpdateNotificationSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[25]
+	mi := &file_app_v1_updates_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1947,7 +2025,7 @@ func (x *UpdateNotificationSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateNotificationSettings.ProtoReflect.Descriptor instead.
 func (*UpdateNotificationSettings) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{25}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpdateNotificationSettings) GetSettings() *NotificationSettings {
@@ -1967,7 +2045,7 @@ type UpdateSessionRevoked struct {
 
 func (x *UpdateSessionRevoked) Reset() {
 	*x = UpdateSessionRevoked{}
-	mi := &file_app_v1_updates_proto_msgTypes[26]
+	mi := &file_app_v1_updates_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1979,7 +2057,7 @@ func (x *UpdateSessionRevoked) String() string {
 func (*UpdateSessionRevoked) ProtoMessage() {}
 
 func (x *UpdateSessionRevoked) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[26]
+	mi := &file_app_v1_updates_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1992,7 +2070,7 @@ func (x *UpdateSessionRevoked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSessionRevoked.ProtoReflect.Descriptor instead.
 func (*UpdateSessionRevoked) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{26}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *UpdateSessionRevoked) GetSessionId() int64 {
@@ -2020,7 +2098,7 @@ type DifferenceEmpty struct {
 
 func (x *DifferenceEmpty) Reset() {
 	*x = DifferenceEmpty{}
-	mi := &file_app_v1_updates_proto_msgTypes[27]
+	mi := &file_app_v1_updates_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2032,7 +2110,7 @@ func (x *DifferenceEmpty) String() string {
 func (*DifferenceEmpty) ProtoMessage() {}
 
 func (x *DifferenceEmpty) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[27]
+	mi := &file_app_v1_updates_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2045,7 +2123,7 @@ func (x *DifferenceEmpty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DifferenceEmpty.ProtoReflect.Descriptor instead.
 func (*DifferenceEmpty) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{27}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{28}
 }
 
 // Position of a sync_mode=large chat the user belongs to.
@@ -2060,7 +2138,7 @@ type LargeChatState struct {
 
 func (x *LargeChatState) Reset() {
 	*x = LargeChatState{}
-	mi := &file_app_v1_updates_proto_msgTypes[28]
+	mi := &file_app_v1_updates_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2072,7 +2150,7 @@ func (x *LargeChatState) String() string {
 func (*LargeChatState) ProtoMessage() {}
 
 func (x *LargeChatState) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[28]
+	mi := &file_app_v1_updates_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2085,7 +2163,7 @@ func (x *LargeChatState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LargeChatState.ProtoReflect.Descriptor instead.
 func (*LargeChatState) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{28}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *LargeChatState) GetChatId() int64 {
@@ -2129,7 +2207,7 @@ type DifferenceUpdates struct {
 
 func (x *DifferenceUpdates) Reset() {
 	*x = DifferenceUpdates{}
-	mi := &file_app_v1_updates_proto_msgTypes[29]
+	mi := &file_app_v1_updates_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2141,7 +2219,7 @@ func (x *DifferenceUpdates) String() string {
 func (*DifferenceUpdates) ProtoMessage() {}
 
 func (x *DifferenceUpdates) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[29]
+	mi := &file_app_v1_updates_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2154,7 +2232,7 @@ func (x *DifferenceUpdates) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DifferenceUpdates.ProtoReflect.Descriptor instead.
 func (*DifferenceUpdates) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{29}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *DifferenceUpdates) GetUpdates() []*Update {
@@ -2197,7 +2275,7 @@ type DifferenceTooLong struct {
 
 func (x *DifferenceTooLong) Reset() {
 	*x = DifferenceTooLong{}
-	mi := &file_app_v1_updates_proto_msgTypes[30]
+	mi := &file_app_v1_updates_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2209,7 +2287,7 @@ func (x *DifferenceTooLong) String() string {
 func (*DifferenceTooLong) ProtoMessage() {}
 
 func (x *DifferenceTooLong) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[30]
+	mi := &file_app_v1_updates_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2222,7 +2300,7 @@ func (x *DifferenceTooLong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DifferenceTooLong.ProtoReflect.Descriptor instead.
 func (*DifferenceTooLong) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{30}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{31}
 }
 
 type GetStateRequest struct {
@@ -2233,7 +2311,7 @@ type GetStateRequest struct {
 
 func (x *GetStateRequest) Reset() {
 	*x = GetStateRequest{}
-	mi := &file_app_v1_updates_proto_msgTypes[31]
+	mi := &file_app_v1_updates_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2245,7 +2323,7 @@ func (x *GetStateRequest) String() string {
 func (*GetStateRequest) ProtoMessage() {}
 
 func (x *GetStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[31]
+	mi := &file_app_v1_updates_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2258,7 +2336,7 @@ func (x *GetStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStateRequest.ProtoReflect.Descriptor instead.
 func (*GetStateRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{31}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{32}
 }
 
 type GetStateResponse struct {
@@ -2270,7 +2348,7 @@ type GetStateResponse struct {
 
 func (x *GetStateResponse) Reset() {
 	*x = GetStateResponse{}
-	mi := &file_app_v1_updates_proto_msgTypes[32]
+	mi := &file_app_v1_updates_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2282,7 +2360,7 @@ func (x *GetStateResponse) String() string {
 func (*GetStateResponse) ProtoMessage() {}
 
 func (x *GetStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[32]
+	mi := &file_app_v1_updates_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2295,7 +2373,7 @@ func (x *GetStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStateResponse.ProtoReflect.Descriptor instead.
 func (*GetStateResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{32}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetStateResponse) GetState() *State {
@@ -2318,7 +2396,7 @@ type GetDifferenceRequest struct {
 
 func (x *GetDifferenceRequest) Reset() {
 	*x = GetDifferenceRequest{}
-	mi := &file_app_v1_updates_proto_msgTypes[33]
+	mi := &file_app_v1_updates_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2330,7 +2408,7 @@ func (x *GetDifferenceRequest) String() string {
 func (*GetDifferenceRequest) ProtoMessage() {}
 
 func (x *GetDifferenceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[33]
+	mi := &file_app_v1_updates_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2343,7 +2421,7 @@ func (x *GetDifferenceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDifferenceRequest.ProtoReflect.Descriptor instead.
 func (*GetDifferenceRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{33}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetDifferenceRequest) GetPts() int64 {
@@ -2384,7 +2462,7 @@ type GetDifferenceResponse struct {
 
 func (x *GetDifferenceResponse) Reset() {
 	*x = GetDifferenceResponse{}
-	mi := &file_app_v1_updates_proto_msgTypes[34]
+	mi := &file_app_v1_updates_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2396,7 +2474,7 @@ func (x *GetDifferenceResponse) String() string {
 func (*GetDifferenceResponse) ProtoMessage() {}
 
 func (x *GetDifferenceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[34]
+	mi := &file_app_v1_updates_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2409,7 +2487,7 @@ func (x *GetDifferenceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDifferenceResponse.ProtoReflect.Descriptor instead.
 func (*GetDifferenceResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{34}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetDifferenceResponse) GetState() *State {
@@ -2504,7 +2582,7 @@ type GetChatDifferenceRequest struct {
 
 func (x *GetChatDifferenceRequest) Reset() {
 	*x = GetChatDifferenceRequest{}
-	mi := &file_app_v1_updates_proto_msgTypes[35]
+	mi := &file_app_v1_updates_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2516,7 +2594,7 @@ func (x *GetChatDifferenceRequest) String() string {
 func (*GetChatDifferenceRequest) ProtoMessage() {}
 
 func (x *GetChatDifferenceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[35]
+	mi := &file_app_v1_updates_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2529,7 +2607,7 @@ func (x *GetChatDifferenceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatDifferenceRequest.ProtoReflect.Descriptor instead.
 func (*GetChatDifferenceRequest) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{35}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetChatDifferenceRequest) GetChatId() int64 {
@@ -2576,7 +2654,7 @@ type GetChatDifferenceResponse struct {
 
 func (x *GetChatDifferenceResponse) Reset() {
 	*x = GetChatDifferenceResponse{}
-	mi := &file_app_v1_updates_proto_msgTypes[36]
+	mi := &file_app_v1_updates_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2588,7 +2666,7 @@ func (x *GetChatDifferenceResponse) String() string {
 func (*GetChatDifferenceResponse) ProtoMessage() {}
 
 func (x *GetChatDifferenceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_app_v1_updates_proto_msgTypes[36]
+	mi := &file_app_v1_updates_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2601,7 +2679,7 @@ func (x *GetChatDifferenceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatDifferenceResponse.ProtoReflect.Descriptor instead.
 func (*GetChatDifferenceResponse) Descriptor() ([]byte, []int) {
-	return file_app_v1_updates_proto_rawDescGZIP(), []int{36}
+	return file_app_v1_updates_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetChatDifferenceResponse) GetState() *ChatState {
@@ -2694,7 +2772,7 @@ const file_app_v1_updates_proto_rawDesc = "" +
 	"\tChatState\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1d\n" +
 	"\bchat_pts\x18\x02 \x01(\x03B\x020\x02R\achatPts\x12%\n" +
-	"\fserver_epoch\x18\x03 \x01(\x03B\x020\x02R\vserverEpoch\"\xd2\x0e\n" +
+	"\fserver_epoch\x18\x03 \x01(\x03B\x020\x02R\vserverEpoch\"\xfc\x0e\n" +
 	"\x06Update\x12\x14\n" +
 	"\x03pts\x18\x01 \x01(\x03B\x020\x02R\x03pts\x12\x1b\n" +
 	"\tpts_count\x18\x02 \x01(\x05R\bptsCount\x12\x1d\n" +
@@ -2729,7 +2807,8 @@ const file_app_v1_updates_proto_rawDesc = "" +
 	"\fuser_changed\x18\x1e \x01(\v2\x19.app.v1.UpdateUserChangedH\x00R\vuserChanged\x12Z\n" +
 	"\x16agent_projects_changed\x18\x1f \x01(\v2\".app.v1.UpdateAgentProjectsChangedH\x00R\x14agentProjectsChanged\x12G\n" +
 	"\x0fadvisor_profile\x18  \x01(\v2\x1c.app.v1.UpdateAdvisorProfileH\x00R\x0eadvisorProfile\x12U\n" +
-	"\x15dialog_hidden_from_ai\x18\" \x01(\v2 .app.v1.UpdateDialogHiddenFromAIH\x00R\x12dialogHiddenFromAiB\x06\n" +
+	"\x15dialog_hidden_from_ai\x18\" \x01(\v2 .app.v1.UpdateDialogHiddenFromAIH\x00R\x12dialogHiddenFromAi\x12(\n" +
+	"\x04poll\x18# \x01(\v2\x12.app.v1.UpdatePollH\x00R\x04pollB\x06\n" +
 	"\x04kind\"=\n" +
 	"\x10UpdateMessageNew\x12)\n" +
 	"\amessage\x18\x01 \x01(\v2\x0f.app.v1.MessageR\amessage\"V\n" +
@@ -2746,7 +2825,12 @@ const file_app_v1_updates_proto_rawDesc = "" +
 	"\x0eUpdateReaction\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
 	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x123\n" +
-	"\treactions\x18\x03 \x03(\v2\x15.app.v1.ReactionCountR\treactions\"\xbe\x02\n" +
+	"\treactions\x18\x03 \x03(\v2\x15.app.v1.ReactionCountR\treactions\"a\n" +
+	"\n" +
+	"UpdatePoll\x12\x1b\n" +
+	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x14\n" +
+	"\x03seq\x18\x02 \x01(\x03B\x020\x02R\x03seq\x12 \n" +
+	"\x04poll\x18\x03 \x01(\v2\f.app.v1.PollR\x04poll\"\xbe\x02\n" +
 	"\n" +
 	"UpdateRead\x12\x1b\n" +
 	"\achat_id\x18\x01 \x01(\x03B\x020\x02R\x06chatId\x12\x1b\n" +
@@ -2870,7 +2954,7 @@ func file_app_v1_updates_proto_rawDescGZIP() []byte {
 	return file_app_v1_updates_proto_rawDescData
 }
 
-var file_app_v1_updates_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_app_v1_updates_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_app_v1_updates_proto_goTypes = []any{
 	(*State)(nil),                      // 0: app.v1.State
 	(*ChatState)(nil),                  // 1: app.v1.ChatState
@@ -2880,45 +2964,47 @@ var file_app_v1_updates_proto_goTypes = []any{
 	(*UpdateMessageDelete)(nil),        // 5: app.v1.UpdateMessageDelete
 	(*UpdateMessageHidden)(nil),        // 6: app.v1.UpdateMessageHidden
 	(*UpdateReaction)(nil),             // 7: app.v1.UpdateReaction
-	(*UpdateRead)(nil),                 // 8: app.v1.UpdateRead
-	(*UpdatePin)(nil),                  // 9: app.v1.UpdatePin
-	(*UpdateMemberAdded)(nil),          // 10: app.v1.UpdateMemberAdded
-	(*UpdateMemberRemoved)(nil),        // 11: app.v1.UpdateMemberRemoved
-	(*UpdateMemberPermissions)(nil),    // 12: app.v1.UpdateMemberPermissions
-	(*UpdateChatModeChanged)(nil),      // 13: app.v1.UpdateChatModeChanged
-	(*UpdateChatUpdated)(nil),          // 14: app.v1.UpdateChatUpdated
-	(*UpdateChatActivity)(nil),         // 15: app.v1.UpdateChatActivity
-	(*UpdateTopicChanged)(nil),         // 16: app.v1.UpdateTopicChanged
-	(*UpdateDialogMute)(nil),           // 17: app.v1.UpdateDialogMute
-	(*UpdateDialogHiddenFromAI)(nil),   // 18: app.v1.UpdateDialogHiddenFromAI
-	(*UpdatePinnedDialogs)(nil),        // 19: app.v1.UpdatePinnedDialogs
-	(*UpdateChatDeleted)(nil),          // 20: app.v1.UpdateChatDeleted
-	(*UpdateDialogUnreadMark)(nil),     // 21: app.v1.UpdateDialogUnreadMark
-	(*UpdateUserChanged)(nil),          // 22: app.v1.UpdateUserChanged
-	(*UpdateAgentProjectsChanged)(nil), // 23: app.v1.UpdateAgentProjectsChanged
-	(*UpdateAdvisorProfile)(nil),       // 24: app.v1.UpdateAdvisorProfile
-	(*UpdateNotificationSettings)(nil), // 25: app.v1.UpdateNotificationSettings
-	(*UpdateSessionRevoked)(nil),       // 26: app.v1.UpdateSessionRevoked
-	(*DifferenceEmpty)(nil),            // 27: app.v1.DifferenceEmpty
-	(*LargeChatState)(nil),             // 28: app.v1.LargeChatState
-	(*DifferenceUpdates)(nil),          // 29: app.v1.DifferenceUpdates
-	(*DifferenceTooLong)(nil),          // 30: app.v1.DifferenceTooLong
-	(*GetStateRequest)(nil),            // 31: app.v1.GetStateRequest
-	(*GetStateResponse)(nil),           // 32: app.v1.GetStateResponse
-	(*GetDifferenceRequest)(nil),       // 33: app.v1.GetDifferenceRequest
-	(*GetDifferenceResponse)(nil),      // 34: app.v1.GetDifferenceResponse
-	(*GetChatDifferenceRequest)(nil),   // 35: app.v1.GetChatDifferenceRequest
-	(*GetChatDifferenceResponse)(nil),  // 36: app.v1.GetChatDifferenceResponse
-	(*Message)(nil),                    // 37: app.v1.Message
-	(*ReactionCount)(nil),              // 38: app.v1.ReactionCount
-	(MemberRole)(0),                    // 39: app.v1.MemberRole
-	(SyncMode)(0),                      // 40: app.v1.SyncMode
-	(*Chat)(nil),                       // 41: app.v1.Chat
-	(*ForumTopic)(nil),                 // 42: app.v1.ForumTopic
-	(*AdvisorProfile)(nil),             // 43: app.v1.AdvisorProfile
-	(*NotificationSettings)(nil),       // 44: app.v1.NotificationSettings
-	(SessionRevokeReason)(0),           // 45: app.v1.SessionRevokeReason
-	(*User)(nil),                       // 46: app.v1.User
+	(*UpdatePoll)(nil),                 // 8: app.v1.UpdatePoll
+	(*UpdateRead)(nil),                 // 9: app.v1.UpdateRead
+	(*UpdatePin)(nil),                  // 10: app.v1.UpdatePin
+	(*UpdateMemberAdded)(nil),          // 11: app.v1.UpdateMemberAdded
+	(*UpdateMemberRemoved)(nil),        // 12: app.v1.UpdateMemberRemoved
+	(*UpdateMemberPermissions)(nil),    // 13: app.v1.UpdateMemberPermissions
+	(*UpdateChatModeChanged)(nil),      // 14: app.v1.UpdateChatModeChanged
+	(*UpdateChatUpdated)(nil),          // 15: app.v1.UpdateChatUpdated
+	(*UpdateChatActivity)(nil),         // 16: app.v1.UpdateChatActivity
+	(*UpdateTopicChanged)(nil),         // 17: app.v1.UpdateTopicChanged
+	(*UpdateDialogMute)(nil),           // 18: app.v1.UpdateDialogMute
+	(*UpdateDialogHiddenFromAI)(nil),   // 19: app.v1.UpdateDialogHiddenFromAI
+	(*UpdatePinnedDialogs)(nil),        // 20: app.v1.UpdatePinnedDialogs
+	(*UpdateChatDeleted)(nil),          // 21: app.v1.UpdateChatDeleted
+	(*UpdateDialogUnreadMark)(nil),     // 22: app.v1.UpdateDialogUnreadMark
+	(*UpdateUserChanged)(nil),          // 23: app.v1.UpdateUserChanged
+	(*UpdateAgentProjectsChanged)(nil), // 24: app.v1.UpdateAgentProjectsChanged
+	(*UpdateAdvisorProfile)(nil),       // 25: app.v1.UpdateAdvisorProfile
+	(*UpdateNotificationSettings)(nil), // 26: app.v1.UpdateNotificationSettings
+	(*UpdateSessionRevoked)(nil),       // 27: app.v1.UpdateSessionRevoked
+	(*DifferenceEmpty)(nil),            // 28: app.v1.DifferenceEmpty
+	(*LargeChatState)(nil),             // 29: app.v1.LargeChatState
+	(*DifferenceUpdates)(nil),          // 30: app.v1.DifferenceUpdates
+	(*DifferenceTooLong)(nil),          // 31: app.v1.DifferenceTooLong
+	(*GetStateRequest)(nil),            // 32: app.v1.GetStateRequest
+	(*GetStateResponse)(nil),           // 33: app.v1.GetStateResponse
+	(*GetDifferenceRequest)(nil),       // 34: app.v1.GetDifferenceRequest
+	(*GetDifferenceResponse)(nil),      // 35: app.v1.GetDifferenceResponse
+	(*GetChatDifferenceRequest)(nil),   // 36: app.v1.GetChatDifferenceRequest
+	(*GetChatDifferenceResponse)(nil),  // 37: app.v1.GetChatDifferenceResponse
+	(*Message)(nil),                    // 38: app.v1.Message
+	(*ReactionCount)(nil),              // 39: app.v1.ReactionCount
+	(*Poll)(nil),                       // 40: app.v1.Poll
+	(MemberRole)(0),                    // 41: app.v1.MemberRole
+	(SyncMode)(0),                      // 42: app.v1.SyncMode
+	(*Chat)(nil),                       // 43: app.v1.Chat
+	(*ForumTopic)(nil),                 // 44: app.v1.ForumTopic
+	(*AdvisorProfile)(nil),             // 45: app.v1.AdvisorProfile
+	(*NotificationSettings)(nil),       // 46: app.v1.NotificationSettings
+	(SessionRevokeReason)(0),           // 47: app.v1.SessionRevokeReason
+	(*User)(nil),                       // 48: app.v1.User
 }
 var file_app_v1_updates_proto_depIdxs = []int32{
 	3,  // 0: app.v1.Update.message_new:type_name -> app.v1.UpdateMessageNew
@@ -2926,61 +3012,63 @@ var file_app_v1_updates_proto_depIdxs = []int32{
 	5,  // 2: app.v1.Update.message_delete:type_name -> app.v1.UpdateMessageDelete
 	6,  // 3: app.v1.Update.message_hidden:type_name -> app.v1.UpdateMessageHidden
 	7,  // 4: app.v1.Update.reaction:type_name -> app.v1.UpdateReaction
-	8,  // 5: app.v1.Update.read:type_name -> app.v1.UpdateRead
-	9,  // 6: app.v1.Update.pin:type_name -> app.v1.UpdatePin
-	10, // 7: app.v1.Update.member_added:type_name -> app.v1.UpdateMemberAdded
-	11, // 8: app.v1.Update.member_removed:type_name -> app.v1.UpdateMemberRemoved
-	12, // 9: app.v1.Update.member_permissions:type_name -> app.v1.UpdateMemberPermissions
-	13, // 10: app.v1.Update.chat_mode_changed:type_name -> app.v1.UpdateChatModeChanged
-	14, // 11: app.v1.Update.chat_updated:type_name -> app.v1.UpdateChatUpdated
-	15, // 12: app.v1.Update.chat_activity:type_name -> app.v1.UpdateChatActivity
-	26, // 13: app.v1.Update.session_revoked:type_name -> app.v1.UpdateSessionRevoked
-	16, // 14: app.v1.Update.topic_changed:type_name -> app.v1.UpdateTopicChanged
-	17, // 15: app.v1.Update.dialog_mute:type_name -> app.v1.UpdateDialogMute
-	19, // 16: app.v1.Update.pinned_dialogs:type_name -> app.v1.UpdatePinnedDialogs
-	20, // 17: app.v1.Update.chat_deleted:type_name -> app.v1.UpdateChatDeleted
-	21, // 18: app.v1.Update.dialog_unread_mark:type_name -> app.v1.UpdateDialogUnreadMark
-	25, // 19: app.v1.Update.notification_settings:type_name -> app.v1.UpdateNotificationSettings
-	22, // 20: app.v1.Update.user_changed:type_name -> app.v1.UpdateUserChanged
-	23, // 21: app.v1.Update.agent_projects_changed:type_name -> app.v1.UpdateAgentProjectsChanged
-	24, // 22: app.v1.Update.advisor_profile:type_name -> app.v1.UpdateAdvisorProfile
-	18, // 23: app.v1.Update.dialog_hidden_from_ai:type_name -> app.v1.UpdateDialogHiddenFromAI
-	37, // 24: app.v1.UpdateMessageNew.message:type_name -> app.v1.Message
-	37, // 25: app.v1.UpdateMessageEdit.message:type_name -> app.v1.Message
-	38, // 26: app.v1.UpdateReaction.reactions:type_name -> app.v1.ReactionCount
-	39, // 27: app.v1.UpdateMemberPermissions.role:type_name -> app.v1.MemberRole
-	40, // 28: app.v1.UpdateChatModeChanged.sync_mode:type_name -> app.v1.SyncMode
-	41, // 29: app.v1.UpdateChatUpdated.chat:type_name -> app.v1.Chat
-	42, // 30: app.v1.UpdateTopicChanged.topic:type_name -> app.v1.ForumTopic
-	43, // 31: app.v1.UpdateAdvisorProfile.profile:type_name -> app.v1.AdvisorProfile
-	44, // 32: app.v1.UpdateNotificationSettings.settings:type_name -> app.v1.NotificationSettings
-	45, // 33: app.v1.UpdateSessionRevoked.reason:type_name -> app.v1.SessionRevokeReason
-	2,  // 34: app.v1.DifferenceUpdates.updates:type_name -> app.v1.Update
-	46, // 35: app.v1.DifferenceUpdates.users:type_name -> app.v1.User
-	41, // 36: app.v1.DifferenceUpdates.chats:type_name -> app.v1.Chat
-	28, // 37: app.v1.DifferenceUpdates.large_chats:type_name -> app.v1.LargeChatState
-	0,  // 38: app.v1.GetStateResponse.state:type_name -> app.v1.State
-	0,  // 39: app.v1.GetDifferenceResponse.state:type_name -> app.v1.State
-	27, // 40: app.v1.GetDifferenceResponse.empty:type_name -> app.v1.DifferenceEmpty
-	29, // 41: app.v1.GetDifferenceResponse.slice:type_name -> app.v1.DifferenceUpdates
-	29, // 42: app.v1.GetDifferenceResponse.full:type_name -> app.v1.DifferenceUpdates
-	30, // 43: app.v1.GetDifferenceResponse.too_long:type_name -> app.v1.DifferenceTooLong
-	1,  // 44: app.v1.GetChatDifferenceResponse.state:type_name -> app.v1.ChatState
-	27, // 45: app.v1.GetChatDifferenceResponse.empty:type_name -> app.v1.DifferenceEmpty
-	29, // 46: app.v1.GetChatDifferenceResponse.slice:type_name -> app.v1.DifferenceUpdates
-	29, // 47: app.v1.GetChatDifferenceResponse.full:type_name -> app.v1.DifferenceUpdates
-	30, // 48: app.v1.GetChatDifferenceResponse.too_long:type_name -> app.v1.DifferenceTooLong
-	31, // 49: app.v1.UpdatesService.GetState:input_type -> app.v1.GetStateRequest
-	33, // 50: app.v1.UpdatesService.GetDifference:input_type -> app.v1.GetDifferenceRequest
-	35, // 51: app.v1.UpdatesService.GetChatDifference:input_type -> app.v1.GetChatDifferenceRequest
-	32, // 52: app.v1.UpdatesService.GetState:output_type -> app.v1.GetStateResponse
-	34, // 53: app.v1.UpdatesService.GetDifference:output_type -> app.v1.GetDifferenceResponse
-	36, // 54: app.v1.UpdatesService.GetChatDifference:output_type -> app.v1.GetChatDifferenceResponse
-	52, // [52:55] is the sub-list for method output_type
-	49, // [49:52] is the sub-list for method input_type
-	49, // [49:49] is the sub-list for extension type_name
-	49, // [49:49] is the sub-list for extension extendee
-	0,  // [0:49] is the sub-list for field type_name
+	9,  // 5: app.v1.Update.read:type_name -> app.v1.UpdateRead
+	10, // 6: app.v1.Update.pin:type_name -> app.v1.UpdatePin
+	11, // 7: app.v1.Update.member_added:type_name -> app.v1.UpdateMemberAdded
+	12, // 8: app.v1.Update.member_removed:type_name -> app.v1.UpdateMemberRemoved
+	13, // 9: app.v1.Update.member_permissions:type_name -> app.v1.UpdateMemberPermissions
+	14, // 10: app.v1.Update.chat_mode_changed:type_name -> app.v1.UpdateChatModeChanged
+	15, // 11: app.v1.Update.chat_updated:type_name -> app.v1.UpdateChatUpdated
+	16, // 12: app.v1.Update.chat_activity:type_name -> app.v1.UpdateChatActivity
+	27, // 13: app.v1.Update.session_revoked:type_name -> app.v1.UpdateSessionRevoked
+	17, // 14: app.v1.Update.topic_changed:type_name -> app.v1.UpdateTopicChanged
+	18, // 15: app.v1.Update.dialog_mute:type_name -> app.v1.UpdateDialogMute
+	20, // 16: app.v1.Update.pinned_dialogs:type_name -> app.v1.UpdatePinnedDialogs
+	21, // 17: app.v1.Update.chat_deleted:type_name -> app.v1.UpdateChatDeleted
+	22, // 18: app.v1.Update.dialog_unread_mark:type_name -> app.v1.UpdateDialogUnreadMark
+	26, // 19: app.v1.Update.notification_settings:type_name -> app.v1.UpdateNotificationSettings
+	23, // 20: app.v1.Update.user_changed:type_name -> app.v1.UpdateUserChanged
+	24, // 21: app.v1.Update.agent_projects_changed:type_name -> app.v1.UpdateAgentProjectsChanged
+	25, // 22: app.v1.Update.advisor_profile:type_name -> app.v1.UpdateAdvisorProfile
+	19, // 23: app.v1.Update.dialog_hidden_from_ai:type_name -> app.v1.UpdateDialogHiddenFromAI
+	8,  // 24: app.v1.Update.poll:type_name -> app.v1.UpdatePoll
+	38, // 25: app.v1.UpdateMessageNew.message:type_name -> app.v1.Message
+	38, // 26: app.v1.UpdateMessageEdit.message:type_name -> app.v1.Message
+	39, // 27: app.v1.UpdateReaction.reactions:type_name -> app.v1.ReactionCount
+	40, // 28: app.v1.UpdatePoll.poll:type_name -> app.v1.Poll
+	41, // 29: app.v1.UpdateMemberPermissions.role:type_name -> app.v1.MemberRole
+	42, // 30: app.v1.UpdateChatModeChanged.sync_mode:type_name -> app.v1.SyncMode
+	43, // 31: app.v1.UpdateChatUpdated.chat:type_name -> app.v1.Chat
+	44, // 32: app.v1.UpdateTopicChanged.topic:type_name -> app.v1.ForumTopic
+	45, // 33: app.v1.UpdateAdvisorProfile.profile:type_name -> app.v1.AdvisorProfile
+	46, // 34: app.v1.UpdateNotificationSettings.settings:type_name -> app.v1.NotificationSettings
+	47, // 35: app.v1.UpdateSessionRevoked.reason:type_name -> app.v1.SessionRevokeReason
+	2,  // 36: app.v1.DifferenceUpdates.updates:type_name -> app.v1.Update
+	48, // 37: app.v1.DifferenceUpdates.users:type_name -> app.v1.User
+	43, // 38: app.v1.DifferenceUpdates.chats:type_name -> app.v1.Chat
+	29, // 39: app.v1.DifferenceUpdates.large_chats:type_name -> app.v1.LargeChatState
+	0,  // 40: app.v1.GetStateResponse.state:type_name -> app.v1.State
+	0,  // 41: app.v1.GetDifferenceResponse.state:type_name -> app.v1.State
+	28, // 42: app.v1.GetDifferenceResponse.empty:type_name -> app.v1.DifferenceEmpty
+	30, // 43: app.v1.GetDifferenceResponse.slice:type_name -> app.v1.DifferenceUpdates
+	30, // 44: app.v1.GetDifferenceResponse.full:type_name -> app.v1.DifferenceUpdates
+	31, // 45: app.v1.GetDifferenceResponse.too_long:type_name -> app.v1.DifferenceTooLong
+	1,  // 46: app.v1.GetChatDifferenceResponse.state:type_name -> app.v1.ChatState
+	28, // 47: app.v1.GetChatDifferenceResponse.empty:type_name -> app.v1.DifferenceEmpty
+	30, // 48: app.v1.GetChatDifferenceResponse.slice:type_name -> app.v1.DifferenceUpdates
+	30, // 49: app.v1.GetChatDifferenceResponse.full:type_name -> app.v1.DifferenceUpdates
+	31, // 50: app.v1.GetChatDifferenceResponse.too_long:type_name -> app.v1.DifferenceTooLong
+	32, // 51: app.v1.UpdatesService.GetState:input_type -> app.v1.GetStateRequest
+	34, // 52: app.v1.UpdatesService.GetDifference:input_type -> app.v1.GetDifferenceRequest
+	36, // 53: app.v1.UpdatesService.GetChatDifference:input_type -> app.v1.GetChatDifferenceRequest
+	33, // 54: app.v1.UpdatesService.GetState:output_type -> app.v1.GetStateResponse
+	35, // 55: app.v1.UpdatesService.GetDifference:output_type -> app.v1.GetDifferenceResponse
+	37, // 56: app.v1.UpdatesService.GetChatDifference:output_type -> app.v1.GetChatDifferenceResponse
+	54, // [54:57] is the sub-list for method output_type
+	51, // [51:54] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_app_v1_updates_proto_init() }
@@ -3018,14 +3106,15 @@ func file_app_v1_updates_proto_init() {
 		(*Update_AgentProjectsChanged)(nil),
 		(*Update_AdvisorProfile)(nil),
 		(*Update_DialogHiddenFromAi)(nil),
+		(*Update_Poll)(nil),
 	}
-	file_app_v1_updates_proto_msgTypes[34].OneofWrappers = []any{
+	file_app_v1_updates_proto_msgTypes[35].OneofWrappers = []any{
 		(*GetDifferenceResponse_Empty)(nil),
 		(*GetDifferenceResponse_Slice)(nil),
 		(*GetDifferenceResponse_Full)(nil),
 		(*GetDifferenceResponse_TooLong)(nil),
 	}
-	file_app_v1_updates_proto_msgTypes[36].OneofWrappers = []any{
+	file_app_v1_updates_proto_msgTypes[37].OneofWrappers = []any{
 		(*GetChatDifferenceResponse_Empty)(nil),
 		(*GetChatDifferenceResponse_Slice)(nil),
 		(*GetChatDifferenceResponse_Full)(nil),
@@ -3037,7 +3126,7 @@ func file_app_v1_updates_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_app_v1_updates_proto_rawDesc), len(file_app_v1_updates_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   37,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

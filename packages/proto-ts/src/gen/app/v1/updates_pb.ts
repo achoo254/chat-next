@@ -10,7 +10,7 @@ import type { SessionRevokeReason } from "./auth_pb.ts";
 import { file_app_v1_auth } from "./auth_pb.ts";
 import type { Chat, ForumTopic, MemberRole, NotificationSettings, SyncMode } from "./chats_pb.ts";
 import { file_app_v1_chats } from "./chats_pb.ts";
-import type { Message as Message$1, ReactionCount } from "./messages_pb.ts";
+import type { Message as Message$1, Poll, ReactionCount } from "./messages_pb.ts";
 import { file_app_v1_messages } from "./messages_pb.ts";
 import type { User } from "./users_pb.ts";
 import { file_app_v1_users } from "./users_pb.ts";
@@ -20,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file app/v1/updates.proto.
  */
 export const file_app_v1_updates: GenFile = /*@__PURE__*/
-  fileDesc("ChRhcHAvdjEvdXBkYXRlcy5wcm90bxIGYXBwLnYxIkQKBVN0YXRlEg8KA3B0cxgBIAEoA0ICMAISGAoMc2VydmVyX2Vwb2NoGAIgASgDQgIwAhIQCgRkYXRlGAMgASgDQgIwAiJQCglDaGF0U3RhdGUSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIY2hhdF9wdHMYAiABKANCAjACEhgKDHNlcnZlcl9lcG9jaBgDIAEoA0ICMAIitQsKBlVwZGF0ZRIPCgNwdHMYASABKANCAjACEhEKCXB0c19jb3VudBgCIAEoBRIUCghjaGF0X3B0cxgDIAEoA0ICMAISFgoOY2hhdF9wdHNfY291bnQYBCABKAUSEwoHY2hhdF9pZBgFIAEoA0ICMAISGAoMc2VydmVyX2Vwb2NoGAYgASgDQgIwAhIQCgRkYXRlGAcgASgDQgIwAhIvCgttZXNzYWdlX25ldxgKIAEoCzIYLmFwcC52MS5VcGRhdGVNZXNzYWdlTmV3SAASMQoMbWVzc2FnZV9lZGl0GAsgASgLMhkuYXBwLnYxLlVwZGF0ZU1lc3NhZ2VFZGl0SAASNQoObWVzc2FnZV9kZWxldGUYDCABKAsyGy5hcHAudjEuVXBkYXRlTWVzc2FnZURlbGV0ZUgAEjUKDm1lc3NhZ2VfaGlkZGVuGA0gASgLMhsuYXBwLnYxLlVwZGF0ZU1lc3NhZ2VIaWRkZW5IABIqCghyZWFjdGlvbhgOIAEoCzIWLmFwcC52MS5VcGRhdGVSZWFjdGlvbkgAEiIKBHJlYWQYDyABKAsyEi5hcHAudjEuVXBkYXRlUmVhZEgAEiAKA3BpbhgQIAEoCzIRLmFwcC52MS5VcGRhdGVQaW5IABIxCgxtZW1iZXJfYWRkZWQYESABKAsyGS5hcHAudjEuVXBkYXRlTWVtYmVyQWRkZWRIABI1Cg5tZW1iZXJfcmVtb3ZlZBgSIAEoCzIbLmFwcC52MS5VcGRhdGVNZW1iZXJSZW1vdmVkSAASPQoSbWVtYmVyX3Blcm1pc3Npb25zGBMgASgLMh8uYXBwLnYxLlVwZGF0ZU1lbWJlclBlcm1pc3Npb25zSAASOgoRY2hhdF9tb2RlX2NoYW5nZWQYFCABKAsyHS5hcHAudjEuVXBkYXRlQ2hhdE1vZGVDaGFuZ2VkSAASMQoMY2hhdF91cGRhdGVkGBUgASgLMhkuYXBwLnYxLlVwZGF0ZUNoYXRVcGRhdGVkSAASMwoNY2hhdF9hY3Rpdml0eRgWIAEoCzIaLmFwcC52MS5VcGRhdGVDaGF0QWN0aXZpdHlIABI3Cg9zZXNzaW9uX3Jldm9rZWQYFyABKAsyHC5hcHAudjEuVXBkYXRlU2Vzc2lvblJldm9rZWRIABIzCg10b3BpY19jaGFuZ2VkGBggASgLMhouYXBwLnYxLlVwZGF0ZVRvcGljQ2hhbmdlZEgAEi8KC2RpYWxvZ19tdXRlGBkgASgLMhguYXBwLnYxLlVwZGF0ZURpYWxvZ011dGVIABI1Cg5waW5uZWRfZGlhbG9ncxgaIAEoCzIbLmFwcC52MS5VcGRhdGVQaW5uZWREaWFsb2dzSAASMQoMY2hhdF9kZWxldGVkGBsgASgLMhkuYXBwLnYxLlVwZGF0ZUNoYXREZWxldGVkSAASPAoSZGlhbG9nX3VucmVhZF9tYXJrGBwgASgLMh4uYXBwLnYxLlVwZGF0ZURpYWxvZ1VucmVhZE1hcmtIABJDChVub3RpZmljYXRpb25fc2V0dGluZ3MYHSABKAsyIi5hcHAudjEuVXBkYXRlTm90aWZpY2F0aW9uU2V0dGluZ3NIABIxCgx1c2VyX2NoYW5nZWQYHiABKAsyGS5hcHAudjEuVXBkYXRlVXNlckNoYW5nZWRIABJEChZhZ2VudF9wcm9qZWN0c19jaGFuZ2VkGB8gASgLMiIuYXBwLnYxLlVwZGF0ZUFnZW50UHJvamVjdHNDaGFuZ2VkSAASNwoPYWR2aXNvcl9wcm9maWxlGCAgASgLMhwuYXBwLnYxLlVwZGF0ZUFkdmlzb3JQcm9maWxlSAASQQoVZGlhbG9nX2hpZGRlbl9mcm9tX2FpGCIgASgLMiAuYXBwLnYxLlVwZGF0ZURpYWxvZ0hpZGRlbkZyb21BSUgAQgYKBGtpbmQiNAoQVXBkYXRlTWVzc2FnZU5ldxIgCgdtZXNzYWdlGAEgASgLMg8uYXBwLnYxLk1lc3NhZ2UiRQoRVXBkYXRlTWVzc2FnZUVkaXQSIAoHbWVzc2FnZRgBIAEoCzIPLmFwcC52MS5NZXNzYWdlEg4KBm5vdGlmeRgCIAEoCCJOChNVcGRhdGVNZXNzYWdlRGVsZXRlEhMKB2NoYXRfaWQYASABKANCAjACEhAKBHNlcXMYAiADKANCAjACEhAKCHJlY2FsbGVkGAMgASgIIjwKE1VwZGF0ZU1lc3NhZ2VIaWRkZW4SEwoHY2hhdF9pZBgBIAEoA0ICMAISEAoEc2VxcxgCIAMoA0ICMAIiYAoOVXBkYXRlUmVhY3Rpb24SEwoHY2hhdF9pZBgBIAEoA0ICMAISDwoDc2VxGAIgASgDQgIwAhIoCglyZWFjdGlvbnMYAyADKAsyFS5hcHAudjEuUmVhY3Rpb25Db3VudCLYAQoKVXBkYXRlUmVhZBITCgdjaGF0X2lkGAEgASgDQgIwAhITCgdtYXhfc2VxGAIgASgDQgIwAhIOCgZvdXRib3gYAyABKAgSFAoMdW5yZWFkX2NvdW50GAQgASgFEhQKCHRvcGljX2lkGAUgASgDQgIwAhIUCghjaGF0X3B0cxgGIAEoA0ICMAISGgoSdG9waWNfdW5yZWFkX2NvdW50GAcgASgFEhMKB3RvcF9zZXEYCCABKANCAjACEh0KFXVucmVhZF9tZW50aW9uc19jb3VudBgJIAEoBSJTCglVcGRhdGVQaW4SEwoHY2hhdF9pZBgBIAEoA0ICMAISDwoDc2VxGAIgASgDQgIwAhIOCgZwaW5uZWQYAyABKAgSEAoEc2VxcxgEIAMoA0ICMAIiVgoRVXBkYXRlTWVtYmVyQWRkZWQSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIdXNlcl9pZHMYAiADKANCAjACEhYKCmludml0ZXJfaWQYAyABKANCAjACIlUKE1VwZGF0ZU1lbWJlclJlbW92ZWQSEwoHY2hhdF9pZBgBIAEoA0ICMAISEwoHdXNlcl9pZBgCIAEoA0ICMAISFAoIYWN0b3JfaWQYAyABKANCAjACInoKF1VwZGF0ZU1lbWJlclBlcm1pc3Npb25zEhMKB2NoYXRfaWQYASABKANCAjACEhMKB3VzZXJfaWQYAiABKANCAjACEiAKBHJvbGUYAyABKA4yEi5hcHAudjEuTWVtYmVyUm9sZRITCgtwZXJtaXNzaW9ucxgEIAEoDSJnChVVcGRhdGVDaGF0TW9kZUNoYW5nZWQSEwoHY2hhdF9pZBgBIAEoA0ICMAISIwoJc3luY19tb2RlGAIgASgOMhAuYXBwLnYxLlN5bmNNb2RlEhQKCGNoYXRfcHRzGAMgASgDQgIwAiIvChFVcGRhdGVDaGF0VXBkYXRlZBIaCgRjaGF0GAEgASgLMgwuYXBwLnYxLkNoYXQiVAoSVXBkYXRlQ2hhdEFjdGl2aXR5EhMKB2NoYXRfaWQYASABKANCAjACEhQKCGNoYXRfcHRzGAIgASgDQgIwAhITCgd0b3Bfc2VxGAMgASgDQgIwAiI3ChJVcGRhdGVUb3BpY0NoYW5nZWQSIQoFdG9waWMYASABKAsyEi5hcHAudjEuRm9ydW1Ub3BpYyI/ChBVcGRhdGVEaWFsb2dNdXRlEhMKB2NoYXRfaWQYASABKANCAjACEhYKCm11dGVfdW50aWwYAiABKANCAjACIj8KGFVwZGF0ZURpYWxvZ0hpZGRlbkZyb21BSRITCgdjaGF0X2lkGAEgASgDQgIwAhIOCgZoaWRkZW4YAiABKAgiKwoTVXBkYXRlUGlubmVkRGlhbG9ncxIUCghjaGF0X2lkcxgBIAMoA0ICMAIiPgoRVXBkYXRlQ2hhdERlbGV0ZWQSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoMZm9yX2V2ZXJ5b25lGAIgASgIIj0KFlVwZGF0ZURpYWxvZ1VucmVhZE1hcmsSEwoHY2hhdF9pZBgBIAEoA0ICMAISDgoGdW5yZWFkGAIgASgIIigKEVVwZGF0ZVVzZXJDaGFuZ2VkEhMKB3VzZXJfaWQYASABKANCAjACIhwKGlVwZGF0ZUFnZW50UHJvamVjdHNDaGFuZ2VkIj8KFFVwZGF0ZUFkdmlzb3JQcm9maWxlEicKB3Byb2ZpbGUYASABKAsyFi5hcHAudjEuQWR2aXNvclByb2ZpbGUiTAoaVXBkYXRlTm90aWZpY2F0aW9uU2V0dGluZ3MSLgoIc2V0dGluZ3MYASABKAsyHC5hcHAudjEuTm90aWZpY2F0aW9uU2V0dGluZ3MiWwoUVXBkYXRlU2Vzc2lvblJldm9rZWQSFgoKc2Vzc2lvbl9pZBgBIAEoA0ICMAISKwoGcmVhc29uGAIgASgOMhsuYXBwLnYxLlNlc3Npb25SZXZva2VSZWFzb24iEQoPRGlmZmVyZW5jZUVtcHR5IlAKDkxhcmdlQ2hhdFN0YXRlEhMKB2NoYXRfaWQYASABKANCAjACEhQKCGNoYXRfcHRzGAIgASgDQgIwAhITCgd0b3Bfc2VxGAMgASgDQgIwAiKbAQoRRGlmZmVyZW5jZVVwZGF0ZXMSHwoHdXBkYXRlcxgBIAMoCzIOLmFwcC52MS5VcGRhdGUSGwoFdXNlcnMYAiADKAsyDC5hcHAudjEuVXNlchIbCgVjaGF0cxgDIAMoCzIMLmFwcC52MS5DaGF0EisKC2xhcmdlX2NoYXRzGAQgAygLMhYuYXBwLnYxLkxhcmdlQ2hhdFN0YXRlIhMKEURpZmZlcmVuY2VUb29Mb25nIhEKD0dldFN0YXRlUmVxdWVzdCIwChBHZXRTdGF0ZVJlc3BvbnNlEhwKBXN0YXRlGAEgASgLMg0uYXBwLnYxLlN0YXRlIlAKFEdldERpZmZlcmVuY2VSZXF1ZXN0Eg8KA3B0cxgBIAEoA0ICMAISGAoMc2VydmVyX2Vwb2NoGAIgASgDQgIwAhINCgVsaW1pdBgDIAEoBSLvAQoVR2V0RGlmZmVyZW5jZVJlc3BvbnNlEhwKBXN0YXRlGAEgASgLMg0uYXBwLnYxLlN0YXRlEigKBWVtcHR5GAIgASgLMhcuYXBwLnYxLkRpZmZlcmVuY2VFbXB0eUgAEioKBXNsaWNlGAMgASgLMhkuYXBwLnYxLkRpZmZlcmVuY2VVcGRhdGVzSAASKQoEZnVsbBgEIAEoCzIZLmFwcC52MS5EaWZmZXJlbmNlVXBkYXRlc0gAEi0KCHRvb19sb25nGAUgASgLMhkuYXBwLnYxLkRpZmZlcmVuY2VUb29Mb25nSABCCAoGcmVzdWx0Im4KGEdldENoYXREaWZmZXJlbmNlUmVxdWVzdBITCgdjaGF0X2lkGAEgASgDQgIwAhIUCghjaGF0X3B0cxgCIAEoA0ICMAISGAoMc2VydmVyX2Vwb2NoGAMgASgDQgIwAhINCgVsaW1pdBgEIAEoBSL3AQoZR2V0Q2hhdERpZmZlcmVuY2VSZXNwb25zZRIgCgVzdGF0ZRgBIAEoCzIRLmFwcC52MS5DaGF0U3RhdGUSKAoFZW1wdHkYAiABKAsyFy5hcHAudjEuRGlmZmVyZW5jZUVtcHR5SAASKgoFc2xpY2UYAyABKAsyGS5hcHAudjEuRGlmZmVyZW5jZVVwZGF0ZXNIABIpCgRmdWxsGAQgASgLMhkuYXBwLnYxLkRpZmZlcmVuY2VVcGRhdGVzSAASLQoIdG9vX2xvbmcYBSABKAsyGS5hcHAudjEuRGlmZmVyZW5jZVRvb0xvbmdIAEIICgZyZXN1bHQy9wEKDlVwZGF0ZXNTZXJ2aWNlEj0KCEdldFN0YXRlEhcuYXBwLnYxLkdldFN0YXRlUmVxdWVzdBoYLmFwcC52MS5HZXRTdGF0ZVJlc3BvbnNlEkwKDUdldERpZmZlcmVuY2USHC5hcHAudjEuR2V0RGlmZmVyZW5jZVJlcXVlc3QaHS5hcHAudjEuR2V0RGlmZmVyZW5jZVJlc3BvbnNlElgKEUdldENoYXREaWZmZXJlbmNlEiAuYXBwLnYxLkdldENoYXREaWZmZXJlbmNlUmVxdWVzdBohLmFwcC52MS5HZXRDaGF0RGlmZmVyZW5jZVJlc3BvbnNlQiNaIWFwcC5sb2NhbC9zZXJ2ZXIvZ2VuL2FwcC92MTthcHB2MWIGcHJvdG8z", [file_app_v1_advisor, file_app_v1_auth, file_app_v1_chats, file_app_v1_messages, file_app_v1_users]);
+  fileDesc("ChRhcHAvdjEvdXBkYXRlcy5wcm90bxIGYXBwLnYxIkQKBVN0YXRlEg8KA3B0cxgBIAEoA0ICMAISGAoMc2VydmVyX2Vwb2NoGAIgASgDQgIwAhIQCgRkYXRlGAMgASgDQgIwAiJQCglDaGF0U3RhdGUSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIY2hhdF9wdHMYAiABKANCAjACEhgKDHNlcnZlcl9lcG9jaBgDIAEoA0ICMAIi2QsKBlVwZGF0ZRIPCgNwdHMYASABKANCAjACEhEKCXB0c19jb3VudBgCIAEoBRIUCghjaGF0X3B0cxgDIAEoA0ICMAISFgoOY2hhdF9wdHNfY291bnQYBCABKAUSEwoHY2hhdF9pZBgFIAEoA0ICMAISGAoMc2VydmVyX2Vwb2NoGAYgASgDQgIwAhIQCgRkYXRlGAcgASgDQgIwAhIvCgttZXNzYWdlX25ldxgKIAEoCzIYLmFwcC52MS5VcGRhdGVNZXNzYWdlTmV3SAASMQoMbWVzc2FnZV9lZGl0GAsgASgLMhkuYXBwLnYxLlVwZGF0ZU1lc3NhZ2VFZGl0SAASNQoObWVzc2FnZV9kZWxldGUYDCABKAsyGy5hcHAudjEuVXBkYXRlTWVzc2FnZURlbGV0ZUgAEjUKDm1lc3NhZ2VfaGlkZGVuGA0gASgLMhsuYXBwLnYxLlVwZGF0ZU1lc3NhZ2VIaWRkZW5IABIqCghyZWFjdGlvbhgOIAEoCzIWLmFwcC52MS5VcGRhdGVSZWFjdGlvbkgAEiIKBHJlYWQYDyABKAsyEi5hcHAudjEuVXBkYXRlUmVhZEgAEiAKA3BpbhgQIAEoCzIRLmFwcC52MS5VcGRhdGVQaW5IABIxCgxtZW1iZXJfYWRkZWQYESABKAsyGS5hcHAudjEuVXBkYXRlTWVtYmVyQWRkZWRIABI1Cg5tZW1iZXJfcmVtb3ZlZBgSIAEoCzIbLmFwcC52MS5VcGRhdGVNZW1iZXJSZW1vdmVkSAASPQoSbWVtYmVyX3Blcm1pc3Npb25zGBMgASgLMh8uYXBwLnYxLlVwZGF0ZU1lbWJlclBlcm1pc3Npb25zSAASOgoRY2hhdF9tb2RlX2NoYW5nZWQYFCABKAsyHS5hcHAudjEuVXBkYXRlQ2hhdE1vZGVDaGFuZ2VkSAASMQoMY2hhdF91cGRhdGVkGBUgASgLMhkuYXBwLnYxLlVwZGF0ZUNoYXRVcGRhdGVkSAASMwoNY2hhdF9hY3Rpdml0eRgWIAEoCzIaLmFwcC52MS5VcGRhdGVDaGF0QWN0aXZpdHlIABI3Cg9zZXNzaW9uX3Jldm9rZWQYFyABKAsyHC5hcHAudjEuVXBkYXRlU2Vzc2lvblJldm9rZWRIABIzCg10b3BpY19jaGFuZ2VkGBggASgLMhouYXBwLnYxLlVwZGF0ZVRvcGljQ2hhbmdlZEgAEi8KC2RpYWxvZ19tdXRlGBkgASgLMhguYXBwLnYxLlVwZGF0ZURpYWxvZ011dGVIABI1Cg5waW5uZWRfZGlhbG9ncxgaIAEoCzIbLmFwcC52MS5VcGRhdGVQaW5uZWREaWFsb2dzSAASMQoMY2hhdF9kZWxldGVkGBsgASgLMhkuYXBwLnYxLlVwZGF0ZUNoYXREZWxldGVkSAASPAoSZGlhbG9nX3VucmVhZF9tYXJrGBwgASgLMh4uYXBwLnYxLlVwZGF0ZURpYWxvZ1VucmVhZE1hcmtIABJDChVub3RpZmljYXRpb25fc2V0dGluZ3MYHSABKAsyIi5hcHAudjEuVXBkYXRlTm90aWZpY2F0aW9uU2V0dGluZ3NIABIxCgx1c2VyX2NoYW5nZWQYHiABKAsyGS5hcHAudjEuVXBkYXRlVXNlckNoYW5nZWRIABJEChZhZ2VudF9wcm9qZWN0c19jaGFuZ2VkGB8gASgLMiIuYXBwLnYxLlVwZGF0ZUFnZW50UHJvamVjdHNDaGFuZ2VkSAASNwoPYWR2aXNvcl9wcm9maWxlGCAgASgLMhwuYXBwLnYxLlVwZGF0ZUFkdmlzb3JQcm9maWxlSAASQQoVZGlhbG9nX2hpZGRlbl9mcm9tX2FpGCIgASgLMiAuYXBwLnYxLlVwZGF0ZURpYWxvZ0hpZGRlbkZyb21BSUgAEiIKBHBvbGwYIyABKAsyEi5hcHAudjEuVXBkYXRlUG9sbEgAQgYKBGtpbmQiNAoQVXBkYXRlTWVzc2FnZU5ldxIgCgdtZXNzYWdlGAEgASgLMg8uYXBwLnYxLk1lc3NhZ2UiRQoRVXBkYXRlTWVzc2FnZUVkaXQSIAoHbWVzc2FnZRgBIAEoCzIPLmFwcC52MS5NZXNzYWdlEg4KBm5vdGlmeRgCIAEoCCJOChNVcGRhdGVNZXNzYWdlRGVsZXRlEhMKB2NoYXRfaWQYASABKANCAjACEhAKBHNlcXMYAiADKANCAjACEhAKCHJlY2FsbGVkGAMgASgIIjwKE1VwZGF0ZU1lc3NhZ2VIaWRkZW4SEwoHY2hhdF9pZBgBIAEoA0ICMAISEAoEc2VxcxgCIAMoA0ICMAIiYAoOVXBkYXRlUmVhY3Rpb24SEwoHY2hhdF9pZBgBIAEoA0ICMAISDwoDc2VxGAIgASgDQgIwAhIoCglyZWFjdGlvbnMYAyADKAsyFS5hcHAudjEuUmVhY3Rpb25Db3VudCJOCgpVcGRhdGVQb2xsEhMKB2NoYXRfaWQYASABKANCAjACEg8KA3NlcRgCIAEoA0ICMAISGgoEcG9sbBgDIAEoCzIMLmFwcC52MS5Qb2xsItgBCgpVcGRhdGVSZWFkEhMKB2NoYXRfaWQYASABKANCAjACEhMKB21heF9zZXEYAiABKANCAjACEg4KBm91dGJveBgDIAEoCBIUCgx1bnJlYWRfY291bnQYBCABKAUSFAoIdG9waWNfaWQYBSABKANCAjACEhQKCGNoYXRfcHRzGAYgASgDQgIwAhIaChJ0b3BpY191bnJlYWRfY291bnQYByABKAUSEwoHdG9wX3NlcRgIIAEoA0ICMAISHQoVdW5yZWFkX21lbnRpb25zX2NvdW50GAkgASgFIlMKCVVwZGF0ZVBpbhITCgdjaGF0X2lkGAEgASgDQgIwAhIPCgNzZXEYAiABKANCAjACEg4KBnBpbm5lZBgDIAEoCBIQCgRzZXFzGAQgAygDQgIwAiJWChFVcGRhdGVNZW1iZXJBZGRlZBITCgdjaGF0X2lkGAEgASgDQgIwAhIUCgh1c2VyX2lkcxgCIAMoA0ICMAISFgoKaW52aXRlcl9pZBgDIAEoA0ICMAIiVQoTVXBkYXRlTWVtYmVyUmVtb3ZlZBITCgdjaGF0X2lkGAEgASgDQgIwAhITCgd1c2VyX2lkGAIgASgDQgIwAhIUCghhY3Rvcl9pZBgDIAEoA0ICMAIiegoXVXBkYXRlTWVtYmVyUGVybWlzc2lvbnMSEwoHY2hhdF9pZBgBIAEoA0ICMAISEwoHdXNlcl9pZBgCIAEoA0ICMAISIAoEcm9sZRgDIAEoDjISLmFwcC52MS5NZW1iZXJSb2xlEhMKC3Blcm1pc3Npb25zGAQgASgNImcKFVVwZGF0ZUNoYXRNb2RlQ2hhbmdlZBITCgdjaGF0X2lkGAEgASgDQgIwAhIjCglzeW5jX21vZGUYAiABKA4yEC5hcHAudjEuU3luY01vZGUSFAoIY2hhdF9wdHMYAyABKANCAjACIi8KEVVwZGF0ZUNoYXRVcGRhdGVkEhoKBGNoYXQYASABKAsyDC5hcHAudjEuQ2hhdCJUChJVcGRhdGVDaGF0QWN0aXZpdHkSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIY2hhdF9wdHMYAiABKANCAjACEhMKB3RvcF9zZXEYAyABKANCAjACIjcKElVwZGF0ZVRvcGljQ2hhbmdlZBIhCgV0b3BpYxgBIAEoCzISLmFwcC52MS5Gb3J1bVRvcGljIj8KEFVwZGF0ZURpYWxvZ011dGUSEwoHY2hhdF9pZBgBIAEoA0ICMAISFgoKbXV0ZV91bnRpbBgCIAEoA0ICMAIiPwoYVXBkYXRlRGlhbG9nSGlkZGVuRnJvbUFJEhMKB2NoYXRfaWQYASABKANCAjACEg4KBmhpZGRlbhgCIAEoCCIrChNVcGRhdGVQaW5uZWREaWFsb2dzEhQKCGNoYXRfaWRzGAEgAygDQgIwAiI+ChFVcGRhdGVDaGF0RGVsZXRlZBITCgdjaGF0X2lkGAEgASgDQgIwAhIUCgxmb3JfZXZlcnlvbmUYAiABKAgiPQoWVXBkYXRlRGlhbG9nVW5yZWFkTWFyaxITCgdjaGF0X2lkGAEgASgDQgIwAhIOCgZ1bnJlYWQYAiABKAgiKAoRVXBkYXRlVXNlckNoYW5nZWQSEwoHdXNlcl9pZBgBIAEoA0ICMAIiHAoaVXBkYXRlQWdlbnRQcm9qZWN0c0NoYW5nZWQiPwoUVXBkYXRlQWR2aXNvclByb2ZpbGUSJwoHcHJvZmlsZRgBIAEoCzIWLmFwcC52MS5BZHZpc29yUHJvZmlsZSJMChpVcGRhdGVOb3RpZmljYXRpb25TZXR0aW5ncxIuCghzZXR0aW5ncxgBIAEoCzIcLmFwcC52MS5Ob3RpZmljYXRpb25TZXR0aW5ncyJbChRVcGRhdGVTZXNzaW9uUmV2b2tlZBIWCgpzZXNzaW9uX2lkGAEgASgDQgIwAhIrCgZyZWFzb24YAiABKA4yGy5hcHAudjEuU2Vzc2lvblJldm9rZVJlYXNvbiIRCg9EaWZmZXJlbmNlRW1wdHkiUAoOTGFyZ2VDaGF0U3RhdGUSEwoHY2hhdF9pZBgBIAEoA0ICMAISFAoIY2hhdF9wdHMYAiABKANCAjACEhMKB3RvcF9zZXEYAyABKANCAjACIpsBChFEaWZmZXJlbmNlVXBkYXRlcxIfCgd1cGRhdGVzGAEgAygLMg4uYXBwLnYxLlVwZGF0ZRIbCgV1c2VycxgCIAMoCzIMLmFwcC52MS5Vc2VyEhsKBWNoYXRzGAMgAygLMgwuYXBwLnYxLkNoYXQSKwoLbGFyZ2VfY2hhdHMYBCADKAsyFi5hcHAudjEuTGFyZ2VDaGF0U3RhdGUiEwoRRGlmZmVyZW5jZVRvb0xvbmciEQoPR2V0U3RhdGVSZXF1ZXN0IjAKEEdldFN0YXRlUmVzcG9uc2USHAoFc3RhdGUYASABKAsyDS5hcHAudjEuU3RhdGUiUAoUR2V0RGlmZmVyZW5jZVJlcXVlc3QSDwoDcHRzGAEgASgDQgIwAhIYCgxzZXJ2ZXJfZXBvY2gYAiABKANCAjACEg0KBWxpbWl0GAMgASgFIu8BChVHZXREaWZmZXJlbmNlUmVzcG9uc2USHAoFc3RhdGUYASABKAsyDS5hcHAudjEuU3RhdGUSKAoFZW1wdHkYAiABKAsyFy5hcHAudjEuRGlmZmVyZW5jZUVtcHR5SAASKgoFc2xpY2UYAyABKAsyGS5hcHAudjEuRGlmZmVyZW5jZVVwZGF0ZXNIABIpCgRmdWxsGAQgASgLMhkuYXBwLnYxLkRpZmZlcmVuY2VVcGRhdGVzSAASLQoIdG9vX2xvbmcYBSABKAsyGS5hcHAudjEuRGlmZmVyZW5jZVRvb0xvbmdIAEIICgZyZXN1bHQibgoYR2V0Q2hhdERpZmZlcmVuY2VSZXF1ZXN0EhMKB2NoYXRfaWQYASABKANCAjACEhQKCGNoYXRfcHRzGAIgASgDQgIwAhIYCgxzZXJ2ZXJfZXBvY2gYAyABKANCAjACEg0KBWxpbWl0GAQgASgFIvcBChlHZXRDaGF0RGlmZmVyZW5jZVJlc3BvbnNlEiAKBXN0YXRlGAEgASgLMhEuYXBwLnYxLkNoYXRTdGF0ZRIoCgVlbXB0eRgCIAEoCzIXLmFwcC52MS5EaWZmZXJlbmNlRW1wdHlIABIqCgVzbGljZRgDIAEoCzIZLmFwcC52MS5EaWZmZXJlbmNlVXBkYXRlc0gAEikKBGZ1bGwYBCABKAsyGS5hcHAudjEuRGlmZmVyZW5jZVVwZGF0ZXNIABItCgh0b29fbG9uZxgFIAEoCzIZLmFwcC52MS5EaWZmZXJlbmNlVG9vTG9uZ0gAQggKBnJlc3VsdDL3AQoOVXBkYXRlc1NlcnZpY2USPQoIR2V0U3RhdGUSFy5hcHAudjEuR2V0U3RhdGVSZXF1ZXN0GhguYXBwLnYxLkdldFN0YXRlUmVzcG9uc2USTAoNR2V0RGlmZmVyZW5jZRIcLmFwcC52MS5HZXREaWZmZXJlbmNlUmVxdWVzdBodLmFwcC52MS5HZXREaWZmZXJlbmNlUmVzcG9uc2USWAoRR2V0Q2hhdERpZmZlcmVuY2USIC5hcHAudjEuR2V0Q2hhdERpZmZlcmVuY2VSZXF1ZXN0GiEuYXBwLnYxLkdldENoYXREaWZmZXJlbmNlUmVzcG9uc2VCI1ohYXBwLmxvY2FsL3NlcnZlci9nZW4vYXBwL3YxO2FwcHYxYgZwcm90bzM", [file_app_v1_advisor, file_app_v1_auth, file_app_v1_chats, file_app_v1_messages, file_app_v1_users]);
 
 /**
  * @generated from message app.v1.State
@@ -274,6 +274,12 @@ export type Update = Message<"app.v1.Update"> & {
      */
     value: UpdateDialogHiddenFromAI;
     case: "dialogHiddenFromAi";
+  } | {
+    /**
+     * @generated from field: app.v1.UpdatePoll poll = 35;
+     */
+    value: UpdatePoll;
+    case: "poll";
   } | { case: undefined; value?: undefined };
 };
 
@@ -414,6 +420,37 @@ export const UpdateReactionSchema: GenMessage<UpdateReaction> = /*@__PURE__*/
   messageDesc(file_app_v1_updates, 7);
 
 /**
+ * The results (or the closing) of a poll changed.
+ *
+ * @generated from message app.v1.UpdatePoll
+ */
+export type UpdatePoll = Message<"app.v1.UpdatePoll"> & {
+  /**
+   * @generated from field: int64 chat_id = 1 [jstype = JS_NUMBER];
+   */
+  chatId: bigint;
+
+  /**
+   * @generated from field: int64 seq = 2 [jstype = JS_NUMBER];
+   */
+  seq: bigint;
+
+  /**
+   * The poll as the receiver sees it now.
+   *
+   * @generated from field: app.v1.Poll poll = 3;
+   */
+  poll?: Poll | undefined;
+};
+
+/**
+ * Describes the message app.v1.UpdatePoll.
+ * Use `create(UpdatePollSchema)` to create a new message.
+ */
+export const UpdatePollSchema: GenMessage<UpdatePoll> = /*@__PURE__*/
+  messageDesc(file_app_v1_updates, 8);
+
+/**
  * @generated from message app.v1.UpdateRead
  */
 export type UpdateRead = Message<"app.v1.UpdateRead"> & {
@@ -491,7 +528,7 @@ export type UpdateRead = Message<"app.v1.UpdateRead"> & {
  * Use `create(UpdateReadSchema)` to create a new message.
  */
 export const UpdateReadSchema: GenMessage<UpdateRead> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 8);
+  messageDesc(file_app_v1_updates, 9);
 
 /**
  * A message was pinned or unpinned; the caller's Dialog pinned count and
@@ -532,7 +569,7 @@ export type UpdatePin = Message<"app.v1.UpdatePin"> & {
  * Use `create(UpdatePinSchema)` to create a new message.
  */
 export const UpdatePinSchema: GenMessage<UpdatePin> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 9);
+  messageDesc(file_app_v1_updates, 10);
 
 /**
  * @generated from message app.v1.UpdateMemberAdded
@@ -561,7 +598,7 @@ export type UpdateMemberAdded = Message<"app.v1.UpdateMemberAdded"> & {
  * Use `create(UpdateMemberAddedSchema)` to create a new message.
  */
 export const UpdateMemberAddedSchema: GenMessage<UpdateMemberAdded> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 10);
+  messageDesc(file_app_v1_updates, 11);
 
 /**
  * When user_id is the receiving user, the client purges the chat locally.
@@ -592,7 +629,7 @@ export type UpdateMemberRemoved = Message<"app.v1.UpdateMemberRemoved"> & {
  * Use `create(UpdateMemberRemovedSchema)` to create a new message.
  */
 export const UpdateMemberRemovedSchema: GenMessage<UpdateMemberRemoved> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 11);
+  messageDesc(file_app_v1_updates, 12);
 
 /**
  * @generated from message app.v1.UpdateMemberPermissions
@@ -624,7 +661,7 @@ export type UpdateMemberPermissions = Message<"app.v1.UpdateMemberPermissions"> 
  * Use `create(UpdateMemberPermissionsSchema)` to create a new message.
  */
 export const UpdateMemberPermissionsSchema: GenMessage<UpdateMemberPermissions> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 12);
+  messageDesc(file_app_v1_updates, 13);
 
 /**
  * Written into every member's per-user log when a chat switches to
@@ -654,7 +691,7 @@ export type UpdateChatModeChanged = Message<"app.v1.UpdateChatModeChanged"> & {
  * Use `create(UpdateChatModeChangedSchema)` to create a new message.
  */
 export const UpdateChatModeChangedSchema: GenMessage<UpdateChatModeChanged> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 13);
+  messageDesc(file_app_v1_updates, 14);
 
 /**
  * @generated from message app.v1.UpdateChatUpdated
@@ -671,7 +708,7 @@ export type UpdateChatUpdated = Message<"app.v1.UpdateChatUpdated"> & {
  * Use `create(UpdateChatUpdatedSchema)` to create a new message.
  */
 export const UpdateChatUpdatedSchema: GenMessage<UpdateChatUpdated> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 14);
+  messageDesc(file_app_v1_updates, 15);
 
 /**
  * Coalesced periodic hint that a sync_mode=large chat has new updates; the
@@ -701,7 +738,7 @@ export type UpdateChatActivity = Message<"app.v1.UpdateChatActivity"> & {
  * Use `create(UpdateChatActivitySchema)` to create a new message.
  */
 export const UpdateChatActivitySchema: GenMessage<UpdateChatActivity> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 15);
+  messageDesc(file_app_v1_updates, 16);
 
 /**
  * A forum topic was created or changed (title, icon, pinned, closed,
@@ -721,7 +758,7 @@ export type UpdateTopicChanged = Message<"app.v1.UpdateTopicChanged"> & {
  * Use `create(UpdateTopicChangedSchema)` to create a new message.
  */
 export const UpdateTopicChangedSchema: GenMessage<UpdateTopicChanged> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 16);
+  messageDesc(file_app_v1_updates, 17);
 
 /**
  * The user muted or unmuted a chat (Dialog.mute_until).
@@ -745,7 +782,7 @@ export type UpdateDialogMute = Message<"app.v1.UpdateDialogMute"> & {
  * Use `create(UpdateDialogMuteSchema)` to create a new message.
  */
 export const UpdateDialogMuteSchema: GenMessage<UpdateDialogMute> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 17);
+  messageDesc(file_app_v1_updates, 18);
 
 /**
  * The user hid a chat from AI tools or showed it again
@@ -770,7 +807,7 @@ export type UpdateDialogHiddenFromAI = Message<"app.v1.UpdateDialogHiddenFromAI"
  * Use `create(UpdateDialogHiddenFromAISchema)` to create a new message.
  */
 export const UpdateDialogHiddenFromAISchema: GenMessage<UpdateDialogHiddenFromAI> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 18);
+  messageDesc(file_app_v1_updates, 19);
 
 /**
  * The user's pinned chats changed: the complete list, top first.
@@ -789,7 +826,7 @@ export type UpdatePinnedDialogs = Message<"app.v1.UpdatePinnedDialogs"> & {
  * Use `create(UpdatePinnedDialogsSchema)` to create a new message.
  */
 export const UpdatePinnedDialogsSchema: GenMessage<UpdatePinnedDialogs> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 19);
+  messageDesc(file_app_v1_updates, 20);
 
 /**
  * The chat left the user's list: its owner deleted it for every member
@@ -817,7 +854,7 @@ export type UpdateChatDeleted = Message<"app.v1.UpdateChatDeleted"> & {
  * Use `create(UpdateChatDeletedSchema)` to create a new message.
  */
 export const UpdateChatDeletedSchema: GenMessage<UpdateChatDeleted> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 20);
+  messageDesc(file_app_v1_updates, 21);
 
 /**
  * The user marked a chat as unread, or the mark went away (cleared by hand
@@ -842,7 +879,7 @@ export type UpdateDialogUnreadMark = Message<"app.v1.UpdateDialogUnreadMark"> & 
  * Use `create(UpdateDialogUnreadMarkSchema)` to create a new message.
  */
 export const UpdateDialogUnreadMarkSchema: GenMessage<UpdateDialogUnreadMark> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 21);
+  messageDesc(file_app_v1_updates, 22);
 
 /**
  * A user changed in a way others see (their account waits for deletion,
@@ -863,7 +900,7 @@ export type UpdateUserChanged = Message<"app.v1.UpdateUserChanged"> & {
  * Use `create(UpdateUserChangedSchema)` to create a new message.
  */
 export const UpdateUserChangedSchema: GenMessage<UpdateUserChanged> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 22);
+  messageDesc(file_app_v1_updates, 23);
 
 /**
  * The user's AI Agent projects or their workspaces changed on one of their
@@ -880,7 +917,7 @@ export type UpdateAgentProjectsChanged = Message<"app.v1.UpdateAgentProjectsChan
  * Use `create(UpdateAgentProjectsChangedSchema)` to create a new message.
  */
 export const UpdateAgentProjectsChangedSchema: GenMessage<UpdateAgentProjectsChanged> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 23);
+  messageDesc(file_app_v1_updates, 24);
 
 /**
  * The user's Advisor profile after a change (AdvisorService), complete.
@@ -899,7 +936,7 @@ export type UpdateAdvisorProfile = Message<"app.v1.UpdateAdvisorProfile"> & {
  * Use `create(UpdateAdvisorProfileSchema)` to create a new message.
  */
 export const UpdateAdvisorProfileSchema: GenMessage<UpdateAdvisorProfile> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 24);
+  messageDesc(file_app_v1_updates, 25);
 
 /**
  * The user's notification settings after a change, complete.
@@ -918,7 +955,7 @@ export type UpdateNotificationSettings = Message<"app.v1.UpdateNotificationSetti
  * Use `create(UpdateNotificationSettingsSchema)` to create a new message.
  */
 export const UpdateNotificationSettingsSchema: GenMessage<UpdateNotificationSettings> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 25);
+  messageDesc(file_app_v1_updates, 26);
 
 /**
  * @generated from message app.v1.UpdateSessionRevoked
@@ -940,7 +977,7 @@ export type UpdateSessionRevoked = Message<"app.v1.UpdateSessionRevoked"> & {
  * Use `create(UpdateSessionRevokedSchema)` to create a new message.
  */
 export const UpdateSessionRevokedSchema: GenMessage<UpdateSessionRevoked> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 26);
+  messageDesc(file_app_v1_updates, 27);
 
 /**
  * No updates since the given position. GetDifference returns it only when no
@@ -957,7 +994,7 @@ export type DifferenceEmpty = Message<"app.v1.DifferenceEmpty"> & {
  * Use `create(DifferenceEmptySchema)` to create a new message.
  */
 export const DifferenceEmptySchema: GenMessage<DifferenceEmpty> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 27);
+  messageDesc(file_app_v1_updates, 28);
 
 /**
  * Position of a sync_mode=large chat the user belongs to.
@@ -986,7 +1023,7 @@ export type LargeChatState = Message<"app.v1.LargeChatState"> & {
  * Use `create(LargeChatStateSchema)` to create a new message.
  */
 export const LargeChatStateSchema: GenMessage<LargeChatState> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 28);
+  messageDesc(file_app_v1_updates, 29);
 
 /**
  * Updates plus every user and chat they reference, so clients never render an
@@ -1028,7 +1065,7 @@ export type DifferenceUpdates = Message<"app.v1.DifferenceUpdates"> & {
  * Use `create(DifferenceUpdatesSchema)` to create a new message.
  */
 export const DifferenceUpdatesSchema: GenMessage<DifferenceUpdates> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 29);
+  messageDesc(file_app_v1_updates, 30);
 
 /**
  * The log no longer reaches back to the given position (retention passed or
@@ -1046,7 +1083,7 @@ export type DifferenceTooLong = Message<"app.v1.DifferenceTooLong"> & {
  * Use `create(DifferenceTooLongSchema)` to create a new message.
  */
 export const DifferenceTooLongSchema: GenMessage<DifferenceTooLong> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 30);
+  messageDesc(file_app_v1_updates, 31);
 
 /**
  * @generated from message app.v1.GetStateRequest
@@ -1059,7 +1096,7 @@ export type GetStateRequest = Message<"app.v1.GetStateRequest"> & {
  * Use `create(GetStateRequestSchema)` to create a new message.
  */
 export const GetStateRequestSchema: GenMessage<GetStateRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 31);
+  messageDesc(file_app_v1_updates, 32);
 
 /**
  * @generated from message app.v1.GetStateResponse
@@ -1076,7 +1113,7 @@ export type GetStateResponse = Message<"app.v1.GetStateResponse"> & {
  * Use `create(GetStateResponseSchema)` to create a new message.
  */
 export const GetStateResponseSchema: GenMessage<GetStateResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 32);
+  messageDesc(file_app_v1_updates, 33);
 
 /**
  * @generated from message app.v1.GetDifferenceRequest
@@ -1107,7 +1144,7 @@ export type GetDifferenceRequest = Message<"app.v1.GetDifferenceRequest"> & {
  * Use `create(GetDifferenceRequestSchema)` to create a new message.
  */
 export const GetDifferenceRequestSchema: GenMessage<GetDifferenceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 33);
+  messageDesc(file_app_v1_updates, 34);
 
 /**
  * @generated from message app.v1.GetDifferenceResponse
@@ -1159,7 +1196,7 @@ export type GetDifferenceResponse = Message<"app.v1.GetDifferenceResponse"> & {
  * Use `create(GetDifferenceResponseSchema)` to create a new message.
  */
 export const GetDifferenceResponseSchema: GenMessage<GetDifferenceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 34);
+  messageDesc(file_app_v1_updates, 35);
 
 /**
  * @generated from message app.v1.GetChatDifferenceRequest
@@ -1191,7 +1228,7 @@ export type GetChatDifferenceRequest = Message<"app.v1.GetChatDifferenceRequest"
  * Use `create(GetChatDifferenceRequestSchema)` to create a new message.
  */
 export const GetChatDifferenceRequestSchema: GenMessage<GetChatDifferenceRequest> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 35);
+  messageDesc(file_app_v1_updates, 36);
 
 /**
  * @generated from message app.v1.GetChatDifferenceResponse
@@ -1237,7 +1274,7 @@ export type GetChatDifferenceResponse = Message<"app.v1.GetChatDifferenceRespons
  * Use `create(GetChatDifferenceResponseSchema)` to create a new message.
  */
 export const GetChatDifferenceResponseSchema: GenMessage<GetChatDifferenceResponse> = /*@__PURE__*/
-  messageDesc(file_app_v1_updates, 36);
+  messageDesc(file_app_v1_updates, 37);
 
 /**
  * Catching up on missed updates.

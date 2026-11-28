@@ -142,6 +142,24 @@ var handlers = []handler{
 		},
 	},
 	{
+		// A poll is message content: its votes and its closing go the way messages do.
+		feature: feature.Messages,
+		match: func(ev bridge.Event) (string, bool) {
+			if ev.Poll == nil {
+				return "", false
+			}
+			return ev.Poll.Conversation, true
+		},
+		apply: func(r *runner, ctx context.Context, ev bridge.Event) (bool, error) {
+			return r.onPoll(ctx, ev, *ev.Poll)
+		},
+		ops: map[string]func(*runner, context.Context, *outboxRow) error{
+			"poll_vote":  func(r *runner, ctx context.Context, h *outboxRow) error { return r.doPollOp(ctx, h) },
+			"poll_close": func(r *runner, ctx context.Context, h *outboxRow) error { return r.doPollOp(ctx, h) },
+		},
+		poll: func(r *runner, ctx context.Context) error { return r.pollPolls(ctx) },
+	},
+	{
 		feature: feature.Reactions,
 		match: func(ev bridge.Event) (string, bool) {
 			if ev.Reactions == nil {

@@ -123,9 +123,9 @@ func (it *ImportTx) content(ctx context.Context, msg ImportMessage) (string, *ap
 	}
 	content := &appv1.Message{}
 	if msg.Content != nil {
-		content = &appv1.Message{Media: msg.Content.GetMedia(), ForwardFrom: msg.Content.GetForwardFrom()}
+		content = &appv1.Message{Media: msg.Content.GetMedia(), ForwardFrom: msg.Content.GetForwardFrom(), Poll: pollDefinition(msg.Content.GetPoll())}
 	}
-	hasMedia := len(media.MessageFiles(content)) > 0
+	hasMedia := len(media.MessageFiles(content)) > 0 || content.Poll != nil
 	text, ents, err := it.t.s.validateEntities(msg.Text, msg.Entities, hasMedia)
 	if err != nil && len(msg.Entities) > 0 {
 		// A span Chat does not accept (a link scheme it forbids, overlapping
@@ -356,6 +356,9 @@ func (it *ImportTx) Edit(ctx context.Context, seq int64, msg ImportMessage) (boo
 	}
 	if content.ForwardFrom == nil {
 		content.ForwardFrom = old.GetForwardFrom()
+	}
+	if content.Poll == nil {
+		content.Poll = old.GetPoll()
 	}
 	content.Silent = old.GetSilent()
 	if m.Text == text && sameContent(m.Content, content) {

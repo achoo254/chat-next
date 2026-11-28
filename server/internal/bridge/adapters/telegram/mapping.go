@@ -221,7 +221,7 @@ func mapMedia(m tg.MessageMediaClass) []bridge.Media {
 	case *tg.MessageMediaContact:
 		return []bridge.Media{{Kind: "contact"}}
 	case *tg.MessageMediaPoll:
-		return []bridge.Media{{Kind: "poll"}}
+		return nil // Message.Poll carries it
 	default:
 		return []bridge.Media{{Kind: "other"}}
 	}
@@ -288,6 +288,9 @@ func (b *peerBook) mapMessage(m tg.MessageClass, self int64) (bridge.Message, bo
 	}
 	for i := range out.Media {
 		out.Media[i].Ref = fmt.Sprintf("%s/%d", conv, msg.ID)
+	}
+	if p, ok := msg.Media.(*tg.MessageMediaPoll); ok {
+		out.Poll = mapPoll(p)
 	}
 	if h, ok := msg.GetReplyTo(); ok {
 		if rh, ok := h.(*tg.MessageReplyHeader); ok && rh.ReplyToMsgID != 0 && rh.ReplyToPeerID == nil && !startsTopic(rh) {

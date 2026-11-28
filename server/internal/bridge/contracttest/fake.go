@@ -58,6 +58,8 @@ type Fake struct {
 	pinCalls                                   []PinCall
 	reactions                                  map[string]map[string]string // conv/msg -> participant -> emoji
 	reactionCalls                              []string
+	polls                                      map[string]*bridge.PollResults // conv/msg -> state
+	pollCalls                                  []string
 	failPin                                    []error
 	failTopicEdit                              error
 	topicCreates                               []string
@@ -85,7 +87,7 @@ type Fake struct {
 // NewFake makes an app called name.
 func NewFake(name string) *Fake {
 	return &Fake{name: name, history: map[string][]bridge.Message{}, wake: make(chan struct{}, 1), pages: map[string]int{},
-		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, inviteReads: map[string]int{}, gone: map[string]bool{}, goneRefs: map[string]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
+		sentByRandom: map[int64]bridge.SentRef{}, topics: map[string][]bridge.Topic{}, pinned: map[string][]string{}, support: defaultSupport(), dialogs: map[string]bridge.DialogState{}, infos: map[string]bridge.GroupInfo{}, members: map[string][]bridge.Member{}, partial: map[string]bool{}, invites: map[string][]bridge.InviteLink{}, reactions: map[string]map[string]string{}, polls: map[string]*bridge.PollResults{}, topicByRandom: map[int64]string{}, photoBytes: map[string][]byte{}, refuse: map[string]bool{}, inviteReads: map[string]int{}, gone: map[string]bool{}, goneRefs: map[string]string{}, DedupeRandomID: true, EchoSent: true, nextID: 900000}
 }
 
 func defaultSupport() map[feature.Feature]feature.Support {

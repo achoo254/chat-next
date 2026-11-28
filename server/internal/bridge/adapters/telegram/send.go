@@ -48,6 +48,13 @@ func (a *Adapter) SendMessage(ctx context.Context, acct bridge.Account, m bridge
 		return bridge.SentRef{}, err
 	}
 	send := func(reply tg.InputReplyToClass) (tg.UpdatesClass, []int64, error) {
+		if m.Poll != nil {
+			u, err := c.sendPoll(ctx, peer, m, reply)
+			if err != nil {
+				return nil, nil, translatePoll(err)
+			}
+			return u, []int64{m.RandomID}, nil
+		}
 		if len(m.Media) > 0 {
 			return c.sendFiles(ctx, peer, m, ents, reply)
 		}

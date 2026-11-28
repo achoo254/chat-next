@@ -149,6 +149,29 @@ func (s *messagesService) SetReaction(ctx context.Context, req *connect.Request[
 	})
 }
 
+// SendPoll over /rpc is the composer's poll form (chat.FromComposer), like SendMessage.
+func (s *messagesService) SendPoll(ctx context.Context, req *connect.Request[appv1.SendPollRequest]) (*connect.Response[appv1.SendPollResponse], error) {
+	ctx = sentWith(ctx)
+	if !calledInProcess(ctx) {
+		ctx = chat.FromComposer(ctx)
+	}
+	return call(ctx, s.logger, req, func(me int64, m *appv1.SendPollRequest) (*appv1.SendPollResponse, error) {
+		return s.chat.SendPoll(ctx, me, m)
+	})
+}
+
+func (s *messagesService) VotePoll(ctx context.Context, req *connect.Request[appv1.VotePollRequest]) (*connect.Response[appv1.VotePollResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.VotePollRequest) (*appv1.VotePollResponse, error) {
+		return s.chat.VotePoll(ctx, me, m)
+	})
+}
+
+func (s *messagesService) ClosePoll(ctx context.Context, req *connect.Request[appv1.ClosePollRequest]) (*connect.Response[appv1.ClosePollResponse], error) {
+	return call(ctx, s.logger, req, func(me int64, m *appv1.ClosePollRequest) (*appv1.ClosePollResponse, error) {
+		return s.chat.ClosePoll(ctx, me, m)
+	})
+}
+
 func (s *messagesService) GetHistory(ctx context.Context, req *connect.Request[appv1.GetHistoryRequest]) (*connect.Response[appv1.GetHistoryResponse], error) {
 	return call(ctx, s.logger, req, func(me int64, m *appv1.GetHistoryRequest) (*appv1.GetHistoryResponse, error) {
 		return s.chat.GetHistory(ctx, me, m)

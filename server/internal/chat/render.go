@@ -930,6 +930,8 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 				addKey(k.MessageEdit.GetMessage().GetChatId(), k.MessageEdit.GetMessage().GetSeq())
 			case *appv1.Update_Reaction:
 				addKey(k.Reaction.GetChatId(), k.Reaction.GetSeq())
+			case *appv1.Update_Poll:
+				addKey(k.Poll.GetChatId(), k.Poll.GetSeq())
 			default:
 			}
 		}
@@ -943,6 +945,10 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 		return nil, err
 	}
 	reactions, err := loadReactions(ctx, q, keys, viewers)
+	if err != nil {
+		return nil, err
+	}
+	polls, err := loadPolls(ctx, q, keys, viewers)
 	if err != nil {
 		return nil, err
 	}
@@ -992,6 +998,7 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 				if err != nil {
 					return nil, err
 				}
+				polls.fill(rendered, viewer)
 				k.MessageNew.Message = rendered
 				ents.addUsers(viewer, referencedUsers(rendered)...)
 			case *appv1.Update_MessageEdit:
@@ -1004,6 +1011,7 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 				if err != nil {
 					return nil, err
 				}
+				polls.fill(rendered, viewer)
 				k.MessageEdit.Message = rendered
 				ents.addUsers(viewer, referencedUsers(rendered)...)
 			case *appv1.Update_Reaction:
@@ -1014,6 +1022,19 @@ func (s *Service) renderFrames(ctx context.Context, q querier, viewers []int64, 
 				}
 				k.Reaction.Reactions = reactions.forViewer(msgKey{chatID, k.Reaction.GetSeq()}, viewer)
 				ents.addUsers(viewer, recentReactors(k.Reaction.GetReactions())...)
+			case *appv1.Update_Poll:
+				// Results are current: a former member gets none.
+				msg := visible(viewer, m, chatID, k.Poll.GetSeq())
+				if m.Left || msg == nil {
+					u.Kind = nil
+					continue
+				}
+				rendered, err := msg.render(viewer, nil)
+				if err != nil {
+					return nil, err
+				}
+				polls.fill(rendered, viewer)
+				k.Poll.Poll = rendered.GetPoll()
 			case *appv1.Update_MemberAdded:
 				ents.addUsers(viewer, k.MemberAdded.GetUserIds()...)
 				ents.addUsers(viewer, k.MemberAdded.GetInviterId())
@@ -1070,6 +1091,10 @@ func (s *Service) renderMessages(ctx context.Context, q querier, viewer int64, r
 	if err != nil {
 		return nil, nil, err
 	}
+	polls, err := loadPolls(ctx, q, keys, []int64{viewer})
+	if err != nil {
+		return nil, nil, err
+	}
 	ents := newEntitySet()
 	out := make([]*appv1.Message, 0, len(rows))
 	for _, m := range rows {
@@ -1077,6 +1102,7 @@ func (s *Service) renderMessages(ctx context.Context, q querier, viewer int64, r
 		if err != nil {
 			return nil, nil, err
 		}
+		polls.fill(msg, viewer)
 		out = append(out, msg)
 		ents.addUsers(viewer, referencedUsers(msg)...)
 	}

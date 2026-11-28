@@ -82,6 +82,7 @@ message Update {
     UpdateAdvisorProfile advisor_profile = 32;
     // 33 was people_changed (linking users into one person), removed.
     UpdateDialogHiddenFromAI dialog_hidden_from_ai = 34;
+    UpdatePoll poll = 35;
   }
 }
 
@@ -118,6 +119,14 @@ message UpdateReaction {
   int64 seq = 2 [jstype = JS_NUMBER];
   // Full aggregated reactions after the change.
   repeated ReactionCount reactions = 3;
+}
+
+// The results (or the closing) of a poll changed.
+message UpdatePoll {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  // The poll as the receiver sees it now.
+  Poll poll = 3;
 }
 
 message UpdateRead {

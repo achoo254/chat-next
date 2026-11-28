@@ -439,6 +439,12 @@ func (r *runner) buildOut(ctx context.Context, h *outboxRow, outs []*chat.Outbou
 		return msg, err
 	}
 	msg.Topic = topic
+	if p := first.Poll; p != nil {
+		msg.Text, msg.Entities = "", nil
+		msg.Poll = &bridge.OutPoll{Question: p.GetQuestion(), Options: p.GetOptions(), Multiple: p.GetMultiple(),
+			Public: p.GetPublicVoters(), Quiz: p.GetQuiz(), Correct: intsOf(p.GetCorrect()), Explanation: p.GetExplanation()}
+		return msg, nil
+	}
 	var fileIDs []string
 	for _, o := range outs {
 		if o.FileID != "" {

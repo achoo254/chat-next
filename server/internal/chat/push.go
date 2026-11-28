@@ -190,7 +190,7 @@ func (s *Service) PushMessages(ctx context.Context, rows []OutboxRow) ([]PushMes
 		p := PushMessage{
 			OutboxID: r.ID, At: r.CreatedAt, ChatID: r.ChatID, ChatType: c.typ, ChatTitle: c.title,
 			SenderID: last.GetFromId(), SenderName: names[last.GetFromId()], Seq: last.GetSeq(),
-			Text: cutRunes(last.GetText(), pushTextMax), MediaKind: last.GetMedia().GetKind(), FileName: last.GetMedia().GetFileName(),
+			Text: cutRunes(pushText(last), pushTextMax), MediaKind: last.GetMedia().GetKind(), FileName: last.GetMedia().GetFileName(),
 		}
 		if label := last.GetIntegrationLabel(); label != "" {
 			p.SenderName = label
@@ -302,4 +302,12 @@ func deref[T any](p *T) T {
 		return zero
 	}
 	return *p
+}
+
+// pushText is what a notification says of a message: its text, or a poll's question.
+func pushText(m *appv1.Message) string {
+	if q := m.GetPoll().GetQuestion(); q != "" {
+		return "📊 " + q
+	}
+	return m.GetText()
 }

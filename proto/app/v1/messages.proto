@@ -70,6 +70,13 @@ service MessagesService {
   // Who reacted to a message, newest first, optionally for one emoji. Only
   // current members, for messages they can see; in channels admins only.
   rpc GetMessageReactions(GetMessageReactionsRequest) returns (GetMessageReactionsResponse);
+  // Posts a poll (Message.poll) under the same rules as SendMessage.
+  rpc SendPoll(SendPollRequest) returns (SendPollResponse);
+  // Sets the caller's answer to a poll; no options takes the vote back. A
+  // closed poll, or a quiz already answered, refuses (FAILED_PRECONDITION).
+  rpc VotePoll(VotePollRequest) returns (VotePollResponse);
+  // Closes a poll for good: only its sender may.
+  rpc ClosePoll(ClosePollRequest) returns (ClosePollResponse);
 }
 
 enum EntityType {
@@ -199,6 +206,32 @@ message ReactionCount {
   // message. Empty in channels unless the caller is an admin (channel
   // members are private), like GetMessageReactions.
   repeated int64 recent_user_ids = 4 [jstype = JS_NUMBER];
+}
+
+// A poll. question, options and the flags are what the sender posted; the
+// rest is filled for the caller when the message is rendered.
+message Poll {
+  string question = 1;
+  // 2 to 10 answers, in order; an answer is named by its index.
+  repeated string options = 2;
+  // Several answers may be chosen.
+  bool multiple = 3;
+  // Members see who chose what (in Chat: only the counts are shown).
+  bool public_voters = 4;
+  // A quiz: one answer is right, a vote cannot be taken back.
+  bool quiz = 5;
+  // Quiz only: the right answers and why. Set once the caller answered, sent
+  // the poll, or it closed; empty before.
+  repeated int32 correct = 6;
+  string explanation = 7;
+  // Nobody may vote any more.
+  bool closed = 8;
+  // Votes of each answer, by index.
+  repeated int32 counts = 9;
+  // People who voted.
+  int32 voters = 10;
+  // The caller's answers; empty when the caller did not vote.
+  repeated int32 chosen = 11;
 }
 
 message ActionChatCreated {
@@ -344,6 +377,8 @@ message Message {
   // The sender posted it through an AI tool (the MCP endpoint). Set only in
   // the sender's own copy: others, and bridged apps, never see it.
   bool sent_via_ai = 23;
+  // A poll instead of text and media.
+  Poll poll = 24;
 }
 
 // Position of the caller's update logs right after a mutation, so the client
@@ -563,6 +598,50 @@ message GetPinnedMessagesResponse {
   int32 count = 3;
   // More pinned messages older than the last one returned.
   bool has_more = 4;
+}
+
+message SendPollRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  string question = 2;
+  repeated string options = 3;
+  bool multiple = 4;
+  bool public_voters = 5;
+  bool quiz = 6;
+  // Quiz: the index of the right answer.
+  int32 correct = 7;
+  // Quiz: shown with the right answer; may be empty.
+  string explanation = 8;
+  int64 reply_to_seq = 9 [jstype = JS_NUMBER];
+  int64 random_id = 10 [jstype = JS_NUMBER];
+  int64 topic_id = 11 [jstype = JS_NUMBER];
+}
+
+message VotePollRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+  // Indexes of the chosen answers; empty takes the vote back.
+  repeated int32 options = 3;
+}
+
+message ClosePollRequest {
+  int64 chat_id = 1 [jstype = JS_NUMBER];
+  int64 seq = 2 [jstype = JS_NUMBER];
+}
+
+message SendPollResponse {
+  Message message = 1;
+  SyncAck ack = 2;
+}
+
+message ClosePollResponse {
+  Poll poll = 1;
+  SyncAck ack = 2;
+}
+
+message VotePollResponse {
+  // The poll as the caller sees it now.
+  Poll poll = 1;
+  SyncAck ack = 2;
 }
 
 message SetReactionRequest {

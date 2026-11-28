@@ -19,6 +19,7 @@ const (
 	kindMessageDelete     = "message_delete"
 	kindMessageHidden     = "message_hidden"
 	kindReaction          = "reaction"
+	kindPoll              = "poll"
 	kindRead              = "read"
 	kindPin               = "pin"
 	kindMemberAdded       = "member_added"
@@ -325,6 +326,8 @@ func encodeStored(u *appv1.Update) ([]byte, error) {
 		k.MessageEdit.Message = messageRef(k.MessageEdit.GetMessage())
 	case *appv1.Update_Reaction:
 		k.Reaction.Reactions = nil
+	case *appv1.Update_Poll:
+		k.Poll.Poll = nil
 	default:
 	}
 	b, err := proto.Marshal(stored)
@@ -359,6 +362,8 @@ func updateChatID(u *appv1.Update) int64 {
 		return k.MessageHidden.GetChatId()
 	case *appv1.Update_Reaction:
 		return k.Reaction.GetChatId()
+	case *appv1.Update_Poll:
+		return k.Poll.GetChatId()
 	case *appv1.Update_Read:
 		return k.Read.GetChatId()
 	case *appv1.Update_Pin:

@@ -173,6 +173,8 @@ type runner struct {
 	infoTick int
 	// reactionsTick counts the same looks, to read the reactions of the newest messages once in a while.
 	reactionsTick int
+	// pollsTick counts the same looks, to read the open polls once in a while.
+	pollsTick int
 	// pending are the chats waiting for their first import, oldest queued first.
 	pending []*chatLink
 	// stickerQueue are the chats whose label-only stickers are given their picture
@@ -737,6 +739,9 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 			continue
 		}
 		content := files[m.ID]
+		if m.Poll != nil {
+			content = &appv1.Message{Poll: pollContent(m.Poll)}
+		}
 		label := labelFor(m, content != nil)
 		if m.Forward != nil {
 			header, err := r.forwardHeader(ctx, m.Forward)
@@ -748,7 +753,7 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 			}
 			content.ForwardFrom = header
 		}
-		if label == "" && m.Text == "" && files[m.ID] == nil {
+		if label == "" && m.Text == "" && files[m.ID] == nil && m.Poll == nil {
 			label = "[Tin nhắn không hỗ trợ]" // an empty message cannot be stored
 		}
 		labelled, moved := withLabel(label, m.Text, m.Entities)
@@ -771,6 +776,13 @@ func (r *runner) appendMessages(ctx context.Context, it *chat.ImportTx, l *chatL
 	seqs, err := it.Append(ctx, imports)
 	if err != nil {
 		return err
+	}
+	for i, m := range fresh {
+		if m.Poll != nil {
+			if _, err := it.SetPoll(ctx, seqs[i], importedPoll(m.Poll.Results), false); err != nil {
+				return err
+			}
+		}
 	}
 	for i, m := range fresh {
 		k := messageKey{r.account.ID, l.ExternalChat, m.ID}
@@ -907,6 +919,11 @@ func (r *runner) applyEdit(ctx context.Context, it *chat.ImportTx, k messageKey,
 	text, ents := mapContent(m.Text, m.Entities, r.e.chat.MessageLengthMax(), r.userOf)
 	if _, err := it.Edit(ctx, have.Seq, chat.ImportMessage{Text: text, Entities: ents, Buttons: chatButtons(m.Buttons), OwnerMention: ownerMention(m.Mention)}); err != nil {
 		return err
+	}
+	if m.Poll != nil {
+		if err := r.setPoll(ctx, it, have.Seq, m.Poll.Results); err != nil {
+			return err
+		}
 	}
 	return setVersion(ctx, it.Tx(), k, m.Version)
 }

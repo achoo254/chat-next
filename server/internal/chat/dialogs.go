@@ -401,6 +401,8 @@ func (s *Service) purgeDeletedChats(ctx context.Context) (int, error) {
 		}
 		for _, sql := range []string{
 			`DELETE FROM message_reactions WHERE chat_id = $1`,
+			`DELETE FROM poll_votes WHERE chat_id = $1`,
+			`DELETE FROM message_polls WHERE chat_id = $1`,
 			`DELETE FROM message_files WHERE chat_id = $1`,
 			`DELETE FROM user_hidden_messages WHERE chat_id = $1`,
 			`DELETE FROM message_mentions WHERE chat_id = $1`,

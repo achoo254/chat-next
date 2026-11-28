@@ -91,7 +91,6 @@ func TestMapMediaKinds(t *testing.T) {
 		"gif":      doc(&tg.DocumentAttributeAnimated{}),
 		"document": doc(&tg.DocumentAttributeFilename{FileName: "a.pdf"}),
 		"location": &tg.MessageMediaGeo{},
-		"poll":     &tg.MessageMediaPoll{},
 	}
 	for want, m := range cases {
 		got := mapMedia(m)
